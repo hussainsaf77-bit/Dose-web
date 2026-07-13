@@ -41,3 +41,4 @@ async def chat(req: ChatRequest):
     data = r.json()
     text = data.get("content", [{}])[0].get("text", "عذراً، تعذّر الحصول على رد.")
     return {"reply": text}
+# updated
