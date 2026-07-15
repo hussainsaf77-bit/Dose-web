@@ -266,6 +266,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
     <div class="logo-pill">💊 جرعة</div>
   </div>
   <div class="header-actions">
+    <button class="lang-btn" onclick="toggleLang()" id="langBtn" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:5px 12px;border-radius:20px;cursor:pointer;font-size:.8rem;font-weight:700;">EN</button>
     <button class="btn-tg" onclick="openTelegram()">
       <span>✈️</span> بوت تيليغرام
     </button>
@@ -1523,16 +1524,17 @@ async function sendChat() {
 
   try {
     const patCtx = patient.name ? `بيانات المريض: الاسم: ${patient.name}, العمر: ${patient.age}, الوزن: ${patient.weight}كغ, الأمراض: ${patient.diseases || "لا يوجد"}, الحساسية: ${patient.allergy || "لا يوجد"}.` : "";
-    const r = await fetch("/.netlify/functions/chat", {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        message: q,
-        patient_context: patCtx
+        model: "claude-sonnet-4-6", max_tokens: 1000,
+        system: `أنت صيدلاني طبي متخصص تقدم معلومات دوائية دقيقة باللغة العربية. ردودك مفيدة وواضحة وتشمل: الجرعة، الاستخدام، الآثار الجانبية، التحذيرات. دائماً أنهِ بنصيحة مراجعة الطبيب. لا تتجاوز 300 كلمة. ${patCtx}`,
+        messages: [{ role: "user", content: q }]
       })
     });
     const data = await r.json();
-    const text = data.reply || "عذراً، تعذّر الحصول على رد.";
+    const text = data.content?.map(b => b.text || "").join("") || "عذراً، تعذّر الحصول على رد.";
     document.getElementById(lid).innerHTML = text.replace(/\n/g, "<br>");
   } catch (e) {
     document.getElementById(lid).innerHTML = "⚠️ تعذّر الاتصال. تأكد من الإنترنت.";
