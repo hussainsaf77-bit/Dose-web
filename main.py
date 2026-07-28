@@ -79,3 +79,7 @@ async def checkout(req: CheckoutRequest):
     data = await create_checkout(req.price_id)
     return data
 # updated
+
+@app.get("/test123")
+def test123():
+    return {"message": "Render is using the latest code"}
