@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from database import supabase
+import traceback
 
 router = APIRouter(prefix="/api", tags=["Authentication"])
 
@@ -23,6 +24,8 @@ async def register(data: RegisterRequest):
             "password": data.password,
         })
 
+        print("SUPABASE RESULT:", result)
+
         if result.user is None:
             raise HTTPException(status_code=400, detail="Registration failed")
 
@@ -43,4 +46,5 @@ async def register(data: RegisterRequest):
         }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=repr(e))
