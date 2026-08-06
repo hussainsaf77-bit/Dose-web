@@ -135,6 +135,24 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
 .macro-bar-bg{background:var(--line);border-radius:4px;height:7px;}
 .macro-bar-fill{height:100%;border-radius:4px;transition:width .6s ease;}
 @media(max-width:600px){main{padding:16px 10px 80px;}.card{padding:16px;}}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:white;border-radius:20px;padding:28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.modal-logo{text-align:center;margin-bottom:20px;}
+.modal-logo span{background:#0d9488;color:white;padding:6px 16px;border-radius:50px;font-size:1.1rem;font-weight:900;}
+.modal-tabs{display:flex;gap:0;margin-bottom:18px;border-radius:10px;overflow:hidden;border:1.5px solid #e2e8f0;}
+.modal-tab{flex:1;padding:9px;border:none;background:#f8fafc;cursor:pointer;font-size:.85rem;font-weight:700;color:#64748b;font-family:inherit;}
+.modal-tab.active{background:#0d9488;color:white;}
+.modal-field{margin-bottom:12px;}
+.modal-field label{display:block;font-weight:700;font-size:.8rem;color:#334155;margin-bottom:3px;}
+.modal-field input,.modal-field select{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.88rem;outline:none;font-family:inherit;}
+.modal-field input:focus{border-color:#0d9488;}
+.modal-submit{width:100%;padding:11px;background:#0d9488;color:white;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;}
+.modal-msg{margin-top:10px;padding:8px;border-radius:8px;font-size:.8rem;text-align:center;}
+.modal-msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+.modal-msg-err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
+.auth-btn{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);color:white;padding:5px 12px;border-radius:20px;cursor:pointer;font-size:.8rem;font-weight:700;}
 </style>
 </head>
 <body>
@@ -144,6 +162,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
 <header>
   <div class="logo"><div class="logo-pill">💊 <span id="logoText">جرعة</span></div></div>
   <div class="header-right">
+    <button class="auth-btn" onclick="openAuth()" id="authBtn">👤</button>
     <button class="lang-btn" onclick="toggleLang()" id="langBtn">EN</button>
     <button class="tg-btn" onclick="openTelegram()">✈️ <span id="tgBtnText">البوت</span></button>
   </div>
@@ -964,7 +983,40 @@ function showPatient(){
 function exportPatient(){
   if(!patient.name){toast('⚠️');return;}
   const w=window.open('','_blank');
-  w.document.write(`<html dir="${lang==='ar'?'rtl':'ltr'}"><head><title>${lang==='ar'?'ملف المريض':'Patient File'}</title></head><body style="font-family:Arial;padding:30px;direction:${lang==='ar'?'rtl':'ltr'}"><h1 style="color:#0d9488;">💊 ${lang==='ar'?'ملف المريض — جرعة':'Patient File — Dose'}</h1><p><b>${t('pNameLabel')}:</b> ${patient.name}</p><p><b>${t('pAgeLabel')}:</b> ${patient.age}</p><p><b>${t('pWtLabel')}:</b> ${patient.weight} kg</p><p><b>${t('pAllergyLabel')}:</b> <span style="color:red">${patient.allergy||'—'}</span></p><p><b>${t('pDisLabel')}:</b> ${patient.diseases||'—'}</p><p><b>${t('pMedsLabel')}:</b> ${patient.meds||'—'}</p><hr><small>${new Date().toLocaleString()}</small></body></html>`);
+  w.document.write(`<html dir="${lang==='ar'?'rtl':'ltr'}"><head><title>${lang==='ar'?'ملف المريض':'Patient File'}</title></head><body style="font-family:Arial;padding:30px;direction:${lang==='ar'?'rtl':'ltr'}"><h1 style="color:#0d9488;">💊 ${lang==='ar'?'ملف المريض — جرعة':'Patient File — Dose'}</h1><p><b>${t('pNameLabel')}:</b> ${patient.name}</p><p><b>${t('pAgeLabel')}:</b> ${patient.age}</p><p><b>${t('pWtLabel')}:</b> ${patient.weight} kg</p><p><b>${t('pAllergyLabel')}:</b> <span style="color:red">${patient.allergy||'—'}</span></p><p><b>${t('pDisLabel')}:</b> ${patient.diseases||'—'}</p><p><b>${t('pMedsLabel')}:</b> ${patient.meds||'—'}</p><hr><small>${new Date().toLocaleString()}</small>
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal" onclick="closeAuthOutside(event)">
+  <div class="modal-box">
+    <div class="modal-logo"><span>💊 جرعة | Dose</span></div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchAuthTab('login')">دخول</button>
+      <button class="modal-tab" onclick="switchAuthTab('register')">حساب جديد</button>
+    </div>
+    <div id="authLoginForm">
+      <div class="modal-field"><label>البريد الإلكتروني</label><input type="email" id="authEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="modal-field"><label>كلمة المرور</label><input type="password" id="authPass" placeholder="••••••••"></div>
+      <button class="modal-submit" onclick="doLogin()">🔐 دخول</button>
+    </div>
+    <div id="authRegisterForm" style="display:none;">
+      <div class="modal-field"><label>الاسم</label><input type="text" id="authName" placeholder="محمد أحمد"></div>
+      <div class="modal-field"><label>البريد الإلكتروني</label><input type="email" id="authRegEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="modal-field"><label>كلمة المرور</label><input type="password" id="authRegPass" placeholder="8 أحرف على الأقل"></div>
+      <div class="modal-field"><label>المهنة</label>
+        <select id="authRole">
+          <option value="user">مستخدم عام</option>
+          <option value="doctor">طبيب</option>
+          <option value="pharmacist">صيدلاني</option>
+          <option value="nurse">ممرض/ة</option>
+          <option value="student">طالب طب</option>
+        </select>
+      </div>
+      <button class="modal-submit" onclick="doRegister()">✅ إنشاء حساب</button>
+    </div>
+    <div id="authMsg"></div>
+  </div>
+</div>
+
+</body></html>`);
   w.document.close();w.print();
 }
 
@@ -1054,7 +1106,102 @@ function updateWaitlistCount(){
 function openTelegram(){window.open('https://t.me/Drugscalculat_bot','_blank');}
 function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),3000);}
 
+
+// ══ SUPABASE AUTH ══
+const SB_URL='https://finwslipvvasokmuxdla.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbndzbGlwdnZhc29rbXV4ZGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwMDI5NDMsImV4cCI6MjA2MTU3ODk0M30.v3bx3i2qOLPJiECTgBPJ6EiDKUfJTdL4cBKBEFPRuAA';
+
+async function sbFetch(path,method='GET',body=null){
+  const h={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+  const r=await fetch(SB_URL+path,{method,headers:h,body:body?JSON.stringify(body):null});
+  return r.json();
+}
+
+function openAuth(){document.getElementById('authModal').classList.add('open');}
+function closeAuth(){document.getElementById('authModal').classList.remove('open');}
+function closeAuthOutside(e){if(e.target===document.getElementById('authModal'))closeAuth();}
+function switchAuthTab(tab){
+  document.getElementById('authLoginForm').style.display=tab==='login'?'block':'none';
+  document.getElementById('authRegisterForm').style.display=tab==='register'?'block':'none';
+  document.querySelectorAll('.modal-tab').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
+  document.getElementById('authMsg').innerHTML='';
+}
+
+async function doLogin(){
+  const email=document.getElementById('authEmail').value.trim();
+  const pass=document.getElementById('authPass').value;
+  const msg=document.getElementById('authMsg');
+  if(!email||!pass){msg.innerHTML='<div class="modal-msg modal-msg-err">أدخل البريد وكلمة المرور</div>';return;}
+  const r=await fetch(SB_URL+'/auth/v1/token?grant_type=password',{
+    method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},
+    body:JSON.stringify({email,password:pass})
+  });
+  const d=await r.json();
+  if(d.error){msg.innerHTML='<div class="modal-msg modal-msg-err">❌ '+d.error_description+'</div>';return;}
+  localStorage.setItem('dose_token',d.access_token);
+  localStorage.setItem('dose_user',JSON.stringify(d.user));
+  document.getElementById('authBtn').textContent='✅ '+d.user.email.split('@')[0];
+  msg.innerHTML='<div class="modal-msg modal-msg-ok">✅ تم الدخول!</div>';
+  setTimeout(closeAuth,1500);
+}
+
+async function doRegister(){
+  const name=document.getElementById('authName').value.trim();
+  const email=document.getElementById('authRegEmail').value.trim();
+  const pass=document.getElementById('authRegPass').value;
+  const role=document.getElementById('authRole').value;
+  const msg=document.getElementById('authMsg');
+  if(!name||!email||!pass){msg.innerHTML='<div class="modal-msg modal-msg-err">أدخل جميع البيانات</div>';return;}
+  if(pass.length<8){msg.innerHTML='<div class="modal-msg modal-msg-err">كلمة المرور 8 أحرف على الأقل</div>';return;}
+  const r=await fetch(SB_URL+'/auth/v1/signup',{
+    method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY},
+    body:JSON.stringify({email,password:pass,data:{name,role}})
+  });
+  const d=await r.json();
+  if(d.error){msg.innerHTML='<div class="modal-msg modal-msg-err">❌ '+d.error+'</div>';return;}
+  msg.innerHTML='<div class="modal-msg modal-msg-ok">🎉 تم إنشاء الحساب! تحقق من بريدك للتفعيل</div>';
+}
+
+// تحقق من الجلسة
+const savedUser=localStorage.getItem('dose_user');
+if(savedUser){
+  try{const u=JSON.parse(savedUser);document.getElementById('authBtn').textContent='✅ '+u.email.split('@')[0];}catch(e){}
+}
+
 init();
 </script>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal" onclick="closeAuthOutside(event)">
+  <div class="modal-box">
+    <div class="modal-logo"><span>💊 جرعة | Dose</span></div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchAuthTab('login')">دخول</button>
+      <button class="modal-tab" onclick="switchAuthTab('register')">حساب جديد</button>
+    </div>
+    <div id="authLoginForm">
+      <div class="modal-field"><label>البريد الإلكتروني</label><input type="email" id="authEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="modal-field"><label>كلمة المرور</label><input type="password" id="authPass" placeholder="••••••••"></div>
+      <button class="modal-submit" onclick="doLogin()">🔐 دخول</button>
+    </div>
+    <div id="authRegisterForm" style="display:none;">
+      <div class="modal-field"><label>الاسم</label><input type="text" id="authName" placeholder="محمد أحمد"></div>
+      <div class="modal-field"><label>البريد الإلكتروني</label><input type="email" id="authRegEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="modal-field"><label>كلمة المرور</label><input type="password" id="authRegPass" placeholder="8 أحرف على الأقل"></div>
+      <div class="modal-field"><label>المهنة</label>
+        <select id="authRole">
+          <option value="user">مستخدم عام</option>
+          <option value="doctor">طبيب</option>
+          <option value="pharmacist">صيدلاني</option>
+          <option value="nurse">ممرض/ة</option>
+          <option value="student">طالب طب</option>
+        </select>
+      </div>
+      <button class="modal-submit" onclick="doRegister()">✅ إنشاء حساب</button>
+    </div>
+    <div id="authMsg"></div>
+  </div>
+</div>
+
 </body>
 </html>
