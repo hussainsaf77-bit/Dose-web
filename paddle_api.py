@@ -16,7 +16,7 @@ HEADERS = {
 }
 
 
-async def create_checkout(price_id: str):
+async def create_checkout(price_id: str, uid: str, email: str, plan: str):
     url = f"{BASE_URL}/transactions"
 
     payload = {
@@ -25,7 +25,14 @@ async def create_checkout(price_id: str):
                 "price_id": price_id,
                 "quantity": 1
             }
-        ]
+        ],
+        "customer": {
+            "email": email
+        },
+        "custom_data": {
+            "uid": uid,
+            "plan": plan
+        }
     }
 
     async with httpx.AsyncClient(timeout=30) as client:

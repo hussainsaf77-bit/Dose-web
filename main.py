@@ -13,11 +13,13 @@ from pydantic import BaseModel
 import httpx, os
 
 from auth import router as auth_router
+from webhook import router as webhook_router
 from paddle_api import create_checkout
 
 app = FastAPI()
 
 app.include_router(auth_router)
+app.include_router(webhook_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,6 +40,9 @@ class ChatRequest(BaseModel):
 
 class CheckoutRequest(BaseModel):
     price_id: str
+    uid: str
+    email: str
+    plan: str
 
 
 @app.get("/")
@@ -85,7 +90,12 @@ async def chat(req: ChatRequest):
 
 @app.post("/api/create-checkout")
 async def checkout(req: CheckoutRequest):
-    data = await create_checkout(req.price_id)
+    data = await create_checkout(
+        req.price_id,
+        req.uid,
+        req.email,
+        req.plan
+    )
     return data
 # updated
 
