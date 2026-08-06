@@ -1,3 +1,12 @@
+
+PADDLE_PRICES = {
+    "weekly":    "pri_01kyf5s78t52cze4nf2bp45t7e",
+    "monthly":   "pri_01kyf5t6qes6s4bwdt4111j3vp",
+    "quarterly": "pri_01kyf5v6mvqmjwzzd97cjbkt6v",
+    "biannual":  "pri_01kyf5w0g2fhw82p6554dt6m45",
+    "annual":    "pri_01kyf5wszwtsneevhbqwqmwbj2",
+}
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
