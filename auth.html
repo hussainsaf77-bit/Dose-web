@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>تسجيل الدخول | جرعة</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#0f172a,#134e4a);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.card{background:white;border-radius:20px;padding:36px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.logo{text-align:center;margin-bottom:28px;}
+.logo-pill{background:#0d9488;color:white;padding:8px 20px;border-radius:50px;font-size:1.3rem;font-weight:900;display:inline-block;}
+.tabs{display:flex;gap:0;margin-bottom:24px;border-radius:10px;overflow:hidden;border:1.5px solid #e2e8f0;}
+.tab-btn{flex:1;padding:10px;border:none;background:#f8fafc;cursor:pointer;font-size:.9rem;font-weight:700;color:#64748b;font-family:inherit;transition:all .2s;}
+.tab-btn.active{background:#0d9488;color:white;}
+.field{margin-bottom:14px;}
+label{display:block;font-weight:700;font-size:.83rem;color:#334155;margin-bottom:4px;}
+input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;font-family:inherit;}
+input:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.1);}
+.btn{width:100%;padding:12px;background:#0d9488;color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;}
+.btn:hover{background:#0f766e;}
+.btn:disabled{opacity:.6;cursor:not-allowed;}
+.msg{margin-top:12px;padding:10px;border-radius:8px;font-size:.85rem;text-align:center;}
+.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
+.msg-err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
+.divider{text-align:center;color:#94a3b8;font-size:.82rem;margin:16px 0;}
+.tg-btn{width:100%;padding:11px;background:#0f172a;color:white;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
+.disclaimer{margin-top:16px;font-size:.72rem;color:#94a3b8;text-align:center;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><div class="logo-pill">💊 جرعة | Dose</div></div>
+  
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('login')">تسجيل الدخول</button>
+    <button class="tab-btn" onclick="showTab('register')">حساب جديد</button>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginForm">
+    <div class="field"><label>البريد الإلكتروني</label><input type="email" id="loginEmail" placeholder="example@email.com" dir="ltr"></div>
+    <div class="field"><label>كلمة المرور</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+    <button class="btn" onclick="login()">🔐 دخول</button>
+    <div class="divider">أو</div>
+    <button class="tg-btn" onclick="openTelegram()">✈️ استخدام بوت تيليغرام</button>
+    <div id="loginMsg"></div>
+  </div>
+
+  <!-- REGISTER -->
+  <div id="registerForm" style="display:none;">
+    <div class="field"><label>الاسم الكامل</label><input type="text" id="regName" placeholder="محمد أحمد"></div>
+    <div class="field"><label>البريد الإلكتروني</label><input type="email" id="regEmail" placeholder="example@email.com" dir="ltr"></div>
+    <div class="field"><label>كلمة المرور</label><input type="password" id="regPass" placeholder="8 أحرف على الأقل"></div>
+    <div class="field"><label>المهنة (اختياري)</label>
+      <select id="regRole" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;font-family:inherit;">
+        <option value="user">مستخدم عام</option>
+        <option value="doctor">طبيب</option>
+        <option value="pharmacist">صيدلاني</option>
+        <option value="nurse">ممرض/ة</option>
+        <option value="student">طالب طب</option>
+      </select>
+    </div>
+    <button class="btn" onclick="register()">✅ إنشاء حساب</button>
+    <div id="registerMsg"></div>
+  </div>
+
+  <div class="disclaimer">⚕️ للأغراض التعليمية فقط — باستخدامك توافق على شروط الخدمة</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://finwslipvvasokmuxdla.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbndzbGlwdnZhc29rbXV4ZGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwMDI5NDMsImV4cCI6MjA2MTU3ODk0M30.sb_publishable_7g9H8VEBGrgGcF9CEfLrNg_Bu6xlorY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function showTab(tab) {
+  document.getElementById('loginForm').style.display = tab==='login'?'block':'none';
+  document.getElementById('registerForm').style.display = tab==='register'?'block':'none';
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
+}
+
+async function login() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const msg = document.getElementById('loginMsg');
+  if(!email||!pass){msg.innerHTML='<div class="msg msg-err">أدخل البريد وكلمة المرور</div>';return;}
+  const {data,error} = await sb.auth.signInWithPassword({email,password:pass});
+  if(error){msg.innerHTML=`<div class="msg msg-err">❌ ${error.message}</div>`;return;}
+  localStorage.setItem('dose_user', JSON.stringify(data.user));
+  msg.innerHTML='<div class="msg msg-ok">✅ تم الدخول! جارٍ التحويل...</div>';
+  setTimeout(()=>window.location.href='https://hussainsaf77-bit.github.io/Dose-web/',1500);
+}
+
+async function register() {
+  const name = document.getElementById('regName').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  const role = document.getElementById('regRole').value;
+  const msg = document.getElementById('registerMsg');
+  if(!name||!email||!pass){msg.innerHTML='<div class="msg msg-err">أدخل جميع البيانات</div>';return;}
+  if(pass.length<8){msg.innerHTML='<div class="msg msg-err">كلمة المرور 8 أحرف على الأقل</div>';return;}
+  
+  const {data,error} = await sb.auth.signUp({email,password:pass,options:{data:{name,role}}});
+  if(error){msg.innerHTML=`<div class="msg msg-err">❌ ${error.message}</div>';return;}
+  
+  // حفظ في جدول users
+  if(data.user) {
+    await sb.from('users').upsert({
+      uid: data.user.id,
+      email,name,role,
+      plan:'free',
+      usage_count:0,
+      created_at: new Date().toISOString()
+    });
+  }
+  msg.innerHTML='<div class="msg msg-ok">🎉 تم إنشاء الحساب! تحقق من بريدك للتفعيل</div>';
+}
+
+function openTelegram(){window.open('https://t.me/Drugscalculat_bot','_blank');}
+
+// تحقق من تسجيل الدخول
+sb.auth.getSession().then(({data})=>{
+  if(data.session) window.location.href='https://hussainsaf77-bit.github.io/Dose-web/';
+});
+</script>
+</body>
+</html>
