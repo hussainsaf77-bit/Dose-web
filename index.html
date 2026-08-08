@@ -378,22 +378,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
       <p style="color:var(--muted);font-size:.9rem;" id="wlSubtitle">اشترك للحصول على كامل الميزات</p>
     </div>
     <div class="plan-cards">
-      <div class="plan-card" onclick="selectPlan(this,'monthly')">
+      <div class="plan-card" onclick="selectPlan(this,'monthly')" data-url="https://buy.paddle.com/product/pri_01kyf5t6qes6s4bwdt4111j3vp">
         <div class="plan-name" id="planM_name">شهري</div>
         <div class="plan-price">$2.99</div>
         <div style="font-size:.75rem;color:var(--muted);" id="planM_desc">كل شهر</div>
       </div>
-      <div class="plan-card selected" onclick="selectPlan(this,'quarterly')">
+      <div class="plan-card selected" onclick="selectPlan(this,'quarterly')" data-url="https://buy.paddle.com/product/pri_01kyf5v6mvqmjwzzd97cjbkt6v">
         <div class="plan-name" id="planQ_name">3 أشهر</div>
         <div class="plan-price">$6.99</div>
         <div class="plan-free" id="planQ_free">🎁 + شهر مجاني</div>
       </div>
-      <div class="plan-card" onclick="selectPlan(this,'biannual')">
+      <div class="plan-card" onclick="selectPlan(this,'biannual')" data-url="https://buy.paddle.com/product/pri_01kyf5w0g2fhw82p6554dt6m45">
         <div class="plan-name" id="planB_name">6 أشهر</div>
         <div class="plan-price">$11.99</div>
         <div class="plan-free" id="planB_free">🎁 + شهرين مجاناً</div>
       </div>
-      <div class="plan-card" onclick="selectPlan(this,'annual')">
+      <div class="plan-card" onclick="selectPlan(this,'annual')" data-url="https://buy.paddle.com/product/pri_01kyf5wszwtsneevhbqwqmwbj2">
         <div class="plan-name" id="planA_name">سنوي ⭐</div>
         <div class="plan-price">$19.99</div>
         <div class="plan-free" id="planA_free">🎁 + 6 أشهر مجاناً</div>
@@ -1087,6 +1087,16 @@ async function sendChat(){
 let selectedPlan='quarterly';
 function selectPlan(el,plan){document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');selectedPlan=plan;}
 function joinWaitlist(){
+  const name=document.getElementById('wlName').value.trim();
+  const email=document.getElementById('wlEmail').value.trim();
+  const msg=document.getElementById('wlMsg');
+  if(!name||!email||!email.includes('@')){msg.innerHTML='<div class="alert alert-warn">⚠️ أدخل الاسم والبريد</div>';return;}
+  // فتح رابط Paddle للباقة المختارة
+  const selected=document.querySelector('.plan-card.selected');
+  const url=selected?selected.dataset.url:'https://bit.ly/dose-web';
+  window.open(url,'_blank');
+  return;
+
   const name=document.getElementById('wlName').value.trim();
   const email=document.getElementById('wlEmail').value.trim();
   const msg=document.getElementById('wlMsg');
