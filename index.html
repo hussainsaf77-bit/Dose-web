@@ -1086,15 +1086,31 @@ async function sendChat(){
 
 let selectedPlan='quarterly';
 function selectPlan(el,plan){document.querySelectorAll('.plan-card').forEach(c=>c.classList.remove('selected'));el.classList.add('selected');selectedPlan=plan;}
-function joinWaitlist(){
+async function joinWaitlist(){
   const wlN=document.getElementById('wlName').value.trim();
   const wlE=document.getElementById('wlEmail').value.trim();
   const wlM=document.getElementById('wlMsg');
   if(!wlN||!wlE||!wlE.includes('@')){wlM.innerHTML='<div class="alert alert-warn">⚠️ أدخل الاسم والبريد</div>';return;}
-  const wlSel=document.querySelector('.plan-card.selected');
-  const wlUrl=wlSel?wlSel.dataset.url:'https://bit.ly/dose-web';
-  window.open(wlUrl,'_blank');
-  return;
+  const plans={monthly:'pri_01kyf5t6qes6s4bwdt4111j3vp',quarterly:'pri_01kyf5v6mvqmjwzzd97cjbkt6v',biannual:'pri_01kyf5w0g2fhw82p6554dt6m45',annual:'pri_01kyf5wszwtsneevhbqwqmwbj2',weekly:'pri_01kyf5s78t52cze4nf2bp45t7e'};
+  const sel=document.querySelector('.plan-card.selected');
+  const planName=sel?sel.onclick.toString().match(/'(\w+)'/)?.[1]:'monthly';
+  const priceId=plans[planName]||plans.monthly;
+  wlM.innerHTML='<div class="alert alert-info">⏳ جارٍ إنشاء رابط الدفع...</div>';
+  try{
+    const r=await fetch('https://dose-web-api.onrender.com/api/create-checkout',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({price_id:priceId,uid:wlE,email:wlE,plan:planName})
+    });
+    const d=await r.json();
+    if(d.data?.checkout?.url){
+      window.open(d.data.checkout.url,'_blank');
+      wlM.innerHTML='<div class="alert alert-ok">✅ تم! أكمل الدفع في النافذة الجديدة</div>';
+    }else{
+      wlM.innerHTML='<div class="alert alert-err">❌ حدث خطأ. حاول مرة أخرى</div>';
+    }
+  }catch(e){
+    wlM.innerHTML='<div class="alert alert-err">❌ تعذر الاتصال</div>';
+  }
 
   const name=document.getElementById('wlName').value.trim();
   const email=document.getElementById('wlEmail').value.trim();
