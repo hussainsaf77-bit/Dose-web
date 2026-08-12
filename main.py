@@ -99,6 +99,10 @@ async def checkout(req: CheckoutRequest):
     return data
 # updated
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/test123")
 def test123():
     return {"message": "Render is using the latest code"}
