@@ -1723,7 +1723,8 @@ async function joinWaitlist() {
       return;
     }
 
-    const checkoutUrl = data.checkout_url || (data.data && data.data.checkout && data.data.checkout.url);\n\n    if (!checkoutUrl) {
+    const checkoutUrl = data.checkout_url || (data.data && data.data.checkout && data.data.checkout.url);
+    if (!checkoutUrl) {
       msg.innerHTML = `<div class="alert alert-err">
         ⚠️ لم يصل رابط الدفع من Paddle.
       </div>`;
