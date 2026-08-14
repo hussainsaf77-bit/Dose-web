@@ -15,9 +15,9 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-
 async def create_checkout(price_id: str, uid: str, email: str, plan: str):
-    url = f"{BASE_URL}/transactions"
+    if not PADDLE_API_KEY:
+        raise RuntimeError("PADDLE_API_KEY is missing")
 
     payload = {
         "items": [
@@ -26,20 +26,50 @@ async def create_checkout(price_id: str, uid: str, email: str, plan: str):
                 "quantity": 1
             }
         ],
-        "customer": {
-            "email": email
-        },
         "custom_data": {
             "uid": uid,
             "plan": plan
         }
     }
 
+    # Paddle Checkout can collect the customer's email itself.
+    # We keep it in custom data as well for our own reference.
+    if email:
+        payload["customer"] = {
+            "email": email
+        }
+
     async with httpx.AsyncClient(timeout=30) as client:
         response = await client.post(
-            url,
+            f"{BASE_URL}/transactions",
             headers=HEADERS,
             json=payload
         )
 
-    return response.json()
+    try:
+        data = response.json()
+    except Exception:
+        data = {
+            "error": "Invalid response from Paddle",
+            "status_code": response.status_code,
+            "text": response.text
+        }
+
+    if response.status_code >= 400:
+        return {
+            "success": False,
+            "status_code": response.status_code,
+            "error": data
+        }
+
+    transaction = data.get("data", data)
+
+    checkout = transaction.get("checkout") or {}
+    checkout_url = checkout.get("url")
+
+    return {
+        "success": True,
+        "transaction_id": transaction.get("id"),
+        "checkout_url": checkout_url,
+        "plan": plan
+    }

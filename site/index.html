@@ -625,7 +625,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
     <div class="waitlist-hero">
       <div style="font-size:2.5rem;margin-bottom:10px;">⭐</div>
       <h2>جرعة Pro</h2>
-      <p>انضم لقائمة الانتظار للحصول على وصول مبكر مجاني</p>
+      <p>اختر خطتك وابدأ اشتراكك الآن</p>
     </div>
 
     <div class="plan-cards">
@@ -684,7 +684,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
       </select>
     </div>
     <button class="btn btn-primary" style="width:100%;" onclick="joinWaitlist()">
-      ⭐ انضم لقائمة الانتظار مجاناً
+      💳 اشترك الآن
     </button>
     <div id="wlMsg" style="margin-top:12px;"></div>
     <div id="wlCount" style="text-align:center;margin-top:12px;font-size:.85rem;color:var(--muted);"></div>
@@ -1659,38 +1659,90 @@ function closeAccount() {
 }
 
 // ════════════════ WAITLIST ════════════════
-let selectedPlan = "pro";
+let selectedPlan = "weekly";
 function selectPlan(el, plan) {
   document.querySelectorAll(".plan-card").forEach(c => c.classList.remove("selected"));
   el.classList.add("selected");
   selectedPlan = plan;
 }
 
-function joinWaitlist() {
+async function joinWaitlist() {
   const name = document.getElementById("wlName").value.trim();
   const email = document.getElementById("wlEmail").value.trim();
-  const prof = document.getElementById("wlProf").value;
   const msg = document.getElementById("wlMsg");
 
-  if (!name || !email || !email.includes("@")) {
-    msg.innerHTML = `<div class="alert alert-warn">⚠️ أدخل الاسم والبريد الإلكتروني</div>`;
+  if (!email || !email.includes("@")) {
+    msg.innerHTML = `<div class="alert alert-warn">⚠️ أدخل بريدك الإلكتروني</div>`;
     return;
   }
 
-  const entry = { name, email, prof, plan: selectedPlan, date: new Date().toISOString() };
-  waitlist.push(entry);
-  try { localStorage.setItem("waitlist", JSON.stringify(waitlist)); } catch(e) {}
+  const prices = {
+    weekly: "pri_01kyf5s78t52cze4nf2bp45t7e",
+    monthly: "pri_01kyf5t6qes6s4bwdt4111j3vp",
+    quarterly: "pri_01kyf5v6mvqmjwzzd97cjbkt6v",
+    biannual: "pri_01kyf5w0g2fhw82p6554dt6m45",
+    annual: "pri_01kyf5wszwtsneevhbqwqmwbj2"
+  };
 
-  msg.innerHTML = `<div class="alert alert-ok">
-    🎉 <strong>شكراً ${name}!</strong><br>
-    تم تسجيلك في قائمة الانتظار للخطة ${selectedPlan === "pro" ? "⭐ Pro" : "🌿 الأساسية"}.<br>
-    سنتواصل معك على ${email} عند الإطلاق.
-  </div>`;
-  document.getElementById("wlName").value = "";
-  document.getElementById("wlEmail").value = "";
-  updateWaitlistCount();
+  const priceId = prices[selectedPlan];
+
+  if (!priceId) {
+    msg.innerHTML = `<div class="alert alert-err">⚠️ اختر باقة اشتراك صحيحة</div>`;
+    return;
+  }
+
+  msg.innerHTML = `<div class="alert alert-info">⏳ جارٍ تجهيز صفحة الدفع...</div>`;
+
+  try {
+    const uid = localStorage.getItem("uid") || ("guest_" + Date.now());
+
+    const response = await fetch(
+      "https://dose-web-api.onrender.com/api/create-checkout",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          price_id: priceId,
+          uid: uid,
+          email: email,
+          plan: selectedPlan
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    console.log("PADDLE CHECKOUT:", data);
+
+    if (!response.ok) {
+      msg.innerHTML = `<div class="alert alert-err">
+        ⚠️ تعذّر إنشاء عملية الدفع.
+      </div>`;
+      return;
+    }
+
+    const checkoutUrl = data.checkout_url || (data.data && data.data.checkout && data.data.checkout.url);\n\n    if (!checkoutUrl) {
+      msg.innerHTML = `<div class="alert alert-err">
+        ⚠️ لم يصل رابط الدفع من Paddle.
+      </div>`;
+      return;
+    }
+
+    msg.innerHTML = `<div class="alert alert-ok">
+      ✅ تم تجهيز الدفع، جارٍ فتح صفحة الدفع...
+    </div>`;
+
+    window.location.href = checkoutUrl;
+
+  } catch (error) {
+    console.error("CHECKOUT ERROR:", error);
+    msg.innerHTML = `<div class="alert alert-err">
+      ⚠️ تعذّر الاتصال بخدمة الدفع.
+    </div>`;
+  }
 }
-
 function updateWaitlistCount() {
   const count = waitlist.length + 47; // seed number
   const el = document.getElementById("wlCount");
