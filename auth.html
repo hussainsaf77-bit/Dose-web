@@ -3,126 +3,129 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>تسجيل الدخول | جرعة</title>
+<title>تسجيل الدخول | DoseBot</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:linear-gradient(135deg,#0f172a,#134e4a);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
-.card{background:white;border-radius:20px;padding:36px 28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.3);}
-.logo{text-align:center;margin-bottom:28px;}
-.logo-pill{background:#0d9488;color:white;padding:8px 20px;border-radius:50px;font-size:1.3rem;font-weight:900;display:inline-block;}
-.tabs{display:flex;gap:0;margin-bottom:24px;border-radius:10px;overflow:hidden;border:1.5px solid #e2e8f0;}
-.tab-btn{flex:1;padding:10px;border:none;background:#f8fafc;cursor:pointer;font-size:.9rem;font-weight:700;color:#64748b;font-family:inherit;transition:all .2s;}
-.tab-btn.active{background:#0d9488;color:white;}
-.field{margin-bottom:14px;}
-label{display:block;font-weight:700;font-size:.83rem;color:#334155;margin-bottom:4px;}
-input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;font-family:inherit;}
-input:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.1);}
-.btn{width:100%;padding:12px;background:#0d9488;color:white;border:none;border-radius:10px;font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit;margin-top:6px;}
-.btn:hover{background:#0f766e;}
-.btn:disabled{opacity:.6;cursor:not-allowed;}
-.msg{margin-top:12px;padding:10px;border-radius:8px;font-size:.85rem;text-align:center;}
-.msg-ok{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;}
-.msg-err{background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
-.divider{text-align:center;color:#94a3b8;font-size:.82rem;margin:16px 0;}
-.tg-btn{width:100%;padding:11px;background:#0f172a;color:white;border:none;border-radius:10px;font-size:.9rem;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;}
-.disclaimer{margin-top:16px;font-size:.72rem;color:#94a3b8;text-align:center;line-height:1.5;}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Cairo',sans-serif;background:#f0f4ff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.page{width:100%;max-width:420px}
+.logo{text-align:center;margin-bottom:24px}
+.logo-icon{width:64px;height:64px;background:#1a6fd4;border-radius:18px;display:inline-flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:10px}
+.logo h1{font-size:22px;font-weight:700;color:#1e293b}
+.logo p{color:#64748b;font-size:14px}
+.card{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,.08);padding:28px;border:1px solid #e2e8f0}
+.tabs{display:flex;background:#f1f5f9;border-radius:10px;padding:4px;margin-bottom:20px;gap:4px}
+.tab{flex:1;padding:8px;border:none;background:transparent;cursor:pointer;border-radius:8px;font-family:'Cairo',sans-serif;font-size:15px;color:#64748b;font-weight:600;transition:.2s}
+.tab.active{background:#fff;color:#1a6fd4;box-shadow:0 2px 8px rgba(0,0,0,.1)}
+.form{display:none}.form.active{display:block}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;font-weight:600;color:#1e293b;margin-bottom:6px}
+.field input{width:100%;padding:11px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:15px;font-family:'Cairo',sans-serif;color:#1e293b;transition:.2s}
+.field input:focus{outline:none;border-color:#1a6fd4;box-shadow:0 0 0 3px rgba(26,111,212,.1)}
+.btn{width:100%;padding:12px;background:#1a6fd4;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;transition:.2s;margin-top:4px}
+.btn:hover{background:#1558b0}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+.alert{padding:10px 14px;border-radius:8px;font-size:14px;margin-bottom:14px;display:none}
+.alert.error{background:#fef2f2;color:#dc2626;border:1px solid #fecaca}
+.alert.success{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0}
+.alert.show{display:block}
+.footer{text-align:center;margin-top:14px;font-size:13px;color:#64748b}
+.footer a{color:#1a6fd4;text-decoration:none;font-weight:600}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="logo"><div class="logo-pill">💊 جرعة | Dose</div></div>
-  
-  <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('login')">تسجيل الدخول</button>
-    <button class="tab-btn" onclick="showTab('register')">حساب جديد</button>
+<div class="page">
+  <div class="logo">
+    <div class="logo-icon">💊</div>
+    <h1>حاسبة الجرعات</h1>
+    <p>DoseBot — نظام طبي ذكي</p>
   </div>
-
-  <!-- LOGIN -->
-  <div id="loginForm">
-    <div class="field"><label>البريد الإلكتروني</label><input type="email" id="loginEmail" placeholder="example@email.com" dir="ltr"></div>
-    <div class="field"><label>كلمة المرور</label><input type="password" id="loginPass" placeholder="••••••••"></div>
-    <button class="btn" onclick="login()">🔐 دخول</button>
-    <div class="divider">أو</div>
-    <button class="tg-btn" onclick="openTelegram()">✈️ استخدام بوت تيليغرام</button>
-    <div id="loginMsg"></div>
-  </div>
-
-  <!-- REGISTER -->
-  <div id="registerForm" style="display:none;">
-    <div class="field"><label>الاسم الكامل</label><input type="text" id="regName" placeholder="محمد أحمد"></div>
-    <div class="field"><label>البريد الإلكتروني</label><input type="email" id="regEmail" placeholder="example@email.com" dir="ltr"></div>
-    <div class="field"><label>كلمة المرور</label><input type="password" id="regPass" placeholder="8 أحرف على الأقل"></div>
-    <div class="field"><label>المهنة (اختياري)</label>
-      <select id="regRole" style="width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:.9rem;outline:none;font-family:inherit;">
-        <option value="user">مستخدم عام</option>
-        <option value="doctor">طبيب</option>
-        <option value="pharmacist">صيدلاني</option>
-        <option value="nurse">ممرض/ة</option>
-        <option value="student">طالب طب</option>
-      </select>
+  <div class="card">
+    <div id="alert" class="alert"></div>
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('login')">تسجيل الدخول</button>
+      <button class="tab" onclick="switchTab('register')">إنشاء حساب</button>
     </div>
-    <button class="btn" onclick="register()">✅ إنشاء حساب</button>
-    <div id="registerMsg"></div>
+    <div id="loginForm" class="form active">
+      <div class="field"><label>البريد الإلكتروني</label><input type="email" id="loginEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="field"><label>كلمة المرور</label><input type="password" id="loginPass" placeholder="••••••••" dir="ltr"></div>
+      <button class="btn" id="loginBtn" onclick="doLogin()">🔑 تسجيل الدخول</button>
+    </div>
+    <div id="registerForm" class="form">
+      <div class="field"><label>الاسم (اختياري)</label><input type="text" id="regName" placeholder="اسمك الكريم"></div>
+      <div class="field"><label>البريد الإلكتروني</label><input type="email" id="regEmail" placeholder="example@email.com" dir="ltr"></div>
+      <div class="field"><label>كلمة المرور (8 أحرف على الأقل)</label><input type="password" id="regPass" placeholder="••••••••" dir="ltr"></div>
+      <button class="btn" id="regBtn" onclick="doRegister()">🚀 إنشاء الحساب مجاناً</button>
+    </div>
+    <div class="footer" id="footerLink">
+      ليس لديك حساب؟ <a href="#" onclick="switchTab('register');return false">أنشئ حساباً مجانياً</a>
+    </div>
   </div>
-
-  <div class="disclaimer">⚕️ للأغراض التعليمية فقط — باستخدامك توافق على شروط الخدمة</div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const SUPABASE_URL = 'https://finwslipvvasokmuxdla.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpbndzbGlwdnZhc29rbXV4ZGxhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYwMDI5NDMsImV4cCI6MjA2MTU3ODk0M30.sb_publishable_7g9H8VEBGrgGcF9CEfLrNg_Bu6xlorY';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const API='https://dose-web-api.onrender.com';
 
-function showTab(tab) {
-  document.getElementById('loginForm').style.display = tab==='login'?'block':'none';
-  document.getElementById('registerForm').style.display = tab==='register'?'block':'none';
-  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
+function switchTab(tab){
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',(tab==='login'&&i===0)||(tab==='register'&&i===1)));
+  document.getElementById('loginForm').classList.toggle('active',tab==='login');
+  document.getElementById('registerForm').classList.toggle('active',tab==='register');
+  document.getElementById('footerLink').innerHTML=tab==='login'
+    ?'ليس لديك حساب؟ <a href="#" onclick="switchTab(\'register\');return false">أنشئ حساباً مجانياً</a>'
+    :'لديك حساب؟ <a href="#" onclick="switchTab(\'login\');return false">تسجيل الدخول</a>';
+  hideAlert();
 }
 
-async function login() {
-  const email = document.getElementById('loginEmail').value.trim();
-  const pass = document.getElementById('loginPass').value;
-  const msg = document.getElementById('loginMsg');
-  if(!email||!pass){msg.innerHTML='<div class="msg msg-err">أدخل البريد وكلمة المرور</div>';return;}
-  const {data,error} = await sb.auth.signInWithPassword({email,password:pass});
-  if(error){msg.innerHTML=`<div class="msg msg-err">❌ ${error.message}</div>`;return;}
-  localStorage.setItem('dose_user', JSON.stringify(data.user));
-  msg.innerHTML='<div class="msg msg-ok">✅ تم الدخول! جارٍ التحويل...</div>';
-  setTimeout(()=>window.location.href='https://hussainsaf77-bit.github.io/Dose-web/',1500);
+function showAlert(msg,type='error'){
+  const el=document.getElementById('alert');
+  el.textContent=msg;el.className='alert '+type+' show';
+}
+function hideAlert(){document.getElementById('alert').className='alert';}
+
+async function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  if(!email||!pass){showAlert('يرجى ملء جميع الحقول');return;}
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true;btn.textContent='⏳ جاري الدخول...';
+  try{
+    const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'خطأ في تسجيل الدخول');
+    localStorage.setItem('db_token',d.token);
+    localStorage.setItem('db_user',JSON.stringify(d.user));
+    showAlert('✅ تم تسجيل الدخول! يتم تحويلك...','success');
+    setTimeout(()=>location.href='dashboard.html',1000);
+  }catch(e){showAlert(e.message);}
+  finally{btn.disabled=false;btn.textContent='🔑 تسجيل الدخول';}
 }
 
-async function register() {
-  const name = document.getElementById('regName').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const pass = document.getElementById('regPass').value;
-  const role = document.getElementById('regRole').value;
-  const msg = document.getElementById('registerMsg');
-  if(!name||!email||!pass){msg.innerHTML='<div class="msg msg-err">أدخل جميع البيانات</div>';return;}
-  if(pass.length<8){msg.innerHTML='<div class="msg msg-err">كلمة المرور 8 أحرف على الأقل</div>';return;}
-  
-  const {data,error} = await sb.auth.signUp({email,password:pass,options:{data:{name,role}}});
-  if(error){msg.innerHTML=`<div class="msg msg-err">❌ ${error.message}</div>';return;}
-  
-  // حفظ في جدول users
-  if(data.user) {
-    await sb.from('users').upsert({
-      uid: data.user.id,
-      email,name,role,
-      plan:'free',
-      usage_count:0,
-      created_at: new Date().toISOString()
-    });
-  }
-  msg.innerHTML='<div class="msg msg-ok">🎉 تم إنشاء الحساب! تحقق من بريدك للتفعيل</div>';
+async function doRegister(){
+  const name=document.getElementById('regName').value.trim();
+  const email=document.getElementById('regEmail').value.trim();
+  const pass=document.getElementById('regPass').value;
+  if(!email||!pass){showAlert('البريد وكلمة المرور مطلوبان');return;}
+  if(pass.length<8){showAlert('كلمة المرور يجب أن تكون 8 أحرف على الأقل');return;}
+  const btn=document.getElementById('regBtn');
+  btn.disabled=true;btn.textContent='⏳ جاري الإنشاء...';
+  try{
+    const r=await fetch(API+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass,name:name||null})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'خطأ في إنشاء الحساب');
+    localStorage.setItem('db_token',d.token);
+    localStorage.setItem('db_user',JSON.stringify(d.user));
+    showAlert('🎉 تم إنشاء حسابك!','success');
+    setTimeout(()=>location.href='dashboard.html',1000);
+  }catch(e){showAlert(e.message);}
+  finally{btn.disabled=false;btn.textContent='🚀 إنشاء الحساب مجاناً';}
 }
 
-function openTelegram(){window.open('https://t.me/Drugscalculat_bot','_blank');}
+// إذا مسجّل مسبقاً
+(function(){
+  const t=localStorage.getItem('db_token');
+  if(t){try{const p=JSON.parse(atob(t.split('.')[1]));if(p.exp*1000>Date.now())location.href='dashboard.html';}catch(e){localStorage.removeItem('db_token');}}
+})();
 
-// تحقق من تسجيل الدخول
-sb.auth.getSession().then(({data})=>{
-  if(data.session) window.location.href='https://hussainsaf77-bit.github.io/Dose-web/';
-});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'){if(document.getElementById('loginForm').classList.contains('active'))doLogin();else doRegister();}});
 </script>
 </body>
 </html>
