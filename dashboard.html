@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة التحكم | DoseBot</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#1a6fd4;--bg:#f0f4ff;--card:#fff;--border:#e2e8f0;--muted:#64748b}
+body{font-family:'Cairo',sans-serif;background:var(--bg);display:flex;min-height:100vh}
+.sidebar{width:220px;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;position:fixed;right:0;top:0;bottom:0}
+.brand{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700}
+.nav{flex:1;padding:10px 8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:var(--muted);margin-bottom:2px;border:none;background:none;width:100%;text-align:right;font-family:'Cairo',sans-serif;transition:.15s}
+.nav-item:hover,.nav-item.active{background:#e8f0fc;color:var(--primary)}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border)}
+.user-box{background:var(--bg);border-radius:10px;padding:10px;margin-bottom:8px}
+.user-name{font-size:13px;font-weight:700}
+.user-plan{font-size:11px;color:var(--muted)}
+.logout{width:100%;padding:8px;background:none;border:1px solid var(--border);border-radius:8px;font-family:'Cairo',sans-serif;font-size:13px;cursor:pointer;color:#dc2626}
+.main{flex:1;margin-right:220px;padding:24px;overflow-x:hidden}
+.section{display:none}.section.active{display:block}
+.topbar{margin-bottom:20px}
+.topbar h1{font-size:20px;font-weight:800}
+.topbar p{font-size:13px;color:var(--muted);margin-top:2px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;align-items:center;gap:12px}
+.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;background:#e8f0fc;flex-shrink:0}
+.stat-val{font-size:22px;font-weight:800}
+.stat-label{font-size:12px;color:var(--muted)}
+.search-box{display:flex;gap:10px;margin-bottom:12px}
+.search-input{flex:1;padding:11px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;font-family:'Cairo',sans-serif;transition:.2s}
+.search-input:focus{outline:none;border-color:var(--primary)}
+.search-btn{padding:11px 20px;background:var(--primary);color:#fff;border:none;border-radius:12px;font-size:15px;font-family:'Cairo',sans-serif;font-weight:600;cursor:pointer}
+.drug-result{border:1px solid var(--border);border-radius:12px;display:none;overflow:hidden;margin-top:12px}
+.drug-header{background:var(--primary);color:#fff;padding:16px 20px}
+.drug-header h3{font-size:17px;font-weight:700}
+.drug-body{padding:16px 20px}
+.drug-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.drug-field{background:var(--bg);border-radius:8px;padding:10px}
+.drug-field label{font-size:11px;color:var(--muted);font-weight:600;display:block;margin-bottom:3px}
+.drug-field .val{font-size:14px;font-weight:700}
+.drug-field .val.big{font-size:22px;color:var(--primary)}
+.info-box{border-radius:8px;padding:10px;margin-bottom:8px;font-size:13px}
+.info-box.warn{background:#fff7ed;color:#d97706}
+.info-box.danger{background:#fef2f2;color:#dc2626}
+.info-box.info{background:#e8f0fc;color:var(--primary)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn-sm{padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;font-family:'Cairo',sans-serif;cursor:pointer;border:none;transition:.2s}
+.btn-blue{background:#e8f0fc;color:var(--primary)}
+.btn-green{background:#f0fdf4;color:#16a34a}
+.calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.calc-field label{font-size:13px;font-weight:600;display:block;margin-bottom:6px}
+.calc-field input,.calc-field select{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Cairo',sans-serif}
+.calc-result{background:#e8f0fc;border-radius:12px;padding:16px;margin-top:14px;text-align:center;display:none}
+.calc-dose{font-size:36px;font-weight:800;color:var(--primary)}
+.rem-item{border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.rem-info{flex:1}
+.rem-name{font-weight:700;font-size:15px}
+.rem-detail{font-size:13px;color:var(--muted)}
+.rem-times{display:flex;gap:6px;margin-top:4px;flex-wrap:wrap}
+.rem-time{background:#e8f0fc;color:var(--primary);padding:2px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.rem-del{background:none;border:none;font-size:18px;cursor:pointer;color:#dc2626}
+.empty{text-align:center;padding:32px;color:var(--muted)}
+.sub-card{background:linear-gradient(135deg,var(--primary),#1558b0);color:#fff;border-radius:14px;padding:24px;position:relative;overflow:hidden;margin-bottom:16px}
+.sub-plan{font-size:28px;font-weight:800}
+.sub-actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.sub-btn{padding:10px 20px;border-radius:10px;font-size:14px;font-weight:600;font-family:'Cairo',sans-serif;cursor:pointer}
+.sub-btn.white{background:#fff;color:var(--primary);border:none}
+.sub-btn.outline{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.4)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;transition:.3s;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.success{background:#16a34a}
+.toast.error{background:#dc2626}
+.hist-item{border:1px solid var(--border);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;transition:.15s}
+.hist-item:hover{background:#e8f0fc}
+.suggestions{position:relative}
+.sugg-list{position:absolute;top:100%;right:0;left:0;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.1);z-index:100;display:none;margin-top:4px;overflow:hidden}
+.sugg-item{padding:10px 16px;cursor:pointer;font-size:14px;display:flex;justify-content:space-between;transition:.15s}
+.sugg-item:hover{background:#e8f0fc;color:var(--primary)}
+@media(max-width:768px){.sidebar{display:none}.main{margin-right:0}}
+</style>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand">💊 DoseBot</div>
+  <nav class="nav">
+    <button class="nav-item active" onclick="showSection('search')">🔍 بحث الأدوية</button>
+    <button class="nav-item" onclick="showSection('calc')">🍼 جرعات الأطفال</button>
+    <button class="nav-item" onclick="showSection('reminders')">⏰ التذكيرات</button>
+    <button class="nav-item" onclick="showSection('history')">📋 السجل</button>
+    <button class="nav-item" onclick="showSection('subscription')">💳 الاشتراك</button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="user-box">
+      <div class="user-name" id="sidebarName">...</div>
+      <div class="user-plan" id="sidebarPlan">مجاني</div>
+    </div>
+    <button class="logout" onclick="logout()">🚪 تسجيل الخروج</button>
+  </div>
+</aside>
+
+<main class="main">
+  <section id="sec-search" class="section active">
+    <div class="topbar"><h1>🔍 بحث الأدوية</h1><p>ابحث بأي جزء من الاسم</p></div>
+    <div class="card">
+      <div class="suggestions">
+        <div class="search-box">
+          <input type="text" class="search-input" id="searchInput" placeholder="اكتب اسم الدواء..." oninput="onInput()" onkeyup="e=>e.key==='Enter'&&doSearch()">
+          <button class="search-btn" onclick="doSearch()">بحث</button>
+        </div>
+        <div class="sugg-list" id="suggList"></div>
+      </div>
+    </div>
+    <div class="drug-result" id="drugResult">
+      <div class="drug-header"><h3 id="drugName"></h3><p id="drugCat"></p></div>
+      <div class="drug-body">
+        <div id="drugTrade" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+        <div class="drug-grid" id="drugFields"></div>
+        <div id="drugExtra"></div>
+        <div class="btn-row">
+          <button class="btn-sm btn-blue" onclick="copyInfo()">📋 نسخ</button>
+          <button class="btn-sm btn-green" onclick="saveHistory()">📌 حفظ</button>
+          <button class="btn-sm btn-blue" onclick="showSection('calc')">🍼 احسب للطفل</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec-calc" class="section">
+    <div class="topbar"><h1>🍼 حاسبة جرعات الأطفال</h1><p>الجرعة الدقيقة بالمل</p></div>
+    <div class="card">
+      <div class="calc-grid">
+        <div class="calc-field"><label>اسم الدواء</label><input type="text" id="calcDrug" placeholder="باراسيتامول"></div>
+        <div class="calc-field"><label>وزن الطفل (كجم)</label><input type="number" id="calcWeight" placeholder="15" min="1" max="80"></div>
+        <div class="calc-field"><label>تركيز الشراب</label>
+          <select id="calcConc">
+            <option value="">اختر...</option>
+            <option value="125">125mg/5ml</option>
+            <option value="200">200mg/5ml</option>
+            <option value="250">250mg/5ml</option>
+            <option value="100">100mg/5ml</option>
+          </select>
+        </div>
+        <div class="calc-field"><label>عمر الطفل (اختياري)</label><input type="number" id="calcAge" placeholder="سنوات"></div>
+      </div>
+      <button onclick="calcDose()" style="margin-top:14px;padding:12px 24px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer">احسب ←</button>
+      <div class="calc-result" id="calcResult">
+        <div class="calc-dose" id="calcDoseVal"></div>
+        <div id="calcLabel" style="color:#64748b;font-size:13px;margin-top:4px"></div>
+        <div id="calcWarn" style="background:#fff7ed;border-radius:8px;padding:10px;margin-top:10px;font-size:13px;color:#d97706;display:none"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec-reminders" class="section">
+    <div class="topbar" style="display:flex;align-items:center;justify-content:space-between">
+      <div><h1>⏰ التذكيرات</h1><p>تذكيرات أدويتك المزمنة</p></div>
+      <button onclick="document.getElementById('addRemCard').style.display='block'" style="padding:10px 18px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-weight:600;font-family:'Cairo',sans-serif;cursor:pointer">+ إضافة</button>
+    </div>
+    <div class="card" id="remsList"><div class="empty">⏰ لا توجد تذكيرات</div></div>
+    <div class="card" id="addRemCard" style="display:none">
+      <div style="font-size:16px;font-weight:700;margin-bottom:14px">➕ تذكير جديد</div>
+      <div class="calc-grid">
+        <div class="calc-field"><label>اسم الدواء</label><input type="text" id="remDrug" placeholder="ميتفورمين"></div>
+        <div class="calc-field"><label>الجرعة</label><input type="text" id="remDose" placeholder="500mg"></div>
+      </div>
+      <div style="margin:12px 0">
+        <label style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">أوقات التذكير</label>
+        <div id="timesContainer" style="display:flex;gap:8px;flex-wrap:wrap">
+          <input type="time" value="08:00" class="rem-time-input" style="padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:'Cairo',sans-serif">
+          <button onclick="addTime()" style="padding:8px 14px;background:none;border:1.5px dashed var(--border);border-radius:8px;cursor:pointer;font-size:18px;color:var(--muted)">+</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="saveReminder()" style="padding:10px 20px;background:#16a34a;color:#fff;border:none;border-radius:10px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer">✅ حفظ</button>
+        <button onclick="document.getElementById('addRemCard').style.display='none'" style="padding:10px 20px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer">إلغاء</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="sec-history" class="section">
+    <div class="topbar"><h1>📋 سجل الأدوية</h1><p>آخر الأدوية المبحوثة</p></div>
+    <div class="card" id="histList"><div class="empty">📋 السجل فارغ</div></div>
+  </section>
+
+  <section id="sec-subscription" class="section">
+    <div class="topbar"><h1>💳 الاشتراك</h1></div>
+    <div class="sub-card">
+      <div class="sub-plan" id="subPlan">مجاني</div>
+      <div id="subStatus" style="opacity:.85;font-size:14px;margin-top:4px">الخطة المجانية</div>
+      <div class="sub-actions">
+        <button class="sub-btn white" onclick="location.href='pricing.html'">⬆️ ترقية</button>
+        <button class="sub-btn outline" id="cancelBtn" onclick="cancelSub()" style="display:none">إلغاء الاشتراك</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="stat-icon">🔍</div><div><div class="stat-val" id="statSearch">0</div><div class="stat-label" id="statSearchLabel">من 5 بحث اليوم</div></div></div>
+      <div class="stat"><div class="stat-icon">⏰</div><div><div class="stat-val" id="statRem">0</div><div class="stat-label">تذكير نشط</div></div></div>
+      <div class="stat"><div class="stat-icon">📋</div><div><div class="stat-val" id="statHist">0</div><div class="stat-label">في السجل</div></div></div>
+    </div>
+    <div class="card">
+      <div style="font-size:16px;font-weight:700;margin-bottom:12px">📱 ربط Telegram</div>
+      <p style="font-size:14px;color:var(--muted);margin-bottom:12px">اربط حسابك للتمتع بنفس الاشتراك على البوت</p>
+      <button id="tgBtn" onclick="linkTelegram()" style="padding:10px 20px;background:#0088cc;color:#fff;border:none;border-radius:10px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer">ربط Telegram ←</button>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API='https://dose-web-api.onrender.com';
+let token=localStorage.getItem('db_token');
+let userData=null, drugsDB=[], currentDrug=null;
+
+if(!token) location.href='auth.html';
+
+function toast(msg,type=''){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.className='toast show '+(type||'');
+  setTimeout(()=>t.className='toast',3000);
+}
+
+function showSection(name){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.querySelector(`[onclick="showSection('${name}')"]`).classList.add('active');
+  if(name==='reminders') loadReminders();
+  if(name==='history') loadHistory();
+  if(name==='subscription') renderSub();
+}
+
+async function loadUser(){
+  const r=await fetch(API+'/auth/me',{headers:{Authorization:'Bearer '+token}});
+  if(r.status===401){logout();return;}
+  userData=await r.json();
+  document.getElementById('sidebarName').textContent=userData.name||userData.email;
+  document.getElementById('sidebarPlan').textContent=userData.plan?.name_ar||'مجاني';
+}
+
+async function loadDrugs(){
+  try{const r=await fetch('drugs.json');drugsDB=await r.json();}catch(e){drugsDB=[];}
+}
+
+function onInput(){
+  const q=document.getElementById('searchInput').value.trim();
+  const sl=document.getElementById('suggList');
+  if(q.length<2){sl.style.display='none';return;}
+  const m=drugsDB.filter(d=>d.name_ar?.includes(q)||d.name_en?.toLowerCase().includes(q.toLowerCase())||(d.trade_names||[]).some(t=>t.toLowerCase().includes(q.toLowerCase()))).slice(0,7);
+  if(!m.length){sl.style.display='none';return;}
+  sl.innerHTML=m.map(d=>`<div class="sugg-item" onclick="selectDrug(${d.id})">💊 ${d.name_ar} — ${d.name_en}<span style="font-size:11px;color:var(--muted)">${d.category||''}</span></div>`).join('');
+  sl.style.display='block';
+}
+
+function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();
+  document.getElementById('suggList').style.display='none';
+  if(!q)return;
+  const drug=drugsDB.find(d=>d.name_ar?.includes(q)||d.name_en?.toLowerCase().includes(q.toLowerCase())||(d.trade_names||[]).some(t=>t.toLowerCase().includes(q.toLowerCase())));
+  if(!drug){toast('لم يُعثر على الدواء','error');return;}
+  showDrug(drug);
+  trackUsage();
+}
+
+function selectDrug(id){
+  document.getElementById('suggList').style.display='none';
+  const drug=drugsDB.find(d=>d.id===id);
+  if(drug){showDrug(drug);trackUsage();}
+}
+
+function showDrug(drug){
+  currentDrug=drug;
+  document.getElementById('drugName').textContent=drug.name_ar+' — '+drug.name_en;
+  document.getElementById('drugCat').textContent=drug.category||'';
+  document.getElementById('drugTrade').innerHTML=(drug.trade_names||[]).map(t=>`<span style="background:#e8f0fc;color:var(--primary);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600">💊 ${t}</span>`).join('');
+  document.getElementById('drugFields').innerHTML=[
+    {l:'جرعة الأطفال (ml/kg)',v:drug.child_dose_ml_per_kg?(drug.child_dose_ml_per_kg+' ml/kg'):'—',big:true},
+    {l:'جرعة الأطفال (mg/kg)',v:drug.child_dose_mg_per_kg?(drug.child_dose_mg_per_kg+' mg/kg'):'—'},
+    {l:'جرعة الكبار',v:drug.adult_dose_mg?(drug.adult_dose_mg+'–'+(drug.adult_dose_max_mg||drug.adult_dose_mg)+' mg'):'—'},
+    {l:'الحد الأقصى اليومي',v:drug.max_daily_dose_mg?(drug.max_daily_dose_mg+' mg'):'—'},
+    {l:'التكرار',v:drug.frequency_ar||'—'},
+    {l:'الحمل',v:drug.pregnancy||'—'},
+    {l:'الرضاعة',v:drug.lactation||'—'},
+    {l:'الكلى',v:drug.renal||'—'},
+  ].map(f=>`<div class="drug-field"><label>${f.l}</label><div class="val ${f.big?'big':''}">${f.v}</div></div>`).join('');
+  document.getElementById('drugExtra').innerHTML=
+    (drug.contraindications_ar?`<div class="info-box danger">⛔ <strong>الموانع:</strong> ${drug.contraindications_ar}</div>`:'') +
+    (drug.side_effects_ar?`<div class="info-box warn">⚠️ <strong>آثار جانبية:</strong> ${drug.side_effects_ar}</div>`:'') +
+    (drug.notes_ar?`<div class="info-box info">📝 ${drug.notes_ar}</div>`:'');
+  document.getElementById('drugResult').style.display='block';
+  document.getElementById('calcDrug').value=drug.name_ar;
+}
+
+async function trackUsage(){
+  if(!token) return;
+  try{await fetch(API+'/usage/track?action=search',{method:'POST',headers:{Authorization:'Bearer '+token}});}catch(e){}
+}
+
+function copyInfo(){
+  if(!currentDrug)return;
+  const t=`💊 ${currentDrug.name_ar} (${currentDrug.name_en})\n👶 ${currentDrug.child_dose_ml_per_kg||'—'} ml/kg | ${currentDrug.child_dose_mg_per_kg||'—'} mg/kg\n👤 ${currentDrug.adult_dose_mg||'—'}–${currentDrug.adult_dose_max_mg||'—'} mg\n⏰ ${currentDrug.frequency_ar||'—'}`;
+  navigator.clipboard.writeText(t).then(()=>toast('تم النسخ ✅','success'));
+}
+
+async function saveHistory(){
+  if(!currentDrug||!token)return;
+  await fetch(API+'/history/add?drug_name='+encodeURIComponent(currentDrug.name_ar)+'&drug_id='+currentDrug.id,{method:'POST',headers:{Authorization:'Bearer '+token}});
+  toast('تم الحفظ ✅','success');
+}
+
+function calcDose(){
+  const w=parseFloat(document.getElementById('calcWeight').value);
+  const conc=parseFloat(document.getElementById('calcConc').value);
+  const drug=currentDrug||drugsDB.find(d=>d.name_ar?.includes(document.getElementById('calcDrug').value));
+  if(!w){toast('أدخل وزن الطفل','error');return;}
+  if(!drug||!drug.child_dose_mg_per_kg){toast('لا تتوفر بيانات لهذا الدواء','error');return;}
+  const mg=drug.child_dose_mg_per_kg*w;
+  const res=document.getElementById('calcResult');
+  res.style.display='block';
+  if(conc){
+    document.getElementById('calcDoseVal').textContent=(mg/conc*5).toFixed(1)+' مل';
+    document.getElementById('calcLabel').textContent=`(${drug.child_dose_mg_per_kg}mg/kg × ${w}كجم = ${mg.toFixed(0)}mg من تركيز ${conc}mg/5ml)`;
+  } else {
+    document.getElementById('calcDoseVal').textContent=mg.toFixed(0)+' mg';
+    document.getElementById('calcLabel').textContent=`(${drug.child_dose_mg_per_kg}mg/kg × ${w}كجم)`;
+  }
+  const maxW=document.getElementById('calcWarn');
+  if(drug.max_daily_dose_child_mg_per_kg){
+    maxW.style.display='block';
+    maxW.textContent=`الحد الأقصى اليومي: ${(drug.max_daily_dose_child_mg_per_kg*w).toFixed(0)}mg — ${drug.frequency_ar||''}`;
+  } else maxW.style.display='none';
+}
+
+async function loadReminders(){
+  if(!token)return;
+  try{
+    const r=await fetch(API+'/reminders',{headers:{Authorization:'Bearer '+token}});
+    const data=await r.json();
+    const el=document.getElementById('remsList');
+    if(!data.length){el.innerHTML='<div class="empty">⏰ لا توجد تذكيرات</div>';return;}
+    el.innerHTML=data.map(rem=>`
+      <div class="rem-item">
+        <div style="font-size:24px">💊</div>
+        <div class="rem-info">
+          <div class="rem-name">${rem.drug_name}</div>
+          <div class="rem-detail">${rem.dose||''}</div>
+          <div class="rem-times">${(rem.times||[]).map(t=>`<span class="rem-time">🕐 ${t}</span>`).join('')}</div>
+        </div>
+        <button class="rem-del" onclick="delReminder(${rem.id},this)">🗑</button>
+      </div>`).join('');
+    document.getElementById('statRem').textContent=data.length;
+  }catch(e){}
+}
+
+function addTime(){
+  const c=document.getElementById('timesContainer');
+  const btn=c.querySelector('button');
+  const inp=document.createElement('input');
+  inp.type='time';inp.value='12:00';inp.className='rem-time-input';
+  inp.style='padding:8px;border:1.5px solid var(--border);border-radius:8px;font-family:Cairo,sans-serif';
+  c.insertBefore(inp,btn);
+}
+
+async function saveReminder(){
+  const drug=document.getElementById('remDrug').value.trim();
+  const dose=document.getElementById('remDose').value.trim();
+  const times=[...document.querySelectorAll('.rem-time-input')].map(i=>i.value);
+  if(!drug){toast('أدخل اسم الدواء','error');return;}
+  try{
+    const r=await fetch(API+'/reminders',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({drug_name:drug,dose,times,days:[],email_notify:false})});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail);
+    toast('تم إنشاء التذكير ✅','success');
+    document.getElementById('addRemCard').style.display='none';
+    loadReminders();
+  }catch(e){toast(e.message||'فشل','error');}
+}
+
+async function delReminder(id,btn){
+  await fetch(API+'/reminders/'+id,{method:'DELETE',headers:{Authorization:'Bearer '+token}});
+  btn.closest('.rem-item').remove();
+  toast('تم الحذف ✅');
+}
+
+async function loadHistory(){
+  if(!token)return;
+  const r=await fetch(API+'/history',{headers:{Authorization:'Bearer '+token}});
+  const data=await r.json();
+  document.getElementById('statHist').textContent=data.length;
+  const el=document.getElementById('histList');
+  if(!data.length){el.innerHTML='<div class="empty">📋 السجل فارغ</div>';return;}
+  el.innerHTML=data.map(h=>`<div class="hist-item" onclick="searchFromHist('${h.drug_name}')"><div style="font-size:20px">💊</div><div style="font-weight:600;font-size:14px">${h.drug_name}</div><div style="margin-right:auto;font-size:12px;color:var(--muted)">${new Date(h.searched_at).toLocaleDateString('ar-EG')}</div></div>`).join('');
+}
+
+function searchFromHist(name){
+  document.getElementById('searchInput').value=name;
+  showSection('search');
+  doSearch();
+}
+
+function renderSub(){
+  if(!userData)return;
+  document.getElementById('subPlan').textContent=userData.plan?.name_ar||'مجاني';
+  document.getElementById('subStatus').textContent=userData.subscription?.expires?'ينتهي: '+new Date(userData.subscription.expires).toLocaleDateString('ar-EG'):'الخطة المجانية';
+  document.getElementById('statSearch').textContent=userData.usage_today?.searches||0;
+  document.getElementById('statSearchLabel').textContent='من '+(userData.plan?.search_limit===-1?'غير محدود':userData.plan?.search_limit||5)+' بحث اليوم';
+  const cancelBtn=document.getElementById('cancelBtn');
+  if(userData.subscription?.status==='active') cancelBtn.style.display='block';
+  if(userData.telegram_linked){
+    const btn=document.getElementById('tgBtn');
+    btn.textContent='✅ Telegram مرتبط';btn.style.background='#16a34a';btn.onclick=null;
+  }
+}
+
+async function cancelSub(){
+  if(!confirm('هل أنت متأكد من الإلغاء؟'))return;
+  const r=await fetch(API+'/subscription/cancel',{method:'POST',headers:{Authorization:'Bearer '+token}});
+  const d=await r.json();
+  toast(d.message,'success');
+}
+
+function linkTelegram(){
+  window.open('https://t.me/YourBotUsername?start=link_'+(userData?.uid||''),'_blank');
+  toast('افتح البوت واضغط Start','success');
+}
+
+function logout(){
+  localStorage.removeItem('db_token');
+  location.href='auth.html';
+}
+
+document.addEventListener('click',e=>{if(!e.target.closest('.suggestions'))document.getElementById('suggList').style.display='none';});
+document.getElementById('searchInput').addEventListener('keyup',e=>{if(e.key==='Enter')doSearch();});
+
+(async()=>{
+  await Promise.all([loadUser(),loadDrugs()]);
+  if(new URLSearchParams(location.search).get('checkout')==='success')toast('🎉 تم الاشتراك بنجاح!','success');
+})();
+</script>
+</body>
+</html>
