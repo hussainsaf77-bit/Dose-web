@@ -252,6 +252,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
 
 @media(max-width:600px){main{padding:18px 12px 80px;}.card{padding:18px;}}
 </style>
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script><script>Paddle.Initialize({token:"test_3f6fe28f60d098b9eabbc7f12bd"});</script>
 </head>
 <body>
 
@@ -1419,7 +1420,8 @@ function showPatient() {
 function exportPatient() {
   if (!patient.name) { toast("⚠️ لا يوجد ملف محفوظ"); return; }
   const w = window.open("", "_blank");
-  w.document.write(`<html dir="rtl"><head><title>ملف المريض</title><style>body{font-family:Arial;padding:30px;direction:rtl} h1{color:#0d9488} table{width:100%;border-collapse:collapse} td,th{padding:10px;border:1px solid #ccc} th{background:#f0fdfa;text-align:right}</style></head><body>
+  w.document.write(`<html dir="rtl"><head><title>ملف المريض</title><style>body{font-family:Arial;padding:30px;direction:rtl} h1{color:#0d9488} table{width:100%;border-collapse:collapse} td,th{padding:10px;border:1px solid #ccc} th{background:#f0fdfa;text-align:right}</style><script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script><script>Paddle.Initialize({token:"test_3f6fe28f60d098b9eabbc7f12bd"});</script>
+</head><body>
     <h1>💊 ملف المريض — جرعة</h1>
     <p style="color:#999;font-size:12px;">⚕️ هذا الملف للأغراض الطبية المرجعية فقط</p>
     <table><tr><th>البيان</th><th>القيمة</th></tr>
