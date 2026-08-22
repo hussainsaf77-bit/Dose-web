@@ -352,13 +352,13 @@ function onInput(){
   const sl = document.getElementById('suggList');
   if(q.length < 2){ sl.style.display='none'; return; }
   const m = drugsDB.filter(d =>
-    d.name_ar?.includes(q) || d.name_en?.toLowerCase().includes(q.toLowerCase()) ||
-    (d.trade_names||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
+    d.name_ar?.includes(q) || d.aliases?.[0]?.toLowerCase().includes(q.toLowerCase()) ||
+    (d.aliases||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
   ).slice(0, 8);
   if(!m.length){ sl.style.display='none'; return; }
   sl.innerHTML = m.map(d => `
     <div class="sugg-item" onclick="selectDrug(${d.id})">
-      <span>💊 ${d.name_ar} — ${d.name_en}</span>
+      <span>💊 ${d.name_ar} — ${d.aliases?.[0]}</span>
       <span class="sugg-cat">${d.category||''}</span>
     </div>`).join('');
   sl.style.display = 'block';
@@ -369,8 +369,8 @@ function doSearch(){
   document.getElementById('suggList').style.display = 'none';
   if(!q){ return; }
   const drug = drugsDB.find(d =>
-    d.name_ar?.includes(q) || d.name_en?.toLowerCase().includes(q.toLowerCase()) ||
-    (d.trade_names||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
+    d.name_ar?.includes(q) || d.aliases?.[0]?.toLowerCase().includes(q.toLowerCase()) ||
+    (d.aliases||[]).some(t => t.toLowerCase().includes(q.toLowerCase()))
   );
   if(!drug){ toast('لم يُعثر على الدواء — جرب اسماً مختلفاً', 'error'); return; }
   showDrug(drug);
@@ -384,24 +384,24 @@ function selectDrug(id){
 
 function showDrug(drug){
   currentDrug = drug;
-  document.getElementById('drugName').textContent = drug.name_ar + ' — ' + drug.name_en;
-  document.getElementById('drugCat').textContent = drug.category || '';
-  document.getElementById('drugTrades').innerHTML = (drug.trade_names||[]).map(t =>
+  document.getElementById('drugName').textContent = drug.name_ar + ' — ' + drug.aliases?.[0];
+  document.getElementById('drugCat').textContent = drug?.category || '';
+  document.getElementById('drugTrades').innerHTML = (drug.aliases||[]).map(t =>
     `<span class="drug-trade">💊 ${t}</span>`).join('');
   document.getElementById('drugGrid').innerHTML = [
-    {l:'جرعة الأطفال (ml/kg)', v: drug.child_dose_ml_per_kg ? drug.child_dose_ml_per_kg+' ml/kg' : '—', big: true},
-    {l:'جرعة الأطفال (mg/kg)', v: drug.child_dose_mg_per_kg ? drug.child_dose_mg_per_kg+' mg/kg' : '—'},
-    {l:'جرعة الكبار', v: drug.adult_dose_mg ? drug.adult_dose_mg+'–'+(drug.adult_dose_max_mg||drug.adult_dose_mg)+' mg' : '—'},
-    {l:'الحد الأقصى اليومي', v: drug.max_daily_dose_mg ? drug.max_daily_dose_mg+' mg' : '—'},
-    {l:'التكرار', v: drug.frequency_ar || '—'},
-    {l:'الحمل', v: drug.pregnancy || '—'},
-    {l:'الرضاعة', v: drug.lactation || '—'},
-    {l:'الكلى', v: drug.renal || '—'},
+    {l:'جرعة الأطفال (ml/kg)', v: drug.pediatric_ml_per_kg ? drug.pediatric_ml_per_kg+' ml/kg' : '—', big: true},
+    {l:'جرعة الأطفال (mg/kg)', v: drug.pediatric_mg_per_kg ? drug.pediatric_mg_per_kg+' mg/kg' : '—'},
+    {l:'جرعة الكبار', v: drug.adult_dose_min ? drug.adult_dose_min+'–'+(drug.adult_dose_max||drug.adult_dose_min)+' mg' : '—'},
+    {l:'الحد الأقصى اليومي', v: drug.max_daily ? drug.max_daily+' mg' : '—'},
+    {l:'التكرار', v: drug.adult_frequency || '—'},
+    {l:'الحمل', v: drug?.pregnancy || '—'},
+    {l:'الرضاعة', v: drug?.lactation || '—'},
+    {l:'الكلى', v: drug?.renal || '—'},
   ].map(f => `<div class="drug-field"><label>${f.l}</label><div class="val ${f.big?'big':''}">${f.v}</div></div>`).join('');
   document.getElementById('drugInfos').innerHTML =
-    (drug.contraindications_ar ? `<div class="info-row danger">⛔ <strong>الموانع:</strong> ${drug.contraindications_ar}</div>` : '') +
-    (drug.side_effects_ar ? `<div class="info-row warn">⚠️ <strong>آثار جانبية:</strong> ${drug.side_effects_ar}</div>` : '') +
-    (drug.notes_ar ? `<div class="info-row info">📝 ${drug.notes_ar}</div>` : '');
+    (drug.contraindications?.join(", ") ? `<div class="info-row danger">⛔ <strong>الموانع:</strong> ${drug.contraindications?.join(", ")}</div>` : '') +
+    (drug.side_effects?.join(", ") ? `<div class="info-row warn">⚠️ <strong>آثار جانبية:</strong> ${drug.side_effects?.join(", ")}</div>` : '') +
+    (drug?.notes ? `<div class="info-row info">📝 ${drug?.notes}</div>` : '');
   document.getElementById('drugResult').style.display = 'block';
   document.getElementById('drugResult').scrollIntoView({behavior:'smooth', block:'nearest'});
 }
