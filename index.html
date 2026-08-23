@@ -3,24 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>DoseBot | حاسبة الجرعات</title>
+<title>DoseBot | حاسبة الجرعات الطبية</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{--p:#1a6fd4;--pd:#1558b0;--s:#0d9488;--bg:#f0f4ff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0}
 body{font-family:Cairo,sans-serif;background:var(--bg);color:var(--text)}
-/* NAV */
 nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.06)}
 .brand{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:800;text-decoration:none;color:var(--text)}
 .bi{width:36px;height:36px;background:linear-gradient(135deg,var(--p),var(--s));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
-.nav-r{display:flex;gap:6px;align-items:center}
+.nav-r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .nbtn{padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;border:none;transition:.2s;text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .np{background:var(--p);color:#fff}.np:hover{background:var(--pd)}
 .no{background:transparent;color:var(--p);border:2px solid var(--p)}.no:hover{background:var(--p);color:#fff}
 .ntg{background:#0088cc;color:#fff}.ntg:hover{background:#0077b3}
-.nlang{background:var(--bg);border:1px solid var(--border);color:var(--text)}
-/* HERO */
+.nlang{background:var(--bg);border:1px solid var(--border);color:var(--text);font-weight:700}
 .hero{background:linear-gradient(135deg,#0f172a,#1e3a5f 60%,#0d9488);color:#fff;padding:64px 16px;text-align:center}
 .hbadge{display:inline-block;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:5px 14px;font-size:13px;margin-bottom:16px}
 .hero h1{font-size:clamp(24px,6vw,46px);font-weight:900;line-height:1.2;margin-bottom:12px}
@@ -28,44 +26,38 @@ nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;disp
 .hero p{font-size:15px;opacity:.85;max-width:560px;margin:0 auto 24px;line-height:1.8}
 .hbtns{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:36px}
 .hb{padding:12px 24px;border-radius:12px;font-size:15px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;border:none;transition:.2s}
-.hbw{background:#fff;color:var(--p)}.hbw:hover{transform:translateY(-2px)}
+.hbw{background:#fff;color:var(--p)}.hbw:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
 .hbo{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.25)}.hbo:hover{background:rgba(255,255,255,.25)}
 .hstats{display:flex;gap:24px;justify-content:center;flex-wrap:wrap}
-.hs .n{font-size:28px;font-weight:900;color:#5eead4}
-.hs .l{font-size:12px;opacity:.7}
-/* SECTIONS */
-.sec{padding:48px 16px}
-.secw{background:#fff}
+.hs .n{font-size:28px;font-weight:900;color:#5eead4}.hs .l{font-size:12px;opacity:.7}
+.sec{padding:48px 16px}.secw{background:#fff}
 .stitle{text-align:center;margin-bottom:28px}
 .stitle h2{font-size:24px;font-weight:800;margin-bottom:6px}
 .stitle p{color:var(--muted);font-size:14px}
-/* SEARCH */
-.sw{max-width:700px;margin:0 auto}
+.sw{max-width:720px;margin:0 auto}
 .sr{position:relative}
 .sbox{display:flex;gap:8px;margin-bottom:10px}
 .si{flex:1;padding:13px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;font-family:Cairo,sans-serif;background:var(--bg);transition:.2s}
-.si:focus{outline:none;border-color:var(--p);background:#fff}
-.sb{padding:13px 20px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-family:Cairo,sans-serif;font-weight:700;cursor:pointer}
+.si:focus{outline:none;border-color:var(--p);background:#fff;box-shadow:0 0 0 4px rgba(26,111,212,.1)}
+.sb{padding:13px 20px;background:var(--p);color:#fff;border:none;border-radius:12px;font-size:15px;font-family:Cairo,sans-serif;font-weight:700;cursor:pointer;white-space:nowrap}
 .sb:hover{background:var(--pd)}
-.sugg{position:absolute;top:100%;right:0;left:0;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);z-index:50;display:none;overflow:hidden;margin-top:4px}
+.sugg{position:absolute;top:100%;right:0;left:0;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.12);z-index:50;display:none;overflow:hidden;margin-top:4px;max-height:320px;overflow-y:auto}
 .si-item{padding:10px 16px;cursor:pointer;font-size:14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);transition:.15s}
 .si-item:last-child{border:none}
 .si-item:hover{background:var(--bg);color:var(--p)}
-.si-cat{font-size:11px;color:var(--muted);background:var(--bg);padding:2px 8px;border-radius:20px}
-/* DRUG CARD */
+.si-cat{font-size:11px;color:var(--muted);background:var(--bg);padding:2px 8px;border-radius:20px;flex-shrink:0;margin-right:8px}
 .dc{border:1px solid var(--border);border-radius:16px;overflow:hidden;display:none;margin-top:14px;animation:fi .3s}
 @keyframes fi{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 .dh{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;padding:16px 20px}
-.dh h3{font-size:18px;font-weight:700}
-.dh p{opacity:.8;font-size:13px;margin-top:2px}
+.dh h3{font-size:18px;font-weight:700}.dh p{opacity:.8;font-size:13px;margin-top:2px}
 .db{padding:16px 20px;background:#fff}
-.aliases{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px}
+.aliases{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
 .al{background:#e8f0fc;color:var(--p);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
 .df{background:var(--bg);border-radius:9px;padding:10px}
 .df label{font-size:10px;color:var(--muted);font-weight:700;display:block;margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
 .df .v{font-size:14px;font-weight:700}
-.df .vb{font-size:20px;color:var(--p);font-weight:900}
+.df .vb{font-size:22px;color:var(--p);font-weight:900}
 .df .vg{color:#16a34a}.df .vo{color:#d97706}.df .vr{color:#dc2626}
 .ibox{border-radius:9px;padding:10px 13px;margin-bottom:7px;font-size:13px;line-height:1.6}
 .ib-r{background:#fef2f2;color:#dc2626;border-right:3px solid #dc2626}
@@ -74,29 +66,26 @@ nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;disp
 .ib-g{background:#f0fdf4;color:#16a34a;border-right:3px solid #16a34a}
 .dacts{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
 .da{padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;border:none;transition:.2s}
-.dab{background:#e8f0fc;color:var(--p)}
-.dag{background:#f0fdf4;color:#16a34a}
-.dat{background:#0088cc;color:#fff}
+.dab{background:#e8f0fc;color:var(--p)}.dag{background:#f0fdf4;color:#16a34a}.dat{background:#0088cc;color:#fff}
 .da:hover{opacity:.85;transform:translateY(-1px)}
-/* FEATURES */
+.info-tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+.itab{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:Cairo,sans-serif;background:var(--bg);color:var(--muted);transition:.2s}
+.itab.on{background:var(--p);color:#fff}
+.itab-content{display:none}.itab-content.on{display:block}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;max-width:1100px;margin:0 auto}
 .fc{background:#fff;border:1px solid var(--border);border-radius:14px;padding:22px;transition:.2s}
 .fc:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.08)}
 .fi{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:12px}
 .fi-bl{background:#e8f0fc}.fi-gr{background:#f0fdf4}.fi-pu{background:#faf5ff}
 .fi-te{background:#f0fdfa}.fi-re{background:#fef2f2}.fi-or{background:#fff7ed}
-.fc h3{font-size:15px;font-weight:700;margin-bottom:6px}
-.fc p{font-size:13px;color:var(--muted);line-height:1.7}
-/* PLANS */
+.fc h3{font-size:15px;font-weight:700;margin-bottom:6px}.fc p{font-size:13px;color:var(--muted);line-height:1.7}
 .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:980px;margin:0 auto}
 .pl{background:var(--bg);border:2px solid var(--border);border-radius:16px;padding:22px;position:relative;transition:.2s}
 .pl:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.1)}
-.pl.pop{border-color:var(--p);background:#fff}
-.pl.ann{border-color:#d97706}
+.pl.pop{border-color:var(--p);background:#fff}.pl.ann{border-color:#d97706}
 .pbg{position:absolute;top:-1px;right:18px;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:0 0 9px 9px}
 .pbg-b{background:var(--p)}.pbg-g{background:#d97706}
-.pe{font-size:28px;margin-bottom:8px}
-.pn{font-size:17px;font-weight:800;margin-bottom:3px}
+.pe{font-size:28px;margin-bottom:8px}.pn{font-size:17px;font-weight:800;margin-bottom:3px}
 .pd{font-size:12px;color:var(--muted);margin-bottom:12px}
 .pp{font-size:36px;font-weight:900;margin-bottom:3px}
 .pp span{font-size:13px;font-weight:400;color:var(--muted)}
@@ -107,14 +96,11 @@ nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;disp
 .pb-p{background:var(--p);color:#fff}.pb-p:hover{background:var(--pd)}
 .pb-o{background:transparent;color:var(--p);border:2px solid var(--p)}.pb-o:hover{background:var(--p);color:#fff}
 .pb-g{background:#d97706;color:#fff}.pb-g:hover{background:#b45309}
-/* CTA */
 .cta{background:linear-gradient(135deg,var(--p),var(--s));color:#fff;padding:52px 16px;text-align:center}
 .cta h2{font-size:clamp(20px,5vw,32px);font-weight:900;margin-bottom:10px}
 .cta p{font-size:15px;opacity:.85;margin-bottom:22px}
-/* FOOTER */
 footer{background:#0f172a;color:#94a3b8;padding:24px 16px;text-align:center;font-size:13px;line-height:2}
 footer a{color:#5eead4;text-decoration:none}
-/* MODAL */
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:center;justify-content:center;padding:16px}
 .modal.on{display:flex}
 .mbox{background:#fff;border-radius:18px;padding:24px;width:100%;max-width:400px;animation:fi .2s}
@@ -131,47 +117,43 @@ footer a{color:#5eead4;text-decoration:none}
 .mres .dose{font-size:36px;font-weight:900;color:var(--p)}
 .mres .note{font-size:13px;color:var(--muted);margin-top:4px}
 .mres .maxd{background:#fff7ed;border-radius:8px;padding:8px;margin-top:8px;font-size:12px;color:#d97706;display:none}
-/* TOAST */
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:12px;font-size:14px;font-weight:600;transition:.3s;z-index:999}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:12px;font-size:14px;font-weight:600;transition:.3s;z-index:999;white-space:nowrap}
 .toast.on{transform:translateX(-50%) translateY(0)}
 .tok{background:#16a34a}.terr{background:#dc2626}
-@media(max-width:580px){.dgrid{grid-template-columns:1fr}.hstats{gap:16px}}
+@media(max-width:580px){.dgrid{grid-template-columns:1fr}.hstats{gap:16px}.nav-r .ntg{display:none}}
 </style>
 </head>
 <body>
-<!-- NAV -->
 <nav>
-  <a href="#" class="brand"><div class="bi">💊</div>DoseBot</a>
+  <a href="#" class="brand"><div class="bi">&#128138;</div>DoseBot</a>
   <div class="nav-r">
     <button class="nbtn nlang" onclick="tgLang()" id="lBtn">EN</button>
-    <a href="https://t.me/Drugscalculat_bot" target="_blank" class="nbtn ntg">🤖 البوت</a>
-    <button class="nbtn no" onclick="loc('auth.html')" id="lInBtn">👤 دخول</button>
-    <button class="nbtn np" onclick="loc('dashboard.html')" id="dBtn" style="display:none">📊 لوحتي</button>
+    <a href="https://t.me/Drugscalculat_bot" target="_blank" class="nbtn ntg">&#129302; البوت</a>
+    <button class="nbtn no" onclick="loc('auth.html')" id="lInBtn">&#128100; دخول</button>
+    <button class="nbtn np" onclick="loc('dashboard.html')" id="dBtn" style="display:none">&#128202; لوحتي</button>
   </div>
 </nav>
 
-<!-- HERO -->
 <section class="hero">
-  <div class="hbadge" id="hb">🏥 نظام طبي ذكي للمحترفين</div>
+  <div class="hbadge" id="hb">&#127973; نظام طبي ذكي للمحترفين</div>
   <h1 id="ht">حاسبة الجرعات<br><em>الأكثر دقة وشمولاً</em></h1>
-  <p id="hp">منصة طبية للأطباء والصيادلة والممرضين — ابحث في 527+ دواء، احسب جرعات الأطفال بدقة، فعّل تذكيرات الأدوية المزمنة</p>
+  <p id="hp">منصة طبية للأطباء والصيادلة والممرضين — ابحث في 527+ دواء، احسب جرعات الأطفال، فعّل التذكيرات، وتمتع باشتراك موحد للموقع والبوت</p>
   <div class="hbtns">
-    <button class="hb hbw" onclick="scrl('ssec')" id="h1">🔍 ابحث عن دواء</button>
-    <button class="hb hbo" onclick="loc('auth.html')" id="h2">🚀 أنشئ حسابك مجاناً</button>
+    <button class="hb hbw" onclick="scrl('ssec')" id="h1">&#128269; ابحث عن دواء</button>
+    <button class="hb hbo" onclick="loc('auth.html')" id="h2">&#128640; أنشئ حسابك مجاناً</button>
   </div>
   <div class="hstats">
     <div class="hs"><div class="n">527+</div><div class="l" id="s1">دواء في القاعدة</div></div>
     <div class="hs"><div class="n">100%</div><div class="l" id="s2">دقة في الجرعات</div></div>
-    <div class="hs"><div class="n">٢٤/٧</div><div class="l" id="s3">متاح دائماً</div></div>
+    <div class="hs"><div class="n">24/7</div><div class="l" id="s3">متاح دائماً</div></div>
     <div class="hs"><div class="n" id="s4n">مجاني</div><div class="l" id="s4l">للبدء</div></div>
   </div>
 </section>
 
-<!-- SEARCH -->
 <section class="sec secw" id="ssec">
   <div class="stitle">
-    <h2 id="st1">🔍 ابحث عن أي دواء</h2>
-    <p id="st2">ابحث بالاسم العربي أو الإنجليزي أو الاسم التجاري</p>
+    <h2 id="st1">&#128269; ابحث عن أي دواء</h2>
+    <p id="st2">ابحث بالاسم العربي أو الإنجليزي أو الاسم التجاري — 527 دواء</p>
   </div>
   <div class="sw">
     <div class="sr">
@@ -185,55 +167,52 @@ footer a{color:#5eead4;text-decoration:none}
       <div class="dh"><h3 id="dN"></h3><p id="dCt"></p></div>
       <div class="db">
         <div class="aliases" id="dAl"></div>
-        <div class="dgrid" id="dGr"></div>
-        <div id="dInf"></div>
+        <div class="info-tabs" id="dTabs"></div>
+        <div id="dTabContent"></div>
         <div class="dacts">
-          <button class="da dab" onclick="cpDrug()" id="cpBtn">📋 نسخ</button>
-          <button class="da dag" onclick="opCalc()" id="cBtn">🍼 جرعة الطفل</button>
-          <button class="da dat" onclick="window.open('https://t.me/Drugscalculat_bot','_blank')">🤖 البوت</button>
-          <button class="da dab" onclick="loc('auth.html')" id="svBtn">⭐ حفظ</button>
+          <button class="da dab" onclick="cpDrug()" id="cpBtn">&#128203; نسخ</button>
+          <button class="da dag" onclick="opCalc()" id="cBtn">&#127868; جرعة الطفل</button>
+          <button class="da dat" onclick="window.open('https://t.me/Drugscalculat_bot','_blank')">&#129302; البوت</button>
+          <button class="da dab" onclick="loc('dashboard.html')" id="svBtn">&#11088; لوحتي</button>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FEATURES -->
 <section class="sec" id="fsec">
   <div class="stitle">
-    <h2 id="ft1">✨ كل ما تحتاجه في مكان واحد</h2>
+    <h2 id="ft1">&#10024; كل ما تحتاجه في مكان واحد</h2>
     <p id="ft2">منصة متكاملة للكادر الصحي والمرضى</p>
   </div>
   <div class="fgrid">
-    <div class="fc"><div class="fi fi-bl">💊</div><h3 id="f1h">527+ دواء</h3><p id="f1p">قاعدة بيانات شاملة بالعربية والإنجليزية مع معلومات تفصيلية كاملة</p></div>
-    <div class="fc"><div class="fi fi-gr">🍼</div><h3 id="f2h">جرعات الأطفال بالمل</h3><p id="f2p">احسب الجرعة الدقيقة بالمل حسب وزن الطفل وتركيز الشراب</p></div>
-    <div class="fc"><div class="fi fi-pu">⏰</div><h3 id="f3h">تذكيرات الأدوية</h3><p id="f3p">تذكيرات تلقائية للأدوية المزمنة عبر الموقع وبوت Telegram</p></div>
-    <div class="fc"><div class="fi fi-te">🤖</div><h3 id="f4h">بوت Telegram</h3><p id="f4p">اشتراك واحد يعمل على الموقع والبوت — نفس الخدمة في كل مكان</p></div>
-    <div class="fc"><div class="fi fi-re">⚠️</div><h3 id="f5h">موانع وتفاعلات</h3><p id="f5p">موانع الاستخدام، التداخلات الدوائية، والسلامة في الحمل والرضاعة</p></div>
-    <div class="fc"><div class="fi fi-or">📋</div><h3 id="f6h">سجل طبي شخصي</h3><p id="f6p">احفظ تاريخ بحثك وأدويتك في ملف طبي شخصي آمن ومشفّر</p></div>
+    <div class="fc"><div class="fi fi-bl">&#128138;</div><h3 id="f1h">527+ دواء بالعربي والإنجليزي</h3><p id="f1p">قاعدة بيانات شاملة مع معلومات تفصيلية: جرعات، موانع، آثار جانبية، تفاعلات، حمل، رضاعة، كلى</p></div>
+    <div class="fc"><div class="fi fi-gr">&#127868;</div><h3 id="f2h">حاسبة جرعات الأطفال بالمل</h3><p id="f2p">أدخل وزن الطفل وتركيز الشراب واحصل على الجرعة الدقيقة بالمل مع تحذير الحد الأقصى</p></div>
+    <div class="fc"><div class="fi fi-pu">&#9200;</div><h3 id="f3h">تذكيرات الأدوية المزمنة</h3><p id="f3p">تذكيرات تلقائية عبر الموقع وبوت Telegram — لا تفوّت جرعة مرة أخرى</p></div>
+    <div class="fc"><div class="fi fi-te">&#129302;</div><h3 id="f4h">بوت Telegram متكامل</h3><p id="f4p">اشتراك واحد يعمل على الموقع والبوت معاً — نفس الحساب ونفس البيانات في كل مكان</p></div>
+    <div class="fc"><div class="fi fi-re">&#9888;&#65039;</div><h3 id="f5h">موانع وتفاعلات دوائية</h3><p id="f5p">موانع الاستخدام، التداخلات الدوائية الكاملة، والسلامة في الحمل والرضاعة والكلى</p></div>
+    <div class="fc"><div class="fi fi-or">&#128203;</div><h3 id="f6h">سجل طبي وتاريخ بحث</h3><p id="f6p">احفظ تاريخ بحثك وأدويتك في ملف طبي شخصي آمن ومشفّر — متاح من أي جهاز</p></div>
   </div>
 </section>
 
-<!-- PLANS -->
 <section class="sec secw" id="psec">
   <div class="stitle">
-    <h2 id="pt1">💳 خطط بسيطة وواضحة</h2>
+    <h2 id="pt1">&#128179; خطط بسيطة وواضحة</h2>
     <p id="pt2">ابدأ مجاناً — اشتراك واحد للموقع والبوت</p>
   </div>
   <div class="pgrid" id="pg">
-    <div style="grid-column:1/-1;text-align:center;padding:28px;color:var(--muted)">⏳ جاري التحميل...</div>
+    <div style="grid-column:1/-1;text-align:center;padding:28px;color:var(--muted)">&#9203; جاري التحميل...</div>
   </div>
 </section>
 
-<!-- CTA -->
 <section class="cta">
-  <h2 id="ct1">ابدأ الآن مجاناً 🚀</h2>
-  <p id="ct2">أنشئ حسابك في ثوانٍ واستمتع بـ 5 بحث يومياً مجاناً</p>
-  <button class="hb hbw" onclick="loc('auth.html')" id="ctBtn">إنشاء حساب مجاني ←</button>
+  <h2 id="ct1">ابدأ الآن مجاناً &#128640;</h2>
+  <p id="ct2">أنشئ حسابك في ثوانٍ واستمتع بـ 5 بحث يومياً مجاناً — لا يلزم بطاقة ائتمان</p>
+  <button class="hb hbw" onclick="loc('auth.html')" id="ctBtn">إنشاء حساب مجاني &#8592;</button>
 </section>
 
 <footer>
-  <p>💊 DoseBot — للأغراض التعليمية فقط. استشر طبيبك دائماً</p>
+  <p>&#128138; DoseBot — للأغراض التعليمية فقط. استشر طبيبك دائماً</p>
   <p>
     <a href="auth.html" id="fLogin">تسجيل الدخول</a> ·
     <a href="dashboard.html" id="fDash">لوحة التحكم</a> ·
@@ -242,12 +221,11 @@ footer a{color:#5eead4;text-decoration:none}
   </p>
 </footer>
 
-<!-- CALC MODAL -->
 <div class="modal" id="cModal">
   <div class="mbox">
-    <div class="mhd"><h3 id="cmT">🍼 حاسبة جرعات الأطفال</h3><button class="mx" onclick="cls('cModal')">✕</button></div>
+    <div class="mhd"><h3 id="cmT">&#127868; حاسبة جرعات الأطفال</h3><button class="mx" onclick="cls('cModal')">&#10005;</button></div>
     <div class="mf"><label id="cmDL">الدواء</label><input id="cmD" readonly></div>
-    <div class="mf"><label id="cmWL">وزن الطفل (كجم)</label><input type="number" id="cmW" placeholder="15" min="1" max="80"></div>
+    <div class="mf"><label id="cmWL">وزن الطفل (كجم)</label><input type="number" id="cmW" placeholder="15" min="1" max="80" step="0.5"></div>
     <div class="mf">
       <label id="cmCL">تركيز الشراب</label>
       <select id="cmC">
@@ -257,9 +235,10 @@ footer a{color:#5eead4;text-decoration:none}
         <option value="250">250mg/5ml</option>
         <option value="100">100mg/5ml</option>
         <option value="50">50mg/5ml</option>
+        <option value="120">120mg/5ml</option>
       </select>
     </div>
-    <button class="mbtn" onclick="doCalc()" id="cmBtn">احسب الجرعة ←</button>
+    <button class="mbtn" onclick="doCalc()" id="cmBtn">احسب الجرعة &#8592;</button>
     <div class="mres" id="cmR">
       <div class="dose" id="cmDose"></div>
       <div class="note" id="cmNote"></div>
@@ -271,136 +250,142 @@ footer a{color:#5eead4;text-decoration:none}
 <div class="toast" id="tst"></div>
 
 <script>
-const API = 'https://dose-web-api.onrender.com';
-let DB = [], cur = null, lg = 'ar';
+const API='https://dose-web-api.onrender.com';
+let DB=[],cur=null,lg='ar',activeTab=0;
+
 Paddle.Initialize({token:'test_3f6fe28f60d098b9eabbc7f12bd'});
 
-const T = {
+/* ── TEXTS ── */
+const TX={
   ar:{
-    hb:'🏥 نظام طبي ذكي للمحترفين',
+    hb:'&#127973; نظام طبي ذكي للمحترفين',
     ht:'حاسبة الجرعات<br><em>الأكثر دقة وشمولاً</em>',
-    hp:'منصة طبية للأطباء والصيادلة والممرضين — ابحث في 527+ دواء، احسب جرعات الأطفال بدقة، فعّل تذكيرات الأدوية المزمنة',
-    h1:'🔍 ابحث عن دواء', h2:'🚀 أنشئ حسابك مجاناً',
-    s1:'دواء في القاعدة', s2:'دقة في الجرعات', s3:'متاح دائماً', s4n:'مجاني', s4l:'للبدء',
-    st1:'🔍 ابحث عن أي دواء', st2:'ابحث بالاسم العربي أو الإنجليزي أو الاسم التجاري',
+    hp:'منصة طبية للأطباء والصيادلة والممرضين — ابحث في 527+ دواء، احسب جرعات الأطفال، فعّل التذكيرات، واشتراك موحد للموقع والبوت',
+    h1:'&#128269; ابحث عن دواء',h2:'&#128640; أنشئ حسابك مجاناً',
+    s1:'دواء في القاعدة',s2:'دقة في الجرعات',s3:'متاح دائماً',s4n:'مجاني',s4l:'للبدء',
+    st1:'&#128269; ابحث عن أي دواء',st2:'ابحث بالاسم العربي أو الإنجليزي أو الاسم التجاري — 527 دواء',
     ph:'باراسيتامول، Amoxicillin، بنادول...',sbEl:'بحث',
-    ft1:'✨ كل ما تحتاجه في مكان واحد', ft2:'منصة متكاملة للكادر الصحي والمرضى',
-    f1h:'527+ دواء', f1p:'قاعدة بيانات شاملة بالعربية والإنجليزية',
-    f2h:'جرعات الأطفال بالمل', f2p:'احسب الجرعة الدقيقة حسب وزن الطفل وتركيز الشراب',
-    f3h:'تذكيرات الأدوية', f3p:'تذكيرات تلقائية للأدوية المزمنة عبر الموقع والبوت',
-    f4h:'بوت Telegram', f4p:'اشتراك واحد يعمل على الموقع والبوت',
-    f5h:'موانع وتفاعلات', f5p:'موانع الاستخدام، التداخلات، والسلامة في الحمل والرضاعة',
-    f6h:'سجل طبي شخصي', f6p:'ملف طبي آمن ومشفّر',
-    pt1:'💳 خطط بسيطة وواضحة', pt2:'ابدأ مجاناً — اشتراك واحد للموقع والبوت',
-    ct1:'ابدأ الآن مجاناً 🚀', ct2:'أنشئ حسابك واستمتع بـ 5 بحث يومياً مجاناً',
-    ctBtn:'إنشاء حساب مجاني ←',
-    lInBtn:'👤 دخول', dBtn:'📊 لوحتي',
-    cpBtn:'📋 نسخ', cBtn:'🍼 جرعة الطفل', svBtn:'⭐ حفظ',
-    cmT:'🍼 حاسبة جرعات الأطفال', cmDL:'الدواء', cmWL:'وزن الطفل (كجم)', cmCL:'تركيز الشراب', cmBtn:'احسب الجرعة ←',
-    fLogin:'تسجيل الدخول', fDash:'لوحة التحكم', fPrice:'الأسعار',
-    fd:['جرعة الأطفال (ml/kg)','جرعة الأطفال (mg/kg)','جرعة الكبار','الحد الأقصى اليومي','التكرار','الحمل','الرضاعة','الكلى'],
-    contra:'⛔ الموانع:', sides:'⚠️ آثار جانبية:', inters:'🔄 التفاعلات:', notes:'📝 ملاحظات:',
-    notFound:'لم يُعثر على الدواء',
-    copied:'تم النسخ ✅', loginFirst:'سجّل الدخول أولاً',
-    noKid:'لا تتوفر بيانات جرعة الأطفال',
-    entW:'أدخل وزن الطفل',
+    ft1:'&#10024; كل ما تحتاجه في مكان واحد',ft2:'منصة متكاملة للكادر الصحي والمرضى',
+    pt1:'&#128179; خطط بسيطة وواضحة',pt2:'ابدأ مجاناً — اشتراك واحد للموقع والبوت',
+    ct1:'ابدأ الآن مجاناً &#128640;',ct2:'أنشئ حسابك في ثوانٍ واستمتع بـ 5 بحث يومياً مجاناً',
+    ctBtn:'إنشاء حساب مجاني &#8592;',
+    lInBtn:'&#128100; دخول',dBtn:'&#128202; لوحتي',
+    cpBtn:'&#128203; نسخ',cBtn:'&#127868; جرعة الطفل',svBtn:'&#11088; لوحتي',
+    cmT:'&#127868; حاسبة جرعات الأطفال',
+    cmDL:'الدواء',cmWL:'وزن الطفل (كجم)',cmCL:'تركيز الشراب',cmBtn:'احسب الجرعة &#8592;',
+    fLogin:'تسجيل الدخول',fDash:'لوحة التحكم',fPrice:'الأسعار',
+    tabs:['&#128138; الجرعات','&#9888; الموانع','&#128100; السلامة','&#128221; ملاحظات'],
+    fl:['جرعة الأطفال (ml/kg)','جرعة الأطفال (mg/kg)','جرعة الكبار الدنيا','جرعة الكبار القصوى','الحد الأقصى اليومي','تكرار الأطفال','تكرار الكبار'],
+    preg:'الحمل',lact:'الرضاعة',renal:'الكلى',
+    contra:'&#9940; الموانع:',sides:'&#9888;&#65039; آثار جانبية:',inters:'&#128260; التفاعلات:',notes:'&#128221; ملاحظات:',
+    notFound:'لم يُعثر على الدواء — جرب اسماً مختلفاً',
+    copied:'تم النسخ &#10003;',loginFirst:'سجّل الدخول أولاً',
+    noKid:'لا تتوفر بيانات جرعة الأطفال',entW:'أدخل وزن الطفل',
     maxDay:'الحد الأقصى اليومي:',
-    pDesc:{Free:'للتجربة',Basic:'للاستخدام اليومي',Pro:'للمحترفين','Pro Annual':'وفّر 33%'},
-    pBtn:{Free:'ابدأ مجاناً',Basic:'🚀 اشترك',Pro:'🚀 اشترك','Pro Annual':'⭐ اشترك سنوياً'},
-    popBadge:'الأكثر شيوعاً', annBadge:'الأفضل قيمة',
-    pPer:{month:' / شهر', year:' / سنة', free:''},
+    pDesc:{'Free':'للتجربة','Basic':'للاستخدام اليومي','Pro':'للمحترفين','Pro Annual':'وفّر 33%'},
+    pBtn:{'Free':'ابدأ مجاناً','Basic':'&#128640; اشترك','Pro':'&#128640; اشترك','Pro Annual':'&#11088; اشترك سنوياً'},
+    popB:'الأكثر شيوعاً',annB:'الأفضل قيمة',
+    pPer:{'month':' / شهر','year':' / سنة','free':''},
   },
   en:{
-    hb:'🏥 Smart Medical System for Professionals',
+    hb:'&#127973; Smart Medical System for Professionals',
     ht:'Dose Calculator<br><em>Most Accurate & Comprehensive</em>',
-    hp:'Medical platform for doctors, pharmacists & nurses — search 527+ drugs, calculate pediatric doses, set medication reminders',
-    h1:'🔍 Search Drug', h2:'🚀 Create Free Account',
-    s1:'Drugs in DB', s2:'Dosing accuracy', s3:'Always available', s4n:'Free', s4l:'To start',
-    st1:'🔍 Search Any Drug', st2:'Search by Arabic, English or brand name',
+    hp:'Medical platform for doctors, pharmacists & nurses — search 527+ drugs, calculate pediatric doses, set reminders, one subscription for website & bot',
+    h1:'&#128269; Search Drug',h2:'&#128640; Create Free Account',
+    s1:'Drugs in DB',s2:'Dosing accuracy',s3:'Always available',s4n:'Free',s4l:'To start',
+    st1:'&#128269; Search Any Drug',st2:'Search by Arabic, English name or brand name — 527 drugs',
     ph:'Paracetamol, Amoxicillin, Panadol...',sbEl:'Search',
-    ft1:'✨ Everything You Need', ft2:'Integrated platform for healthcare & patients',
-    f1h:'527+ Drugs', f1p:'Comprehensive database in Arabic & English',
-    f2h:'Pediatric Doses in ml', f2p:'Calculate exact ml dose by weight & concentration',
-    f3h:'Medication Reminders', f3p:'Automatic reminders via website and Telegram bot',
-    f4h:'Telegram Bot', f4p:'One subscription for website and bot',
-    f5h:'Contraindications & Interactions', f5p:'Drug interactions, pregnancy & lactation safety',
-    f6h:'Personal Medical Record', f6p:'Secure encrypted medical profile',
-    pt1:'💳 Simple & Clear Plans', pt2:'Start free — one subscription for website & bot',
-    ct1:'Start Free Now 🚀', ct2:'Create your account and get 5 free searches daily',
-    ctBtn:'Create Free Account →',
-    lInBtn:'👤 Login', dBtn:'📊 Dashboard',
-    cpBtn:'📋 Copy', cBtn:'🍼 Child Dose', svBtn:'⭐ Save',
-    cmT:'🍼 Pediatric Dose Calculator', cmDL:'Drug', cmWL:'Child Weight (kg)', cmCL:'Concentration', cmBtn:'Calculate →',
-    fLogin:'Login', fDash:'Dashboard', fPrice:'Pricing',
-    fd:['Pediatric (ml/kg)','Pediatric (mg/kg)','Adult Dose','Max Daily','Frequency','Pregnancy','Lactation','Renal'],
-    contra:'⛔ Contraindications:', sides:'⚠️ Side Effects:', inters:'🔄 Interactions:', notes:'📝 Notes:',
-    notFound:'Drug not found',
-    copied:'Copied ✅', loginFirst:'Please login first',
-    noKid:'No pediatric dosing data',
-    entW:'Enter child weight',
+    ft1:'&#10024; Everything You Need in One Place',ft2:'Integrated platform for healthcare professionals & patients',
+    pt1:'&#128179; Simple & Clear Plans',pt2:'Start free — one subscription for website & bot',
+    ct1:'Start Free Now &#128640;',ct2:'Create your account in seconds — 5 free searches daily, no credit card',
+    ctBtn:'Create Free Account &rarr;',
+    lInBtn:'&#128100; Login',dBtn:'&#128202; Dashboard',
+    cpBtn:'&#128203; Copy',cBtn:'&#127868; Child Dose',svBtn:'&#11088; Dashboard',
+    cmT:'&#127868; Pediatric Dose Calculator',
+    cmDL:'Drug',cmWL:'Child Weight (kg)',cmCL:'Syrup Concentration',cmBtn:'Calculate &rarr;',
+    fLogin:'Login',fDash:'Dashboard',fPrice:'Pricing',
+    tabs:['&#128138; Dosing','&#9888; Contraindications','&#128100; Safety','&#128221; Notes'],
+    fl:['Pediatric (ml/kg)','Pediatric (mg/kg)','Adult Min Dose','Adult Max Dose','Max Daily','Pediatric Frequency','Adult Frequency'],
+    preg:'Pregnancy',lact:'Lactation',renal:'Renal',
+    contra:'&#9940; Contraindications:',sides:'&#9888;&#65039; Side Effects:',inters:'&#128260; Interactions:',notes:'&#128221; Notes:',
+    notFound:'Drug not found — try a different name',
+    copied:'Copied &#10003;',loginFirst:'Please login first',
+    noKid:'No pediatric dosing data available',entW:'Enter child weight',
     maxDay:'Max daily:',
-    pDesc:{Free:'Free forever',Basic:'Daily use',Pro:'For professionals','Pro Annual':'Save 33%'},
-    pBtn:{Free:'Start Free',Basic:'🚀 Subscribe',Pro:'🚀 Subscribe','Pro Annual':'⭐ Annual'},
-    popBadge:'Most Popular', annBadge:'Best Value',
-    pPer:{month:' / month', year:' / year', free:''},
+    pDesc:{'Free':'Free forever','Basic':'Daily use','Pro':'For professionals','Pro Annual':'Save 33%'},
+    pBtn:{'Free':'Start Free','Basic':'&#128640; Subscribe','Pro':'&#128640; Subscribe','Pro Annual':'&#11088; Annual Plan'},
+    popB:'Most Popular',annB:'Best Value',
+    pPer:{'month':' / month','year':' / year','free':''},
   }
 };
 
-function t(k){ return T[lg][k] || T.ar[k] || k; }
-function loc(u){ location.href = u; }
-function scrl(id){ document.getElementById(id).scrollIntoView({behavior:'smooth'}); }
-function cls(id){ document.getElementById(id).classList.remove('on'); }
+function t(k){return TX[lg][k]||TX.ar[k]||k;}
+function loc(u){location.href=u;}
+function scrl(id){document.getElementById(id).scrollIntoView({behavior:'smooth'});}
+function cls(id){document.getElementById(id).classList.remove('on');}
 
-function toast(msg, type=''){
-  const el = document.getElementById('tst');
-  el.textContent = msg; el.className = 'toast on ' + type;
-  setTimeout(() => el.className = 'toast', 3000);
+function toast(msg,type=''){
+  const el=document.getElementById('tst');
+  el.innerHTML=msg;el.className='toast on '+type;
+  setTimeout(()=>el.className='toast',3000);
 }
 
-// ── Auth ─────────────────────────────────────────
+/* ── AUTH ── */
 (function(){
-  const tk = localStorage.getItem('db_token');
-  if(tk){ try{ const p=JSON.parse(atob(tk.split('.')[1])); if(p.exp*1000>Date.now()){ document.getElementById('lInBtn').style.display='none'; document.getElementById('dBtn').style.display='inline-flex'; } }catch(e){} }
+  const tk=localStorage.getItem('db_token');
+  if(tk){try{const p=JSON.parse(atob(tk.split('.')[1]));if(p.exp*1000>Date.now()){document.getElementById('lInBtn').style.display='none';document.getElementById('dBtn').style.display='inline-flex';}}catch(e){}}
 })();
 
-// ── Lang ─────────────────────────────────────────
+/* ── LANG ── */
 function tgLang(){
-  lg = lg==='ar' ? 'en' : 'ar';
-  document.documentElement.lang = lg;
-  document.documentElement.dir = lg==='ar' ? 'rtl' : 'ltr';
-  document.getElementById('lBtn').textContent = lg==='ar' ? 'EN' : 'ع';
+  lg=lg==='ar'?'en':'ar';
+  document.documentElement.lang=lg;
+  document.documentElement.dir=lg==='ar'?'rtl':'ltr';
+  document.getElementById('lBtn').textContent=lg==='ar'?'EN':'ع';
   applyLang();
 }
 
 function applyLang(){
-  const keys = ['hb','ht','hp','h1','h2','s1','s2','s3','s4n','s4l','st1','st2','sbEl',
-    'ft1','ft2','f1h','f1p','f2h','f2p','f3h','f3p','f4h','f4p','f5h','f5p','f6h','f6p',
-    'pt1','pt2','ct1','ct2','ctBtn','lInBtn','dBtn','cpBtn','cBtn','svBtn',
+  const keys=['hb','ht','hp','h1','h2','s1','s2','s3','s4n','s4l','st1','st2','sbEl',
+    'ft1','ft2','pt1','pt2','ct1','ct2','ctBtn','lInBtn','dBtn','cpBtn','cBtn','svBtn',
     'cmT','cmDL','cmWL','cmCL','cmBtn','fLogin','fDash','fPrice'];
-  keys.forEach(k => { const el=document.getElementById(k); if(el) el.innerHTML=t(k); });
-  document.getElementById('si').placeholder = t('ph');
-  if(cur) showDrug(cur);
+  keys.forEach(k=>{const el=document.getElementById(k);if(el)el.innerHTML=t(k);});
+  document.getElementById('si').placeholder=t('ph');
+  if(cur)showDrug(cur);
   loadPlans();
 }
 
-// ── DB ───────────────────────────────────────────
+/* ── DB ── */
 async function loadDB(){
-  try{ const r=await fetch('drugs.json'); DB=await r.json(); }catch(e){ DB=[]; }
+  try{const r=await fetch('drugs.json');DB=await r.json();}catch(e){DB=[];}
 }
 
-// ── Search ───────────────────────────────────────
+/* ── SEARCH ── */
+function isArabic(q){return /[؀-ۿ]/.test(q);}
+
 function mtch(d,q){
   const ql=q.toLowerCase();
-  return d.name_ar?.includes(q)||(d.aliases||[]).some(a=>a.toLowerCase().includes(ql));
+  if(isArabic(q)){
+    return d.name_ar?.includes(q)||(d.aliases||[]).some(a=>/[؀-ۿ]/.test(a)&&a.includes(q));
+  }else{
+    return (d.aliases||[]).some(a=>!/[؀-ۿ]/.test(a)&&a.toLowerCase().includes(ql))||
+           d.name_ar?.includes(q);
+  }
 }
 
 function onIn(){
   const q=document.getElementById('si').value.trim();
   const sl=document.getElementById('sugg');
   if(q.length<2){sl.style.display='none';return;}
-  const m=DB.filter(d=>mtch(d,q)).slice(0,8);
+  const m=DB.filter(d=>mtch(d,q)).slice(0,10);
   if(!m.length){sl.style.display='none';return;}
-  sl.innerHTML=m.map((d,i)=>`<div class="si-item" onclick="pick(${DB.indexOf(d)})"><span>💊 ${d.name_ar} — ${(d.aliases||[])[0]||''}</span><span class="si-cat">${d.category||''}</span></div>`).join('');
+  sl.innerHTML=m.map(d=>{
+    const enName=(d.aliases||[]).find(a=>!/[؀-ۿ]/.test(a))||'';
+    return `<div class="si-item" onclick="pick(${DB.indexOf(d)})">
+      <span>&#128138; ${d.name_ar}${enName?' — '+enName:''}</span>
+      <span class="si-cat">${d.category||''}</span>
+    </div>`;
+  }).join('');
   sl.style.display='block';
 }
 
@@ -418,77 +403,100 @@ function pick(i){
   showDrug(DB[i]);
 }
 
+/* ── SHOW DRUG ── */
 function showDrug(drug){
-  cur=drug;
-  const isEn=lg==='en';
-  // Name
-  const en=(drug.aliases||[])[0]||'';
-  document.getElementById('dN').textContent=drug.name_ar+(en?' — '+en:'');
+  cur=drug;activeTab=0;
+  const enName=(drug.aliases||[]).find(a=>!/[؀-ۿ]/.test(a))||'';
+  document.getElementById('dN').textContent=drug.name_ar+(enName?' — '+enName:'');
   document.getElementById('dCt').textContent=drug.category||'';
-  // Aliases
-  document.getElementById('dAl').innerHTML=(drug.aliases||[]).slice(1,6).map(a=>`<span class="al">💊 ${a}</span>`).join('');
-  // Calc ml/kg
+  // Aliases - show top 6 excluding first english
+  const allAliases=(drug.aliases||[]).filter(a=>a!==enName).slice(0,6);
+  document.getElementById('dAl').innerHTML=allAliases.map(a=>`<span class="al">&#128138; ${a}</span>`).join('');
+  // Tabs
+  const tabs=t('tabs');
+  document.getElementById('dTabs').innerHTML=tabs.map((tb,i)=>
+    `<button class="itab ${i===0?'on':''}" onclick="showTab(${i})">${tb}</button>`).join('');
+  renderTab(drug,0);
+  document.getElementById('dc').style.display='block';
+  setTimeout(()=>document.getElementById('dc').scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+}
+
+function showTab(i){
+  activeTab=i;
+  document.querySelectorAll('.itab').forEach((b,j)=>b.classList.toggle('on',j===i));
+  renderTab(cur,i);
+}
+
+function arr(a){return Array.isArray(a)?a.join('، '):(a||'');}
+
+function renderTab(drug,tab){
+  const c=document.getElementById('dTabContent');
   const mgKg=drug.pediatric_mg_per_kg||drug.pediatric_max_mg_per_kg;
   const mlKg=mgKg?(mgKg/250*5).toFixed(2):null;
-  // Pregnancy color
   const pregOk=(drug.pregnancy||'').includes('مسموح')||(drug.pregnancy||'').toLowerCase().includes('safe')||(drug.pregnancy||'').includes('آمن');
   const lacOk=(drug.lactation||'').includes('مسموح')||(drug.lactation||'').toLowerCase().includes('safe')||(drug.lactation||'').includes('آمن');
-  // Renal
   const renal=typeof drug.renal_dose==='string'?drug.renal_dose:(drug.renal_dose?JSON.stringify(drug.renal_dose):'—');
-  // Freq
-  const freq=isEn?(drug.adult_frequency_en||drug.adult_frequency||drug.pediatric_frequency_en||'—'):(drug.adult_frequency||drug.pediatric_frequency||'—');
-  // Grid
-  const fds=t('fd');
-  const vals=[
-    {v:mlKg?mlKg+' ml/kg':'—',big:!!mlKg},
-    {v:mgKg?mgKg+' mg/kg':'—',big:false},
-    {v:drug.adult_dose_min?drug.adult_dose_min+'–'+(drug.adult_dose_max||drug.adult_dose_min)+' mg':'—',big:false},
-    {v:drug.max_daily?drug.max_daily+' mg':'—',big:false},
-    {v:freq,big:false},
-    {v:drug.pregnancy||'—',cls:pregOk?'vg':'vo'},
-    {v:drug.lactation||'—',cls:lacOk?'vg':'vo'},
-    {v:renal,big:false},
-  ];
-  document.getElementById('dGr').innerHTML=fds.map((l,i)=>{
-    const vv=vals[i];
-    const cls=vv.big?'vb':(vv.cls||'v');
-    return `<div class="df"><label>${l}</label><div class="${cls}">${vv.v}</div></div>`;
-  }).join('');
-  // Info
-  const arr=a=>Array.isArray(a)?a.join('، '):(a||'');
-  const contra=arr(drug.contraindications);
-  const sides=arr(drug.side_effects);
-  const inters=arr(drug.interactions);
-  const notes=drug.notes||drug.notes_ar||'';
-  document.getElementById('dInf').innerHTML=
-    (contra?`<div class="ibox ib-r">${t('contra')} ${contra}</div>`:'')+
-    (sides?`<div class="ibox ib-o">${t('sides')} ${sides}</div>`:'')+
-    (inters?`<div class="ibox ib-b">${t('inters')} ${inters}</div>`:'')+
-    (notes?`<div class="ibox ib-g">${t('notes')} ${notes}</div>`:'');
-  document.getElementById('dc').style.display='block';
-  document.getElementById('dc').scrollIntoView({behavior:'smooth',block:'nearest'});
+  const freq_p=lg==='en'?(drug.pediatric_frequency_en||drug.pediatric_frequency||'—'):(drug.pediatric_frequency||'—');
+  const freq_a=lg==='en'?(drug.adult_frequency_en||drug.adult_frequency||'—'):(drug.adult_frequency||'—');
+  const fl=t('fl');
+
+  if(tab===0){
+    // Dosing tab
+    const fields=[
+      {l:fl[0],v:mlKg?mlKg+' ml/kg':'—',big:!!mlKg},
+      {l:fl[1],v:mgKg?mgKg+' mg/kg':'—',big:false},
+      {l:fl[2],v:drug.adult_dose_min?drug.adult_dose_min+' mg':'—',big:false},
+      {l:fl[3],v:drug.adult_dose_max?drug.adult_dose_max+' mg':'—',big:false},
+      {l:fl[4],v:drug.max_daily?drug.max_daily+' mg ('+t('maxDay').replace(':','')+')':'—',big:false},
+      {l:fl[5],v:freq_p,big:false},
+      {l:fl[6],v:freq_a,big:false},
+    ];
+    c.innerHTML='<div class="dgrid">'+fields.map(f=>`<div class="df"><label>${f.l}</label><div class="${f.big?'vb':'v'}">${f.v}</div></div>`).join('')+'</div>';
+  }else if(tab===1){
+    // Contraindications
+    const contra=arr(drug.contraindications);
+    const sides=arr(drug.side_effects);
+    const inters=arr(drug.interactions);
+    c.innerHTML=
+      (contra?`<div class="ibox ib-r">${t('contra')} ${contra}</div>`:'<div class="ibox ib-r">'+t('contra')+' —</div>')+
+      (sides?`<div class="ibox ib-o">${t('sides')} ${sides}</div>`:'')+
+      (inters?`<div class="ibox ib-b">${t('inters')} ${inters}</div>`:'');
+  }else if(tab===2){
+    // Safety
+    c.innerHTML=`
+      <div class="dgrid">
+        <div class="df"><label>${t('preg')}</label><div class="v ${pregOk?'vg':'vo'}">${drug.pregnancy||'—'}</div></div>
+        <div class="df"><label>${t('lact')}</label><div class="v ${lacOk?'vg':'vo'}">${drug.lactation||'—'}</div></div>
+        <div class="df" style="grid-column:1/-1"><label>${t('renal')}</label><div class="v">${renal}</div></div>
+      </div>`;
+  }else if(tab===3){
+    // Notes
+    const notes=drug.notes||drug.notes_ar||'';
+    c.innerHTML=notes?`<div class="ibox ib-g">${t('notes')} ${notes}</div>`:`<div style="text-align:center;color:var(--muted);padding:20px">—</div>`;
+  }
 }
 
 function cpDrug(){
   if(!cur)return;
   const mgKg=cur.pediatric_mg_per_kg||cur.pediatric_max_mg_per_kg;
-  const tx=`💊 ${cur.name_ar} (${(cur.aliases||[])[0]||''})
-`+
-    `📦 ${(cur.aliases||[]).join(', ')}
-`+
-    `👶 ${mgKg||'—'} mg/kg
-`+
-    `👤 ${cur.adult_dose_min||'—'}–${cur.adult_dose_max||'—'} mg
-`+
-    `⏰ ${cur.adult_frequency||'—'}
-`+
-    `🚫 ${Array.isArray(cur.contraindications)?cur.contraindications.join(', '):(cur.contraindications||'—')}
-`+
-    `🤰 ${cur.pregnancy||'—'} | 🍼 ${cur.lactation||'—'}`;
+  const enName=(cur.aliases||[]).find(a=>!/[؀-ۿ]/.test(a))||'';
+  const tx='&#128138; '+cur.name_ar+(enName?' ('+enName+')':'')+'
+'+
+    '&#128230; '+arr(cur.aliases)+'
+'+
+    '&#128118; '+( mgKg?mgKg+' mg/kg':'—')+'
+'+
+    '&#128100; '+(cur.adult_dose_min||'—')+'–'+(cur.adult_dose_max||'—')+' mg
+'+
+    '&#9200; '+(cur.adult_frequency||'—')+'
+'+
+    '&#9940; '+arr(cur.contraindications)+'
+'+
+    '&#128336; Pregnancy: '+(cur.pregnancy||'—')+' | Lactation: '+(cur.lactation||'—');
   navigator.clipboard.writeText(tx).then(()=>toast(t('copied'),'tok'));
 }
 
-// ── Calc ─────────────────────────────────────────
+/* ── CALC ── */
 function opCalc(){
   if(!cur){toast(t('notFound'),'terr');return;}
   document.getElementById('cmD').value=cur.name_ar;
@@ -507,55 +515,52 @@ function doCalc(){
   out.style.display='block';
   if(c){
     document.getElementById('cmDose').textContent=(mg/c*5).toFixed(1)+(lg==='ar'?' مل':' ml');
-    document.getElementById('cmNote').textContent=`(${mgKg}mg/kg × ${w}kg = ${mg.toFixed(0)}mg ÷ ${c}mg/5ml)`;
+    document.getElementById('cmNote').textContent='('+mgKg+'mg/kg × '+w+'kg = '+mg.toFixed(0)+'mg ÷ '+c+'mg/5ml)';
   }else{
     document.getElementById('cmDose').textContent=mg.toFixed(0)+' mg';
-    document.getElementById('cmNote').textContent=`(${mgKg}mg/kg × ${w}kg)`;
+    document.getElementById('cmNote').textContent='('+mgKg+'mg/kg × '+w+'kg)';
   }
   const mx=document.getElementById('cmMax');
   if(cur.max_daily_pediatric){
     mx.style.display='block';
-    mx.textContent=t('maxDay')+' '+(cur.max_daily_pediatric*w).toFixed(0)+'mg — '+(cur.pediatric_frequency||'');
+    mx.textContent=t('maxDay')+' '+(cur.max_daily_pediatric*w).toFixed(0)+'mg / '+(cur.max_daily_pediatric)+' mg/kg/day';
   }else mx.style.display='none';
 }
 
-// ── Plans ─────────────────────────────────────────
+/* ── PLANS ── */
 async function loadPlans(){
   try{
     const r=await fetch(API+'/plans');
     const plans=await r.json();
-    const pDesc=t('pDesc'), pBtn=t('pBtn'), pPer=t('pPer');
-    const popB=t('popBadge'), annB=t('annBadge');
+    const pDesc=t('pDesc'),pBtn_t=t('pBtn'),pPer=t('pPer'),popB=t('popB'),annB=t('annB');
     document.getElementById('pg').innerHTML=plans.map(p=>{
-      const isFree=p.interval==='free';
-      const isPro=p.name==='Pro';
-      const isAnn=p.name==='Pro Annual';
+      const isFree=p.interval==='free',isPro=p.name==='Pro',isAnn=p.name==='Pro Annual';
       const nm=lg==='ar'?p.name_ar:p.name;
       const per=pPer[p.interval]||'';
       const priceTxt=isFree?(lg==='ar'?'مجاني':'Free'):'$'+p.price;
-      const desc=pDesc[p.name]||(isFree?'Free':'');
-      const btnT=pBtn[p.name]||(isFree?'Start Free':'Subscribe');
+      const desc=pDesc[p.name]||'';
+      const btnT=pBtn_t[p.name]||(lg==='ar'?'اشترك':'Subscribe');
       const btnC=isPro?'pb-p':isAnn?'pb-g':'pb-o';
-      const onclick=isFree?`loc('auth.html')`:`ckout('${p.paddle_price_id}','${nm}')`;
-      const feats=(p.features||[]).map(f=>`<li>✅ ${f}</li>`).join('');
-      return `<div class="pl ${isPro?'pop':''} ${isAnn?'ann':''}">
-        ${isPro?`<div class="pbg pbg-b">${popB}</div>`:''}
-        ${isAnn?`<div class="pbg pbg-g">${annB}</div>`:''}
-        <div class="pe">${isFree?'🆓':isAnn?'⭐':isPro?'🚀':'📦'}</div>
-        <div class="pn">${nm}</div>
-        <div class="pd">${desc}</div>
-        <div class="pp">${priceTxt}<span>${per}</span></div>
-        <ul class="pf">${feats}</ul>
-        <button class="pbtn ${btnC}" onclick="${onclick}">${btnT}</button>
-      </div>`;
+      const onclick=isFree?"loc('auth.html')":`ckout('${p.paddle_price_id}','${nm}')`;
+      const feats=(p.features||[]).map(f=>'<li>&#10003; '+f+'</li>').join('');
+      return '<div class="pl '+(isPro?'pop':'')+(isAnn?' ann':'')+'">'+
+        (isPro?'<div class="pbg pbg-b">'+popB+'</div>':'')+
+        (isAnn?'<div class="pbg pbg-g">'+annB+'</div>':'')+
+        '<div class="pe">'+(isFree?'&#127379;':isAnn?'&#11088;':isPro?'&#128640;':'&#128230;')+'</div>'+
+        '<div class="pn">'+nm+'</div>'+
+        '<div class="pd">'+desc+'</div>'+
+        '<div class="pp">'+priceTxt+'<span>'+per+'</span></div>'+
+        '<ul class="pf">'+feats+'</ul>'+
+        '<button class="pbtn '+btnC+'" onclick="'+onclick+'">'+btnT+'</button>'+
+        '</div>';
     }).join('');
   }catch(e){
-    document.getElementById('pg').innerHTML=`<div style="grid-column:1/-1;text-align:center;color:#dc2626">⚠️ ${lg==='ar'?'تعذّر التحميل':'Load failed'}</div>`;
+    document.getElementById('pg').innerHTML='<div style="grid-column:1/-1;text-align:center;color:#dc2626">&#9888;&#65039; '+(lg==='ar'?'تعذّر التحميل':'Load failed')+'</div>';
   }
 }
 
-// ── Checkout ──────────────────────────────────────
-async function ckout(priceId, name){
+/* ── CHECKOUT ── */
+async function ckout(priceId,name){
   const tk=localStorage.getItem('db_token');
   if(!tk){toast(t('loginFirst'),'terr');setTimeout(()=>loc('auth.html'),1500);return;}
   if(!priceId||priceId==='null'){toast(lg==='ar'?'قريباً!':'Coming soon!','terr');return;}
@@ -567,14 +572,15 @@ async function ckout(priceId, name){
       customer:{email:u.email},
       settings:{displayMode:'overlay',theme:'light',locale:lg,
         successUrl:location.href+'?checkout=success'},
-      eventCallback:d=>{if(d.name==='checkout.completed')toast('🎉 '+(lg==='ar'?'تم الاشتراك!':'Subscribed!'),'tok');}
+      eventCallback:d=>{if(d.name==='checkout.completed')toast('&#127881; '+(lg==='ar'?'تم الاشتراك بنجاح!':'Subscribed successfully!'),'tok');}
     });
-  }catch(e){toast(lg==='ar'?'خطأ في الدفع':'Payment error','terr');}
+  }catch(e){toast(lg==='ar'?'&#9888;&#65039; خطأ في الدفع':'&#9888;&#65039; Payment error','terr');}
 }
 
-// ── Init ──────────────────────────────────────────
+/* ── INIT ── */
 document.addEventListener('click',e=>{if(!e.target.closest('.sr'))document.getElementById('sugg').style.display='none';});
-if(new URLSearchParams(location.search).get('checkout')==='success') toast('🎉 '+(lg==='ar'?'تم الاشتراك!':'Subscribed!'),'tok');
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){cls('cModal');}});
+if(new URLSearchParams(location.search).get('checkout')==='success')toast('&#127881; '+(lg==='ar'?'تم الاشتراك بنجاح!':'Subscribed!'),'tok');
 loadDB();
 loadPlans();
 </script>
