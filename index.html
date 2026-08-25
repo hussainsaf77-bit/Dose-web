@@ -357,11 +357,11 @@ function applyLang(){
 
 /* ── PLANS ── */
 const FP=[
-  {id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال","معلومات الأدوية"]},
-  {id:2,name:"Basic",name_ar:"أساسي",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:4.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},
-  {id:3,name:"Pro",name_ar:"احترافي",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:9.99,interval:"month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","ربط Telegram"]},
-  {id:4,name:"Pro Annual",name_ar:"احترافي سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:79.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["كل مميزات Pro","وفّر 33%","دعم مخصص","وصول API"]}
-];
+  {id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال بالمل","معلومات الأدوية"]},
+  {id:2,name:"شهري",name_ar:"شهري",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:2.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},
+  {id:3,name:"6 أشهر",name_ar:"6 أشهر",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:11.99,interval:"6month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","وفّر 33%"]},
+  {id:4,name:"سنوي",name_ar:"سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:19.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","وفّر 44%"]}
+]
 
 async function loadPlans(){
   let plans=FP;
@@ -568,11 +568,11 @@ function doCalc(){
 /* ── PLANS ── */
 const FALLBACK_PLANS=[{id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال","معلومات الأدوية"]},{id:2,name:"Basic",name_ar:"أساسي",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:4.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},{id:3,name:"Pro",name_ar:"احترافي",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:9.99,interval:"month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","ربط Telegram"]},{id:4,name:"Pro Annual",name_ar:"احترافي سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:79.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["كل مميزات Pro","وفّر 33%","دعم مخصص","وصول API"]}];
 const FP=[
-  {id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال","معلومات الأدوية"]},
-  {id:2,name:"Basic",name_ar:"أساسي",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:4.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},
-  {id:3,name:"Pro",name_ar:"احترافي",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:9.99,interval:"month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","ربط Telegram"]},
-  {id:4,name:"Pro Annual",name_ar:"احترافي سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:79.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["كل مميزات Pro","وفّر 33%","دعم مخصص","وصول API"]}
-];
+  {id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال بالمل","معلومات الأدوية"]},
+  {id:2,name:"شهري",name_ar:"شهري",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:2.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},
+  {id:3,name:"6 أشهر",name_ar:"6 أشهر",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:11.99,interval:"6month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","وفّر 33%"]},
+  {id:4,name:"سنوي",name_ar:"سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:19.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","وفّر 44%"]}
+]
 async function loadPlans(){
   try{
     let plans=FP;
