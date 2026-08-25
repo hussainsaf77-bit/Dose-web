@@ -528,10 +528,17 @@ function doCalc(){
 }
 
 /* ── PLANS ── */
+const FALLBACK_PLANS=[{id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال","معلومات الأدوية"]},{id:2,name:"Basic",name_ar:"أساسي",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:4.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},{id:3,name:"Pro",name_ar:"احترافي",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:9.99,interval:"month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","ربط Telegram"]},{id:4,name:"Pro Annual",name_ar:"احترافي سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:79.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["كل مميزات Pro","وفّر 33%","دعم مخصص","وصول API"]}];
+const FP=[
+  {id:1,name:"Free",name_ar:"مجاني",paddle_price_id:null,price:0,interval:"free",search_limit:5,reminder_limit:0,features:["5 بحث يومياً","جرعات الأطفال","معلومات الأدوية"]},
+  {id:2,name:"Basic",name_ar:"أساسي",paddle_price_id:"pri_01kyf5t6qes6s4bwdt4111j3vp",price:4.99,interval:"month",search_limit:100,reminder_limit:5,features:["100 بحث يومياً","5 تذكيرات","جرعات كاملة","موانع وآثار جانبية"]},
+  {id:3,name:"Pro",name_ar:"احترافي",paddle_price_id:"pri_01kyf5w0g2fhw82p6554dt6m45",price:9.99,interval:"month",search_limit:-1,reminder_limit:-1,features:["بحث غير محدود","تذكيرات غير محدودة","تصدير PDF","فحص التفاعلات","ربط Telegram"]},
+  {id:4,name:"Pro Annual",name_ar:"احترافي سنوي",paddle_price_id:"pri_01kyf5wszwtsneevhbqwqmwbj2",price:79.99,interval:"year",search_limit:-1,reminder_limit:-1,features:["كل مميزات Pro","وفّر 33%","دعم مخصص","وصول API"]}
+];
 async function loadPlans(){
   try{
-    const r=await fetch(API+'/plans');
-    const plans=await r.json();
+    let plans=FP;
+    try{const r=await fetch(API+'/plans',{signal:AbortSignal.timeout(5000)});if(r.ok)plans=await r.json();}catch(e){}
     const pDesc=t('pDesc'),pBtn_t=t('pBtn'),pPer=t('pPer'),popB=t('popB'),annB=t('annB');
     document.getElementById('pg').innerHTML=plans.map(p=>{
       const isFree=p.interval==='free',isPro=p.name==='Pro',isAnn=p.name==='Pro Annual';
