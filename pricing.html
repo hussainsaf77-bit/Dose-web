@@ -2,113 +2,219 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>الأسعار | DoseBot</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DoseBot | الأسعار</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Cairo',sans-serif;background:#f0f4ff;color:#1e293b}
-nav{background:#fff;border-bottom:1px solid #e2e8f0;padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
-.brand{font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px}
-.nav-btn{padding:8px 18px;background:#1a6fd4;color:#fff;border:none;border-radius:8px;font-family:'Cairo',sans-serif;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
-.hero{text-align:center;padding:48px 20px 32px}
-.hero h1{font-size:32px;font-weight:800;margin-bottom:12px}
-.hero h1 em{color:#1a6fd4;font-style:normal}
-.hero p{color:#64748b;font-size:16px}
-.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;max-width:1000px;margin:0 auto;padding:0 20px 60px}
-.plan{background:#fff;border:2px solid #e2e8f0;border-radius:16px;padding:28px;position:relative;transition:.2s}
-.plan:hover{transform:translateY(-4px);box-shadow:0 12px 32px rgba(0,0,0,.1)}
-.plan.popular{border-color:#1a6fd4}
-.badge{position:absolute;top:16px;left:0;background:#1a6fd4;color:#fff;font-size:11px;font-weight:700;padding:4px 12px 4px 10px;border-radius:0 20px 20px 0}
-.plan-name{font-size:18px;font-weight:700;margin-bottom:4px}
-.plan-price{font-size:36px;font-weight:800;margin:16px 0 4px}
-.plan-price span{font-size:14px;color:#64748b;font-weight:400}
-.features{list-style:none;margin:16px 0 24px}
-.features li{padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:14px;display:flex;gap:8px}
-.btn{width:100%;padding:12px;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:'Cairo',sans-serif;cursor:pointer;transition:.2s}
-.btn-primary{background:#1a6fd4;color:#fff}
-.btn-primary:hover{background:#1558b0}
-.btn-outline{background:transparent;color:#1a6fd4;border:2px solid #1a6fd4}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;transition:.3s;z-index:999}
-.toast.show{transform:translateX(-50%) translateY(0)}
-.toast.success{background:#16a34a}
-.toast.error{background:#dc2626}
+:root{--p:#1a6fd4;--pd:#1558b0;--s:#0d9488;--bg:#f0f4ff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0}
+body{font-family:Cairo,sans-serif;background:var(--bg);color:var(--text)}
+nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.brand{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:800;text-decoration:none;color:var(--text)}
+.bi{width:34px;height:34px;background:linear-gradient(135deg,var(--p),var(--s));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.nav-r{display:flex;gap:6px;align-items:center}
+.nbtn{padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;border:none;transition:.2s;text-decoration:none;display:inline-block}
+.np{background:var(--p);color:#fff}.np:hover{background:var(--pd)}
+.no{background:transparent;color:var(--p);border:2px solid var(--p)}.no:hover{background:var(--p);color:#fff}
+.hero{background:linear-gradient(135deg,#0f172a,#1e3a5f 60%,#0d9488);color:#fff;padding:52px 16px;text-align:center}
+.hero h1{font-size:clamp(22px,5vw,38px);font-weight:900;margin-bottom:10px}
+.hero h1 em{color:#5eead4;font-style:normal}
+.hero p{font-size:14px;opacity:.85;max-width:500px;margin:0 auto 20px}
+.toggle-wrap{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px}
+.toggle-label{font-size:14px;font-weight:600}
+.toggle{position:relative;width:48px;height:26px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#64748b;border-radius:26px;transition:.3s}
+.slider::before{content:'';position:absolute;width:20px;height:20px;background:#fff;border-radius:50%;top:3px;right:3px;transition:.3s}
+input:checked + .slider{background:var(--s)}
+input:checked + .slider::before{right:calc(100% - 23px)}
+.save-badge{background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700}
+.plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:960px;margin:0 auto;padding:32px 16px}
+.plan{background:#fff;border:2px solid var(--border);border-radius:16px;padding:22px;position:relative;transition:.2s}
+.plan:hover{transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,.1)}
+.plan.pop{border-color:var(--p)}
+.plan.top{border-color:#d97706}
+.pbadge{position:absolute;top:-1px;right:18px;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:0 0 9px 9px}
+.pbadge-b{background:var(--p)}.pbadge-g{background:#d97706}
+.plan-em{font-size:28px;margin-bottom:8px}
+.plan-name{font-size:17px;font-weight:800;margin-bottom:3px}
+.plan-desc{font-size:12px;color:var(--muted);margin-bottom:14px}
+.plan-price{font-size:36px;font-weight:900;margin-bottom:3px}
+.plan-price span{font-size:13px;font-weight:400;color:var(--muted)}
+.plan-orig{font-size:12px;color:var(--muted);text-decoration:line-through;margin-bottom:2px}
+.plan-feats{list-style:none;margin:12px 0 18px}
+.plan-feats li{font-size:13px;padding:4px 0;border-bottom:1px solid var(--border);display:flex;gap:6px;align-items:flex-start}
+.plan-feats li:last-child{border:none}
+.pbtn{width:100%;padding:11px;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;transition:.2s}
+.pb-p{background:var(--p);color:#fff}.pb-p:hover{background:var(--pd)}
+.pb-o{background:transparent;color:var(--p);border:2px solid var(--p)}.pb-o:hover{background:var(--p);color:#fff}
+.pb-g{background:#d97706;color:#fff}.pb-g:hover{background:#b45309}
+.faq{max-width:680px;margin:0 auto;padding:0 16px 48px}
+.faq h2{text-align:center;font-size:22px;font-weight:800;margin-bottom:20px}
+.faq-item{background:#fff;border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.faq-q{padding:14px 16px;cursor:pointer;font-weight:600;font-size:14px;display:flex;justify-content:space-between;transition:.2s}
+.faq-q:hover{background:var(--bg)}
+.faq-a{max-height:0;overflow:hidden;transition:.3s;font-size:13px;color:var(--muted);line-height:1.7;padding:0 16px}
+.faq-item.open .faq-a{max-height:150px;padding:0 16px 14px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:12px;font-size:14px;font-weight:600;transition:.3s;z-index:999}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.tok{background:#16a34a}.terr{background:#dc2626}
+@media(max-width:580px){.plans{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <nav>
-  <div class="brand">💊 DoseBot</div>
-  <a href="auth.html" class="nav-btn" id="navBtn">تسجيل الدخول</a>
+  <a href="index.html" class="brand"><div class="bi">💊</div>DoseBot</a>
+  <div class="nav-r">
+    <a href="dashboard.html" class="nbtn no" id="dashBtn" style="display:none">📊 لوحتي</a>
+    <button class="nbtn np" onclick="location.href='auth.html'" id="loginBtn">👤 دخول</button>
+  </div>
 </nav>
+
 <div class="hero">
-  <h1>اختر خطتك <em>المناسبة</em></h1>
-  <p>ابدأ مجاناً وقم بالترقية في أي وقت — اشتراك موحد للموقع والبوت</p>
+  <h1>خطط بسيطة<br><em>واشتراك موحد للموقع والبوت</em></h1>
+  <p>اشتراك واحد يعمل على الموقع وبوت Telegram — ابدأ مجاناً</p>
+  <div class="toggle-wrap">
+    <span class="toggle-label" id="tl1">شهري</span>
+    <label class="toggle">
+      <input type="checkbox" id="billingToggle" onchange="renderPlans()">
+      <span class="slider"></span>
+    </label>
+    <span class="toggle-label" id="tl2">سنوي</span>
+    <span class="save-badge" id="saveBadge">وفّر 44%</span>
+  </div>
 </div>
+
 <div class="plans" id="plansGrid">
-  <div style="grid-column:1/-1;text-align:center;padding:40px;color:#64748b">⏳ جاري التحميل...</div>
+  <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--muted)">⏳ جاري التحميل...</div>
 </div>
+
+<div class="faq">
+  <h2>❓ أسئلة شائعة</h2>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">هل اشتراك واحد يعمل على الموقع والبوت؟ <span>▾</span></div>
+    <div class="faq-a">نعم! بعد ربط حساب Telegram بحسابك على الموقع، يصبح الاشتراك موحداً تماماً.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">هل يمكنني الإلغاء في أي وقت؟ <span>▾</span></div>
+    <div class="faq-a">نعم، يمكنك الإلغاء من لوحة التحكم في أي وقت. يستمر الاشتراك حتى نهاية الفترة المدفوعة.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">ما طرق الدفع المتاحة؟ <span>▾</span></div>
+    <div class="faq-a">نقبل Visa وMastercard والمحافظ الرقمية عبر Paddle — منصة دفع آمنة ومعتمدة عالمياً.</div>
+  </div>
+  <div class="faq-item" onclick="this.classList.toggle('open')">
+    <div class="faq-q">هل هناك فترة تجريبية؟ <span>▾</span></div>
+    <div class="faq-a">الخطة المجانية متاحة دائماً بـ 5 بحث يومياً. للخطط المدفوعة، ضمان استرداد المبلغ خلال 7 أيام.</div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
-<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+
 <script>
-const API='https://dose-web-api.onrender.com';
-const PADDLE_TOKEN='live_xxxxxxxxxxxxxxx';
-Paddle.Initialize({token:PADDLE_TOKEN});
+const API = 'https://dose-web-api.onrender.com';
+Paddle.Initialize({token:'test_3f6fe28f60d098b9eabbc7f12bd'});
 
-function toast(msg,type=''){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.className='toast show '+(type||'');
-  setTimeout(()=>t.className='toast',3000);
-}
-
-async function loadPlans(){
-  try{
-    const r=await fetch(API+'/plans');
-    const plans=await r.json();
-    const token=localStorage.getItem('db_token');
-    if(token){
-      document.getElementById('navBtn').textContent='📊 لوحة التحكم';
-      document.getElementById('navBtn').href='dashboard.html';
-    }
-    document.getElementById('plansGrid').innerHTML=plans.map(p=>{
-      const isFree=p.interval==='free';
-      const isPop=p.name==='Pro';
-      const isYear=p.interval==='year';
-      return `<div class="plan ${isPop?'popular':''}">
-        ${isPop?'<div class="badge">الأكثر شيوعاً</div>':''}
-        <div style="font-size:28px;margin-bottom:8px">${isFree?'🆓':isYear?'⭐':isPop?'🚀':'📦'}</div>
-        <div class="plan-name">${p.name_ar}</div>
-        <div class="plan-price">${isFree?'مجاني':'$'+p.price}<span>${isFree?'':' / '+(isYear?'سنة':'شهر')}</span></div>
-        <ul class="features">${(p.features||[]).map(f=>`<li>✅ ${f}</li>`).join('')}</ul>
-        <button class="btn ${isPop?'btn-primary':'btn-outline'}" onclick="${isFree?`location.href='auth.html'`:`checkout('${p.paddle_price_id}','${p.name}')`}">
-          ${isFree?'ابدأ مجاناً':isYear?'⭐ اشترك سنوياً':'🚀 اشترك الآن'}
-        </button>
-      </div>`;
-    }).join('');
-  }catch(e){
-    document.getElementById('plansGrid').innerHTML='<div style="grid-column:1/-1;text-align:center;color:#dc2626">⚠️ تعذّر تحميل الخطط</div>';
-  }
-}
-
-async function checkout(priceId,name){
-  const token=localStorage.getItem('db_token');
-  if(!token){toast('سجّل الدخول أولاً','error');setTimeout(()=>location.href='auth.html',1500);return;}
-  if(!priceId||priceId==='null'){toast('قريباً! Paddle غير مفعّل بعد','error');return;}
-  const me=await fetch(API+'/auth/me',{headers:{Authorization:'Bearer '+token}});
-  const user=await me.json();
-  Paddle.Checkout.open({
-    items:[{priceId,quantity:1}],
-    customer:{email:user.email},
-    settings:{displayMode:'overlay',theme:'light',locale:'ar',
-      successUrl:location.origin+'/dashboard.html?checkout=success'},
-    eventCallback:d=>{
-      if(d.name==='checkout.completed'){
-        toast('🎉 تم الاشتراك بنجاح!','success');
-        setTimeout(()=>location.href='dashboard.html?checkout=success',2000);
+// Auth check
+(function(){
+  const tk = localStorage.getItem('db_token');
+  if(tk){
+    try{
+      const p = JSON.parse(atob(tk.split('.')[1]));
+      if(p.exp*1000 > Date.now()){
+        document.getElementById('loginBtn').style.display='none';
+        document.getElementById('dashBtn').style.display='inline-block';
       }
-    }
-  });
+    }catch(e){}
+  }
+})();
+
+function toast(msg, type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast on '+type;
+  setTimeout(()=>el.className='toast',3000);
 }
-loadPlans();
+
+// Static plans with correct Paddle price IDs
+const PLANS = {
+  monthly:[
+    {name:'مجاني',en:'Free',price:'مجاني',per:'',priceId:null,
+     feats:['5 بحث يومياً','جرعات الأطفال بالمل','معلومات الأدوية الأساسية'],
+     em:'🆓',type:'free'},
+    {name:'شهري',en:'Monthly',price:'$2.99',per:' / شهر',priceId:'pri_01kyf5t6qes6s4bwdt4111j3vp',
+     feats:['100 بحث يومياً','5 تذكيرات نشطة','جرعات كاملة + موانع','ربط Telegram'],
+     em:'📦',type:'basic'},
+    {name:'3 أشهر',en:'3 Months',price:'$6.99',per:' / 3 أشهر',priceId:'pri_01kyf5v6mvqmjwzzd97cjbkt6v',
+     orig:'$8.97',save:'وفّر 22%',
+     feats:['بحث غير محدود','تذكيرات غير محدودة','تصدير PDF','فحص التفاعلات'],
+     em:'🚀',type:'pro',pop:true},
+    {name:'6 أشهر',en:'6 Months',price:'$11.99',per:' / 6 أشهر',priceId:'pri_01kyf5w0g2fhw82p6554dt6m45',
+     orig:'$17.94',save:'وفّر 33%',
+     feats:['كل مميزات Pro','أولوية دعم','وصول API'],
+     em:'⭐',type:'top'},
+  ],
+  annual:[
+    {name:'مجاني',en:'Free',price:'مجاني',per:'',priceId:null,
+     feats:['5 بحث يومياً','جرعات الأطفال بالمل','معلومات الأدوية الأساسية'],
+     em:'🆓',type:'free'},
+    {name:'سنوي',en:'Annual',price:'$19.99',per:' / سنة',priceId:'pri_01kyf5wszwtsneevhbqwqmwbj2',
+     orig:'$35.88',save:'وفّر 44%',
+     feats:['بحث غير محدود','تذكيرات غير محدودة','تصدير PDF','فحص التفاعلات','أولوية دعم','وصول API'],
+     em:'👑',type:'top',pop:true},
+  ]
+};
+
+function renderPlans(){
+  const isAnnual = document.getElementById('billingToggle').checked;
+  const plans = isAnnual ? PLANS.annual : PLANS.monthly;
+  document.getElementById('plansGrid').innerHTML = plans.map(p=>{
+    const isPop = p.pop;
+    const isTop = p.type==='top';
+    const btnClass = p.type==='free'?'pb-o':isPop?'pb-p':isTop?'pb-g':'pb-o';
+    const btnText = p.type==='free'?'ابدأ مجاناً':isTop?'⭐ اشترك الآن':'🚀 اشترك';
+    const onclick = p.type==='free'
+      ? "location.href='auth.html'"
+      : `ckout('${p.priceId}','${p.name}')`;
+    return `<div class="plan ${isPop?'pop':''} ${isTop&&!isPop?'top':''}">
+      ${isPop?'<div class="pbadge pbadge-b">الأفضل قيمة</div>':''}
+      ${isTop&&!isPop?'<div class="pbadge pbadge-g">شامل</div>':''}
+      <div class="plan-em">${p.em}</div>
+      <div class="plan-name">${p.name}</div>
+      <div class="plan-desc">${p.save||''}</div>
+      ${p.orig?`<div class="plan-orig">${p.orig}</div>`:''}
+      <div class="plan-price">${p.price}<span>${p.per}</span></div>
+      <ul class="plan-feats">${p.feats.map(f=>`<li>✅ ${f}</li>`).join('')}</ul>
+      <button class="pbtn ${btnClass}" onclick="${onclick}">${btnText}</button>
+    </div>`;
+  }).join('');
+}
+
+async function ckout(priceId, name){
+  const tk = localStorage.getItem('db_token');
+  if(!tk){toast('سجّل الدخول أولاً','terr');setTimeout(()=>location.href='auth.html',1500);return;}
+  if(!priceId){toast('قريباً!','terr');return;}
+  try{
+    const me = await fetch(API+'/auth/me',{headers:{Authorization:'Bearer '+tk}});
+    const u = await me.json();
+    Paddle.Checkout.open({
+      items:[{priceId,quantity:1}],
+      customer:{email:u.email},
+      settings:{displayMode:'overlay',theme:'light',locale:'ar',
+        successUrl:location.origin+location.pathname.replace('pricing.html','')+'dashboard.html?checkout=success'},
+      eventCallback:d=>{
+        if(d.name==='checkout.completed')
+          toast('🎉 تم الاشتراك! جاري تفعيل حسابك...','tok');
+          setTimeout(()=>location.href='dashboard.html?checkout=success',2000);
+      }
+    });
+  }catch(e){toast('خطأ في الدفع','terr');}
+}
+
+// Init
+renderPlans();
+if(new URLSearchParams(location.search).get('checkout')==='success')
+  toast('🎉 تم الاشتراك بنجاح!','tok');
 </script>
 </body>
 </html>
