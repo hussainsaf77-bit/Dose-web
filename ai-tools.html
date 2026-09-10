@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DoseBot | الأدوات الذكية</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--p:#1a6fd4;--pd:#1558b0;--s:#0d9488;--bg:#f0f4ff;--card:#fff;--text:#1e293b;--muted:#64748b;--border:#e2e8f0}
+body{font-family:Cairo,sans-serif;background:var(--bg);color:var(--text)}
+nav{background:#fff;border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;text-decoration:none;color:var(--text)}
+.bi{width:34px;height:34px;background:linear-gradient(135deg,var(--p),var(--s));border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.nav-r{display:flex;gap:6px}
+.nbtn{padding:7px 13px;border-radius:8px;font-size:12px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;border:none;text-decoration:none;display:inline-block}
+.np{background:var(--p);color:#fff}.no{background:var(--bg);color:var(--p);border:1px solid var(--border)}
+/* TOOLS GRID */
+.tools-hero{background:linear-gradient(135deg,#0f172a,#1e3a5f);color:#fff;padding:40px 16px;text-align:center}
+.tools-hero h1{font-size:clamp(20px,5vw,32px);font-weight:900;margin-bottom:8px}
+.tools-hero p{font-size:13px;opacity:.8;max-width:500px;margin:0 auto}
+.tools-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;max-width:900px;margin:0 auto;padding:24px 16px}
+.tool-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;cursor:pointer;transition:.2s}
+.tool-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,.1);border-color:var(--p)}
+.tool-card.active{border-color:var(--p);background:#e8f0fc}
+.tc-icon{font-size:32px;margin-bottom:8px}
+.tc-name{font-size:13px;font-weight:700}
+.tc-desc{font-size:11px;color:var(--muted);margin-top:3px}
+/* TOOL CONTENT */
+.tool-sec{display:none;max-width:800px;margin:0 auto;padding:0 16px 40px}
+.tool-sec.on{display:block}
+.tool-title{font-size:18px;font-weight:800;margin-bottom:4px;margin-top:20px}
+.tool-sub{font-size:13px;color:var(--muted);margin-bottom:16px}
+/* CHAT */
+.chat-box{background:#fff;border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.chat-msgs{height:350px;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg{max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.6}
+.msg-user{background:var(--p);color:#fff;align-self:flex-start;border-radius:12px 12px 4px 12px}
+.msg-ai{background:var(--bg);color:var(--text);align-self:flex-end;border-radius:12px 12px 12px 4px}
+.msg-ai.loading{opacity:.6}
+.chat-input{display:flex;gap:8px;padding:12px;border-top:1px solid var(--border);background:#fff}
+.chat-in{flex:1;padding:10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:Cairo,sans-serif;resize:none;height:42px}
+.chat-in:focus{outline:none;border-color:var(--p)}
+.send-btn{padding:10px 16px;background:var(--p);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:18px}
+/* FORMS */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.ff{display:flex;flex-direction:column;gap:5px}
+.ff label{font-size:12px;font-weight:600}
+.ff input,.ff select,.ff textarea{padding:9px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13px;font-family:Cairo,sans-serif;transition:.2s}
+.ff textarea{resize:vertical;min-height:120px}
+.ff input:focus,.ff select:focus,.ff textarea:focus{outline:none;border-color:var(--p)}
+.run-btn{width:100%;padding:12px;background:var(--p);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;margin-bottom:14px}
+.run-btn:hover{background:var(--pd)}
+/* RESULT */
+.result-box{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;display:none;animation:fi .3s;white-space:pre-wrap;font-size:13px;line-height:1.8}
+@keyframes fi{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+/* NUTRITION RESULT */
+.nut-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+.nut-card{background:var(--bg);border-radius:10px;padding:12px;text-align:center}
+.nut-val{font-size:22px;font-weight:900;color:var(--p)}
+.nut-label{font-size:11px;color:var(--muted);margin-top:2px}
+/* DOSE FORMS */
+.dose-forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.df-card{background:#fff;border:2px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:.2s}
+.df-card:hover,.df-card.sel{border-color:var(--p);background:#e8f0fc}
+.df-card .ic{font-size:24px;margin-bottom:4px}
+.df-card .nm{font-size:12px;font-weight:700}
+/* PATIENT FILE */
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:#1e293b;color:#fff;padding:10px 20px;border-radius:12px;font-size:13px;font-weight:600;transition:.3s;z-index:999;white-space:nowrap}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.tok{background:#16a34a}.terr{background:#dc2626}
+@media(max-width:580px){.form-grid,.pf-grid{grid-template-columns:1fr}.chat-msgs{height:280px}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="brand"><div class="bi">💊</div>DoseBot AI</a>
+  <div class="nav-r">
+    <a href="dashboard.html" class="nbtn no">📊 لوحتي</a>
+    <a href="index.html" class="nbtn np">🏠 الرئيسية</a>
+  </div>
+</nav>
+
+<div class="tools-hero">
+  <h1>🤖 الأدوات الذكية</h1>
+  <p>مساعد طبي بالذكاء الاصطناعي — تحليل تحاليل، جرعات متقدمة، تغذية، تلخيص محاضرات</p>
+</div>
+
+<div class="tools-grid">
+  <div class="tool-card active" onclick="showTool('chat')">
+    <div class="tc-icon">🤖</div>
+    <div class="tc-name">مساعد الأطباء</div>
+    <div class="tc-desc">أسئلة طبية بالذكاء</div>
+  </div>
+  <div class="tool-card" onclick="showTool('labs')">
+    <div class="tc-icon">🧪</div>
+    <div class="tc-name">تحليل التحاليل</div>
+    <div class="tc-desc">تفسير نتائج المختبر</div>
+  </div>
+  <div class="tool-card" onclick="showTool('dose')">
+    <div class="tc-icon">🍼</div>
+    <div class="tc-name">جرعات الأطفال</div>
+    <div class="tc-desc">شراب، تحاميل، قطرات</div>
+  </div>
+  <div class="tool-card" onclick="showTool('nutrition')">
+    <div class="tc-icon">🥗</div>
+    <div class="tc-name">التغذية العلاجية</div>
+    <div class="tc-desc">سعرات، وزن مثالي، BMI</div>
+  </div>
+  <div class="tool-card" onclick="showTool('patient')">
+    <div class="tc-icon">👤</div>
+    <div class="tc-name">ملف المريض</div>
+    <div class="tc-desc">بيانات وتاريخ طبي</div>
+  </div>
+  <div class="tool-card" onclick="showTool('summarize')">
+    <div class="tc-icon">📝</div>
+    <div class="tc-name">تلخيص محاضرات</div>
+    <div class="tc-desc">تلخيص وتحويل نصوص</div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div class="tool-sec on" id="tool-chat">
+  <div class="tool-title">🤖 مساعد الأطباء الذكي</div>
+  <div class="tool-sub">اسأل أي سؤال طبي أو دوائي — يدعم العربية والإنجليزية</div>
+  <div class="chat-box">
+    <div class="chat-msgs" id="chatMsgs">
+      <div class="msg msg-ai">مرحباً! أنا مساعدك الطبي الذكي. يمكنني مساعدتك في الأسئلة الدوائية، التشخيصية، والعلاجية. كيف يمكنني مساعدتك؟ 💊</div>
+    </div>
+    <div class="chat-input">
+      <textarea class="chat-in" id="chatIn" placeholder="اكتب سؤالك الطبي..." onkeydown="if(event.key=='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+      <button class="send-btn" onclick="sendChat()">➤</button>
+    </div>
+  </div>
+</div>
+
+<!-- LABS -->
+<div class="tool-sec" id="tool-labs">
+  <div class="tool-title">🧪 تحليل التحاليل المخبرية</div>
+  <div class="tool-sub">الصق نتائج تحاليلك وسنفسرها بدقة طبية</div>
+  <div class="ff" style="margin-bottom:12px">
+    <label>نتائج التحاليل</label>
+    <textarea id="labsText" placeholder="مثال:
+HbA1c: 7.2%
+Fasting glucose: 126 mg/dL
+Cholesterol: 210 mg/dL
+..."></textarea>
+  </div>
+  <button class="run-btn" onclick="analyzeLabs()">🔬 تحليل النتائج</button>
+  <div class="result-box" id="labsResult"></div>
+</div>
+
+<!-- DOSE FORMS -->
+<div class="tool-sec" id="tool-dose">
+  <div class="tool-title">🍼 حاسبة جرعات الأطفال المتقدمة</div>
+  <div class="tool-sub">احسب الجرعة حسب شكل الدواء ووزن الطفل</div>
+  <div style="font-size:13px;font-weight:700;margin-bottom:10px">اختر شكل الدواء:</div>
+  <div class="dose-forms">
+    <div class="df-card sel" onclick="selForm(this,'syrup')"><div class="ic">🍶</div><div class="nm">شراب</div></div>
+    <div class="df-card" onclick="selForm(this,'supp')"><div class="ic">💊</div><div class="nm">تحاميل</div></div>
+    <div class="df-card" onclick="selForm(this,'drops')"><div class="ic">💧</div><div class="nm">قطرات</div></div>
+    <div class="df-card" onclick="selForm(this,'cream')"><div class="ic">🧴</div><div class="nm">مرهم/كريم</div></div>
+    <div class="df-card" onclick="selForm(this,'iv')"><div class="ic">💉</div><div class="nm">وريدي/عضلي</div></div>
+    <div class="df-card" onclick="selForm(this,'tablet')"><div class="ic">⬜</div><div class="nm">أقراص</div></div>
+  </div>
+  <div class="form-grid">
+    <div class="ff"><label>اسم الدواء</label><input id="dDrug" placeholder="باراسيتامول"></div>
+    <div class="ff"><label>وزن الطفل (كجم)</label><input type="number" id="dWeight" placeholder="15" min="1" max="80"></div>
+    <div class="ff"><label>تركيز الدواء</label><input id="dConc" placeholder="مثال: 250mg/5ml أو 125mg/supp"></div>
+    <div class="ff"><label>عمر الطفل (سنوات)</label><input type="number" id="dAge" placeholder="5"></div>
+  </div>
+  <button class="run-btn" onclick="calcAdvDose()">🍼 احسب الجرعة</button>
+  <div class="result-box" id="doseResult"></div>
+</div>
+
+<!-- NUTRITION -->
+<div class="tool-sec" id="tool-nutrition">
+  <div class="tool-title">🥗 التغذية العلاجية والسعرات</div>
+  <div class="tool-sub">احسب احتياجاتك اليومية والوزن المثالي</div>
+  <div class="form-grid">
+    <div class="ff"><label>العمر (سنة)</label><input type="number" id="nAge" placeholder="30"></div>
+    <div class="ff"><label>الجنس</label><select id="nGender"><option value="male">ذكر</option><option value="female">أنثى</option></select></div>
+    <div class="ff"><label>الوزن (كجم)</label><input type="number" id="nWeight" placeholder="75"></div>
+    <div class="ff"><label>الطول (سم)</label><input type="number" id="nHeight" placeholder="175"></div>
+    <div class="ff"><label>مستوى النشاط</label>
+      <select id="nActivity">
+        <option value="sedentary">خامل (لا رياضة)</option>
+        <option value="light">خفيف (1-3 أيام/أسبوع)</option>
+        <option value="moderate" selected>متوسط (3-5 أيام)</option>
+        <option value="active">نشيط (6-7 أيام)</option>
+        <option value="very_active">نشيط جداً</option>
+      </select>
+    </div>
+    <div class="ff"><label>الهدف</label>
+      <select id="nGoal">
+        <option value="lose">خسارة وزن</option>
+        <option value="maintain" selected>حفاظ على الوزن</option>
+        <option value="gain">زيادة وزن</option>
+      </select>
+    </div>
+  </div>
+  <button class="run-btn" onclick="calcNutrition()">🥗 احسب الآن</button>
+  <div id="nutResult" style="display:none">
+    <div class="nut-grid">
+      <div class="nut-card"><div class="nut-val" id="nBMR">0</div><div class="nut-label">معدل الأيض الأساسي (BMR)</div></div>
+      <div class="nut-card"><div class="nut-val" id="nTDEE">0</div><div class="nut-label">السعرات اليومية (TDEE)</div></div>
+      <div class="nut-card"><div class="nut-val" id="nGoalCal">0</div><div class="nut-label">سعرات الهدف</div></div>
+      <div class="nut-card"><div class="nut-val" id="nIdeal">0</div><div class="nut-label">الوزن المثالي (كجم)</div></div>
+      <div class="nut-card"><div class="nut-val" id="nBMI">0</div><div class="nut-label">مؤشر كتلة الجسم (BMI)</div></div>
+      <div class="nut-card"><div class="nut-val" id="nBMICat">-</div><div class="nut-label">التصنيف</div></div>
+    </div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:12px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">📊 التوزيع الغذائي اليومي الموصى به:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div style="background:#e8f0fc;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:900;color:var(--p)" id="nProt">0</div><div style="font-size:11px;color:var(--muted)">بروتين (ج)</div></div>
+        <div style="background:#f0fdf4;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:900;color:#16a34a" id="nCarbs">0</div><div style="font-size:11px;color:var(--muted)">كربوهيدرات (ج)</div></div>
+        <div style="background:#fff7ed;border-radius:8px;padding:10px"><div style="font-size:18px;font-weight:900;color:#d97706" id="nFat">0</div><div style="font-size:11px;color:var(--muted)">دهون (ج)</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PATIENT FILE -->
+<div class="tool-sec" id="tool-patient">
+  <div class="tool-title">👤 ملف المريض</div>
+  <div class="tool-sub">سجّل وأدر البيانات الطبية للمريض</div>
+  <div class="pf-grid">
+    <div class="ff"><label>اسم المريض</label><input id="pfName" placeholder="محمد أحمد"></div>
+    <div class="ff"><label>العمر</label><input type="number" id="pfAge" placeholder="45"></div>
+    <div class="ff"><label>الجنس</label><select id="pfGender"><option value="male">ذكر</option><option value="female">أنثى</option></select></div>
+    <div class="ff"><label>الوزن (كجم)</label><input type="number" id="pfWeight" placeholder="75"></div>
+    <div class="ff"><label>فصيلة الدم</label><select id="pfBlood"><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>O+</option><option>O-</option><option>AB+</option><option>AB-</option></select></div>
+    <div class="ff"><label>الحساسية</label><input id="pfAllergy" placeholder="البنسلين، الفول السوداني..."></div>
+  </div>
+  <div class="ff" style="margin-bottom:10px"><label>الأمراض المزمنة</label><input id="pfDiseases" placeholder="سكري، ضغط، قلب..."></div>
+  <div class="ff" style="margin-bottom:10px"><label>الأدوية الحالية</label><textarea id="pfMeds" placeholder="ميتفورمين 500mg مرتين يومياً&#10;أملوديبين 5mg مرة يومياً" style="min-height:80px"></textarea></div>
+  <div class="ff" style="margin-bottom:14px"><label>ملاحظات إضافية</label><textarea id="pfNotes" placeholder="أي معلومات مهمة أخرى..." style="min-height:60px"></textarea></div>
+  <button class="run-btn" onclick="savePatient()">💾 حفظ الملف</button>
+  <button onclick="printPatient()" style="width:100%;padding:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:700;font-family:Cairo,sans-serif;cursor:pointer;margin-bottom:14px">🖨️ طباعة الملف</button>
+  <div class="result-box" id="patientResult"></div>
+</div>
+
+<!-- SUMMARIZE -->
+<div class="tool-sec" id="tool-summarize">
+  <div class="tool-title">📝 تلخيص المحاضرات والنصوص</div>
+  <div class="tool-sub">الصق أي نص طبي أو محاضرة وسنلخصها بنقاط واضحة</div>
+  <div class="ff" style="margin-bottom:12px">
+    <label>النص المراد تلخيصه</label>
+    <textarea id="sumText" placeholder="الصق هنا نص المحاضرة أو المقال الطبي..." style="min-height:200px"></textarea>
+  </div>
+  <div class="ff" style="margin-bottom:12px">
+    <label>نوع الملخص</label>
+    <select id="sumType">
+      <option value="points">نقاط رئيسية</option>
+      <option value="detailed">ملخص مفصّل</option>
+      <option value="simple">شرح مبسط</option>
+      <option value="exam">ملخص للامتحان</option>
+    </select>
+  </div>
+  <button class="run-btn" onclick="summarizeText()">📝 لخّص الآن</button>
+  <div class="result-box" id="sumResult"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://dose-web-api.onrender.com';
+const tk = () => localStorage.getItem('db_token');
+let chatHistory = [];
+let selectedForm = 'syrup';
+
+if(!tk()) location.href = 'auth.html';
+
+function toast(msg, type=''){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className='toast on '+type;
+  setTimeout(()=>el.className='toast',3000);
+}
+
+function showTool(name){
+  document.querySelectorAll('.tool-sec').forEach(s=>s.classList.remove('on'));
+  document.querySelectorAll('.tool-card').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tool-'+name).classList.add('on');
+  event.currentTarget.classList.add('active');
+}
+
+function selForm(el, form){
+  document.querySelectorAll('.df-card').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedForm = form;
+}
+
+// ── Chat ──────────────────────────────────────────
+async function sendChat(){
+  const inp = document.getElementById('chatIn');
+  const msg = inp.value.trim();
+  if(!msg) return;
+  inp.value = '';
+
+  const msgs = document.getElementById('chatMsgs');
+  msgs.innerHTML += `<div class="msg msg-user">${msg}</div>`;
+  msgs.innerHTML += `<div class="msg msg-ai loading" id="aiLoading">⏳ جاري التفكير...</div>`;
+  msgs.scrollTop = msgs.scrollHeight;
+
+  chatHistory.push({role:'user', content:msg});
+
+  try{
+    const r = await fetch(API+'/ai/chat', {
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk(),'Content-Type':'application/json'},
+      body: JSON.stringify({message:msg, history:chatHistory.slice(-6)})
+    });
+    const d = await r.json();
+    if(!r.ok) throw new Error(d.detail);
+    chatHistory.push({role:'assistant', content:d.reply});
+    document.getElementById('aiLoading').textContent = d.reply;
+    document.getElementById('aiLoading').classList.remove('loading');
+  }catch(e){
+    document.getElementById('aiLoading').textContent = '⚠️ ' + (e.message||'خطأ في الاتصال');
+    document.getElementById('aiLoading').classList.remove('loading');
+  }
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── Labs ──────────────────────────────────────────
+async function analyzeLabs(){
+  const text = document.getElementById('labsText').value.trim();
+  if(!text){toast('أدخل نتائج التحاليل','terr');return;}
+  const el = document.getElementById('labsResult');
+  el.style.display='block';
+  el.textContent = '⏳ جاري تحليل النتائج...';
+  try{
+    const r = await fetch(API+'/ai/analyze-labs',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk(),'Content-Type':'application/json'},
+      body:JSON.stringify({text,lang:'ar'})
+    });
+    const d = await r.json();
+    el.textContent = d.analysis;
+  }catch(e){el.textContent='⚠️ '+e.message;}
+}
+
+// ── Advanced Dose ─────────────────────────────────
+async function calcAdvDose(){
+  const drug = document.getElementById('dDrug').value.trim();
+  const weight = parseFloat(document.getElementById('dWeight').value);
+  const conc = document.getElementById('dConc').value.trim();
+  const age = document.getElementById('dAge').value;
+  if(!drug||!weight){toast('أدخل اسم الدواء والوزن','terr');return;}
+
+  const el = document.getElementById('doseResult');
+  el.style.display='block';
+  el.textContent='⏳ جاري الحساب...';
+
+  const formNames = {syrup:'شراب',supp:'تحميلة شرجية',drops:'قطرات',cream:'مرهم/كريم',iv:'حقن وريدي/عضلي',tablet:'أقراص'};
+  const prompt = `احسب جرعة ${drug} (${formNames[selectedForm]}) لطفل وزنه ${weight} كجم${age?' وعمره '+age+' سنوات':''}${conc?' والتركيز المتاح: '+conc:''}.
+أعطني:
+1. الجرعة الدقيقة المحسوبة
+2. طريقة الإعطاء
+3. التكرار المناسب
+4. الحد الأقصى اليومي
+5. ملاحظات مهمة`;
+
+  try{
+    const r = await fetch(API+'/ai/chat',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk(),'Content-Type':'application/json'},
+      body:JSON.stringify({message:prompt, system:'أنت صيدلاني أطفال متخصص. أجب بدقة علمية.'})
+    });
+    const d = await r.json();
+    el.textContent = d.reply;
+  }catch(e){el.textContent='⚠️ '+e.message;}
+}
+
+// ── Nutrition ─────────────────────────────────────
+async function calcNutrition(){
+  const age = parseInt(document.getElementById('nAge').value);
+  const weight = parseFloat(document.getElementById('nWeight').value);
+  const height = parseFloat(document.getElementById('nHeight').value);
+  const gender = document.getElementById('nGender').value;
+  const activity = document.getElementById('nActivity').value;
+  const goal = document.getElementById('nGoal').value;
+  if(!age||!weight||!height){toast('أدخل جميع البيانات','terr');return;}
+  try{
+    const r = await fetch(API+'/ai/nutrition',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk(),'Content-Type':'application/json'},
+      body:JSON.stringify({age,weight,height,gender,activity,goal})
+    });
+    const d = await r.json();
+    document.getElementById('nutResult').style.display='block';
+    document.getElementById('nBMR').textContent=d.bmr;
+    document.getElementById('nTDEE').textContent=d.tdee;
+    document.getElementById('nGoalCal').textContent=d.goal_calories;
+    document.getElementById('nIdeal').textContent=d.ideal_weight;
+    document.getElementById('nBMI').textContent=d.bmi;
+    document.getElementById('nBMICat').textContent=d.bmi_category;
+    document.getElementById('nProt').textContent=d.protein_g;
+    document.getElementById('nCarbs').textContent=d.carbs_g;
+    document.getElementById('nFat').textContent=d.fat_g;
+  }catch(e){toast('خطأ: '+e.message,'terr');}
+}
+
+// ── Patient ───────────────────────────────────────
+function savePatient(){
+  const data = {
+    name:document.getElementById('pfName').value,
+    age:document.getElementById('pfAge').value,
+    gender:document.getElementById('pfGender').value==='male'?'ذكر':'أنثى',
+    weight:document.getElementById('pfWeight').value,
+    blood:document.getElementById('pfBlood').value,
+    allergy:document.getElementById('pfAllergy').value,
+    diseases:document.getElementById('pfDiseases').value,
+    meds:document.getElementById('pfMeds').value,
+    notes:document.getElementById('pfNotes').value,
+    date:new Date().toLocaleDateString('ar-EG')
+  };
+  localStorage.setItem('patient_file', JSON.stringify(data));
+  const el = document.getElementById('patientResult');
+  el.style.display='block';
+  el.textContent = `✅ تم حفظ ملف المريض
+
+👤 ${data.name} | ${data.gender} | ${data.age} سنة
+⚖️ ${data.weight} كجم | 🩸 ${data.blood}
+⚠️ حساسية: ${data.allergy||'لا توجد'}
+🏥 أمراض: ${data.diseases||'لا توجد'}
+💊 أدوية: ${data.meds||'لا توجد'}`;
+  toast('تم حفظ ملف المريض ✅','tok');
+}
+
+function printPatient(){
+  const saved = localStorage.getItem('patient_file');
+  if(!saved){toast('احفظ الملف أولاً','terr');return;}
+  const d = JSON.parse(saved);
+  const w = window.open('','_blank');
+  w.document.write(`<html dir="rtl"><head><title>ملف المريض</title>
+  <style>body{font-family:Arial;padding:30px;direction:rtl} h2{color:#1a6fd4} table{width:100%;border-collapse:collapse} td,th{padding:8px;border:1px solid #ddd} th{background:#e8f0fc;text-align:right}</style></head>
+  <body><h2>💊 DoseBot — ملف المريض</h2>
+  <table><tr><th>البيان</th><th>القيمة</th></tr>
+  <tr><td>الاسم</td><td>${d.name}</td></tr>
+  <tr><td>العمر</td><td>${d.age} سنة</td></tr>
+  <tr><td>الجنس</td><td>${d.gender}</td></tr>
+  <tr><td>الوزن</td><td>${d.weight} كجم</td></tr>
+  <tr><td>فصيلة الدم</td><td>${d.blood}</td></tr>
+  <tr><td>الحساسية</td><td style="color:red">${d.allergy||'لا توجد'}</td></tr>
+  <tr><td>الأمراض المزمنة</td><td>${d.diseases||'لا توجد'}</td></tr>
+  <tr><td>الأدوية الحالية</td><td style="white-space:pre">${d.meds||'لا توجد'}</td></tr>
+  <tr><td>ملاحظات</td><td>${d.notes||'-'}</td></tr>
+  <tr><td>تاريخ التسجيل</td><td>${d.date}</td></tr>
+  </table>
+  <p style="margin-top:20px;font-size:12px;color:gray">🏥 DoseBot — للأغراض التعليمية فقط</p>
+  </body></html>`);
+  w.document.close();
+  w.print();
+}
+
+// ── Summarize ─────────────────────────────────────
+async function summarizeText(){
+  const text = document.getElementById('sumText').value.trim();
+  const type = document.getElementById('sumType').value;
+  if(!text){toast('أدخل النص المراد تلخيصه','terr');return;}
+  const el = document.getElementById('sumResult');
+  el.style.display='block';
+  el.textContent='⏳ جاري التلخيص...';
+
+  const typeMap = {
+    points:'لخّص بنقاط رئيسية مرقمة',
+    detailed:'لخّص بشكل مفصّل مع الاحتفاظ بالمعلومات المهمة',
+    simple:'اشرح بأسلوب مبسط يناسب الطالب المبتدئ',
+    exam:'لخّص على شكل نقاط مهمة للمذاكرة والامتحان'
+  };
+
+  try{
+    const r = await fetch(API+'/ai/summarize',{
+      method:'POST',
+      headers:{Authorization:'Bearer '+tk(),'Content-Type':'application/json'},
+      body:JSON.stringify({message:text, system:`أنت متخصص في تلخيص المحتوى الطبي. ${typeMap[type]}. استخدم نفس لغة النص.`})
+    });
+    const d = await r.json();
+    el.textContent = d.summary || d.reply;
+  }catch(e){el.textContent='⚠️ '+e.message;}
+}
+
+// Load saved patient
+const saved = localStorage.getItem('patient_file');
+if(saved){
+  try{
+    const d = JSON.parse(saved);
+    document.getElementById('pfName').value=d.name||'';
+    document.getElementById('pfAge').value=d.age||'';
+    document.getElementById('pfWeight').value=d.weight||'';
+    document.getElementById('pfAllergy').value=d.allergy||'';
+    document.getElementById('pfDiseases').value=d.diseases||'';
+    document.getElementById('pfMeds').value=d.meds||'';
+    document.getElementById('pfNotes').value=d.notes||'';
+  }catch(e){}
+}
+</script>
+</body>
+</html>
