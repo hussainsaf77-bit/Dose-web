@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>جرعة — حاسبة الجرعات الطبية</title>
 <meta name="description" content="حاسبة جرعات الأدوية للأطفال والكبار، تذكيرات الدواء، ملف المريض، فحص التفاعلات الدوائية">
 <link rel="manifest" href="manifest.json">
@@ -306,15 +306,21 @@ input:focus,select:focus,textarea:focus{border-color:var(--teal);box-shadow:0 0 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  body { font-family: "Cairo", sans-serif !important; background: #0f172a !important; color: #f8fafc !important; }
-  header { background: #1e293b !important; border-bottom: 1px solid #334155 !important; padding: 0 16px !important; }
-  .nav-wrap { background: #1e293b !important; border-bottom: 1px solid #334155 !important; }
-  .tab { color: #94a3b8 !important; border-radius: 8px !important; padding: 8px 12px !important; font-size: 13px !important; font-weight: 700 !important; }
-  .tab.active { background: #0d9488 !important; color: #ffffff !important; }
-  .card { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 16px !important; color: #f1f5f9 !important; padding: 20px !important; }
-  .card-title { color: #38bdf8 !important; font-weight: 800 !important; }
-  input, select { background: #0f172a !important; border: 1px solid #334155 !important; color: #fff !important; border-radius: 10px !important; }
-  .btn-calc, button.btn { background: #0d9488 !important; color: #fff !important; border-radius: 10px !important; }
+  * { box-sizing: border-box !important; }
+  body { font-family: "Cairo", sans-serif !important; background: #0f172a !important; color: #f8fafc !important; margin:0; padding:0; }
+  header { background: #1e293b !important; height: 60px; padding: 0 14px !important; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; position: sticky; top:0; z-index:100; }
+  .logo-pill { background: linear-gradient(135deg, #0d9488, #0284c7) !important; color: white !important; font-weight:800; padding: 6px 14px; border-radius: 12px; }
+  .nav-wrap { background: #111e38 !important; border-bottom: 1px solid #334155 !important; position: sticky; top: 60px; z-index: 90; overflow-x: auto; scrollbar-width: none; }
+  .nav-tabs { display: flex !important; gap: 6px !important; padding: 8px 12px !important; width: max-content; }
+  .tab { color: #94a3b8 !important; border-radius: 10px !important; padding: 8px 14px !important; font-size: 13px !important; font-weight: 700 !important; border: 1px solid transparent !important; background: transparent; cursor: pointer; white-space: nowrap; }
+  .tab.active { background: #0d9488 !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(13,148,136,0.3); }
+  main { max-width: 800px !important; margin: 0 auto !important; padding: 16px 12px 90px !important; }
+  .card { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 18px !important; padding: 20px 16px !important; margin-bottom: 16px !important; color: #f1f5f9 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  .card-title { color: #38bdf8 !important; font-size: 16px !important; font-weight: 800 !important; margin-bottom: 14px !important; }
+  input, select, textarea { width: 100% !important; background: #0f172a !important; border: 1px solid #334155 !important; color: #fff !important; border-radius: 12px !important; padding: 12px !important; font-family: inherit !important; box-sizing: border-box !important; margin-bottom: 10px !important; }
+  .btn-calc, button.btn { width: 100% !important; background: linear-gradient(135deg, #0d9488, #0f766e) !important; color: #fff !important; border: none; border-radius: 12px !important; padding: 12px !important; font-weight: 800; cursor: pointer; font-family: inherit !important; }
+  .med-disclaimer { background: rgba(245, 158, 11, 0.12) !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; color: #fef3c7 !important; border-radius: 14px !important; padding: 12px 14px !important; font-size: 12px !important; margin-bottom: 14px !important; }
+  .auth-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
 </style>
 
 </head>
@@ -636,11 +642,10 @@ doseLoadAccount();
   <div class="logo">
     <div class="logo-pill">💊 جرعة</div>
   </div>
-  <div class="header-actions">
-    <button class="btn-tg" onclick="openTelegram()">
-      <span>✈️</span> بوت تيليغرام
-    </button>
-  </div>
+  <div class="header-actions" style="display:flex;align-items:center;gap:8px;">
+  <button class="auth-btn" onclick="doseOpenAuth()">👤 <span id="userTopName">تسجيل الدخول</span></button>
+  <button class="btn-tg" onclick="openTelegram()" style="background:#0284c7;color:#fff;border:none;border-radius:10px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;">✈️ البوت</button>
+</div>
 </header>
 
 <!-- ── NAV TABS ── -->
@@ -1856,15 +1861,21 @@ function exportPatient() {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-  body { font-family: "Cairo", sans-serif !important; background: #0f172a !important; color: #f8fafc !important; }
-  header { background: #1e293b !important; border-bottom: 1px solid #334155 !important; padding: 0 16px !important; }
-  .nav-wrap { background: #1e293b !important; border-bottom: 1px solid #334155 !important; }
-  .tab { color: #94a3b8 !important; border-radius: 8px !important; padding: 8px 12px !important; font-size: 13px !important; font-weight: 700 !important; }
-  .tab.active { background: #0d9488 !important; color: #ffffff !important; }
-  .card { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 16px !important; color: #f1f5f9 !important; padding: 20px !important; }
-  .card-title { color: #38bdf8 !important; font-weight: 800 !important; }
-  input, select { background: #0f172a !important; border: 1px solid #334155 !important; color: #fff !important; border-radius: 10px !important; }
-  .btn-calc, button.btn { background: #0d9488 !important; color: #fff !important; border-radius: 10px !important; }
+  * { box-sizing: border-box !important; }
+  body { font-family: "Cairo", sans-serif !important; background: #0f172a !important; color: #f8fafc !important; margin:0; padding:0; }
+  header { background: #1e293b !important; height: 60px; padding: 0 14px !important; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; position: sticky; top:0; z-index:100; }
+  .logo-pill { background: linear-gradient(135deg, #0d9488, #0284c7) !important; color: white !important; font-weight:800; padding: 6px 14px; border-radius: 12px; }
+  .nav-wrap { background: #111e38 !important; border-bottom: 1px solid #334155 !important; position: sticky; top: 60px; z-index: 90; overflow-x: auto; scrollbar-width: none; }
+  .nav-tabs { display: flex !important; gap: 6px !important; padding: 8px 12px !important; width: max-content; }
+  .tab { color: #94a3b8 !important; border-radius: 10px !important; padding: 8px 14px !important; font-size: 13px !important; font-weight: 700 !important; border: 1px solid transparent !important; background: transparent; cursor: pointer; white-space: nowrap; }
+  .tab.active { background: #0d9488 !important; color: #ffffff !important; box-shadow: 0 4px 12px rgba(13,148,136,0.3); }
+  main { max-width: 800px !important; margin: 0 auto !important; padding: 16px 12px 90px !important; }
+  .card { background: #1e293b !important; border: 1px solid #334155 !important; border-radius: 18px !important; padding: 20px 16px !important; margin-bottom: 16px !important; color: #f1f5f9 !important; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+  .card-title { color: #38bdf8 !important; font-size: 16px !important; font-weight: 800 !important; margin-bottom: 14px !important; }
+  input, select, textarea { width: 100% !important; background: #0f172a !important; border: 1px solid #334155 !important; color: #fff !important; border-radius: 12px !important; padding: 12px !important; font-family: inherit !important; box-sizing: border-box !important; margin-bottom: 10px !important; }
+  .btn-calc, button.btn { width: 100% !important; background: linear-gradient(135deg, #0d9488, #0f766e) !important; color: #fff !important; border: none; border-radius: 12px !important; padding: 12px !important; font-weight: 800; cursor: pointer; font-family: inherit !important; }
+  .med-disclaimer { background: rgba(245, 158, 11, 0.12) !important; border: 1px solid rgba(245, 158, 11, 0.3) !important; color: #fef3c7 !important; border-radius: 14px !important; padding: 12px 14px !important; font-size: 12px !important; margin-bottom: 14px !important; }
+  .auth-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
 </style>
 
 </head><body>
@@ -1954,7 +1965,7 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-</body></html>`);
+<\/body><\/html>`);
   w.document.close();
   w.print();
 }
@@ -2580,6 +2591,85 @@ window.addEventListener('DOMContentLoaded', function() {
     if (modal) modal.style.display = 'flex';
   }
 });
+</script>
+
+
+<div id="doseAuthModal" style="display:none;position:fixed;inset:0;z-index:9999999;background:rgba(15,23,42,0.85);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:16px;direction:rtl;">
+  <div style="background:#1e293b;border:1px solid #334155;border-radius:20px;max-width:400px;width:100%;padding:22px;color:#fff;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 id="modalAuthHead" style="margin:0;font-size:17px;font-weight:800;color:#38bdf8;">تسجيل الدخول</h3>
+      <button onclick="document.getElementById('doseAuthModal').style.display='none'" style="background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <button type="button" onclick="doseToggleAuth(true)" id="tabLog" style="flex:1;padding:8px;border-radius:8px;border:1px solid #0d9488;background:#0d948820;color:#38bdf8;font-weight:700;font-size:12px;cursor:pointer;">دخول</button>
+      <button type="button" onclick="doseToggleAuth(false)" id="tabReg" style="flex:1;padding:8px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#94a3b8;font-weight:700;font-size:12px;cursor:pointer;">حساب جديد</button>
+    </div>
+    <div id="areaLogin">
+      <input type="text" id="inEmail" placeholder="البريد الإلكتروني / اسم المستخدم">
+      <input type="password" id="inPass" placeholder="كلمة المرور">
+      <button type="button" onclick="doseSubmitLogin()" class="btn-calc">تسجيل الدخول 🚀</button>
+    </div>
+    <div id="areaRegister" style="display:none;">
+      <input type="text" id="regFullName" placeholder="الاسم الكامل">
+      <input type="email" id="regEmailAddr" placeholder="البريد الإلكتروني">
+      <input type="password" id="regPassword" placeholder="كلمة المرور">
+      <button type="button" onclick="doseSubmitReg()" class="btn-calc">إنشاء الحساب مجاناً ✨</button>
+    </div>
+    <div id="areaLogged" style="display:none;text-align:center;">
+      <p id="loggedUserName" style="font-size:15px;font-weight:700;color:#38bdf8;margin-bottom:12px;"></p>
+      <button type="button" onclick="doseSubmitLogout()" style="width:100%;background:#ef444420;border:1px solid #ef4444;color:#fca5a5;padding:10px;border-radius:10px;font-weight:700;cursor:pointer;">تسجيل الخروج</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function doseOpenAuth() {
+  const u = JSON.parse(localStorage.getItem('dose_user') || 'null');
+  const m = document.getElementById('doseAuthModal');
+  m.style.display = 'flex';
+  if (u) {
+    document.getElementById('areaLogin').style.display = 'none';
+    document.getElementById('areaRegister').style.display = 'none';
+    document.getElementById('areaLogged').style.display = 'block';
+    document.getElementById('loggedUserName').textContent = "مرحباً د. " + (u.name || "المستخدم") + " 👋";
+    document.getElementById('modalAuthHead').textContent = "حسابي";
+  } else {
+    doseToggleAuth(true);
+  }
+}
+function doseToggleAuth(isL) {
+  document.getElementById('areaLogin').style.display = isL ? 'block' : 'none';
+  document.getElementById('areaRegister').style.display = isL ? 'none' : 'block';
+  document.getElementById('areaLogged').style.display = 'none';
+  document.getElementById('modalAuthHead').textContent = isL ? "تسجيل الدخول" : "إنشاء حساب جديد";
+}
+function doseSubmitLogin() {
+  const e = document.getElementById('inEmail').value.trim();
+  if (!e) { alert("يرجى كتابة البريد"); return; }
+  const u = { name: e.split('@')[0] };
+  localStorage.setItem('dose_user', JSON.stringify(u));
+  doseSyncTop();
+  document.getElementById('doseAuthModal').style.display = 'none';
+}
+function doseSubmitReg() {
+  const n = document.getElementById('regFullName').value.trim();
+  if (!n) { alert("يرجى كتابة الاسم"); return; }
+  const u = { name: n };
+  localStorage.setItem('dose_user', JSON.stringify(u));
+  doseSyncTop();
+  document.getElementById('doseAuthModal').style.display = 'none';
+}
+function doseSubmitLogout() {
+  localStorage.removeItem('dose_user');
+  doseSyncTop();
+  document.getElementById('doseAuthModal').style.display = 'none';
+}
+function doseSyncTop() {
+  const u = JSON.parse(localStorage.getItem('dose_user') || 'null');
+  const el = document.getElementById('userTopName');
+  if (el) el.textContent = u ? u.name : "تسجيل الدخول";
+}
+window.addEventListener('DOMContentLoaded', doseSyncTop);
 </script>
 
 </body>
