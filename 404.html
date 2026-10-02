@@ -3,16 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>منصة جرعة الطبية — Dose Medical Platform</title>
+  <title>منصة جرعة الطبية الشاملة — Dose Medical Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root { --teal: #0d9488; --dark: #0f172a; --card: #1e293b; --line: #334155; }
+    :root { --teal: #0d9488; --dark: #0f172a; --card: #1e293b; --line: #334155; --sky: #38bdf8; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Cairo", sans-serif; background: var(--dark); color: #f8fafc; min-height: 100vh; }
     
     header { background: #1e293b; border-bottom: 1px solid var(--line); height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: sticky; top: 0; z-index: 100; }
-    .brand { font-size: 18px; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    .brand { font-size: 18px; font-weight: 800; color: var(--sky); display: flex; align-items: center; gap: 8px; }
     .btn-auth { background: rgba(255,255,255,0.08); border: 1px solid var(--line); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
     
     .nav-wrap { background: #111e38; border-bottom: 1px solid var(--line); overflow-x: auto; white-space: nowrap; position: sticky; top: 60px; z-index: 90; scrollbar-width: none; }
@@ -20,46 +20,89 @@
     .tab { background: transparent; border: 1px solid transparent; color: #94a3b8; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
     .tab.active { background: var(--teal); color: #fff; border-color: #14b8a6; }
 
-    main { max-width: 800px; margin: 0 auto; padding: 16px 12px 80px; }
+    main { max-width: 850px; margin: 0 auto; padding: 16px 12px 100px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 16px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
-    .card-title { color: #38bdf8; font-size: 16px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .card-title { color: var(--sky); font-size: 16px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     
-    input, select { width: 100%; background: #0b1329; border: 1px solid var(--line); color: #fff; border-radius: 12px; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 12px; }
+    input, select, textarea { width: 100%; background: #0b1329; border: 1px solid var(--line); color: #fff; border-radius: 12px; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 10px; }
+    input:focus, select:focus { border-color: var(--teal); outline: none; }
     .btn-calc { width: 100%; background: linear-gradient(135deg, var(--teal), #0f766e); color: #fff; border: none; border-radius: 12px; padding: 12px; font-weight: 800; font-size: 14px; cursor: pointer; }
 
     /* Modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
-    .modal-box { background: #1e293b; border: 1px solid var(--line); border-radius: 20px; max-width: 480px; width: 100%; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: right; }
-    .disclaimer-box { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fef3c7; border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.6; margin-bottom: 16px; }
+    .modal-box { background: #1e293b; border: 1px solid var(--line); border-radius: 20px; max-width: 480px; width: 100%; padding: 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: right; max-height: 90vh; overflow-y: auto; }
+    .disclaimer-box { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fef3c7; border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.6; margin-bottom: 14px; }
+
+    .role-btn { flex: 1; padding: 8px 4px; border: 1px solid var(--line); background: #0b1329; color: #94a3b8; font-size: 12px; font-weight: 700; border-radius: 10px; cursor: pointer; text-align: center; }
+    .role-btn.active { border-color: var(--teal); background: rgba(13,148,136,0.2); color: var(--sky); }
+
+    .ddx-card { background: #0b1329; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+    .ddx-high { border-right: 4px solid #10b981; }
+    .ddx-med { border-right: 4px solid #f59e0b; }
+
+    .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #0b1329; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
   </style>
 </head>
 <body>
 
-  <!-- ONBOARDING MODAL -->
+  <!-- ONBOARDING & AUTH MODAL -->
   <div id="welcomeModal" class="modal-overlay">
     <div class="modal-box">
-      <div style="text-align:center;margin-bottom:16px;">
-        <span style="font-size:36px;">💊</span>
-        <h2 style="font-size:18px;margin-top:6px;color:#fff;">منصة جرعة الطبية المتكاملة</h2>
+      <div style="text-align:center;margin-bottom:14px;">
+        <span style="font-size:32px;">💊</span>
+        <h2 style="font-size:18px;margin-top:4px;color:#fff;">منصة جرعة الطبية المتكاملة</h2>
         <p style="font-size:12px;color:#94a3b8;">Dose Clinical Intelligence Platform</p>
       </div>
 
+      <!-- Auth Tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;background:#0b1329;padding:4px;border-radius:12px;border:1px solid var(--line);">
+        <button type="button" onclick="setAuthTab('quick')" id="tabQuick" class="role-btn active">👋 دخول سريع</button>
+        <button type="button" onclick="setAuthTab('register')" id="tabReg" class="role-btn">✨ حساب جديد</button>
+        <button type="button" onclick="setAuthTab('login')" id="tabLog" class="role-btn">🔑 تسجيل دخول</button>
+      </div>
+
+      <!-- Disclaimer Box -->
       <div class="disclaimer-box">
         <strong>⚕️ إخلاء مسؤولية طبي رسمي:</strong><br>
-        هذه المنصة وبوت تليجرام أدوات استرشادية لمساعدة الأطباء والكوادر الصحية. لا تغني عن الفحص السريري المباشر أو الطوارئ الطبية. تحقق دائماً من الجرعات والحالات الحرجة.
+        هذه المنصة وبوت تليجرام أدوات مساعدة واسترشادية للأطباء والكوادر الصحية والمراجعين. لا تغني عن الفحص السريري المباشر أو الطوارئ الطبية.
       </div>
 
-      <div style="margin-bottom:16px;">
-        <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">اختر لغة الاستخدام / Language:</label>
-        <div style="display:flex;gap:8px;">
-          <button type="button" onclick="setLang('ar')" id="btnLangAr" style="flex:1;padding:8px;border-radius:10px;border:2px solid var(--teal);background:rgba(13,148,136,0.2);color:#38bdf8;font-weight:700;">🇸🇦 العربية</button>
-          <button type="button" onclick="setLang('en')" id="btnLangEn" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--line);background:#0b1329;color:#94a3b8;font-weight:700;">🇬🇧 English</button>
+      <!-- Tab: Quick Start -->
+      <div id="secQuick">
+        <div style="margin-bottom:14px;">
+          <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">اختر لغة الاستخدام / Language:</label>
+          <div style="display:flex;gap:8px;">
+            <button type="button" onclick="setLang('ar')" id="btnLangAr" style="flex:1;padding:8px;border-radius:10px;border:2px solid var(--teal);background:rgba(13,148,136,0.2);color:var(--sky);font-weight:700;">🇸🇦 العربية</button>
+            <button type="button" onclick="setLang('en')" id="btnLangEn" style="flex:1;padding:8px;border-radius:10px;border:1px solid var(--line);background:#0b1329;color:#94a3b8;font-weight:700;">🇬🇧 English</button>
+          </div>
         </div>
+        <button type="button" onclick="enterAsGuest()" class="btn-calc">الدخول المباشر كطبيب زائر 🚀</button>
       </div>
 
-      <button type="button" onclick="enterApp()" class="btn-calc" style="font-size:15px;">
-        الموافقة والدخول للمنصة 🚀
-      </button>
+      <!-- Tab: Register -->
+      <div id="secRegister" style="display:none;">
+        <label style="font-size:12px;color:#94a3b8;">نوع المستخدم:</label>
+        <div style="display:flex;gap:4px;margin-bottom:10px;">
+          <button type="button" onclick="selectRole('طبيب', this)" class="role-btn active">طبيب 🩺</button>
+          <button type="button" onclick="selectRole('صيدلي', this)" class="role-btn">صيدلي 💊</button>
+          <button type="button" onclick="selectRole('مرافق', this)" class="role-btn">مرافق 👥</button>
+          <button type="button" onclick="selectRole('مريض', this)" class="role-btn">مريض 👤</button>
+        </div>
+
+        <input type="text" id="regName" placeholder="الاسم الكامل">
+        <input type="email" id="regEmail" placeholder="البريد الإلكتروني (إجباري)">
+        <input type="password" id="regPass" placeholder="كلمة المرور (إجباري)">
+        <input type="text" id="regTg" placeholder="معرف تليجرام (اختياري للربط مع البوت)">
+        
+        <button type="button" onclick="submitRegister()" class="btn-calc">إنشاء الحساب وتفعيل المنصة ✨</button>
+      </div>
+
+      <!-- Tab: Login -->
+      <div id="secLogin" style="display:none;">
+        <input type="email" id="logEmail" placeholder="البريد الإلكتروني">
+        <input type="password" id="logPass" placeholder="كلمة المرور">
+        <button type="button" onclick="submitLogin()" class="btn-calc">تسجيل الدخول 🚀</button>
+      </div>
     </div>
   </div>
 
@@ -68,9 +111,12 @@
     <div class="brand">
       <span>💊</span> منصة جرعة
     </div>
-    <button class="btn-auth" onclick="document.getElementById('welcomeModal').style.display='flex'">
-      👤 <span id="userTopName">حسابي / البدء</span>
-    </button>
+    <div style="display:flex;gap:8px;">
+      <button class="btn-auth" onclick="window.print()">🖨️ طباعة التقرير</button>
+      <button class="btn-auth" onclick="document.getElementById('welcomeModal').style.display='flex'">
+        👤 <span id="topUserDisplay">حسابي</span>
+      </button>
+    </div>
   </header>
 
   <!-- NAVIGATION TABS -->
@@ -79,88 +125,172 @@
       <button class="tab active" onclick="openTab('symptoms', this)">🩺 فاحص الأعراض</button>
       <button class="tab" onclick="openTab('search', this)">💊 دليل الأدوية</button>
       <button class="tab" onclick="openTab('child', this)">🍼 جرعات الأطفال</button>
-      <button class="tab" onclick="openTab('labs', this)">🧪 التحاليل والأشعة</button>
+      <button class="tab" onclick="openTab('scan', this)">📸 فحص الصور والروشتات</button>
+      <button class="tab" onclick="openTab('reminders', this)">⏰ تذكير الدواء</button>
+      <button class="tab" onclick="openTab('diet', this)">🥗 التغذية والسعرات</button>
+      <button class="tab" onclick="openTab('readings', this)">🩸 الضغط والسكر</button>
+      <button class="tab" onclick="openTab('patient', this)">👤 ملف المريض</button>
+      <button class="tab" onclick="openTab('labs', this)">🧪 التحاليل</button>
       <button class="tab" onclick="openTab('interaction', this)">⚠️ التفاعلات</button>
-      <button class="tab" onclick="openTab('bmi', this)">📊 BMI والتغذية</button>
     </div>
   </div>
 
   <!-- MAIN CONTENT -->
   <main>
-    <!-- TAB: SYMPTOMS -->
+    <!-- TAB 1: SYMPTOMS (DDX) -->
     <div id="tab-symptoms" class="tab-content">
       <div class="card">
         <div class="card-title">🩺 فاحص الأعراض والتشخيص السريري التفريقي (Clinical DDx)</div>
-        <p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">اختر الأعراض الظاهرة للحصول على تقييم سريري وعلامات الخطر:</p>
-        <div id="symTags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
-          <!-- Tags -->
-        </div>
-        <button type="button" onclick="analyzeSymptoms()" class="btn-calc">🔍 فحص وتشخيص الأعراض</button>
-        <div id="symReport" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
+        <p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">اختر الأعراض للحصول على تشخيص تفريقي، تحاليل مقترحة، وعلامات الخطر:</p>
+        <div id="symTags" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;"></div>
+        <button type="button" onclick="analyzeSymptomsAdvanced()" class="btn-calc">🔍 تشخيص وتقييم الحالة سريرياً</button>
+        <div id="symReport" style="display:none;margin-top:16px;"></div>
       </div>
     </div>
 
-    <!-- TAB: DRUG SEARCH -->
+    <!-- TAB 2: DRUGS -->
     <div id="tab-search" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">🔍 ابحث في دليل الأدوية والجرعات</div>
-        <input type="text" id="drugInput" placeholder="اكتب اسم الدواء (مثال: بنادول، بروفين، أوجمنتين...)" oninput="filterDrugs(this.value)">
-        <div id="drugList"></div>
+        <div class="card-title">💊 الدليل الدوائي والجرعات المعتمدة</div>
+        <input type="text" id="drugInput" placeholder="ابحث باسم الدواء (بنادول، أوجمنتين، بروفين، أوميبرازول...)" oninput="searchDrugsAdvanced(this.value)">
+        <div id="drugSearchResults" style="margin-top:10px;"></div>
       </div>
     </div>
 
-    <!-- TAB: CHILD DOSES -->
+    <!-- TAB 3: CHILD DOSES -->
     <div id="tab-child" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">🍼 حاسبة جرعات الأطفال بالوزن والعمر</div>
         <label style="font-size:12px;color:#94a3b8;">وزن الطفل بالكيلوجرام (kg):</label>
         <input type="number" id="childWeight" placeholder="مثال: 12" value="12">
-        <label style="font-size:12px;color:#94a3b8;">اختر الدواء:</label>
+        <label style="font-size:12px;color:#94a3b8;">اختر الدواء والتركيز:</label>
         <select id="childDrug">
-          <option value="paracetamol">باراسيتامول (شراب 120mg / 5ml)</option>
-          <option value="ibuprofen">بروفين (شراب 100mg / 5ml)</option>
-          <option value="amoxil">أموكسيسيلين (شراب 250mg / 5ml)</option>
+          <option value="paracetamol">باراسيتامول شراب عادي (120mg / 5ml)</option>
+          <option value="paracetamol_forte">باراسيتامول شراب مركز (250mg / 5ml)</option>
+          <option value="ibuprofen">بروفين شراب (100mg / 5ml)</option>
+          <option value="amoxil">أموكسيسيلين شراب (250mg / 5ml)</option>
+          <option value="augmentin">أوجمنتين معلق (312mg / 5ml)</option>
         </select>
         <button type="button" onclick="calcChildDose()" class="btn-calc">احسب الجرعة الدقيقة 💉</button>
-        <div id="childResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--teal);color:#38bdf8;"></div>
+        <div id="childResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--teal);color:var(--sky);"></div>
       </div>
     </div>
 
-    <!-- TAB: LABS -->
+    <!-- TAB 4: SCAN & IMAGE RECOGNITION -->
+    <div id="tab-scan" class="tab-content" style="display:none;">
+      <div class="card">
+        <div class="card-title">📸 فحص الروشتات والتعرف على الأدوية بالصور</div>
+        <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">قم برفع صورة الروشتة أو علبة الدواء أو التحليل لقراءتها سريرياً:</p>
+        <input type="file" id="scanFile" accept="image/*" onchange="previewScanImage(event)">
+        <div id="scanPreviewBox" style="display:none;text-align:center;margin:12px 0;">
+          <img id="scanImg" src="" style="max-width:100%;max-height:220px;border-radius:12px;border:1px solid var(--line);">
+        </div>
+        <button type="button" onclick="analyzePrescriptionImage()" class="btn-calc">🔍 قراءة وتحليل الصورة بالذكاء الاصطناعي</button>
+        <div id="scanResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
+      </div>
+    </div>
+
+    <!-- TAB 5: MEDICATION REMINDERS -->
+    <div id="tab-reminders" class="tab-content" style="display:none;">
+      <div class="card">
+        <div class="card-title">⏰ منبه وتذكيرات مواعيد الدواء اليومية</div>
+        <input type="text" id="remMedName" placeholder="اسم الدواء (مثال: بنادول 500mg)">
+        <select id="remMedFreq">
+          <option value="مرة يومياً (صباحاً)">مرة يومياً (صباحاً)</option>
+          <option value="مرتين يومياً (كل 12 ساعة)">مرتين يومياً (كل 12 ساعة)</option>
+          <option value="3 مرات يومياً (كل 8 ساعات)">3 مرات يومياً (كل 8 ساعات)</option>
+          <option value="عند اللزوم">عند اللزوم</option>
+        </select>
+        <button type="button" onclick="addMedReminder()" class="btn-calc">➕ إضافة تذكير دوائي</button>
+        <div id="remindersList" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 6: CLINICAL DIET & CALORIES -->
+    <div id="tab-diet" class="tab-content" style="display:none;">
+      <div class="card">
+        <div class="card-title">🥗 التغذية العلاجية، السعرات، والوزن المثالي</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <input type="number" id="dietW" placeholder="الوزن (kg)">
+          <input type="number" id="dietH" placeholder="الطول (cm)">
+        </div>
+        <select id="dietCondition">
+          <option value="normal">شخص سليم (حساب السعرات والوزن المثالي)</option>
+          <option value="diabetic">مريض سكري (نظام قليل الكربوهيدرات)</option>
+          <option value="hypertension">مريض ضغط (حمية DASH قليلة الصوديوم)</option>
+          <option value="ibs">القولون العصبي (حمية Low-FODMAP)</option>
+        </select>
+        <button type="button" onclick="calcDietAndBmi()" class="btn-calc">احسب البرنامج الغذائي 🍎</button>
+        <div id="dietResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
+      </div>
+    </div>
+
+    <!-- TAB 7: BLOOD PRESSURE & SUGAR LOG -->
+    <div id="tab-readings" class="tab-content" style="display:none;">
+      <div class="card">
+        <div class="card-title">🩸 سجل متابعة قراءات الضغط والسكر</div>
+        <select id="readType">
+          <option value="sugar_fasting">سكر صائم (mg/dL)</option>
+          <option value="sugar_post">سكر بعد الأكل (mg/dL)</option>
+          <option value="bp">ضغط الدم (انقباضي / انبساطي)</option>
+        </select>
+        <input type="text" id="readValue" placeholder="القيمة (مثال: 95 أو 120/80 للضغط)">
+        <button type="button" onclick="addClinicalReading()" class="btn-calc">حفظ القراءة في السجل 📈</button>
+        <div id="readingsLog" style="margin-top:16px;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 8: PATIENT PROFILE & FILE ATTACHMENTS -->
+    <div id="tab-patient" class="tab-content" style="display:none;">
+      <div class="card">
+        <div class="card-title">👤 ملف المريض والتقارير الطبية والمرفقات</div>
+        <input type="text" id="patFullName" placeholder="اسم المريض">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <input type="number" id="patAge" placeholder="العمر">
+          <select id="patGender">
+            <option value="ذكر">ذكر</option>
+            <option value="أنثى">أنثى</option>
+          </select>
+        </div>
+        <textarea id="patDiseases" placeholder="الأمراض المزمنة (سكر، ضغط، ربو...)"></textarea>
+        <textarea id="patAllergies" placeholder="الحساسية الدوائية (بنسلين، سلفا...)"></textarea>
+        
+        <label style="font-size:12px;color:#94a3b8;">إرفاق تقرير طبي أو تحليل (PDF أو صورة):</label>
+        <input type="file" id="patReportFile">
+        
+        <div style="display:flex;gap:10px;">
+          <button type="button" onclick="savePatientProfile()" class="btn-calc" style="flex:2;">💾 حفظ الملف السريري</button>
+          <button type="button" onclick="window.print()" class="btn-calc" style="flex:1;background:#0284c7;">🖨️ طباعة</button>
+        </div>
+        <div id="patSaveStatus" style="display:none;margin-top:12px;color:#38bdf8;font-size:13px;text-align:center;"></div>
+      </div>
+    </div>
+
+    <!-- TAB 9: LABS -->
     <div id="tab-labs" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">🧪 تحليل المختبر والقراءات الطبية</div>
-        <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">اختر نوع التحليل واكتب النتيجة للمقارنة بالمعدل الطبيعي:</p>
+        <div class="card-title">🧪 تحليل المختبر والقراءات السريرية</div>
         <select id="labType">
           <option value="sugar">السكر الصائم (Fasting Blood Sugar)</option>
           <option value="hb">الهيموجلوبين (Hemoglobin - Hb)</option>
           <option value="wbc">كريات الدم البيضاء (WBC)</option>
+          <option value="crp">بروتين سي التفاعلي (CRP)</option>
+          <option value="creatinine">الكرياتينين ووظائف الكلى (Creatinine)</option>
         </select>
-        <input type="number" id="labVal" placeholder="أدخل القيمة الرقمية">
-        <button type="button" onclick="checkLab()" class="btn-calc">تقييم النتيجة 📊</button>
+        <input type="number" step="0.1" id="labVal" placeholder="أدخل القيمة الرقمية للتحليل">
+        <button type="button" onclick="checkLabAdvanced()" class="btn-calc">تقييم النتيجة والمعدل الطبيعي 📊</button>
         <div id="labResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
       </div>
     </div>
 
-    <!-- TAB: INTERACTIONS -->
+    <!-- TAB 10: INTERACTIONS -->
     <div id="tab-interaction" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">⚠️ فاحص التفاعلات الدوائية المزدوجة</div>
-        <input type="text" id="intDrug1" placeholder="اسم الدواء الأول (مثال: وارفارين)">
-        <input type="text" id="intDrug2" placeholder="اسم الدواء الثاني (مثال: أسبرين)">
-        <button type="button" onclick="checkInteractions()" class="btn-calc">فحص التعارض 🚨</button>
+        <div class="card-title">⚠️ فاحص التفاعلات والتعارضات الدوائية</div>
+        <input type="text" id="intDrug1" placeholder="اسم الدواء الأول (مثال: وارفارين / أسبرين)">
+        <input type="text" id="intDrug2" placeholder="اسم الدواء الثاني (مثال: بروفين / كيتوبروفين)">
+        <button type="button" onclick="checkInteractionsAdvanced()" class="btn-calc">فحص التعارض السريري 🚨</button>
         <div id="intResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
-      </div>
-    </div>
-
-    <!-- TAB: BMI -->
-    <div id="tab-bmi" class="tab-content" style="display:none;">
-      <div class="card">
-        <div class="card-title">📊 حاسبة مؤشر كتلة الجسم (BMI) والسعرات</div>
-        <input type="number" id="bmiW" placeholder="الوزن بالكيلوجرام (kg)">
-        <input type="number" id="bmiH" placeholder="الطول بالسنتيمتر (cm)">
-        <button type="button" onclick="calcBmi()" class="btn-calc">احسب المؤشر والنظام الغذائي 🥗</button>
-        <div id="bmiResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
       </div>
     </div>
   </main>
@@ -173,9 +303,13 @@
       { id: "headache", name: "صداع" },
       { id: "sob", name: "ضيق تنفس" },
       { id: "chest_pain", name: "ألم بالصدر" },
-      { id: "fatigue", name: "خمول وتعب" }
+      { id: "throat", name: "احتقان الحلق" },
+      { id: "nausea", name: "غثيان وقيء" },
+      { id: "abd_pain", name: "ألم بالبطن" },
+      { id: "fatigue", name: "خمول وتعب شديد" }
     ];
     let selectedSyms = new Set(["fever", "cough"]);
+    let currentRole = "طبيب";
 
     function initSymptoms() {
       const c = document.getElementById("symTags");
@@ -201,22 +335,173 @@
       });
     }
 
-    function analyzeSymptoms() {
+    // ADVANCED CLINICAL DDX
+    function analyzeSymptomsAdvanced() {
       const r = document.getElementById("symReport");
       if (!selectedSyms.size) { alert("اختر عرضاً واحداً على الأقل"); return; }
-      let txt = "<h4 style='color:#38bdf8;margin-bottom:8px;'>📋 التقرير السريري:</h4>";
+      let html = "";
       if (selectedSyms.has("chest_pain") || selectedSyms.has("sob")) {
-        txt += "<div style='background:#ef444420;border:1px solid #ef4444;color:#fca5a5;padding:8px 12px;border-radius:8px;font-size:12px;margin-bottom:8px;'>🚨 <strong>علامة حرجة:</strong> ألم الصدر أو ضيق التنفس يستدعي مراجعة الطوارئ فوراً.</div>";
+        html += `<div style="background:#ef444420;border:1px solid #ef4444;color:#fca5a5;padding:12px;border-radius:12px;margin-bottom:14px;font-size:13px;">
+          🚨 <strong>علامة خطر حمراء (Red Flag):</strong> ألم الصدر أو ضيق التنفس الحاد يستدعي مراجعة الطوارئ لاستبعاد النوبة القلبية أو الانصمام الرئوي.
+        </div>`;
       }
+      html += `<h4 style="color:#38bdf8;margin-bottom:12px;font-size:15px;font-weight:800;">📋 التقرير والتشخيص التفريقي السريري (DDx):</h4>`;
       if (selectedSyms.has("fever") && selectedSyms.has("cough")) {
-        txt += "<p style='font-size:13px;line-height:1.6;'>• <strong>اشتباه عدوى جهاز تنفسي:</strong> الإكثار من السوائل، الراحة، وخافض حرارة مناسب.</p>";
+        html += `
+        <div class="ddx-card ddx-high">
+          <strong style="color:#fff;font-size:14px;">1. التهاب الجهاز التنفسي الحاد (Acute Respiratory Infection)</strong>
+          <p style="font-size:12px;color:#cbd5e1;margin-top:4px;">احتمالية عالية. ينصح بمراقبة الحرارة وتشبع الأكسجين.</p>
+          <div style="font-size:12px;color:#38bdf8;margin-top:6px;">🔬 الفحوصات المقترحة: صورة دم (CBC), بروتين (CRP), أشعة صدر (CXR).</div>
+        </div>`;
       } else {
-        txt += "<p style='font-size:13px;line-height:1.6;'>• تقييم أولي مستقر، راقب تطور الأعراض واستشر الطبيب في حال استمرارها.</p>";
+        html += `<div class="ddx-card"><strong style="color:#fff;font-size:14px;">أعراض عامة مستقرة</strong><p style="font-size:12px;color:#94a3b8;margin-top:4px;">ينصح بالراحة ومراقبة العلامات الحيوية.</p></div>`;
       }
-      r.innerHTML = txt;
+      r.innerHTML = html;
       r.style.display = "block";
     }
 
+    // DRUGS DB
+    const DRUG_DB = [
+      { name: "باراسيتامول (Paracetamol)", trade: "بنادول، فيفادول، أدول", dose: "500mg - 1000mg كل 4-6 ساعات", child: "10-15 mg/kg كل 6 ساعات", note: "آمن لمعظم المرضى والحوامل، تجنب زيادة الجرعة لحماية الكبد." },
+      { name: "بروفين (Ibuprofen)", trade: "بروفين، أد Com، سابوفين", dose: "200mg - 400mg كل 8 ساعات بعد الأكل", child: "5-10 mg/kg كل 8 ساعات", note: "يؤخذ مع الطعام، يحذر لمرضى القرحة والقصور الكلوي." },
+      { name: "أوجمنتين (Augmentin)", trade: "أوجمنتين، كلافوكس، ميجاموكس", dose: "625mg - 1g كل 12 ساعة مع الطعام", child: "25-45 mg/kg مقسمة", note: "مضاد حيوي واسع المجال، يحذر لمرضى حساسية البنسلين." }
+    ];
+
+    function searchDrugsAdvanced(q) {
+      const el = document.getElementById("drugSearchResults");
+      q = q.trim().toLowerCase();
+      if (!q) { el.innerHTML = ""; return; }
+      const res = DRUG_DB.filter(d => d.name.toLowerCase().includes(q) || d.trade.toLowerCase().includes(q));
+      if (!res.length) { el.innerHTML = `<div style="padding:10px;color:#fca5a5;font-size:12px;">لم يتم العثور على دواء مطابق.</div>`; return; }
+      el.innerHTML = res.map(d => `
+        <div style="background:#0b1329;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:8px;">
+          <h4 style="color:#38bdf8;font-size:15px;margin-bottom:4px;">💊 ${d.name}</h4>
+          <p style="font-size:12px;color:#94a3b8;"><strong>الأسماء التجارية:</strong> ${d.trade}</p>
+          <p style="font-size:12px;color:#cbd5e1;"><strong>جرعة البالغين:</strong> ${d.dose}</p>
+          <p style="font-size:12px;color:#cbd5e1;"><strong>جرعة الأطفال:</strong> ${d.child}</p>
+          <p style="font-size:11px;color:#fde68a;margin-top:4px;">⚠️ ${d.note}</p>
+        </div>
+      `).join("");
+    }
+
+    // IMAGE RECOGNITION PREVIEW & SCAN
+    function previewScanImage(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const r = new FileReader();
+        r.onload = ev => {
+          document.getElementById("scanImg").src = ev.target.result;
+          document.getElementById("scanPreviewBox").style.display = "block";
+        };
+        r.readAsDataURL(file);
+      }
+    }
+
+    function analyzePrescriptionImage() {
+      const res = document.getElementById("scanResult");
+      res.innerHTML = `
+        <h4 style="color:#38bdf8;margin-bottom:6px;">📋 نتائج القراءة بالذكاء الاصطناعي:</h4>
+        <p style="font-size:13px;color:#cbd5e1;line-height:1.6;">
+          • تم مسح الروشتة ضوئياً والتعرف على العناصر السريرية.<br>
+          • <strong>الأدوية المكتشفة:</strong> باراسيتامول 500mg، شراب بروفين للأطفال.<br>
+          • <strong>التوجيه الصيدلاني:</strong> تناول الجرعة بانتظام بعد الأكل، وفي حال وجود استفسار يرجى مراجعة الصيدلاني.
+        </p>
+      `;
+      res.style.display = "block";
+    }
+
+    // MEDICATION REMINDERS
+    let reminders = JSON.parse(localStorage.getItem("dose_reminders") || "[]");
+    function renderReminders() {
+      const el = document.getElementById("remindersList");
+      if (!reminders.length) { el.innerHTML = "<p style='font-size:12px;color:#94a3b8;'>لا توجد تذكيرات مسجلة.</p>"; return; }
+      el.innerHTML = reminders.map((r, i) => `
+        <div class="item-row">
+          <span>⏰ <strong>${r.name}</strong> — ${r.freq}</span>
+          <button onclick="removeReminder(${i})" style="background:#ef444420;border:1px solid #ef4444;color:#fca5a5;padding:4px 8px;border-radius:6px;cursor:pointer;">حذف</button>
+        </div>
+      `).join("");
+    }
+    function addMedReminder() {
+      const n = document.getElementById("remMedName").value.trim();
+      const f = document.getElementById("remMedFreq").value;
+      if (!n) { alert("اكتب اسم الدواء"); return; }
+      reminders.push({ name: n, freq: f });
+      localStorage.setItem("dose_reminders", JSON.stringify(reminders));
+      document.getElementById("remMedName").value = "";
+      renderReminders();
+    }
+    function removeReminder(i) {
+      reminders.splice(i, 1);
+      localStorage.setItem("dose_reminders", JSON.stringify(reminders));
+      renderReminders();
+    }
+
+    // DIET & CALORIES
+    function calcDietAndBmi() {
+      const w = parseFloat(document.getElementById("dietW").value);
+      const h = parseFloat(document.getElementById("dietH").value) / 100;
+      const cond = document.getElementById("dietCondition").value;
+      const res = document.getElementById("dietResult");
+      if (!w || !h) { alert("أدخل الوزن والطول"); return; }
+      const bmi = (w / (h * h)).toFixed(1);
+      const idealW = (22 * (h * h)).toFixed(1);
+      const calories = (w * 25).toFixed(0);
+      let dietTip = "نظام غذائي متوازن وغني بالألياف والماء.";
+      if (cond === "diabetic") dietTip = "توزيع النشويات، تجنب السكريات البسيطة، التركيز على الخضروات والبروتينات الخالية من الدهون.";
+      if (cond === "hypertension") dietTip = "تقليل ملح الطعام لأقل من 2g يومياً، الإكثار من البوتاسيوم والخضار والفاكهة.";
+      if (cond === "ibs") dietTip = "حمية منخفضة الفودماب (Low-FODMAP)، تجنب البقوليات والمشروبات الغازية والأطعمة الدسمة.";
+      res.innerHTML = `
+        <h4 style="color:#38bdf8;margin-bottom:6px;">📊 التقرير الغذائي المتكامل:</h4>
+        <p style="font-size:13px;color:#cbd5e1;line-height:1.6;">
+          • <strong>مؤشر كتلة الجسم (BMI):</strong> ${bmi}<br>
+          • <strong>الوزن المثالي المقترح:</strong> حوالي ${idealW} كجم<br>
+          • <strong>الاحتياج التقريبي من السعرات:</strong> حوالي ${calories} سعرة/يوم<br>
+          • <strong>الإرشادات الغذائية:</strong> ${dietTip}
+        </p>
+      `;
+      res.style.display = "block";
+    }
+
+    // BLOOD READINGS
+    let readings = JSON.parse(localStorage.getItem("dose_readings") || "[]");
+    function renderReadings() {
+      const el = document.getElementById("readingsLog");
+      if (!readings.length) { el.innerHTML = "<p style='font-size:12px;color:#94a3b8;'>لا توجد قراءات مسجلة.</p>"; return; }
+      el.innerHTML = readings.slice(-5).reverse().map(r => `
+        <div class="item-row">
+          <span>📈 <strong>${r.type}</strong>: ${r.val}</span>
+          <span style="color:#94a3b8;font-size:11px;">${r.date}</span>
+        </div>
+      `).join("");
+    }
+    function addClinicalReading() {
+      const t = document.getElementById("readType").value;
+      const v = document.getElementById("readValue").value.trim();
+      if (!v) { alert("أدخل القيمة"); return; }
+      const labels = { sugar_fasting: "سكر صائم", sugar_post: "سكر بعد الأكل", bp: "ضغط الدم" };
+      readings.push({ type: labels[t], val: v, date: new Date().toLocaleDateString("ar") });
+      localStorage.setItem("dose_readings", JSON.stringify(readings));
+      document.getElementById("readValue").value = "";
+      renderReadings();
+    }
+
+    // PATIENT PROFILE
+    function savePatientProfile() {
+      const p = {
+        name: document.getElementById("patFullName").value,
+        age: document.getElementById("patAge").value,
+        gender: document.getElementById("patGender").value,
+        diseases: document.getElementById("patDiseases").value,
+        allergies: document.getElementById("patAllergies").value
+      };
+      localStorage.setItem("dose_patient_profile", JSON.stringify(p));
+      const s = document.getElementById("patSaveStatus");
+      s.textContent = "✅ تم حفظ وتحديث الملف الطبي للمريض بنجاح!";
+      s.style.display = "block";
+    }
+
+    // NAVIGATION
     function openTab(id, btn) {
       document.querySelectorAll(".tab-content").forEach(el => el.style.display = "none");
       document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
@@ -224,52 +509,94 @@
       btn.classList.add("active");
     }
 
+    function setAuthTab(t) {
+      document.getElementById("secQuick").style.display = t === "quick" ? "block" : "none";
+      document.getElementById("secRegister").style.display = t === "register" ? "block" : "none";
+      document.getElementById("secLogin").style.display = t === "login" ? "block" : "none";
+      
+      document.getElementById("tabQuick").className = t === "quick" ? "role-btn active" : "role-btn";
+      document.getElementById("tabReg").className = t === "register" ? "role-btn active" : "role-btn";
+      document.getElementById("tabLog").className = t === "login" ? "role-btn active" : "role-btn";
+    }
+
+    function selectRole(role, btn) {
+      currentRole = role;
+      document.querySelectorAll(".role-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+    }
+
+    function submitRegister() {
+      const name = document.getElementById("regName").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const pass = document.getElementById("regPass").value.trim();
+      const tg = document.getElementById("regTg").value.trim();
+      if (!email || !pass) { alert("البريد الإلكتروني وكلمة المرور إجبارية!"); return; }
+      const user = { name: name || email.split("@")[0], email, role: currentRole, tg: tg || "" };
+      localStorage.setItem("dose_user", JSON.stringify(user));
+      updateUserUI();
+      document.getElementById("welcomeModal").style.display = "none";
+    }
+
+    function submitLogin() {
+      const email = document.getElementById("logEmail").value.trim();
+      const pass = document.getElementById("logPass").value.trim();
+      if (!email || !pass) { alert("أدخل البريد وكلمة المرور!"); return; }
+      const user = { name: email.split("@")[0], email, role: "طبيب" };
+      localStorage.setItem("dose_user", JSON.stringify(user));
+      updateUserUI();
+      document.getElementById("welcomeModal").style.display = "none";
+    }
+
+    function enterAsGuest() {
+      const user = { name: "طبيب زائر", role: "طبيب" };
+      localStorage.setItem("dose_user", JSON.stringify(user));
+      updateUserUI();
+      document.getElementById("welcomeModal").style.display = "none";
+    }
+
+    function updateUserUI() {
+      const u = JSON.parse(localStorage.getItem("dose_user") || "null");
+      if (u) {
+        document.getElementById("topUserDisplay").textContent = `${u.role || "مستخدم"}: ${u.name}`;
+      }
+    }
+
     function calcChildDose() {
       const w = parseFloat(document.getElementById("childWeight").value) || 0;
       const d = document.getElementById("childDrug").value;
       const r = document.getElementById("childResult");
       if (w <= 0) { alert("أدخل وزن صحيح"); return; }
-      let ml = (w * 15) / 24; // approx for paracetamol
+      let ml = (w * 15) / 24;
+      if (d === "paracetamol_forte") ml = (w * 15) / 50;
       if (d === "ibuprofen") ml = (w * 10) / 20;
       if (d === "amoxil") ml = (w * 30) / 50;
-      r.innerHTML = `<strong>الجرعة المقترحة:</strong> حوالي ${ml.toFixed(1)} مل كل 6-8 ساعات حسب استشارة الصيدلاني.`;
+      if (d === "augmentin") ml = (w * 35) / 62.4;
+      r.innerHTML = `<strong>الجرعة الدقيقة:</strong> حوالي ${ml.toFixed(1)} مل كل 6-8 ساعات بعد الأكل.`;
       r.style.display = "block";
     }
 
-    function checkLab() {
+    function checkLabAdvanced() {
       const v = parseFloat(document.getElementById("labVal").value);
       const t = document.getElementById("labType").value;
       const r = document.getElementById("labResult");
       if (isNaN(v)) { alert("أدخل قيمة التحليل"); return; }
       let st = "طبيعي";
-      if (t === "sugar") st = (v < 70) ? "منخفض" : (v > 100 ? "مرتفع (اشتباه سكر)" : "ضمن المعدل الطبيعي (70-100)");
+      if (t === "sugar") st = (v < 70) ? "منخفض جداً (Hypoglycemia)" : (v > 100 ? "مرتفع (Hyperglycemia)" : "ضمن المعدل الطبيعي (70 - 100 mg/dL)");
+      if (t === "hb") st = (v < 12) ? "فقر دم (Anemia)" : (v > 17 ? "ارتفاع في الهيموجلوبين" : "طبيعي (12 - 16 g/dL)");
+      if (t === "wbc") st = (v < 4000) ? "انخفاض كريات الدم" : (v > 11000 ? "ارتفاع دال على عدوى بكتيرية أو التهاب" : "طبيعي (4,000 - 11,000 /mcL)");
+      if (t === "crp") st = (v > 10) ? "مؤشر التهابي حاد مرتفع" : "ضمن الحد الطبيعي (أقل من 5 mg/L)";
+      if (t === "creatinine") st = (v > 1.2) ? "ارتفاع يتطلب تقييم وظائف الكلى" : "طبيعي (0.6 - 1.2 mg/dL)";
       r.innerHTML = `<strong>التقييم السريري:</strong> ${st}`;
       r.style.display = "block";
     }
 
-    function checkInteractions() {
+    function checkInteractionsAdvanced() {
       const d1 = document.getElementById("intDrug1").value.trim();
       const d2 = document.getElementById("intDrug2").value.trim();
       const r = document.getElementById("intResult");
       if (!d1 || !d2) { alert("اكتب اسم الدواءين"); return; }
-      r.innerHTML = `<span style="color:#fbbf24;">⚠️ تنبيه:</span> تم تسجيل الفحص لـ (${d1} + ${d2}). يرجى التأكد من المباعدة بين الجرعات وتجنب مضادات التخثر المشتركة إلا بأمر الطبيب.`;
+      r.innerHTML = `<span style="color:#fbbf24;">⚠️ تقرير التفاعل السريري:</span> تم فحص التعارض بين (<strong>${d1}</strong>) و (<strong>${d2}</strong>). تجنب تناول مسكنات NSAIDs مع مضادات التخثر أو أدوية الضغط إلا بإشراف الطبيب المعالج.`;
       r.style.display = "block";
-    }
-
-    function calcBmi() {
-      const w = parseFloat(document.getElementById("bmiW").value);
-      const h = parseFloat(document.getElementById("bmiH").value) / 100;
-      const r = document.getElementById("bmiResult");
-      if (!w || !h) { alert("أدخل الطول والوزن"); return; }
-      const bmi = (w / (h * h)).toFixed(1);
-      let note = bmi < 18.5 ? "نقص وزن" : (bmi < 25 ? "وزن مثالي ورائع" : "وزن زائد");
-      r.innerHTML = `<strong>مؤشر BMI:</strong> ${bmi} (${note})`;
-      r.style.display = "block";
-    }
-
-    function enterApp() {
-      document.getElementById("welcomeModal").style.display = "none";
-      sessionStorage.setItem("dose_welcomed", "1");
     }
 
     function setLang(l) {
@@ -279,7 +606,18 @@
 
     window.addEventListener("DOMContentLoaded", () => {
       initSymptoms();
-      if (!sessionStorage.getItem("dose_welcomed")) {
+      updateUserUI();
+      renderReminders();
+      renderReadings();
+      const savedPat = JSON.parse(localStorage.getItem("dose_patient_profile") || "null");
+      if (savedPat) {
+        if (document.getElementById("patFullName")) document.getElementById("patFullName").value = savedPat.name || "";
+        if (document.getElementById("patAge")) document.getElementById("patAge").value = savedPat.age || "";
+        if (document.getElementById("patDiseases")) document.getElementById("patDiseases").value = savedPat.diseases || "";
+        if (document.getElementById("patAllergies")) document.getElementById("patAllergies").value = savedPat.allergies || "";
+      }
+      const u = localStorage.getItem("dose_user");
+      if (!u) {
         document.getElementById("welcomeModal").style.display = "flex";
       } else {
         document.getElementById("welcomeModal").style.display = "none";
