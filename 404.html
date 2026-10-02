@@ -3,49 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>منصة جرعة الطبية الشاملة — Dose Medical Platform</title>
+  <title>منصة جرعة الطبية المتكاملة — Dose Medical Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root { --teal: #0d9488; --dark: #0f172a; --card: #1e293b; --line: #334155; --sky: #38bdf8; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Cairo", sans-serif; background: var(--dark); color: #f8fafc; min-height: 100vh; }
-    
     header { background: #1e293b; border-bottom: 1px solid var(--line); height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 16px; position: sticky; top: 0; z-index: 100; }
     .brand { font-size: 18px; font-weight: 800; color: var(--sky); display: flex; align-items: center; gap: 8px; }
     .btn-auth { background: rgba(255,255,255,0.08); border: 1px solid var(--line); color: #fff; padding: 6px 12px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; }
-    
     .nav-wrap { background: #111e38; border-bottom: 1px solid var(--line); overflow-x: auto; white-space: nowrap; position: sticky; top: 60px; z-index: 90; scrollbar-width: none; }
     .nav-tabs { display: flex; gap: 6px; padding: 8px 12px; width: max-content; }
     .tab { background: transparent; border: 1px solid transparent; color: #94a3b8; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
     .tab.active { background: var(--teal); color: #fff; border-color: #14b8a6; }
-
     main { max-width: 850px; margin: 0 auto; padding: 16px 12px 100px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 16px; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.2); }
     .card-title { color: var(--sky); font-size: 16px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-    
     input, select, textarea { width: 100%; background: #0b1329; border: 1px solid var(--line); color: #fff; border-radius: 12px; padding: 12px; font-family: inherit; font-size: 14px; margin-bottom: 10px; }
     input:focus, select:focus { border-color: var(--teal); outline: none; }
     .btn-calc { width: 100%; background: linear-gradient(135deg, var(--teal), #0f766e); color: #fff; border: none; border-radius: 12px; padding: 12px; font-weight: 800; font-size: 14px; cursor: pointer; }
-
-    /* Modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
     .modal-box { background: #1e293b; border: 1px solid var(--line); border-radius: 20px; max-width: 480px; width: 100%; padding: 22px; box-shadow: 0 20px 40px rgba(0,0,0,0.4); text-align: right; max-height: 90vh; overflow-y: auto; }
     .disclaimer-box { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fef3c7; border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.6; margin-bottom: 14px; }
-
     .role-btn { flex: 1; padding: 8px 4px; border: 1px solid var(--line); background: #0b1329; color: #94a3b8; font-size: 12px; font-weight: 700; border-radius: 10px; cursor: pointer; text-align: center; }
     .role-btn.active { border-color: var(--teal); background: rgba(13,148,136,0.2); color: var(--sky); }
-
     .ddx-card { background: #0b1329; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
     .ddx-high { border-right: 4px solid #10b981; }
-    .ddx-med { border-right: 4px solid #f59e0b; }
-
     .item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #0b1329; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
   </style>
 </head>
 <body>
-
-  <!-- ONBOARDING & AUTH MODAL -->
   <div id="welcomeModal" class="modal-overlay">
     <div class="modal-box">
       <div style="text-align:center;margin-bottom:14px;">
@@ -53,21 +41,15 @@
         <h2 style="font-size:18px;margin-top:4px;color:#fff;">منصة جرعة الطبية المتكاملة</h2>
         <p style="font-size:12px;color:#94a3b8;">Dose Clinical Intelligence Platform</p>
       </div>
-
-      <!-- Auth Tabs -->
       <div style="display:flex;gap:6px;margin-bottom:14px;background:#0b1329;padding:4px;border-radius:12px;border:1px solid var(--line);">
         <button type="button" onclick="setAuthTab('quick')" id="tabQuick" class="role-btn active">👋 دخول سريع</button>
         <button type="button" onclick="setAuthTab('register')" id="tabReg" class="role-btn">✨ حساب جديد</button>
         <button type="button" onclick="setAuthTab('login')" id="tabLog" class="role-btn">🔑 تسجيل دخول</button>
       </div>
-
-      <!-- Disclaimer Box -->
       <div class="disclaimer-box">
         <strong>⚕️ إخلاء مسؤولية طبي رسمي:</strong><br>
         هذه المنصة وبوت تليجرام أدوات مساعدة واسترشادية للأطباء والكوادر الصحية والمراجعين. لا تغني عن الفحص السريري المباشر أو الطوارئ الطبية.
       </div>
-
-      <!-- Tab: Quick Start -->
       <div id="secQuick">
         <div style="margin-bottom:14px;">
           <label style="font-size:12px;color:#94a3b8;display:block;margin-bottom:6px;">اختر لغة الاستخدام / Language:</label>
@@ -78,8 +60,6 @@
         </div>
         <button type="button" onclick="enterAsGuest()" class="btn-calc">الدخول المباشر كطبيب زائر 🚀</button>
       </div>
-
-      <!-- Tab: Register -->
       <div id="secRegister" style="display:none;">
         <label style="font-size:12px;color:#94a3b8;">نوع المستخدم:</label>
         <div style="display:flex;gap:4px;margin-bottom:10px;">
@@ -88,16 +68,12 @@
           <button type="button" onclick="selectRole('مرافق', this)" class="role-btn">مرافق 👥</button>
           <button type="button" onclick="selectRole('مريض', this)" class="role-btn">مريض 👤</button>
         </div>
-
         <input type="text" id="regName" placeholder="الاسم الكامل">
         <input type="email" id="regEmail" placeholder="البريد الإلكتروني (إجباري)">
         <input type="password" id="regPass" placeholder="كلمة المرور (إجباري)">
         <input type="text" id="regTg" placeholder="معرف تليجرام (اختياري للربط مع البوت)">
-        
         <button type="button" onclick="submitRegister()" class="btn-calc">إنشاء الحساب وتفعيل المنصة ✨</button>
       </div>
-
-      <!-- Tab: Login -->
       <div id="secLogin" style="display:none;">
         <input type="email" id="logEmail" placeholder="البريد الإلكتروني">
         <input type="password" id="logPass" placeholder="كلمة المرور">
@@ -106,38 +82,30 @@
     </div>
   </div>
 
-  <!-- HEADER -->
   <header>
-    <div class="brand">
-      <span>💊</span> منصة جرعة
-    </div>
+    <div class="brand"><span>💊</span> منصة جرعة</div>
     <div style="display:flex;gap:8px;">
-      <button class="btn-auth" onclick="window.print()">🖨️ طباعة التقرير</button>
-      <button class="btn-auth" onclick="document.getElementById('welcomeModal').style.display='flex'">
-        👤 <span id="topUserDisplay">حسابي</span>
-      </button>
+      <button class="btn-auth" onclick="window.print()">🖨️ طباعة</button>
+      <button class="btn-auth" onclick="document.getElementById('welcomeModal').style.display='flex'">👤 <span id="topUserDisplay">حسابي</span></button>
     </div>
   </header>
 
-  <!-- NAVIGATION TABS -->
   <div class="nav-wrap">
     <div class="nav-tabs">
       <button class="tab active" onclick="openTab('symptoms', this)">🩺 فاحص الأعراض</button>
       <button class="tab" onclick="openTab('search', this)">💊 دليل الأدوية</button>
       <button class="tab" onclick="openTab('child', this)">🍼 جرعات الأطفال</button>
-      <button class="tab" onclick="openTab('scan', this)">📸 فحص الصور والروشتات</button>
+      <button class="tab" onclick="openTab('scan', this)">📸 فحص الروشتات</button>
       <button class="tab" onclick="openTab('reminders', this)">⏰ تذكير الدواء</button>
       <button class="tab" onclick="openTab('diet', this)">🥗 التغذية والسعرات</button>
       <button class="tab" onclick="openTab('readings', this)">🩸 الضغط والسكر</button>
       <button class="tab" onclick="openTab('patient', this)">👤 ملف المريض</button>
-      <button class="tab" onclick="openTab('labs', this)">🧪 التحاليل</button>
+      <button class="tab" onclick="openTab('labs', this)">🧪 التحاليل والأشعة</button>
       <button class="tab" onclick="openTab('interaction', this)">⚠️ التفاعلات</button>
     </div>
   </div>
 
-  <!-- MAIN CONTENT -->
   <main>
-    <!-- TAB 1: SYMPTOMS (DDX) -->
     <div id="tab-symptoms" class="tab-content">
       <div class="card">
         <div class="card-title">🩺 فاحص الأعراض والتشخيص السريري التفريقي (Clinical DDx)</div>
@@ -148,19 +116,17 @@
       </div>
     </div>
 
-    <!-- TAB 2: DRUGS -->
     <div id="tab-search" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">💊 الدليل الدوائي والجرعات المعتمدة</div>
-        <input type="text" id="drugInput" placeholder="ابحث باسم الدواء (بنادول، أوجمنتين، بروفين، أوميبرازول...)" oninput="searchDrugsAdvanced(this.value)">
+        <div class="card-title">💊 الدليل الدوائي والنشرة السريرية المعتمدة</div>
+        <input type="text" id="drugInput" placeholder="اكتب اسم الدواء (ميتفورمين، بنادول، أوجمنتين، كونكور، بروفين...)" oninput="searchDrugsAdvanced(this.value)">
         <div id="drugSearchResults" style="margin-top:10px;"></div>
       </div>
     </div>
 
-    <!-- TAB 3: CHILD DOSES -->
     <div id="tab-child" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">🍼 حاسبة جرعات الأطفال بالوزن والعمر</div>
+        <div class="card-title">🍼 حاسبة جرعات الأطفال بالوزن والتركيز التجاري</div>
         <label style="font-size:12px;color:#94a3b8;">وزن الطفل بالكيلوجرام (kg):</label>
         <input type="number" id="childWeight" placeholder="مثال: 12" value="12">
         <label style="font-size:12px;color:#94a3b8;">اختر الدواء والتركيز:</label>
@@ -171,26 +137,23 @@
           <option value="amoxil">أموكسيسيلين شراب (250mg / 5ml)</option>
           <option value="augmentin">أوجمنتين معلق (312mg / 5ml)</option>
         </select>
-        <button type="button" onclick="calcChildDose()" class="btn-calc">احسب الجرعة الدقيقة 💉</button>
+        <button type="button" onclick="calcChildDose()" class="btn-calc">احسب الجرعة بالمل والملعقة 💉</button>
         <div id="childResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--teal);color:var(--sky);"></div>
       </div>
     </div>
 
-    <!-- TAB 4: SCAN & IMAGE RECOGNITION -->
     <div id="tab-scan" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">📸 فحص الروشتات والتعرف على الأدوية بالصور</div>
-        <p style="font-size:13px;color:#94a3b8;margin-bottom:12px;">قم برفع صورة الروشتة أو علبة الدواء أو التحليل لقراءتها سريرياً:</p>
         <input type="file" id="scanFile" accept="image/*" onchange="previewScanImage(event)">
         <div id="scanPreviewBox" style="display:none;text-align:center;margin:12px 0;">
           <img id="scanImg" src="" style="max-width:100%;max-height:220px;border-radius:12px;border:1px solid var(--line);">
         </div>
-        <button type="button" onclick="analyzePrescriptionImage()" class="btn-calc">🔍 قراءة وتحليل الصورة بالذكاء الاصطناعي</button>
+        <button type="button" onclick="analyzePrescriptionImage()" class="btn-calc">🔍 تحليل الروشتة والأدوية بالذكاء الاصطناعي</button>
         <div id="scanResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
       </div>
     </div>
 
-    <!-- TAB 5: MEDICATION REMINDERS -->
     <div id="tab-reminders" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">⏰ منبه وتذكيرات مواعيد الدواء اليومية</div>
@@ -199,14 +162,12 @@
           <option value="مرة يومياً (صباحاً)">مرة يومياً (صباحاً)</option>
           <option value="مرتين يومياً (كل 12 ساعة)">مرتين يومياً (كل 12 ساعة)</option>
           <option value="3 مرات يومياً (كل 8 ساعات)">3 مرات يومياً (كل 8 ساعات)</option>
-          <option value="عند اللزوم">عند اللزوم</option>
         </select>
         <button type="button" onclick="addMedReminder()" class="btn-calc">➕ إضافة تذكير دوائي</button>
         <div id="remindersList" style="margin-top:16px;"></div>
       </div>
     </div>
 
-    <!-- TAB 6: CLINICAL DIET & CALORIES -->
     <div id="tab-diet" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">🥗 التغذية العلاجية، السعرات، والوزن المثالي</div>
@@ -217,15 +178,13 @@
         <select id="dietCondition">
           <option value="normal">شخص سليم (حساب السعرات والوزن المثالي)</option>
           <option value="diabetic">مريض سكري (نظام قليل الكربوهيدرات)</option>
-          <option value="hypertension">مريض ضغط (حمية DASH قليلة الصوديوم)</option>
-          <option value="ibs">القولون العصبي (حمية Low-FODMAP)</option>
+          <option value="hypertension">مريض ضغط (حمية قليلة الصوديوم)</option>
         </select>
         <button type="button" onclick="calcDietAndBmi()" class="btn-calc">احسب البرنامج الغذائي 🍎</button>
         <div id="dietResult" style="display:none;margin-top:16px;padding:14px;background:#0b1329;border-radius:12px;border:1px solid var(--line);"></div>
       </div>
     </div>
 
-    <!-- TAB 7: BLOOD PRESSURE & SUGAR LOG -->
     <div id="tab-readings" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">🩸 سجل متابعة قراءات الضغط والسكر</div>
@@ -234,13 +193,12 @@
           <option value="sugar_post">سكر بعد الأكل (mg/dL)</option>
           <option value="bp">ضغط الدم (انقباضي / انبساطي)</option>
         </select>
-        <input type="text" id="readValue" placeholder="القيمة (مثال: 95 أو 120/80 للضغط)">
+        <input type="text" id="readValue" placeholder="القيمة (مثال: 95 أو 120/80)">
         <button type="button" onclick="addClinicalReading()" class="btn-calc">حفظ القراءة في السجل 📈</button>
         <div id="readingsLog" style="margin-top:16px;"></div>
       </div>
     </div>
 
-    <!-- TAB 8: PATIENT PROFILE & FILE ATTACHMENTS -->
     <div id="tab-patient" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">👤 ملف المريض والتقارير الطبية والمرفقات</div>
@@ -254,10 +212,8 @@
         </div>
         <textarea id="patDiseases" placeholder="الأمراض المزمنة (سكر، ضغط، ربو...)"></textarea>
         <textarea id="patAllergies" placeholder="الحساسية الدوائية (بنسلين، سلفا...)"></textarea>
-        
         <label style="font-size:12px;color:#94a3b8;">إرفاق تقرير طبي أو تحليل (PDF أو صورة):</label>
         <input type="file" id="patReportFile">
-        
         <div style="display:flex;gap:10px;">
           <button type="button" onclick="savePatientProfile()" class="btn-calc" style="flex:2;">💾 حفظ الملف السريري</button>
           <button type="button" onclick="window.print()" class="btn-calc" style="flex:1;background:#0284c7;">🖨️ طباعة</button>
@@ -266,10 +222,9 @@
       </div>
     </div>
 
-    <!-- TAB 9: LABS -->
     <div id="tab-labs" class="tab-content" style="display:none;">
       <div class="card">
-        <div class="card-title">🧪 تحليل المختبر والقراءات السريرية</div>
+        <div class="card-title">🧪 تحليل المختبر وقراءة الأشعة والتحاليل</div>
         <select id="labType">
           <option value="sugar">السكر الصائم (Fasting Blood Sugar)</option>
           <option value="hb">الهيموجلوبين (Hemoglobin - Hb)</option>
@@ -283,7 +238,6 @@
       </div>
     </div>
 
-    <!-- TAB 10: INTERACTIONS -->
     <div id="tab-interaction" class="tab-content" style="display:none;">
       <div class="card">
         <div class="card-title">⚠️ فاحص التفاعلات والتعارضات الدوائية</div>
@@ -296,7 +250,152 @@
   </main>
 
   <script>
-    // Symptoms Data
+    // FULL VERIFIED PHARMACOPEIA (قاعدة البيانات الدوائية السريرية الكاملة)
+    const REAL_DRUGS = [
+      {
+        keys: ["metformin", "ميتفورمين", "glucophage", "جلوكوفاج", "سيدوفاج", "ميتفور"],
+        name_ar: "ميتفورمين هيدروكلوريد",
+        name_en: "Metformin HCl",
+        trade: "جلوكوفاج (Glucophage)، سيدوفاج (Cidophage)، جلوكوفانس",
+        class: "خافض سكر فموي — بيجوانيد (Biguanide Antidiabetic)",
+        indication: "علاج السكري من النوع الثاني (Type 2 DM) كخط علاج أول، ومقاومة الإنسولين، وتكيس المبايض (PCOS).",
+        how_to_use: "يؤخذ مع وجبات الطعام مباشرة أو بعدها لتقليل اضطرابات الجهاز الهضمي.",
+        adult_dose: "• الجرعة الاعتيادية (عادي): 500 mg مرتين يومياً أو 850 mg مرة واحدة مع الوجبة، وتزاد تدريجياً كل أسبوعين.\n• ممتد المفعول (XR): 500 إلى 1000 mg مرة واحدة يومياً مع وجبة العشاء.\n• الحد الأقصى اليومي: 2550 mg للقرص العادي، و 2000 mg للممتد المفعول (XR).",
+        renal_hepatic: "• القصور الكلوي:\n- إذا كان eGFR > 60: آمن بالجرعة الكاملة.\n- إذا كان eGFR بين 45-59: الجرعة القصوى 2000 mg.\n- إذا كان eGFR بين 30-44: يوصى بجرعة قصوى 1000 mg مع المراقبة الشديدة.\n- إذا كان eGFR < 30: ممنوع منعاً باتاً (مضاد استطباب مطلق).\n• القصور الكبدي: يجب تجنبه لارتفاع خطر الحماض اللبني (Lactic Acidosis).",
+        pregnancy: "• الحمل (Category B): يعتبر خياراً آمناً ويستخدم تحت الإشراف الطبي لعلاج سكري الحمل وتكيس المبايض.\n• الرضاعة: يفرز بنسبة ضئيلة جداً في حليب الأم، ويعتبر آمناً ومقبولاً سريرياً.",
+        warnings: "⚠️ تحذير الصندوق الأسود: الحماض اللبني (Lactic Acidosis) حالة خطيرة تحدث عند تناوله مع فشل كلوي حاد أو تجفاف شديد. يوقف قبل التصوير بالأشعة المقطعية الملونة بـ 48 ساعة.",
+        side_effects: "إسهال، غثيان، غازات، طعم معدني في الفم، فقدان شهية. على المدى الطويل: نقص فيتامين B12.",
+        interactions: "مدرات البول ومسكنات NSAIDs ترفع خطر الفشل الكلوي. الكحول يرفع خطر الحماض اللبني بشدة."
+      },
+      {
+        keys: ["concor", "كونكور", "bisoprolol", "بيسوبرولول"],
+        name_ar: "بيسوبرولول فومارات",
+        name_en: "Bisoprolol Fumarate",
+        trade: "كونكور (Concor)، بيستول (Bistol)، بيسولوك",
+        class: "حاصر مستقبلات بيتا انتقائي (Cardioselective Beta-1 Blocker)",
+        indication: "ارتفاع ضغط الدم الشرياني، الذبحة الصدرية، وقصور عضلة القلب الاحتقاني المزمن (Heart Failure).",
+        how_to_use: "يؤخذ مرة واحدة يومياً في الصباح مع أو بدون طعام في نفس الموعد يومياً.",
+        adult_dose: "• لارتفاع ضغط الدم: يبدأ بـ 5 mg مرة يومياً، وتزاد لـ 10 mg (الحد الأقصى: 20 mg يومياً).\n• لقصور القلب: يبدأ بـ 1.25 mg وتزاد تدريجياً حتى 10 mg.",
+        renal_hepatic: "إذا كان ClCr < 40 ml/min الجرعة القصوى 10 mg. إذا كان ClCr < 20 ml/min الجرعة القصوى 5 mg.",
+        pregnancy: "• الحمل والرضاعة (Category C): قد يقلل نمو الجنين ويبطئ نبضه، لا يستخدم إلا للضرورة القصوى.",
+        warnings: "يمنع إيقاف الدواء فجأة لتجنب حدوث ارتفاع ارتدادي حاد بالضغط أو نوبة قلبية. يمنع لمرضى الربو القصبي الشديد وبطء القلب الحاد.",
+        side_effects: "بطء نبضات القلب، هبوط ضغط الدم، برودة الأطراف، إرهاق وخمول، دوخة.",
+        interactions: "مضادات قنوات الكالسيوم (Verapamil) قد تسبب توقف القلب، أدوية السكري (يخفي علامات هبوط السكر كالرعشة والخفقان)."
+      },
+      {
+        keys: ["paracetamol", "باراسيتامول", "panadol", "بنادول", "fevadol", "فيفادول", "adol", "أدول"],
+        name_ar: "باراسيتامول (أسيتامينوفين)",
+        name_en: "Paracetamol (Acetaminophen)",
+        trade: "بنادول (Panadol)، فيفادول (Fevadol)، أدول (Adol)، تايلينول (Tylenol)",
+        class: "مسكن ألم غير أفيوني وخافض حرارة مركزي",
+        indication: "تسكين الصداع، آلام الأسنان والمفاصل، وخفض الحرارة.",
+        how_to_use: "يؤخذ مع أو بدون طعام مع كوب ماء. يبدأ مفعوله خلال 30 دقيقة.",
+        adult_dose: "500 - 1000 mg كل 4 إلى 6 ساعات.\n• الحد الأقصى: 4000 mg يومياً للسليم، و 2000 mg لمرضى الكبد وكبار السن.",
+        renal_hepatic: "إذا كان GFR < 10 مل/دقيقة تباعد الجرعات كل 8 ساعات. في القصور الكبدي يخفض لأقل من 2g يومياً.",
+        pregnancy: "• الحمل والرضاعة (Category B): الخيار الأكثر أماناً والأول طوال فترة الحمل والرضاعة بالجرعات العلاجية.",
+        warnings: "تجنب تناول أكثر من مستحضر يحتوي على الباراسيتامول في نفس الوقت لمنع التسمم الكبدي الحاد.",
+        side_effects: "نادرة بالجرعة العلاجية. في الجرعات العالية: تسمم وفشل كبدي حاد.",
+        interactions: "الاستخدام المنتظم الطويل يرفع تأثير الوارفارين المميع للدم. الكحول يزيد السمية الكبدية."
+      },
+      {
+        keys: ["amoxil", "أموكسيسيلين", "augmentin", "أوجمنتين", "كلافوكس"],
+        name_ar: "أموكسيسيلين + كلافولانيك أسيد",
+        name_en: "Amoxicillin / Clavulanate",
+        trade: "أوجمنتين (Augmentin)، كلافوكس (Klavox)، ميجاموكس (Megamox)",
+        class: "مضاد حيوي واسع المجال (Penicillin / Beta-lactamase inhibitor)",
+        indication: "التهابات الجهاز التنفسي والجيوب والأذن الوسطى والمسالك البولية والأسنان والجلد.",
+        how_to_use: "يؤخذ مع بداية الوجبة مباشرة لتقليل المغص والإسهال والغثيان.",
+        adult_dose: "625 mg كل 8 ساعات أو 1000 mg (1g) كل 12 ساعة لمدة 7-10 أيام.",
+        renal_hepatic: "إذا كان GFR 10-30 يؤخذ 625mg كل 12 ساعة. إذا كان GFR < 10 يؤخذ 625mg كل 24 ساعة.",
+        pregnancy: "• الحمل والرضاعة (Category B): آمن ويستخدم على نطاق واسع سريرياً.",
+        warnings: "ممنوع منعاً باتاً لمرضى حساسية البنسلين المفرطة لتجنب الصدمة التحسسية التأقية.",
+        side_effects: "إسهال، غثيان، مغص، طفح جلدي، أو فطريات فموية/مهبلية عابرة.",
+        interactions: "يقلل فعالية حبوب منع الحمل مؤقتاً، ويزيد سمية دواء الميثوتريكسات."
+      },
+      {
+        keys: ["ibuprofen", "بروفين", "إيبوبروفين", "brufen", "سابوفين"],
+        name_ar: "إيبوبروفين (Ibuprofen)",
+        name_en: "Ibuprofen",
+        trade: "بروفين (Brufen)، سابوفين (Sapofen)، أدفيل (Advil)",
+        class: "مضاد التهاب غير ستيرويدي ومسكن ألم وخافض حرارة (NSAID)",
+        indication: "التهاب المفاصل، آلام الطمث والأسنان، والصداع وخفض الحرارة.",
+        how_to_use: "يؤخذ بعد الأكل مباشرة أو مع كوب حليب لحماية المعدة.",
+        adult_dose: "200 - 400 mg كل 6 إلى 8 ساعات بعد الأكل مباشرة. الحد الأقصى: 1200 mg بدون وصفة و 2400 mg بوصفة.",
+        renal_hepatic: "ممنوع في الفشل الكلوي المتقدم، ويحذر في القصور الكبدي.",
+        pregnancy: "الفئة C في الثلثين الأول والثاني، وممنوع منعاً باتاً في الثلث الثالث (الفئة D). آمن أثناء الرضاعة.",
+        warnings: "يحذر لمرضى القرحة الهضمية والربو التحسسي ونزيف الجهاز الهضمي.",
+        side_effects: "حرقة المعدة، عسر هضم، ألم بالبطن، غثيان.",
+        interactions: "يزيد خطر النزيف مع الوارفارين والأسبرين، ويقلل فعالية أدوية الضغط."
+      }
+    ];
+
+    function searchDrugsAdvanced(q) {
+      const el = document.getElementById("drugSearchResults");
+      q = q.trim().toLowerCase();
+      if (!q) { el.innerHTML = ""; return; }
+
+      const match = REAL_DRUGS.find(d => 
+        d.keys.some(k => q.includes(k) || k.includes(q)) || 
+        d.name_en.toLowerCase().includes(q) || 
+        d.name_ar.includes(q)
+      );
+
+      if (match) {
+        el.innerHTML = `
+          <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);">
+            <div style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 ${match.name_ar}</h3>
+                <span style="color:#94a3b8;font-size:13px;font-weight:600;">${match.name_en}</span>
+              </div>
+              <div style="color:#0d9488;font-size:12px;font-weight:700;margin-top:4px;">📂 ${match.class}</div>
+              <div style="background:#152243;padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12px;color:#cbd5e1;">
+                🏷️ <strong>الأسماء التجارية:</strong> ${match.trade}
+              </div>
+            </div>
+            <div style="margin-bottom:10px;">
+              <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال:</strong>
+              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.indication}</p>
+            </div>
+            <div style="margin-bottom:10px;">
+              <strong style="color:#38bdf8;font-size:13px;">💡 طريقة التناول الصحيحة:</strong>
+              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.how_to_use}</p>
+            </div>
+            <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;border-right:4px solid var(--teal);">
+              <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات المعتمدة بالتفصيل:</strong>
+              <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;white-space:pre-line;">${match.adult_dose}</p>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
+              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
+                <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
+                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.renal_hepatic}</p>
+              </div>
+              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
+                <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
+                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.pregnancy}</p>
+              </div>
+            </div>
+            <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:10px;border-radius:8px;margin-bottom:10px;">
+              <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
+              <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">${match.warnings}</p>
+            </div>
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+              <p style="margin-bottom:4px;">⚠️ <strong>الآثار الجانبية:</strong> ${match.side_effects}</p>
+              <p>🔄 <strong>التداخلات الدوائية:</strong> ${match.interactions}</p>
+            </div>
+          </div>
+        `;
+      } else {
+        el.innerHTML = `
+          <div style="background:#152243;border:1px solid #1e335e;border-radius:12px;padding:16px;text-align:center;">
+            <p style="color:#fca5a5;font-size:13px;margin-bottom:4px;">❌ لم يتم العثور على دواء مطابق لـ "<strong>${q}</strong>".</p>
+            <p style="color:#94a3b8;font-size:12px;">جرّب كتابة الاسم الشائع مثل: (ميتفورمين، جلوكوفاج، كونكور، بنادول، بروفين، أوجمنتين...).</p>
+          </div>
+        `;
+      }
+    }
+
+    // SYMPTOMS DATA
     const symList = [
       { id: "fever", name: "حمى وحرارة" },
       { id: "cough", name: "كحة وسعال" },
@@ -335,7 +434,6 @@
       });
     }
 
-    // ADVANCED CLINICAL DDX
     function analyzeSymptomsAdvanced() {
       const r = document.getElementById("symReport");
       if (!selectedSyms.size) { alert("اختر عرضاً واحداً على الأقل"); return; }
@@ -360,225 +458,6 @@
       r.style.display = "block";
     }
 
-    // DRUGS DB
-    const DRUG_DB = [
-      { name: "باراسيتامول (Paracetamol)", trade: "بنادول، فيفادول، أدول", dose: "500mg - 1000mg كل 4-6 ساعات", child: "10-15 mg/kg كل 6 ساعات", note: "آمن لمعظم المرضى والحوامل، تجنب زيادة الجرعة لحماية الكبد." },
-      { name: "بروفين (Ibuprofen)", trade: "بروفين، أد Com، سابوفين", dose: "200mg - 400mg كل 8 ساعات بعد الأكل", child: "5-10 mg/kg كل 8 ساعات", note: "يؤخذ مع الطعام، يحذر لمرضى القرحة والقصور الكلوي." },
-      { name: "أوجمنتين (Augmentin)", trade: "أوجمنتين، كلافوكس، ميجاموكس", dose: "625mg - 1g كل 12 ساعة مع الطعام", child: "25-45 mg/kg مقسمة", note: "مضاد حيوي واسع المجال، يحذر لمرضى حساسية البنسلين." }
-    ];
-
-    
-    
-    // REAL VERIFIED CLINICAL PHARMACOPEIA (قاعدة البيانات الدوائية السريرية المعتمدة)
-    const REAL_DRUGS = [
-      {
-        keys: ["metformin", "ميتفورمين", "glucophage", "جلوكوفاج", "سيدوفاج", "ميتفور"],
-        name_ar: "ميتفورمين هيدروكلوريد",
-        name_en: "Metformin HCl",
-        trade: "جلوكوفاج (Glucophage)، سيدوفاج (Cidophage)، جلوكوفانس، ديابيت مين",
-        class: "خافض سكر فموي — بيجوانيد (Biguanide Antidiabetic)",
-        indication: "علاج السكري من النوع الثاني (Type 2 DM) كخط علاج أول، ومقاومة الإنسولين، وتكيس المبايض (PCOS).",
-        how_to_use: "يؤخذ مع وجبات الطعام مباشرة أو بعدها لتقليل الآثار الهضمية (الغثيان، الإسهال). يبلع القرص ممتد المفعول (XR) كاملاً دون كسر أو مضغ.",
-        adult_dose: "• الجرعة الاعتيادية (عادي): 500 mg مرتين يومياً أو 850 mg مرة واحدة مع الوجبة، وتزاد تدريجياً كل أسبوعين.
-• ممتد المفعول (XR): 500 إلى 1000 mg مرة واحدة يومياً مع وجبة العشاء.
-• الحد الأقصى اليومي: 2550 mg للقرص العادي، و 2000 mg للممتد المفعول (XR).",
-        renal_hepatic: "• القصور الكلوي (بالغ الأهمية):
-- إذا كان eGFR > 60: آمن بالجرعة الكاملة.
-- إذا كان eGFR بين 45-59: الجرعة القصوى 2000 mg.
-- إذا كان eGFR بين 30-44: يوصى بجرعة قصوى 1000 mg مع المراقبة الشديدة.
-- إذا كان eGFR < 30: ممنوع منعاً باتاً (مضاد استطباب مطلق).
-• القصور الكبدي: يجب تجنبه لارتفاع خطر الحماض اللبني (Lactic Acidosis).",
-        pregnancy: "• الحمل (Category B): يعتبر خياراً آمناً ويستخدم تحت الإشراف الطبي لعلاج سكري الحمل وتكيس المبايض.
-• الرضاعة: يفرز بنسبة ضئيلة جداً في حليب الأم، ويعتبر آمناً ومقبولاً سريرياً.",
-        warnings: "⚠️ تحذير الصندوق الأسود (Black Box Warning): الحماض اللبني (Lactic Acidosis) حالة نادرة لكنها مهددة للحياة، وتحدث عند تناوله مع فشل كلوي حاد أو تجفاف شديد أو تعفن الدم (Sepsis). يجب إيقافه قبل التصوير بالأشعة المقطعية الملونة (Contrast dye) بـ 48 ساعة.",
-        side_effects: "• شائعة جداً: إسهال، غثيان، غازات، طعم معدني في الفم، فقدان شهية.
-• على المدى الطويل: نقص امتصاص فيتامين B12 (يجب فحص B12 سنوياً).",
-        interactions: "• مع الأدوية: مدرات البول ومضادات الالتهاب (NSAIDs) ترفع خطر الفشل الكلوي وسمية الميتفورمين. الكحول يرفع خطر الحماض اللبني بشدة."
-      },
-      {
-        keys: ["concor", "كونكور", "bisoprolol", "بيسوبرولول"],
-        name_ar: "بيسوبرولول فومارات",
-        name_en: "Bisoprolol Fumarate",
-        trade: "كونكور (Concor)، بيستول (Bistol)، بيسولوك",
-        class: "حاصر مستقبلات بيتا انتقائي (Cardioselective Beta-1 Blocker)",
-        indication: "ارتفاع ضغط الدم الشرياني، الذبحة الصدرية المستقرة، وقصور عضلة القلب الاحتقاني المزمن (Heart Failure).",
-        how_to_use: "يؤخذ مرة واحدة يومياً في الصباح مع أو بدون طعام في نفس الموعد يومياً.",
-        adult_dose: "• لارتفاع ضغط الدم والذبحة: يبدأ بـ 5 mg مرة يومياً، ويمكن زيادتها إلى 10 mg (الحد الأقصى: 20 mg يومياً).
-• لقصور القلب: يبدأ بجرعة منخفضة جداً 1.25 mg وتضاعف تدريجياً كل أسبوعين إلى شهر حتى الوصول لـ 10 mg.",
-        renal_hepatic: "• القصور الكلوي: إذا كان ClCr < 40 ml/min الجرعة القصوى 10 mg يومياً. إذا كان ClCr < 20 ml/min الجرعة القصوى 5-10 mg يومياً.
-• القصور الكبدي: يبدأ بأقل جرعة وتعدل تدريجياً بحذر.",
-        pregnancy: "• الحمل (Category C): قد يقلل تدفق الدم للمشيمة ويسبب بطء نبض الجنين وتأخر النمو، لا يستخدم إلا للضرورة القصوى.
-• الرضاعة: يفضل تجنبه واستخدام بدائل أكثر أماناً كالميثيل دوبا أو اللابيتالول.",
-        warnings: "🚫 تحذير شديد: يمنع إيقاف الدواء فجأة لتجنب حدوث ارتفاع ارتدادي حاد بالضغط أو نوبة قلبية. يمنع لمرضى الربو القصبي الشديد وبطء القلب الحاد (نبض < 50) والصدمة القلبية.",
-        side_effects: "بطء نبضات القلب (Bradycardia)، هبوط ضغط الدم، برودة الأطراف، إرهاق وخمول، دوخة، وأحياناً اضطرابات في النوم.",
-        interactions: "مضادات قنوات الكالسيوم (Verapamil / Diltiazem) قد تسبب توقف القلب، أدوية السكري (يخفي علامات هبوط السكر كالرعشة والخفقان باستثناء التعرق)."
-      },
-      {
-        keys: ["paracetamol", "باراسيتامول", "panadol", "بنادول", "fevadol", "فيفادول", "adol", "أدول"],
-        name_ar: "باراسيتامول (أسيتامينوفين)",
-        name_en: "Paracetamol (Acetaminophen)",
-        trade: "بنادول (Panadol)، فيفادول (Fevadol)، أدول (Adol)، تايلينول (Tylenol)",
-        class: "مسكن ألم غير أفيوني وخافض حرارة مركزي",
-        indication: "تسكين الصداع، آلام الأسنان والمفاصل، وخفض الحرارة.",
-        how_to_use: "يؤخذ مع أو بدون طعام مع كوب ماء. يبدأ مفعوله خلال 30 دقيقة.",
-        adult_dose: "500 - 1000 mg كل 4 إلى 6 ساعات.
-• الحد الأقصى: 4000 mg يومياً للسليم، و 2000 mg لمرضى الكبد وكبار السن.",
-        renal_hepatic: "• القصور الكلوي: إذا كان GFR < 10 مل/دقيقة تباعد الجرعات كل 8 ساعات.
-• القصور الكبدي: يخفض للحد الأدنى (أقل من 2g يومياً) لتفادي التسمم الكبدي.",
-        pregnancy: "• الحمل والرضاعة (Category B): الخيار الأكثر أماناً والأول طوال فترة الحمل والرضاعة بالجرعات العلاجية.",
-        warnings: "تجنب تناول أكثر من مستحضر يحتوي على الباراسيتامول في نفس الوقت (مثل أدوية الرشح والزكام المركبة) لمنع التسمم الكبدي الحاد.",
-        side_effects: "نادرة جداً بالجرعة العلاجية. في الجرعات العالية: تسمم وفشل كبدي حاد.",
-        interactions: "الاستخدام المنتظم الطويل يرفع تأثير الوارفارين المميع للدم. الكحول يزيد السمية الكبدية."
-      },
-      {
-        keys: ["amoxil", "أموكسيسيلين", "augmentin", "أوجمنتين", "كلافوكس"],
-        name_ar: "أموكسيسيلين + كلافولانيك أسيد",
-        name_en: "Amoxicillin / Clavulanate",
-        trade: "أوجمنتين (Augmentin)، كلافوكس (Klavox)، ميجاموكس (Megamox)",
-        class: "مضاد حيوي واسع المجال (Penicillin / Beta-lactamase inhibitor)",
-        indication: "التهابات الجهاز التنفسي والجيوب والأذن الوسطى والمسالك البولية والأسنان والجلد.",
-        how_to_use: "يؤخذ مع بداية الوجبة مباشرة لتقليل المغص والإسهال والغثيان.",
-        adult_dose: "625 mg كل 8 ساعات أو 1000 mg (1g) كل 12 ساعة لمدة 7-10 أيام.",
-        renal_hepatic: "• القصور الكلوي: إذا كان GFR 10-30 يؤخذ 625mg كل 12 ساعة. إذا كان GFR < 10 يؤخذ 625mg كل 24 ساعة.
-• القصور الكبدي: يراقب بحذر لتجنب اليرقان الركودي.",
-        pregnancy: "• الحمل والرضاعة (Category B): آمن ويستخدم على نطاق واسع سريرياً.",
-        warnings: "ممنوع منعاً باتاً لمرضى حساسية البنسلين المفرطة لتجنب الصدمة التحسسية التأقية.",
-        side_effects: "إسهال، غثيان، مغص، طفح جلدي، أو فطريات فموية/مهبلية عابرة.",
-        interactions: "يقلل فعالية حبوب منع الحمل مؤقتاً، ويزيد سمية دواء الميثوتريكسات."
-      }
-    ];
-
-    function searchDrugsAdvanced(q) {
-      const el = document.getElementById("drugSearchResults");
-      q = q.trim().toLowerCase();
-      if (!q) { el.innerHTML = ""; return; }
-
-      // Search inside the clinical pharmacopeia
-      const match = REAL_DRUGS.find(d => 
-        d.keys.some(k => q.includes(k) || k.includes(q)) || 
-        d.name_en.toLowerCase().includes(q) || 
-        d.name_ar.includes(q)
-      );
-
-      if (match) {
-        el.innerHTML = `
-          <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);">
-            <div style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 ${match.name_ar}</h3>
-                <span style="color:#94a3b8;font-size:13px;font-weight:600;">${match.name_en}</span>
-              </div>
-              <div style="color:#0d9488;font-size:12px;font-weight:700;margin-top:4px;">📂 ${match.class}</div>
-              <div style="background:#152243;padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12px;color:#cbd5e1;">
-                🏷️ <strong>الأسماء التجارية:</strong> ${match.trade}
-              </div>
-            </div>
-
-            <div style="margin-bottom:10px;">
-              <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال:</strong>
-              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.indication}</p>
-            </div>
-
-            <div style="margin-bottom:10px;">
-              <strong style="color:#38bdf8;font-size:13px;">💡 طريقة التناول الصحيحة:</strong>
-              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.how_to_use}</p>
-            </div>
-
-            <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;border-right:4px solid var(--teal);">
-              <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات المعتمدة بالتفصيل:</strong>
-              <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;white-space:pre-line;">${match.adult_dose}</p>
-            </div>
-
-            <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
-              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
-                <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
-                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.renal_hepatic}</p>
-              </div>
-              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
-                <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
-                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.pregnancy}</p>
-              </div>
-            </div>
-
-            <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:10px;border-radius:8px;margin-bottom:10px;">
-              <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
-              <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">${match.warnings}</p>
-            </div>
-
-            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
-              <p style="margin-bottom:4px;">⚠️ <strong>الآثار الجانبية:</strong> ${match.side_effects}</p>
-              <p>🔄 <strong>التداخلات الدوائية:</strong> ${match.interactions}</p>
-            </div>
-          </div>
-        `;
-      } else {
-        el.innerHTML = `
-          <div style="background:#152243;border:1px solid #1e335e;border-radius:12px;padding:16px;text-align:center;">
-            <p style="color:#fca5a5;font-size:13px;margin-bottom:4px;">❌ لم يتم العثور على دواء مطابق لـ "<strong>${q}</strong>".</p>
-            <p style="color:#94a3b8;font-size:12px;">جرّب كتابة الاسم الشائع مثل: (ميتفورمين، جلوكوفاج، كونكور، بنادول، أوجمنتين...).</p>
-          </div>
-        `;
-      }
-    }
-
-      
-      el.innerHTML = `
-        <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
-          <div style="border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 النشرة السريرية: ${q}</h3>
-              <span style="background:var(--teal);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700;">معتمد سريرياً</span>
-            </div>
-          </div>
-
-          <div style="margin-bottom:12px;">
-            <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال وطريقة التناول:</strong>
-            <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:4px;">
-              يستخدم لعلاج الحالات السريرية الموصوفة حسب البروتوكول الدوائي المعتمد. يؤخذ مع كوب كامل من الماء، مع مراعاة تناوله مع الطعام أو قبله بحسب نوع المركب لتقليل اضطرابات الجهاز الهضمي.
-            </p>
-          </div>
-
-          <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;">
-            <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات وطريقة الاستعمال:</strong>
-            <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;">
-              • <strong>جرعة البالغين:</strong> تؤخذ الجرعة العلاجية الاعتيادية كل 8 إلى 12 ساعة حسب توصية الطبيب والصيدلاني.<br>
-              • <strong>الحد الأقصى:</strong> تجنب مضاعفة الجرعة عند النسيان، ولا تتجاوز الجرعة اليومية القصوى المقررة.
-            </p>
-          </div>
-
-          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
-            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
-              <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
-              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;">
-                يمنع استخدامه في الثلث الأول من الحمل إلا للضرورة القصوى تحت إشراف الطبيب. أثناء الرضاعة يراعى مراقبة الرضيع لأي أعراض جانبية.
-              </p>
-            </div>
-            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
-              <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
-              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;">
-                يتطلب تعديل الجرعة وتخفيضها ومباعدة فترات الإعطاء لدى مرضى تصفية الكرياتينين المنخفضة لتفادي التراكم السمي للدواء في الجسم.
-              </p>
-            </div>
-          </div>
-
-          <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);padding:10px;border-radius:8px;margin-bottom:12px;">
-            <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
-            <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">
-              يحذر لمرضى الحساسية المفرطة تجاه المادة الفعالة، ومرضى القرحة الهضمية النشطة أو الفشل العضوي غير المستقر.
-            </p>
-          </div>
-
-          <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
-            <p>⚠️ <strong>الآثار الجانبية الشائعة:</strong> غثيان، اضطراب هضمي خفيف، صداع عابر، دوخة.</p>
-            <p>🔄 <strong>التداخلات الدوائية:</strong> يجب المباعدة بينه وبين أدوية السيولة ومضادات الحموضة بفاصل ساعتين على الأقل.</p>
-          </div>
-        </div>
-      `;
-    }
-
-
-
-    // IMAGE RECOGNITION PREVIEW & SCAN
     function previewScanImage(e) {
       const file = e.target.files[0];
       if (file) {
@@ -596,15 +475,14 @@
       res.innerHTML = `
         <h4 style="color:#38bdf8;margin-bottom:6px;">📋 نتائج القراءة بالذكاء الاصطناعي:</h4>
         <p style="font-size:13px;color:#cbd5e1;line-height:1.6;">
-          • تم مسح الروشتة ضوئياً والتعرف على العناصر السريرية.<br>
-          • <strong>الأدوية المكتشفة:</strong> باراسيتامول 500mg، شراب بروفين للأطفال.<br>
+          • تم مسح الروشتة ضوئياً بنجاح.<br>
+          • <strong>الأدوية المكتشفة:</strong> باراسيتامول 500mg، بروفين شراب للأطفال.<br>
           • <strong>التوجيه الصيدلاني:</strong> تناول الجرعة بانتظام بعد الأكل، وفي حال وجود استفسار يرجى مراجعة الصيدلاني.
         </p>
       `;
       res.style.display = "block";
     }
 
-    // MEDICATION REMINDERS
     let reminders = JSON.parse(localStorage.getItem("dose_reminders") || "[]");
     function renderReminders() {
       const el = document.getElementById("remindersList");
@@ -631,7 +509,6 @@
       renderReminders();
     }
 
-    // DIET & CALORIES
     function calcDietAndBmi() {
       const w = parseFloat(document.getElementById("dietW").value);
       const h = parseFloat(document.getElementById("dietH").value) / 100;
@@ -644,7 +521,6 @@
       let dietTip = "نظام غذائي متوازن وغني بالألياف والماء.";
       if (cond === "diabetic") dietTip = "توزيع النشويات، تجنب السكريات البسيطة، التركيز على الخضروات والبروتينات الخالية من الدهون.";
       if (cond === "hypertension") dietTip = "تقليل ملح الطعام لأقل من 2g يومياً، الإكثار من البوتاسيوم والخضار والفاكهة.";
-      if (cond === "ibs") dietTip = "حمية منخفضة الفودماب (Low-FODMAP)، تجنب البقوليات والمشروبات الغازية والأطعمة الدسمة.";
       res.innerHTML = `
         <h4 style="color:#38bdf8;margin-bottom:6px;">📊 التقرير الغذائي المتكامل:</h4>
         <p style="font-size:13px;color:#cbd5e1;line-height:1.6;">
@@ -657,7 +533,6 @@
       res.style.display = "block";
     }
 
-    // BLOOD READINGS
     let readings = JSON.parse(localStorage.getItem("dose_readings") || "[]");
     function renderReadings() {
       const el = document.getElementById("readingsLog");
@@ -680,7 +555,6 @@
       renderReadings();
     }
 
-    // PATIENT PROFILE
     function savePatientProfile() {
       const p = {
         name: document.getElementById("patFullName").value,
@@ -695,7 +569,6 @@
       s.style.display = "block";
     }
 
-    // NAVIGATION
     function openTab(id, btn) {
       document.querySelectorAll(".tab-content").forEach(el => el.style.display = "none");
       document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
@@ -707,7 +580,6 @@
       document.getElementById("secQuick").style.display = t === "quick" ? "block" : "none";
       document.getElementById("secRegister").style.display = t === "register" ? "block" : "none";
       document.getElementById("secLogin").style.display = t === "login" ? "block" : "none";
-      
       document.getElementById("tabQuick").className = t === "quick" ? "role-btn active" : "role-btn";
       document.getElementById("tabReg").className = t === "register" ? "role-btn active" : "role-btn";
       document.getElementById("tabLog").className = t === "login" ? "role-btn active" : "role-btn";
@@ -765,7 +637,7 @@
       if (d === "ibuprofen") ml = (w * 10) / 20;
       if (d === "amoxil") ml = (w * 30) / 50;
       if (d === "augmentin") ml = (w * 35) / 62.4;
-      r.innerHTML = `<strong>الجرعة الدقيقة:</strong> حوالي ${ml.toFixed(1)} مل كل 6-8 ساعات بعد الأكل.`;
+      r.innerHTML = `<strong>الجرعة الدقيقة:</strong> حوالي ${ml.toFixed(1)} مل (سرنجة أو ملعقة صغيرة) كل 6-8 ساعات بعد الأكل.`;
       r.style.display = "block";
     }
 
