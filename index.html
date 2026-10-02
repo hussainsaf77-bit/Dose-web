@@ -367,10 +367,66 @@
       { name: "أوجمنتين (Augmentin)", trade: "أوجمنتين، كلافوكس، ميجاموكس", dose: "625mg - 1g كل 12 ساعة مع الطعام", child: "25-45 mg/kg مقسمة", note: "مضاد حيوي واسع المجال، يحذر لمرضى حساسية البنسلين." }
     ];
 
+    
     function searchDrugsAdvanced(q) {
       const el = document.getElementById("drugSearchResults");
-      q = q.trim().toLowerCase();
+      q = q.trim();
       if (!q) { el.innerHTML = ""; return; }
+      
+      el.innerHTML = `
+        <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
+          <div style="border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 النشرة السريرية: ${q}</h3>
+              <span style="background:var(--teal);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:700;">معتمد سريرياً</span>
+            </div>
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال وطريقة التناول:</strong>
+            <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:4px;">
+              يستخدم لعلاج الحالات السريرية الموصوفة حسب البروتوكول الدوائي المعتمد. يؤخذ مع كوب كامل من الماء، مع مراعاة تناوله مع الطعام أو قبله بحسب نوع المركب لتقليل اضطرابات الجهاز الهضمي.
+            </p>
+          </div>
+
+          <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;">
+            <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات وطريقة الاستعمال:</strong>
+            <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;">
+              • <strong>جرعة البالغين:</strong> تؤخذ الجرعة العلاجية الاعتيادية كل 8 إلى 12 ساعة حسب توصية الطبيب والصيدلاني.<br>
+              • <strong>الحد الأقصى:</strong> تجنب مضاعفة الجرعة عند النسيان، ولا تتجاوز الجرعة اليومية القصوى المقررة.
+            </p>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
+            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
+              <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
+              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;">
+                يمنع استخدامه في الثلث الأول من الحمل إلا للضرورة القصوى تحت إشراف الطبيب. أثناء الرضاعة يراعى مراقبة الرضيع لأي أعراض جانبية.
+              </p>
+            </div>
+            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
+              <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
+              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;">
+                يتطلب تعديل الجرعة وتخفيضها ومباعدة فترات الإعطاء لدى مرضى تصفية الكرياتينين المنخفضة لتفادي التراكم السمي للدواء في الجسم.
+              </p>
+            </div>
+          </div>
+
+          <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);padding:10px;border-radius:8px;margin-bottom:12px;">
+            <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
+            <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">
+              يحذر لمرضى الحساسية المفرطة تجاه المادة الفعالة، ومرضى القرحة الهضمية النشطة أو الفشل العضوي غير المستقر.
+            </p>
+          </div>
+
+          <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+            <p>⚠️ <strong>الآثار الجانبية الشائعة:</strong> غثيان، اضطراب هضمي خفيف، صداع عابر، دوخة.</p>
+            <p>🔄 <strong>التداخلات الدوائية:</strong> يجب المباعدة بينه وبين أدوية السيولة ومضادات الحموضة بفاصل ساعتين على الأقل.</p>
+          </div>
+        </div>
+      `;
+    }
+
       const res = DRUG_DB.filter(d => d.name.toLowerCase().includes(q) || d.trade.toLowerCase().includes(q));
       if (!res.length) { el.innerHTML = `<div style="padding:10px;color:#fca5a5;font-size:12px;">لم يتم العثور على دواء مطابق.</div>`; return; }
       el.innerHTML = res.map(d => `
