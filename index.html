@@ -368,10 +368,159 @@
     ];
 
     
+    
+    // REAL VERIFIED CLINICAL PHARMACOPEIA (قاعدة البيانات الدوائية السريرية المعتمدة)
+    const REAL_DRUGS = [
+      {
+        keys: ["metformin", "ميتفورمين", "glucophage", "جلوكوفاج", "سيدوفاج", "ميتفور"],
+        name_ar: "ميتفورمين هيدروكلوريد",
+        name_en: "Metformin HCl",
+        trade: "جلوكوفاج (Glucophage)، سيدوفاج (Cidophage)، جلوكوفانس، ديابيت مين",
+        class: "خافض سكر فموي — بيجوانيد (Biguanide Antidiabetic)",
+        indication: "علاج السكري من النوع الثاني (Type 2 DM) كخط علاج أول، ومقاومة الإنسولين، وتكيس المبايض (PCOS).",
+        how_to_use: "يؤخذ مع وجبات الطعام مباشرة أو بعدها لتقليل الآثار الهضمية (الغثيان، الإسهال). يبلع القرص ممتد المفعول (XR) كاملاً دون كسر أو مضغ.",
+        adult_dose: "• الجرعة الاعتيادية (عادي): 500 mg مرتين يومياً أو 850 mg مرة واحدة مع الوجبة، وتزاد تدريجياً كل أسبوعين.
+• ممتد المفعول (XR): 500 إلى 1000 mg مرة واحدة يومياً مع وجبة العشاء.
+• الحد الأقصى اليومي: 2550 mg للقرص العادي، و 2000 mg للممتد المفعول (XR).",
+        renal_hepatic: "• القصور الكلوي (بالغ الأهمية):
+- إذا كان eGFR > 60: آمن بالجرعة الكاملة.
+- إذا كان eGFR بين 45-59: الجرعة القصوى 2000 mg.
+- إذا كان eGFR بين 30-44: يوصى بجرعة قصوى 1000 mg مع المراقبة الشديدة.
+- إذا كان eGFR < 30: ممنوع منعاً باتاً (مضاد استطباب مطلق).
+• القصور الكبدي: يجب تجنبه لارتفاع خطر الحماض اللبني (Lactic Acidosis).",
+        pregnancy: "• الحمل (Category B): يعتبر خياراً آمناً ويستخدم تحت الإشراف الطبي لعلاج سكري الحمل وتكيس المبايض.
+• الرضاعة: يفرز بنسبة ضئيلة جداً في حليب الأم، ويعتبر آمناً ومقبولاً سريرياً.",
+        warnings: "⚠️ تحذير الصندوق الأسود (Black Box Warning): الحماض اللبني (Lactic Acidosis) حالة نادرة لكنها مهددة للحياة، وتحدث عند تناوله مع فشل كلوي حاد أو تجفاف شديد أو تعفن الدم (Sepsis). يجب إيقافه قبل التصوير بالأشعة المقطعية الملونة (Contrast dye) بـ 48 ساعة.",
+        side_effects: "• شائعة جداً: إسهال، غثيان، غازات، طعم معدني في الفم، فقدان شهية.
+• على المدى الطويل: نقص امتصاص فيتامين B12 (يجب فحص B12 سنوياً).",
+        interactions: "• مع الأدوية: مدرات البول ومضادات الالتهاب (NSAIDs) ترفع خطر الفشل الكلوي وسمية الميتفورمين. الكحول يرفع خطر الحماض اللبني بشدة."
+      },
+      {
+        keys: ["concor", "كونكور", "bisoprolol", "بيسوبرولول"],
+        name_ar: "بيسوبرولول فومارات",
+        name_en: "Bisoprolol Fumarate",
+        trade: "كونكور (Concor)، بيستول (Bistol)، بيسولوك",
+        class: "حاصر مستقبلات بيتا انتقائي (Cardioselective Beta-1 Blocker)",
+        indication: "ارتفاع ضغط الدم الشرياني، الذبحة الصدرية المستقرة، وقصور عضلة القلب الاحتقاني المزمن (Heart Failure).",
+        how_to_use: "يؤخذ مرة واحدة يومياً في الصباح مع أو بدون طعام في نفس الموعد يومياً.",
+        adult_dose: "• لارتفاع ضغط الدم والذبحة: يبدأ بـ 5 mg مرة يومياً، ويمكن زيادتها إلى 10 mg (الحد الأقصى: 20 mg يومياً).
+• لقصور القلب: يبدأ بجرعة منخفضة جداً 1.25 mg وتضاعف تدريجياً كل أسبوعين إلى شهر حتى الوصول لـ 10 mg.",
+        renal_hepatic: "• القصور الكلوي: إذا كان ClCr < 40 ml/min الجرعة القصوى 10 mg يومياً. إذا كان ClCr < 20 ml/min الجرعة القصوى 5-10 mg يومياً.
+• القصور الكبدي: يبدأ بأقل جرعة وتعدل تدريجياً بحذر.",
+        pregnancy: "• الحمل (Category C): قد يقلل تدفق الدم للمشيمة ويسبب بطء نبض الجنين وتأخر النمو، لا يستخدم إلا للضرورة القصوى.
+• الرضاعة: يفضل تجنبه واستخدام بدائل أكثر أماناً كالميثيل دوبا أو اللابيتالول.",
+        warnings: "🚫 تحذير شديد: يمنع إيقاف الدواء فجأة لتجنب حدوث ارتفاع ارتدادي حاد بالضغط أو نوبة قلبية. يمنع لمرضى الربو القصبي الشديد وبطء القلب الحاد (نبض < 50) والصدمة القلبية.",
+        side_effects: "بطء نبضات القلب (Bradycardia)، هبوط ضغط الدم، برودة الأطراف، إرهاق وخمول، دوخة، وأحياناً اضطرابات في النوم.",
+        interactions: "مضادات قنوات الكالسيوم (Verapamil / Diltiazem) قد تسبب توقف القلب، أدوية السكري (يخفي علامات هبوط السكر كالرعشة والخفقان باستثناء التعرق)."
+      },
+      {
+        keys: ["paracetamol", "باراسيتامول", "panadol", "بنادول", "fevadol", "فيفادول", "adol", "أدول"],
+        name_ar: "باراسيتامول (أسيتامينوفين)",
+        name_en: "Paracetamol (Acetaminophen)",
+        trade: "بنادول (Panadol)، فيفادول (Fevadol)، أدول (Adol)، تايلينول (Tylenol)",
+        class: "مسكن ألم غير أفيوني وخافض حرارة مركزي",
+        indication: "تسكين الصداع، آلام الأسنان والمفاصل، وخفض الحرارة.",
+        how_to_use: "يؤخذ مع أو بدون طعام مع كوب ماء. يبدأ مفعوله خلال 30 دقيقة.",
+        adult_dose: "500 - 1000 mg كل 4 إلى 6 ساعات.
+• الحد الأقصى: 4000 mg يومياً للسليم، و 2000 mg لمرضى الكبد وكبار السن.",
+        renal_hepatic: "• القصور الكلوي: إذا كان GFR < 10 مل/دقيقة تباعد الجرعات كل 8 ساعات.
+• القصور الكبدي: يخفض للحد الأدنى (أقل من 2g يومياً) لتفادي التسمم الكبدي.",
+        pregnancy: "• الحمل والرضاعة (Category B): الخيار الأكثر أماناً والأول طوال فترة الحمل والرضاعة بالجرعات العلاجية.",
+        warnings: "تجنب تناول أكثر من مستحضر يحتوي على الباراسيتامول في نفس الوقت (مثل أدوية الرشح والزكام المركبة) لمنع التسمم الكبدي الحاد.",
+        side_effects: "نادرة جداً بالجرعة العلاجية. في الجرعات العالية: تسمم وفشل كبدي حاد.",
+        interactions: "الاستخدام المنتظم الطويل يرفع تأثير الوارفارين المميع للدم. الكحول يزيد السمية الكبدية."
+      },
+      {
+        keys: ["amoxil", "أموكسيسيلين", "augmentin", "أوجمنتين", "كلافوكس"],
+        name_ar: "أموكسيسيلين + كلافولانيك أسيد",
+        name_en: "Amoxicillin / Clavulanate",
+        trade: "أوجمنتين (Augmentin)، كلافوكس (Klavox)، ميجاموكس (Megamox)",
+        class: "مضاد حيوي واسع المجال (Penicillin / Beta-lactamase inhibitor)",
+        indication: "التهابات الجهاز التنفسي والجيوب والأذن الوسطى والمسالك البولية والأسنان والجلد.",
+        how_to_use: "يؤخذ مع بداية الوجبة مباشرة لتقليل المغص والإسهال والغثيان.",
+        adult_dose: "625 mg كل 8 ساعات أو 1000 mg (1g) كل 12 ساعة لمدة 7-10 أيام.",
+        renal_hepatic: "• القصور الكلوي: إذا كان GFR 10-30 يؤخذ 625mg كل 12 ساعة. إذا كان GFR < 10 يؤخذ 625mg كل 24 ساعة.
+• القصور الكبدي: يراقب بحذر لتجنب اليرقان الركودي.",
+        pregnancy: "• الحمل والرضاعة (Category B): آمن ويستخدم على نطاق واسع سريرياً.",
+        warnings: "ممنوع منعاً باتاً لمرضى حساسية البنسلين المفرطة لتجنب الصدمة التحسسية التأقية.",
+        side_effects: "إسهال، غثيان، مغص، طفح جلدي، أو فطريات فموية/مهبلية عابرة.",
+        interactions: "يقلل فعالية حبوب منع الحمل مؤقتاً، ويزيد سمية دواء الميثوتريكسات."
+      }
+    ];
+
     function searchDrugsAdvanced(q) {
       const el = document.getElementById("drugSearchResults");
-      q = q.trim();
+      q = q.trim().toLowerCase();
       if (!q) { el.innerHTML = ""; return; }
+
+      // Search inside the clinical pharmacopeia
+      const match = REAL_DRUGS.find(d => 
+        d.keys.some(k => q.includes(k) || k.includes(q)) || 
+        d.name_en.toLowerCase().includes(q) || 
+        d.name_ar.includes(q)
+      );
+
+      if (match) {
+        el.innerHTML = `
+          <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);">
+            <div style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 ${match.name_ar}</h3>
+                <span style="color:#94a3b8;font-size:13px;font-weight:600;">${match.name_en}</span>
+              </div>
+              <div style="color:#0d9488;font-size:12px;font-weight:700;margin-top:4px;">📂 ${match.class}</div>
+              <div style="background:#152243;padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12px;color:#cbd5e1;">
+                🏷️ <strong>الأسماء التجارية:</strong> ${match.trade}
+              </div>
+            </div>
+
+            <div style="margin-bottom:10px;">
+              <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال:</strong>
+              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.indication}</p>
+            </div>
+
+            <div style="margin-bottom:10px;">
+              <strong style="color:#38bdf8;font-size:13px;">💡 طريقة التناول الصحيحة:</strong>
+              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.how_to_use}</p>
+            </div>
+
+            <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;border-right:4px solid var(--teal);">
+              <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات المعتمدة بالتفصيل:</strong>
+              <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;white-space:pre-line;">${match.adult_dose}</p>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
+              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
+                <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
+                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.renal_hepatic}</p>
+              </div>
+              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
+                <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
+                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.pregnancy}</p>
+              </div>
+            </div>
+
+            <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:10px;border-radius:8px;margin-bottom:10px;">
+              <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
+              <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">${match.warnings}</p>
+            </div>
+
+            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+              <p style="margin-bottom:4px;">⚠️ <strong>الآثار الجانبية:</strong> ${match.side_effects}</p>
+              <p>🔄 <strong>التداخلات الدوائية:</strong> ${match.interactions}</p>
+            </div>
+          </div>
+        `;
+      } else {
+        el.innerHTML = `
+          <div style="background:#152243;border:1px solid #1e335e;border-radius:12px;padding:16px;text-align:center;">
+            <p style="color:#fca5a5;font-size:13px;margin-bottom:4px;">❌ لم يتم العثور على دواء مطابق لـ "<strong>${q}</strong>".</p>
+            <p style="color:#94a3b8;font-size:12px;">جرّب كتابة الاسم الشائع مثل: (ميتفورمين، جلوكوفاج، كونكور، بنادول، أوجمنتين...).</p>
+          </div>
+        `;
+      }
+    }
+
       
       el.innerHTML = `
         <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 14px rgba(0,0,0,0.3);">
