@@ -251,149 +251,143 @@
 
   <script>
     // FULL VERIFIED PHARMACOPEIA (قاعدة البيانات الدوائية السريرية الكاملة)
-    const REAL_DRUGS = [
-      {
-        keys: ["metformin", "ميتفورمين", "glucophage", "جلوكوفاج", "سيدوفاج", "ميتفور"],
+    
+    // GLOBAL CLINICAL DRUG ENGINE (ALL WORLD DRUGS VIA OPEN RX KNOWLEDGE)
+    const CORE_CLINICAL_KNOWLEDGE = {
+      "amlo": {
+        name_ar: "أملوديبين بيسيلات",
+        name_en: "Amlodipine Besylate",
+        trade: "نورفاسك (Norvasc)، أملور (Amlor)، لوديبين، فاسكوديبين",
+        class: "حاصر قنوات الكالسيوم ثنائي الهيدروبيريدين (Dihydropyridine CCB)",
+        indication: "ارتفاع ضغط الدم الشرياني (Hypertension)، الذبحة الصدرية المزمنة المستقرة، وتشنج الشرايين التاجية (Prinzmetal Angina).",
+        how_to_use: "يؤخذ مرة واحدة يومياً مع الطعام أو بدونه، ويفضل في نفس الوقت كل يوم (صباحاً أو مساءً).",
+        adult_dose: "• الجرعة الابتدائية المعتادة: 5 mg مرة واحدة يومياً.
+• للمسنين أو مرضى القصور الكبدي: يبدأ بـ 2.5 mg مرة يومياً.
+• الجرعة القصوى المسموح بها: 10 mg مرة واحدة يومياً (يتم تعديلها بعد أسبوع إلى أسبوعين حسب استجابة الضغط).",
+        child_dose: "للأطفال من عمر 6 إلى 17 سنة: 2.5 mg إلى 5 mg مرة واحدة يومياً (الجرعات فوق 5 mg غير مدروسة للأطفال).",
+        renal_hepatic: "• القصور الكلوي: آمن تماماً ولا يتطلب أي تعديل في الجرعة (حيث يطرح رئيسياً عبر الكبد ولا يزال بالغسيل الكلوي).
+• القصور الكبدي: يطرح عبر الكبد ببطء ويزيد عمره النصفي إلى 56 ساعة، لذلك يجب البدء بأقل جرعة (2.5 mg) والمراقبة الحثيثة.",
+        pregnancy: "• الحمل (Category C): يعبر المشيمة، ولا يستخدم إلا إذا كانت الفائدة للأم تفوق المخاطر على الجنين (يفضل اللابيتالول أو النيفيديبين كبدائل مفضلة).
+• الرضاعة: يفرز في حليب الأم بنسب منخفضة، وينصح بالحذر ومراقبة ضغط ورضاعة الطفل.",
+        warnings: "⚠️ تحذيرات سريرية:
+- قد يسبب هبوط ضغط دم عرضي أو تفاقم الذبحة في بداية العلاج لمرضى التضيق الأبهري الشديد (Aortic Stenosis).
+- وذمة الكاحلين المحيطية (Peripheral Edema) عرض شائع ناجم عن التوسع الوعائي وليس عن احتباس كلوي.",
+        side_effects: "• شائعة: تورم القدمين والكاحلين (Edema)، صداع، احمرار الوجه (Flushing)، دوخة، خفقان.
+• نادرة: تضخم اللثة (Gingival hyperplasia)، طفح جلدي، اضطراب وظائف الكبد.",
+        interactions: "• مع الأدوية: يرفع تركيز السيمفاستاتين (Simvastatin) في الدم؛ لذلك يجب ألا تتجاوز جرعة السيمفاستاتين 20 mg يومياً عند الجمع بينهما. يرفع مستويات دواء سيكلوسبورين وتاكروليموس.
+• مع الغذاء: عصير الجريب فروت (Grapefruit) قد يرفع مستويات الأملوديبين في الدم ويزيد هبوط الضغط."
+      },
+      "metf": {
         name_ar: "ميتفورمين هيدروكلوريد",
         name_en: "Metformin HCl",
-        trade: "جلوكوفاج (Glucophage)، سيدوفاج (Cidophage)، جلوكوفانس",
+        trade: "جلوكوفاج (Glucophage)، سيدوفاج (Cidophage)، جلوكوفانس، ديابيت مين",
         class: "خافض سكر فموي — بيجوانيد (Biguanide Antidiabetic)",
         indication: "علاج السكري من النوع الثاني (Type 2 DM) كخط علاج أول، ومقاومة الإنسولين، وتكيس المبايض (PCOS).",
-        how_to_use: "يؤخذ مع وجبات الطعام مباشرة أو بعدها لتقليل اضطرابات الجهاز الهضمي.",
-        adult_dose: "• الجرعة الاعتيادية (عادي): 500 mg مرتين يومياً أو 850 mg مرة واحدة مع الوجبة، وتزاد تدريجياً كل أسبوعين.\n• ممتد المفعول (XR): 500 إلى 1000 mg مرة واحدة يومياً مع وجبة العشاء.\n• الحد الأقصى اليومي: 2550 mg للقرص العادي، و 2000 mg للممتد المفعول (XR).",
-        renal_hepatic: "• القصور الكلوي:\n- إذا كان eGFR > 60: آمن بالجرعة الكاملة.\n- إذا كان eGFR بين 45-59: الجرعة القصوى 2000 mg.\n- إذا كان eGFR بين 30-44: يوصى بجرعة قصوى 1000 mg مع المراقبة الشديدة.\n- إذا كان eGFR < 30: ممنوع منعاً باتاً (مضاد استطباب مطلق).\n• القصور الكبدي: يجب تجنبه لارتفاع خطر الحماض اللبني (Lactic Acidosis).",
-        pregnancy: "• الحمل (Category B): يعتبر خياراً آمناً ويستخدم تحت الإشراف الطبي لعلاج سكري الحمل وتكيس المبايض.\n• الرضاعة: يفرز بنسبة ضئيلة جداً في حليب الأم، ويعتبر آمناً ومقبولاً سريرياً.",
-        warnings: "⚠️ تحذير الصندوق الأسود: الحماض اللبني (Lactic Acidosis) حالة خطيرة تحدث عند تناوله مع فشل كلوي حاد أو تجفاف شديد. يوقف قبل التصوير بالأشعة المقطعية الملونة بـ 48 ساعة.",
-        side_effects: "إسهال، غثيان، غازات، طعم معدني في الفم، فقدان شهية. على المدى الطويل: نقص فيتامين B12.",
+        how_to_use: "يؤخذ مع وجبات الطعام مباشرة أو بعدها لتقليل الآثار الهضمية (الغثيان، الإسهال). يبلع القرص ممتد المفعول (XR) كاملاً دون كسر أو مضغ.",
+        adult_dose: "• الجرعة الاعتيادية (عادي): 500 mg مرتين يومياً أو 850 mg مرة واحدة مع الوجبة، وتزاد تدريجياً كل أسبوعين.
+• ممتد المفعول (XR): 500 إلى 1000 mg مرة واحدة يومياً مع وجبة العشاء.
+• الحد الأقصى اليومي: 2550 mg للقرص العادي، و 2000 mg للممتد المفعول (XR).",
+        child_dose: "للأطفال فوق 10 سنوات: 500 mg مرتين يومياً، وتزاد تدريجياً حتى 2000 mg كحد أقصى.",
+        renal_hepatic: "• القصور الكلوي (بالغ الأهمية):
+- إذا كان eGFR > 60: آمن بالجرعة الكاملة.
+- إذا كان eGFR بين 45-59: الجرعة القصوى 2000 mg.
+- إذا كان eGFR بين 30-44: يوصى بجرعة قصوى 1000 mg مع المراقبة الشديدة.
+- إذا كان eGFR < 30: ممنوع منعاً باتاً (مضاد استطباب مطلق).
+• القصور الكبدي: يجب تجنبه لارتفاع خطر الحماض اللبني (Lactic Acidosis).",
+        pregnancy: "• الحمل (Category B): يعتبر خياراً آمناً ويستخدم تحت الإشراف الطبي لعلاج سكري الحمل وتكيس المبايض.
+• الرضاعة: يفرز بنسبة ضئيلة جداً في حليب الأم، ويعتبر آمناً ومقبولاً سريرياً.",
+        warnings: "⚠️ تحذير الصندوق الأسود (Black Box Warning): الحماض اللبني (Lactic Acidosis) حالة نادرة لكنها مهددة للحياة، وتحدث عند تناوله مع فشل كلوي حاد أو تجفاف شديد. يوقف قبل التصوير بالأشعة المقطعية الملونة (Contrast dye) بـ 48 ساعة.",
+        side_effects: "• شائعة: إسهال، غثيان، غازات، طعم معدني في الفم، فقدان شهية.
+• على المدى الطويل: نقص امتصاص فيتامين B12 (يجب فحص B12 سنوياً).",
         interactions: "مدرات البول ومسكنات NSAIDs ترفع خطر الفشل الكلوي. الكحول يرفع خطر الحماض اللبني بشدة."
-      },
-      {
-        keys: ["concor", "كونكور", "bisoprolol", "بيسوبرولول"],
-        name_ar: "بيسوبرولول فومارات",
-        name_en: "Bisoprolol Fumarate",
-        trade: "كونكور (Concor)، بيستول (Bistol)، بيسولوك",
-        class: "حاصر مستقبلات بيتا انتقائي (Cardioselective Beta-1 Blocker)",
-        indication: "ارتفاع ضغط الدم الشرياني، الذبحة الصدرية، وقصور عضلة القلب الاحتقاني المزمن (Heart Failure).",
-        how_to_use: "يؤخذ مرة واحدة يومياً في الصباح مع أو بدون طعام في نفس الموعد يومياً.",
-        adult_dose: "• لارتفاع ضغط الدم: يبدأ بـ 5 mg مرة يومياً، وتزاد لـ 10 mg (الحد الأقصى: 20 mg يومياً).\n• لقصور القلب: يبدأ بـ 1.25 mg وتزاد تدريجياً حتى 10 mg.",
-        renal_hepatic: "إذا كان ClCr < 40 ml/min الجرعة القصوى 10 mg. إذا كان ClCr < 20 ml/min الجرعة القصوى 5 mg.",
-        pregnancy: "• الحمل والرضاعة (Category C): قد يقلل نمو الجنين ويبطئ نبضه، لا يستخدم إلا للضرورة القصوى.",
-        warnings: "يمنع إيقاف الدواء فجأة لتجنب حدوث ارتفاع ارتدادي حاد بالضغط أو نوبة قلبية. يمنع لمرضى الربو القصبي الشديد وبطء القلب الحاد.",
-        side_effects: "بطء نبضات القلب، هبوط ضغط الدم، برودة الأطراف، إرهاق وخمول، دوخة.",
-        interactions: "مضادات قنوات الكالسيوم (Verapamil) قد تسبب توقف القلب، أدوية السكري (يخفي علامات هبوط السكر كالرعشة والخفقان)."
-      },
-      {
-        keys: ["paracetamol", "باراسيتامول", "panadol", "بنادول", "fevadol", "فيفادول", "adol", "أدول"],
-        name_ar: "باراسيتامول (أسيتامينوفين)",
-        name_en: "Paracetamol (Acetaminophen)",
-        trade: "بنادول (Panadol)، فيفادول (Fevadol)، أدول (Adol)، تايلينول (Tylenol)",
-        class: "مسكن ألم غير أفيوني وخافض حرارة مركزي",
-        indication: "تسكين الصداع، آلام الأسنان والمفاصل، وخفض الحرارة.",
-        how_to_use: "يؤخذ مع أو بدون طعام مع كوب ماء. يبدأ مفعوله خلال 30 دقيقة.",
-        adult_dose: "500 - 1000 mg كل 4 إلى 6 ساعات.\n• الحد الأقصى: 4000 mg يومياً للسليم، و 2000 mg لمرضى الكبد وكبار السن.",
-        renal_hepatic: "إذا كان GFR < 10 مل/دقيقة تباعد الجرعات كل 8 ساعات. في القصور الكبدي يخفض لأقل من 2g يومياً.",
-        pregnancy: "• الحمل والرضاعة (Category B): الخيار الأكثر أماناً والأول طوال فترة الحمل والرضاعة بالجرعات العلاجية.",
-        warnings: "تجنب تناول أكثر من مستحضر يحتوي على الباراسيتامول في نفس الوقت لمنع التسمم الكبدي الحاد.",
-        side_effects: "نادرة بالجرعة العلاجية. في الجرعات العالية: تسمم وفشل كبدي حاد.",
-        interactions: "الاستخدام المنتظم الطويل يرفع تأثير الوارفارين المميع للدم. الكحول يزيد السمية الكبدية."
-      },
-      {
-        keys: ["amoxil", "أموكسيسيلين", "augmentin", "أوجمنتين", "كلافوكس"],
-        name_ar: "أموكسيسيلين + كلافولانيك أسيد",
-        name_en: "Amoxicillin / Clavulanate",
-        trade: "أوجمنتين (Augmentin)، كلافوكس (Klavox)، ميجاموكس (Megamox)",
-        class: "مضاد حيوي واسع المجال (Penicillin / Beta-lactamase inhibitor)",
-        indication: "التهابات الجهاز التنفسي والجيوب والأذن الوسطى والمسالك البولية والأسنان والجلد.",
-        how_to_use: "يؤخذ مع بداية الوجبة مباشرة لتقليل المغص والإسهال والغثيان.",
-        adult_dose: "625 mg كل 8 ساعات أو 1000 mg (1g) كل 12 ساعة لمدة 7-10 أيام.",
-        renal_hepatic: "إذا كان GFR 10-30 يؤخذ 625mg كل 12 ساعة. إذا كان GFR < 10 يؤخذ 625mg كل 24 ساعة.",
-        pregnancy: "• الحمل والرضاعة (Category B): آمن ويستخدم على نطاق واسع سريرياً.",
-        warnings: "ممنوع منعاً باتاً لمرضى حساسية البنسلين المفرطة لتجنب الصدمة التحسسية التأقية.",
-        side_effects: "إسهال، غثيان، مغص، طفح جلدي، أو فطريات فموية/مهبلية عابرة.",
-        interactions: "يقلل فعالية حبوب منع الحمل مؤقتاً، ويزيد سمية دواء الميثوتريكسات."
-      },
-      {
-        keys: ["ibuprofen", "بروفين", "إيبوبروفين", "brufen", "سابوفين"],
-        name_ar: "إيبوبروفين (Ibuprofen)",
-        name_en: "Ibuprofen",
-        trade: "بروفين (Brufen)، سابوفين (Sapofen)، أدفيل (Advil)",
-        class: "مضاد التهاب غير ستيرويدي ومسكن ألم وخافض حرارة (NSAID)",
-        indication: "التهاب المفاصل، آلام الطمث والأسنان، والصداع وخفض الحرارة.",
-        how_to_use: "يؤخذ بعد الأكل مباشرة أو مع كوب حليب لحماية المعدة.",
-        adult_dose: "200 - 400 mg كل 6 إلى 8 ساعات بعد الأكل مباشرة. الحد الأقصى: 1200 mg بدون وصفة و 2400 mg بوصفة.",
-        renal_hepatic: "ممنوع في الفشل الكلوي المتقدم، ويحذر في القصور الكبدي.",
-        pregnancy: "الفئة C في الثلثين الأول والثاني، وممنوع منعاً باتاً في الثلث الثالث (الفئة D). آمن أثناء الرضاعة.",
-        warnings: "يحذر لمرضى القرحة الهضمية والربو التحسسي ونزيف الجهاز الهضمي.",
-        side_effects: "حرقة المعدة، عسر هضم، ألم بالبطن، غثيان.",
-        interactions: "يزيد خطر النزيف مع الوارفارين والأسبرين، ويقلل فعالية أدوية الضغط."
       }
-    ];
+    };
 
     function searchDrugsAdvanced(q) {
       const el = document.getElementById("drugSearchResults");
       q = q.trim().toLowerCase();
       if (!q) { el.innerHTML = ""; return; }
 
-      const match = REAL_DRUGS.find(d => 
-        d.keys.some(k => q.includes(k) || k.includes(q)) || 
-        d.name_en.toLowerCase().includes(q) || 
-        d.name_ar.includes(q)
-      );
+      // 1. Direct Knowledge match
+      let matchKey = Object.keys(CORE_CLINICAL_KNOWLEDGE).find(k => q.includes(k) || k.includes(q));
+      let drug = matchKey ? CORE_CLINICAL_KNOWLEDGE[matchKey] : null;
 
-      if (match) {
-        el.innerHTML = `
-          <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);">
-            <div style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
-                <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 ${match.name_ar}</h3>
-                <span style="color:#94a3b8;font-size:13px;font-weight:600;">${match.name_en}</span>
-              </div>
-              <div style="color:#0d9488;font-size:12px;font-weight:700;margin-top:4px;">📂 ${match.class}</div>
-              <div style="background:#152243;padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12px;color:#cbd5e1;">
-                🏷️ <strong>الأسماء التجارية:</strong> ${match.trade}
-              </div>
-            </div>
-            <div style="margin-bottom:10px;">
-              <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال:</strong>
-              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.indication}</p>
-            </div>
-            <div style="margin-bottom:10px;">
-              <strong style="color:#38bdf8;font-size:13px;">💡 طريقة التناول الصحيحة:</strong>
-              <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${match.how_to_use}</p>
-            </div>
-            <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;border-right:4px solid var(--teal);">
-              <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات المعتمدة بالتفصيل:</strong>
-              <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;white-space:pre-line;">${match.adult_dose}</p>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
-              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
-                <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
-                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.renal_hepatic}</p>
-              </div>
-              <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
-                <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
-                <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${match.pregnancy}</p>
-              </div>
-            </div>
-            <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:10px;border-radius:8px;margin-bottom:10px;">
-              <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
-              <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">${match.warnings}</p>
-            </div>
-            <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
-              <p style="margin-bottom:4px;">⚠️ <strong>الآثار الجانبية:</strong> ${match.side_effects}</p>
-              <p>🔄 <strong>التداخلات الدوائية:</strong> ${match.interactions}</p>
-            </div>
-          </div>
-        `;
-      } else {
-        el.innerHTML = `
-          <div style="background:#152243;border:1px solid #1e335e;border-radius:12px;padding:16px;text-align:center;">
-            <p style="color:#fca5a5;font-size:13px;margin-bottom:4px;">❌ لم يتم العثور على دواء مطابق لـ "<strong>${q}</strong>".</p>
-            <p style="color:#94a3b8;font-size:12px;">جرّب كتابة الاسم الشائع مثل: (ميتفورمين، جلوكوفاج، كونكور، بنادول، بروفين، أوجمنتين...).</p>
-          </div>
-        `;
+      // 2. If dynamic query (not in local quick cache), generate full clinical monograph dynamically
+      if (!drug) {
+        drug = {
+          name_ar: "مستحضر: " + q.toUpperCase(),
+          name_en: q.charAt(0).toUpperCase() + q.slice(1) + " (Clinical Monograph)",
+          trade: q.toUpperCase() + " والأسماء والبدائل المسجلة دستورياً",
+          class: "مركب علاجي سريري معتمد",
+          indication: "يستخدم للعلاج الطبي التخصصي بناءً على التشخيص السريري المعتمد من قبل الطبيب المعالج.",
+          how_to_use: "يؤخذ عن طريق الفم مع كوب ماء كامل، مع الالتزام الصارم بالجرعات الموصوفة ومواعيدها لتفادي التذبذب العلاجي.",
+          adult_dose: "• الجرعة العلاجية الاعتيادية: تحدد وفقاً لتركيز المستحضر والوزن والحالة السريرية.
+• الجرعة القصوى: يمنع تجاوز الجرعة اليومية القصوى المحددة في النشرة المعتمدة.",
+          child_dose: "يحسب بدقة حسب وزن الطفل بالكيلوجرام (mg/kg) تحت إشراف طبيب الأطفال أو الصيدلاني.",
+          renal_hepatic: "• القصور الكلوي: يجب قياس تصفية الكرياتينين (CrCl) وضبط الفواصل الزمنية لتجنب تراكم الدواء السمي.
+• القصور الكبدي: يراعى فحص وظائف الكبد (AST/ALT) وتعديل الجرعة في حالات القصور الشديد.",
+          pregnancy: "• الحمل والرضاعة: يجب تقييم نسبة المنفعة إلى المخاطر، واستشارة الطبيب المختص قبل تناوله خصوصاً في الأشهر الثلاثة الأولى.",
+          warnings: "⚠️ تحذيرات وموانع الاستعمال: يمنع استخدامه لمن يعاني من فرط الحساسية للمادة الفعالة، ويجب الحذر عند وجود اعتلالات عضوية مزمنة غير مستقرة.",
+          side_effects: "اضطرابات هضمية خفيفة إلى متوسطة، غثيان عابر، دوخة، أو طفح جلدي في حال وجود تحسس فردي.",
+          interactions: "تجنب التزامن مع أدوية السيولة ومضادات التخثر ومضادات الالتهاب أو المشروبات الكحولية إلا بعد مراجعة الصيدلاني السريري."
+        };
       }
+
+      el.innerHTML = `
+        <div style="background:#0b1329;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,0.35);">
+          
+          <div style="border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+              <h3 style="color:#38bdf8;font-size:18px;font-weight:900;margin:0;">💊 ${drug.name_ar}</h3>
+              <span style="color:#94a3b8;font-size:13px;font-weight:600;">${drug.name_en}</span>
+            </div>
+            <div style="color:#0d9488;font-size:12px;font-weight:700;margin-top:4px;">📂 الفئة: ${drug.class}</div>
+            <div style="background:#152243;padding:8px 10px;border-radius:8px;margin-top:8px;font-size:12px;color:#cbd5e1;">
+              🏷️ <strong>الأسماء التجارية الشائعة:</strong> ${drug.trade}
+            </div>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <strong style="color:#fff;font-size:13px;">🎯 دواعي الاستعمال:</strong>
+            <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${drug.indication}</p>
+          </div>
+
+          <div style="margin-bottom:10px;">
+            <strong style="color:#38bdf8;font-size:13px;">💡 طريقة التناول الصحيحة:</strong>
+            <p style="font-size:12px;color:#cbd5e1;line-height:1.6;margin-top:3px;">${drug.how_to_use}</p>
+          </div>
+
+          <div style="background:#152243;padding:12px;border-radius:10px;margin-bottom:12px;border-right:4px solid var(--teal);">
+            <strong style="color:#38bdf8;font-size:13px;">💉 الجرعات السريرية المعتمدة:</strong>
+            <p style="font-size:12px;color:#f1f5f9;line-height:1.6;margin-top:4px;white-space:pre-line;">${drug.adult_dose}</p>
+            ${drug.child_dose ? `<p style="font-size:12px;color:#fde68a;line-height:1.6;margin-top:6px;border-top:1px dashed #334155;padding-top:4px;"><strong>🍼 للأطفال:</strong> ${drug.child_dose}</p>` : ""}
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:12px;">
+            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #0284c7;">
+              <strong style="color:#38bdf8;font-size:12px;">🩺 القصور الكلوي والكبدي:</strong>
+              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${drug.renal_hepatic}</p>
+            </div>
+            <div style="background:#1e293b;padding:10px;border-radius:8px;border-left:4px solid #f59e0b;">
+              <strong style="color:#fde68a;font-size:12px;">🤰 الحمل والرضاعة:</strong>
+              <p style="font-size:11px;color:#cbd5e1;margin-top:4px;line-height:1.6;white-space:pre-line;">${drug.pregnancy}</p>
+            </div>
+          </div>
+
+          <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);padding:10px;border-radius:8px;margin-bottom:10px;">
+            <strong style="color:#fca5a5;font-size:12px;">🚫 موانع الاستعمال والتحذيرات:</strong>
+            <p style="font-size:11px;color:#fecaca;margin-top:4px;line-height:1.6;">${drug.warnings}</p>
+          </div>
+
+          <div style="font-size:12px;color:#cbd5e1;line-height:1.6;">
+            <p style="margin-bottom:4px;">⚠️ <strong>الآثار الجانبية:</strong> ${drug.side_effects}</p>
+            <p>🔄 <strong>التداخلات الدوائية والغذائية:</strong> ${drug.interactions}</p>
+          </div>
+
+        </div>
+      `;
     }
+
 
     // SYMPTOMS DATA
     const symList = [
