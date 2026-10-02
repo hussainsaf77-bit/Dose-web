@@ -661,8 +661,9 @@
         if (document.getElementById("patDiseases")) document.getElementById("patDiseases").value = savedPat.diseases || "";
         if (document.getElementById("patAllergies")) document.getElementById("patAllergies").value = savedPat.allergies || "";
       }
-      const u = localStorage.getItem("dose_user");
-      if (!u) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const isForceStart = urlParams.get("welcome") === "1" || urlParams.get("start") === "1" || !sessionStorage.getItem("dose_welcomed_session");
+      if (isForceStart) {
         document.getElementById("welcomeModal").style.display = "flex";
       } else {
         document.getElementById("welcomeModal").style.display = "none";
