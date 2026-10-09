@@ -7,16 +7,21 @@ echo "=============================================="
 
 DOWNLOAD_URL="https://ais-pre-od4aemezdgaeup2ncw76si-295455119343.europe-west2.run.app/dose_vercel_update.zip"
 
-echo "📥 1. التحقق من وجود حزمة التحديث المحدثة..."
-if [ -f "/sdcard/Download/dose_vercel_update.zip" ]; then
-    echo "✅ تم العثور على ملف التحديث في مجلد التنزيلات بالجهاز."
-    cp "/sdcard/Download/dose_vercel_update.zip" ./dose_vercel_update.zip
-elif [ -f "$HOME/storage/downloads/dose_vercel_update.zip" ]; then
-    echo "✅ تم العثور على ملف التحديث في تنزيلات Termux."
-    cp "$HOME/storage/downloads/dose_vercel_update.zip" ./dose_vercel_update.zip
+echo "📥 1. جاري جلب أحدث حزمة تحديث مباشرة..."
+# محاولة التحميل المباشر أولاً لضمان الحصول على آخر كود دون الاعتماد على كاش الجهاز
+if curl -fSL --connect-timeout 10 -o dose_vercel_update.zip "$DOWNLOAD_URL"; then
+    echo "✅ تم تحميل أحدث حزمة مباشرة بنجاح."
 else
-    echo "🌐 محاولة التحميل المباشر..."
-    curl -sL -o dose_vercel_update.zip "$DOWNLOAD_URL" || true
+    echo "⚠️ تعذر التحميل المباشر، جاري البحث في التنزيلات بالجهاز..."
+    # ابحث عن أحدث ملف تم تنزيله حتى لو كان باسم (1) أو (2)
+    LATEST_DOWNLOAD=$(ls -t /sdcard/Download/dose_vercel_update*.zip 2>/dev/null | head -n 1 || true)
+    if [ -n "$LATEST_DOWNLOAD" ] && [ -f "$LATEST_DOWNLOAD" ]; then
+        echo "✅ تم العثور على أحدث ملف في التنزيلات: $LATEST_DOWNLOAD"
+        cp "$LATEST_DOWNLOAD" ./dose_vercel_update.zip
+    else
+        echo "❌ لم يتم العثور على حزمة التحديث."
+        exit 1
+    fi
 fi
 
 echo "📦 2. جاري فك ضغط الملفات المحدثة في مستودعك..."
@@ -25,16 +30,20 @@ rm -f dose_vercel_update.zip
 
 echo "🚀 3. جاري حفظ التغييرات والرفع إلى GitHub..."
 git add -A
-git commit -m "feat: accurate clinical decimals, range bounds, and lab recognition" 2>/dev/null || true
-git push origin main 2>/dev/null || git push 2>/dev/null || true
+COMMIT_OUTPUT=$(git commit -m "feat: complete accurate clinical lab engine and decimals" 2>&1 || true)
+echo "$COMMIT_OUTPUT"
 
-echo "⚡ 4. محاولة النشر المباشر عبر Vercel CLI إن وجد..."
-if command -v vercel &> /dev/null; then
-    vercel --prod --yes 2>/dev/null || true
-elif command -v npx &> /dev/null; then
-    npx --yes vercel --prod --yes 2>/dev/null || true
+if echo "$COMMIT_OUTPUT" | grep -q "nothing to commit"; then
+    echo "ℹ️ لا توجد تغييرات جديدة، المستودع محدث بالفعل لأحدث نسخة!"
+else
+    echo "📤 جاري الدفع إلى GitHub..."
+    git push origin main || git push
 fi
 
 echo "=============================================="
-echo "✅ تم إرسال التحديث بنجاح! سيتم تحديث web-dose.vercel.app فوراً."
+echo "🎯 قياس نجاح العملية:"
+echo "1. تحقق من ظهور index-C7HJUL9f.js في الملفات المفكوكة"
+echo "2. تم الدفع إلى GitHub بنجاح"
+echo "3. استغرق 30-60 ثانية ليقوم Vercel بالنشر التلقائي"
 echo "=============================================="
+
