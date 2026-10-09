@@ -1,8 +1,0 @@
-{
-  "name": "dose-web",
-  "version": "3.6.0",
-  "private": true,
-  "scripts": {
-    "build": "mkdir -p dist && cp -rf index.html assets dist/ 2>/dev/null || true && echo Build successful"
-  }
-}
