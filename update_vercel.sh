@@ -5,20 +5,12 @@ echo "=============================================="
 echo "🩺 تحديث منصة جرعة الطبية إلى Vercel & GitHub"
 echo "=============================================="
 
-# 1. البحث عن أحدث ملف تحديث في مجلد التنزيلات بالجهاز
-LATEST_ZIP=""
-if [ -f "/sdcard/Download/dose_v3_release.zip" ]; then
-    LATEST_ZIP="/sdcard/Download/dose_v3_release.zip"
-elif [ -f "/sdcard/Download/dose_release_v3.zip" ]; then
-    LATEST_ZIP="/sdcard/Download/dose_release_v3.zip"
-else
-    # ابحث عن أي ملف يبدأ بـ dose وينتهي بـ .zip مرتباً حسب الأحدث
-    LATEST_ZIP=$(ls -t /sdcard/Download/dose*.zip 2>/dev/null | head -n 1 || true)
-fi
+# 1. البحث عن أحدث ملف تحديث زمني في مجلد التنزيلات بالجهاز
+LATEST_ZIP=$(ls -t /sdcard/Download/*dose*.zip /sdcard/Download/dose*.zip 2>/dev/null | head -n 1 || true)
 
 if [ -z "$LATEST_ZIP" ] || [ ! -f "$LATEST_ZIP" ]; then
-    echo "❌ خطأ: لم يتم العثور على ملف تحديث في /sdcard/Download/"
-    echo "💡 يرجى تنزيل ملف التحديث dose_v3_release.zip أولاً من المتصفح."
+    echo "❌ خطأ: لم يتم العثور على أي ملف تحديث يبدأ بـ dose في /sdcard/Download/"
+    echo "💡 يرجى تنزيل ملف التحديث dose_v36_final.zip أو dose_v3_release.zip أولاً."
     exit 1
 fi
 
