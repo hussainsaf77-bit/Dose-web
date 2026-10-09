@@ -5,45 +5,59 @@ echo "=============================================="
 echo "🩺 تحديث منصة جرعة الطبية إلى Vercel & GitHub"
 echo "=============================================="
 
-DOWNLOAD_URL="https://ais-pre-od4aemezdgaeup2ncw76si-295455119343.europe-west2.run.app/dose_vercel_update.zip"
-
-echo "📥 1. جاري جلب أحدث حزمة تحديث مباشرة..."
-# محاولة التحميل المباشر أولاً لضمان الحصول على آخر كود دون الاعتماد على كاش الجهاز
-if curl -fSL --connect-timeout 10 -o dose_vercel_update.zip "$DOWNLOAD_URL"; then
-    echo "✅ تم تحميل أحدث حزمة مباشرة بنجاح."
+# 1. البحث عن أحدث ملف تحديث في مجلد التنزيلات بالجهاز
+LATEST_ZIP=""
+if [ -f "/sdcard/Download/dose_v3_release.zip" ]; then
+    LATEST_ZIP="/sdcard/Download/dose_v3_release.zip"
+elif [ -f "/sdcard/Download/dose_release_v3.zip" ]; then
+    LATEST_ZIP="/sdcard/Download/dose_release_v3.zip"
 else
-    echo "⚠️ تعذر التحميل المباشر، جاري البحث في التنزيلات بالجهاز..."
-    # ابحث عن أحدث ملف تم تنزيله حتى لو كان باسم (1) أو (2)
-    LATEST_DOWNLOAD=$(ls -t /sdcard/Download/dose_vercel_update*.zip 2>/dev/null | head -n 1 || true)
-    if [ -n "$LATEST_DOWNLOAD" ] && [ -f "$LATEST_DOWNLOAD" ]; then
-        echo "✅ تم العثور على أحدث ملف في التنزيلات: $LATEST_DOWNLOAD"
-        cp "$LATEST_DOWNLOAD" ./dose_vercel_update.zip
-    else
-        echo "❌ لم يتم العثور على حزمة التحديث."
-        exit 1
-    fi
+    # ابحث عن أي ملف يبدأ بـ dose وينتهي بـ .zip مرتباً حسب الأحدث
+    LATEST_ZIP=$(ls -t /sdcard/Download/dose*.zip 2>/dev/null | head -n 1 || true)
 fi
 
-echo "📦 2. جاري فك ضغط الملفات المحدثة في مستودعك..."
-unzip -o dose_vercel_update.zip
-rm -f dose_vercel_update.zip
+if [ -z "$LATEST_ZIP" ] || [ ! -f "$LATEST_ZIP" ]; then
+    echo "❌ خطأ: لم يتم العثور على ملف تحديث في /sdcard/Download/"
+    echo "💡 يرجى تنزيل ملف التحديث dose_v3_release.zip أولاً من المتصفح."
+    exit 1
+fi
 
-echo "🚀 3. جاري حفظ التغييرات والرفع إلى GitHub..."
+echo "📥 1. تم العثور على حزمة التحديث:"
+echo "   📂 المسار: $LATEST_ZIP"
+echo "   📊 الحجم: $(du -h "$LATEST_ZIP" | cut -f1)"
+
+# نسخ الحزمة لبيئة العمل المحلية
+cp "$LATEST_ZIP" ./dose_current_update.zip
+
+echo "🧹 2. تنظيف ملفات البناء القديمة في assets/ لضمان التحديث الجذري..."
+rm -f assets/index-*.js assets/index-*.css
+
+echo "📦 3. فك ضغط الحزمة المحدثة بالكامل..."
+unzip -o dose_current_update.zip
+rm -f dose_current_update.zip
+
+NEW_JS=$(ls assets/index-*.js 2>/dev/null | head -n 1)
+echo "✅ الملف البرمجي النشط الجديد: $NEW_JS"
+
+echo "🚀 4. تسجيل التحديث في Git والرفع إلى GitHub..."
 git add -A
-COMMIT_OUTPUT=$(git commit -m "feat: complete accurate clinical lab engine and decimals" 2>&1 || true)
-echo "$COMMIT_OUTPUT"
+COMMIT_MSG="feat: complete medical CMP panel, OCR resilience and accurate decimals (v3)"
+COMMIT_OUT=$(git commit -m "$COMMIT_MSG" 2>&1 || true)
+echo "$COMMIT_OUT"
 
-if echo "$COMMIT_OUTPUT" | grep -q "nothing to commit"; then
-    echo "ℹ️ لا توجد تغييرات جديدة، المستودع محدث بالفعل لأحدث نسخة!"
+if echo "$COMMIT_OUT" | grep -q "nothing to commit"; then
+    echo "⚠️ لم يتم اكتشاف ملفات جديدة (الملفات المستخرجة متطابقة مع الموجود)."
 else
     echo "📤 جاري الدفع إلى GitHub..."
     git push origin main || git push
+    echo "✅ تم الدفع إلى GitHub بنجاح!"
 fi
 
 echo "=============================================="
-echo "🎯 قياس نجاح العملية:"
-echo "1. تحقق من ظهور index-C7HJUL9f.js في الملفات المفكوكة"
-echo "2. تم الدفع إلى GitHub بنجاح"
-echo "3. استغرق 30-60 ثانية ليقوم Vercel بالنشر التلقائي"
+echo "🎯 مقياس نجاح التحديث النهائي:"
+echo "1. الملف المحدث هو: $NEW_JS"
+echo "2. تم الدفع إلى GitHub وتلقائياً يبدأ Vercel البناء"
+echo "3. انتظر 45 ثانية، ثم افتح المتصفح في نافذة تصفح متخفي (Incognito)"
+echo "   أو قم بعمل Hard Refresh لموقعك web-dose.vercel.app"
 echo "=============================================="
 
