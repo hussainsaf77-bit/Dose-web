@@ -24,7 +24,8 @@ import {
   UserPlus, 
   Sparkles,
   CheckCircle2,
-  Send
+  Send,
+  Download
 } from 'lucide-react';
 
 export type ActiveTabType =
@@ -125,8 +126,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="font-extrabold text-base sm:text-lg text-white tracking-tight">
                   {t.brand_title}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-950 text-teal-300 border border-teal-800/80 font-mono font-bold hidden sm:inline-block">
-                  {t.tag_bot}
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
+                  v3.6 Live
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 hidden md:block">
@@ -138,6 +139,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Center / Right Actions: Language + Auth + Mobile Menu */}
           <div className="flex items-center gap-2">
             
+            {/* Direct V3.6 Zip Download Button */}
+            <a
+              id="header-download-v36-zip"
+              href="/dose_v36_final.zip"
+              download="dose_v36_final.zip"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/30 hover:scale-105 active:scale-95 animate-pulse"
+              title="تحميل ملف التحديث dose_v36_final.zip إلى جهازك"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">تحميل V3.6 Zip</span>
+              <span className="sm:hidden">تحديث V3.6</span>
+            </a>
+
             {/* Direct Telegram Bot Link */}
             <a
               id="header-open-telegram-bot"
@@ -286,6 +300,20 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          {/* Prominent Mobile Download Link */}
+          <div className="pt-2 border-t border-slate-800/80">
+            <a
+              id="mobile-download-v36-zip"
+              href="/dose_v36_final.zip"
+              download="dose_v36_final.zip"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md shadow-emerald-900/40"
+            >
+              <Download className="w-4 h-4" />
+              <span>تحميل ملف التحديث المكتمل (dose_v36_final.zip)</span>
+            </a>
           </div>
         </div>
       )}

@@ -9,7 +9,6 @@ import { SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
 import { LAB_CATALOG_GROUPS, LabTestItem, LabCategoryGroup } from '../data/labCatalogData';
 import { parseClinicalReportFromText } from '../utils/medicalOcrParser';
-import Tesseract from 'tesseract.js';
 
 interface LabAndImagingAnalyzerProps {
   userTier?: SubscriptionTier;
@@ -138,6 +137,38 @@ export const LAB_PANELS: LabPanelInfo[] = [
         'إجراء تصوير بالموجات فوق الصوتية للبطن والكبد (Abdominal Ultrasound) لتقييم درجة التدهن.',
         'تعديل نمط الحياة بتخفيف الوزن، تقليل السكريات المكررة والدهون المشبعة، وممارسة الرياضة المنتظمة.',
         'إجراء فحص الفيروسات الكبدية (HBsAg وHCV Ab) لنفي العدوى الفيروسية كإجراء روتيني.'
+      ]
+    }
+  },
+  {
+    id: 'cmp_electrolytes',
+    icon: '⚗️',
+    titleAr: 'الكيمياء الشاملة والأملاح وإنزيمات الكبد (CMP & Electrolytes)',
+    titleEn: 'Comprehensive Metabolic Panel & Electrolytes',
+    desc: 'الصوديوم، البوتاسيوم، الكلوريد، البيكربونات (CO2)، وظائف الكبد (ALT/AST)، اليوريا (BUN)، الكرياتينين، وحمض اللاكتيك',
+    testsList: ['ALT (SGPT)', 'AST (SGOT)', 'Potassium (K+)', 'Sodium (Na+)', 'Chloride (Cl-)', 'CO2 / Bicarbonate', 'BUN', 'Creatinine', 'Lactic Acid'],
+    sampleNotes: 'تحليل كيمياء حيوية وأملاح شامل: ALT = 315 H, AST = 285 H, Potassium = 3.4 L, Lactic Acid = 3.8 H, BUN = 6 L, Sodium = 139, Chloride = 104, CO2 = 24, Creatinine = 0.9 mg/dL.',
+    sampleResult: {
+      testName: 'لوحة الكيمياء الحيوية والأملاح وإنزيمات الكبد (Comprehensive Metabolic & Electrolytes Panel)',
+      clinicalSummaryTitle: 'إصابة كبدية خلوية حادة (Acute Hepatocellular Injury) مع ارتفاع حمض اللاكتيك ونقص طفيف بالبوتاسيوم',
+      urgencyLevel: 'high',
+      items: [
+        { name: 'ALT / SGPT (إنزيم ناقلة ألانين الكبدي)', value: '315 U/L (مرتفع H)', referenceRange: '7 - 56 U/L', status: 'high' },
+        { name: 'AST / SGOT (إنزيم ناقلة أسبارتات)', value: '285 U/L (مرتفع H)', referenceRange: '10 - 40 U/L', status: 'high' },
+        { name: 'Lactic Acid (حمض اللاكتيك في الدم)', value: '3.8 mmol/L (مرتفع H)', referenceRange: '0.5 - 2.2 mmol/L', status: 'high' },
+        { name: 'Serum Potassium (K+ / البوتاسيوم)', value: '3.4 mmol/L (منخفض L)', referenceRange: '3.5 - 5.1 mmol/L', status: 'low' },
+        { name: 'Blood Urea Nitrogen (BUN / نتروجين اليوريا)', value: '6 mg/dL (منخفض L)', referenceRange: '8 - 23 mg/dL', status: 'low' },
+        { name: 'Serum Sodium (Na+ / الصوديوم)', value: '139 mmol/L (سليم)', referenceRange: '136 - 145 mmol/L', status: 'normal' },
+        { name: 'Serum Chloride (Cl- / الكلوريد)', value: '104 mmol/L (سليم)', referenceRange: '98 - 107 mmol/L', status: 'normal' },
+        { name: 'CO2 / Bicarbonate (بيكربونات الدم)', value: '24 mmol/L (سليم)', referenceRange: '22 - 29 mmol/L', status: 'normal' },
+        { name: 'Serum Creatinine (الكرياتينين الكلوي)', value: '0.9 mg/dL (سليم)', referenceRange: '0.7 - 1.3 mg/dL', status: 'normal' }
+      ],
+      detailedExplanation: 'التقرير يوضح إصابة كبدية خلوية صريحة مع ارتفاع ملحوظ في إنزيمات الكبد (ALT 315 وAST 285 بمقدار يتجاوز 5-6 أضعاف الحد الطبيعي)، مترافقاً مع ارتفاع حمض اللاكتيك (3.8 mmol/L) ونقص طفيف في بوتاسيوم الدم (3.4 mmol/L). وظائف الكلى الأساسية (الكرياتينين والصوديوم والبيكربونات) مستقرة وضمن المعدل الطبيعي. يتطلب هذا النمط تقييماً سريرياً عاجلاً للأسباب المحتملة مثل السمية الدوائية، الإقفار الكبدي، أو التهاب الكبد الحاد.',
+      recommendations: [
+        '🩺 التقييم الطبي العاجل في العيادة الباطنية أو الطوارئ لمراجعة أي أدوية تم تناولها (بما في ذلك المسكنات أو المكملات) واستبعاد السمية الكبدية.',
+        '🧪 استكمال فحوصات وظائف الكبد التخليقية: زمن البروثرومبين والسيولة (PT / INR) والبيليروبين الكلي والمباشر والألبومين.',
+        '🔬 إجراء مسح فيروسات الكبد الفيروسية (Hepatitis Viral Serology: HAV IgM, HBsAg, HCV Ab).',
+        '💧 تعويض السوائل والبوتاسيوم ومراقبة مستوى حمض اللاكتيك للتأكد من تراجعه.'
       ]
     }
   },
@@ -330,11 +361,6 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   const [selectedCatalogTest, setSelectedCatalogTest] = useState<LabTestItem | null>(null);
   const [customTestValue, setCustomTestValue] = useState('');
 
-  // OCR Extraction States
-  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState(0);
-  const [extractedOcrText, setExtractedOcrText] = useState('');
-
   const sampleLabCases = [
     { 
       title: 'تقرير هرمونات ومقاومة إنسولين وفيتامين د ومخزون حديد', 
@@ -430,13 +456,18 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           const ctx = canvas.getContext('2d');
           if (!ctx) return resolve(dataUrl);
 
-          // Optimal resolution: upscale if small to at least 1800px width so decimal points are crisp
+          // Optimal resolution: limit max dimension to 1400px so mobile devices do not run out of RAM
           let w = img.width;
           let h = img.height;
-          if (w < 1800) {
-            const scale = 1800 / w;
-            w = 1800;
-            h = Math.round(img.height * scale);
+          const maxDim = 1400;
+          if (w > maxDim || h > maxDim) {
+            const scale = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          } else if (w < 800) {
+            const scale = 800 / w;
+            w = 800;
+            h = Math.round(h * scale);
           }
 
           canvas.width = w;
@@ -486,59 +517,6 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
         setPreviewUrl(dataUrl);
         setResult(null);
         setErrorMsg(null);
-
-        // Run client-side OCR for lab images
-        if (analysisType === 'lab') {
-          setIsOcrProcessing(true);
-          setOcrProgress(20);
-          try {
-            // Enhance contrast and decimal dots with canvas preprocessor
-            const ocrSourceUrl = await enhanceImageForMedicalOcr(dataUrl);
-            let recognizedText = '';
-            // 1. Try eng+ara recognition (prioritizing English numbers, units, and decimal points while supporting Arabic text)
-            try {
-              const res = await Promise.race([
-                Tesseract.recognize(ocrSourceUrl, 'eng+ara', {
-                  logger: (m: any) => {
-                    if (m?.status === 'recognizing text' && typeof m?.progress === 'number') {
-                      setOcrProgress(Math.round(m.progress * 100));
-                    }
-                  }
-                }),
-                new Promise<null>((resolve) => setTimeout(() => resolve(null), 12000))
-              ]);
-              if (res && res.data && res.data.text && res.data.text.trim().length > 4) {
-                recognizedText = res.data.text;
-              }
-            } catch (bilingualErr) {
-              console.warn('eng+ara OCR failed or slow, trying eng:', bilingualErr);
-            }
-
-            // 2. If eng+ara yielded nothing, fall back to eng
-            if (!recognizedText) {
-              const engRes = await Promise.race([
-                Tesseract.recognize(ocrSourceUrl, 'eng'),
-                new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000))
-              ]);
-              if (engRes && engRes.data && engRes.data.text && engRes.data.text.trim().length > 4) {
-                recognizedText = engRes.data.text;
-              }
-            }
-
-            if (recognizedText) {
-              setExtractedOcrText(recognizedText);
-              if (!textNotes) setTextNotes(recognizedText);
-              const autoReport = parseClinicalReportFromText(recognizedText);
-              if (autoReport && autoReport.items && autoReport.items.length > 0) {
-                setResult(autoReport);
-              }
-            }
-          } catch (ocrErr) {
-            console.warn('Browser OCR error:', ocrErr);
-          } finally {
-            setIsOcrProcessing(false);
-          }
-        }
       };
       reader.readAsDataURL(file);
     }
@@ -591,7 +569,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
               analyzedSuccessfully = true;
             } else if (data.isValidReport === false) {
               // Server rejected: check if client-side 4-pillar parser extracted any items from OCR or notes
-              const combinedText = [customPrompt, textNotes, extractedOcrText].filter(Boolean).join('\n');
+              const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
               const localReport = parseClinicalReportFromText(combinedText);
               if (localReport && localReport.items && localReport.items.length > 0) {
                 setResult(localReport);
@@ -612,7 +590,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
 
       if (!analyzedSuccessfully) {
         // Clinical Fallback Generator based on parsed text, selectedLabCategory, or notes
-        const combinedText = [customPrompt, textNotes, extractedOcrText].filter(Boolean).join('\n');
+        let combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
 
         if (analysisType === 'lab') {
           // 1. Try our intelligent medical report parser on extracted text or notes
@@ -620,8 +598,8 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
             setResult(parsedReport);
             analyzedSuccessfully = true;
-          } else if (selectedLabCategory && selectedLabCategory !== 'all') {
-            // If user selected a specific lab panel (e.g. CBC, Liver, Kidney, Lipids, etc.)
+          } else if (customPrompt && selectedLabCategory && selectedLabCategory !== 'all') {
+            // If user explicitly triggered a pre-defined sample catalog panel
             const catPanel = LAB_PANELS.find(c => c.id === selectedLabCategory);
             if (catPanel && catPanel.sampleResult) {
               setResult({
@@ -630,40 +608,18 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
               });
               analyzedSuccessfully = true;
             }
-          } else if (activeDataUrl) {
-            // If an image was uploaded: return a balanced clinical panel
-            setResult({
-              isValidReport: true,
-              testName: 'فحص المؤشرات المخبرية الأساسية الشاملة (Clinical Lab Panel)',
-              clinicalSummaryTitle: 'قراءة المؤشرات المخبرية ومقارنتها بالنطاقات السريرية المعتمدة',
-              urgencyLevel: 'normal',
-              items: [
-                { name: 'Fasting Blood Glucose (السكر الصائم)', value: '94 mg/dL', referenceRange: '70 - 99 mg/dL', status: 'normal' },
-                { name: 'Hemoglobin (Hb / خضاب الدم)', value: '14.1 g/dL', referenceRange: '13.0 - 17.5 g/dL', status: 'normal' },
-                { name: 'Serum Creatinine (الكرياتينين)', value: '0.88 mg/dL', referenceRange: '0.60 - 1.20 mg/dL', status: 'normal' },
-                { name: 'Total Cholesterol (الكوليسترول الكلي)', value: '182 mg/dL', referenceRange: '< 200 mg/dL', status: 'normal' },
-                { name: 'ALT / SGPT (إنزيم الكبد)', value: '26 U/L', referenceRange: '7 - 56 U/L', status: 'normal' }
-              ],
-              detailedExplanation: 'تمت قراءة وتحليل تقرير الفحص المخبري المرفق بنجاح.\n\nكافة المؤشرات الحيوية المستخرجة تقع ضمن النطاق الفسيولوجي المعتدل والسليم، ولا توجد علامات سريرية مقلقة.\n\nيمكنك كتابة أي نتائج إضافية في خانة الملاحظات وسيقوم المحلل الطبي بتفصيلها فوراً.',
-              recommendations: [
-                'الحفاظ على نمط الحياة الصحي وشرب كميات كافية من الماء.',
-                'مراجعة الطبيب المعالج لمطابقة التقرير مع الفحص السريري.',
-                'إجراء الفحص الدوري الشامل سنوياً للاطمئنان على الصحة العامة.'
-              ]
-            });
-            analyzedSuccessfully = true;
           } else {
-            // Only when NO image and NO text was provided
+            // Honest diagnostic report: never hallucinate or fake lab numbers
             setResult({
               isValidReport: false,
-              validationError: 'NO_VALID_LAB_DATA',
-              testName: 'تنبيه: يرجى رفع صورة التقرير أو كتابة النتائج',
-              clinicalSummaryTitle: 'يرجى إرفاق صورة التقرير أو كتابة النتائج المخبرية',
+              testName: 'فحص مخبري بحاجة لتوضيح',
+              clinicalSummaryTitle: 'تعذر استخراج أرقام الفحص بدقة من الصورة',
               urgencyLevel: 'normal',
               items: [],
-              detailedExplanation: 'يرجى اختيار صورة لتقرير الفحص الطبي المخبري أو تدوين قيم التحاليل مباشرة في خانة الملاحظات لتحليلها فوراً.',
+              detailedExplanation: 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح من الصورة المرفوعة. قد يكون ذلك بسبب زاوية الالتقاط أو انعكاس الضوء أو انخفاض دقة الكاميرا.',
               recommendations: [
-                'التقاط صورة واضحة لورقة التحليل الطبي أو كتابة النتائج بالأسفل.'
+                'إعادة التقاط صورة مستقيمة وعالية الوضوح لورقة التحليل الطبي.',
+                'يمكنك كتابة نتائج التحليل والأرقام المطبوعة مباشرة في خانة الملاحظات أدناه وسيقوم النظام بتفسيرها فوراً وبدقة تامة.'
               ]
             });
             analyzedSuccessfully = true;
@@ -936,9 +892,15 @@ ${recsText}
         <div className="absolute -top-12 -right-12 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold mb-2">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>تحليل ذكي فوري بالذكاء الاصطناعي الطبي</span>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>تحليل ذكي فوري بالذكاء الاصطناعي الطبي</span>
+              </div>
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-[11px] font-mono font-bold shadow-sm">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>إصدار التحديث: v3.6 Live (محرك CMP السريري + الفواصل العشرية الدقيقة)</span>
+              </div>
             </div>
             <h2 className="text-2xl font-black text-white">المختبر والتحاليل الطبية وقراءة الأشعة</h2>
             <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
@@ -1049,6 +1011,65 @@ ${recsText}
                 </p>
               </div>
 
+              {/* Instant 1-Click Clinical CMP Analyzer Button */}
+              {!previewUrl ? (
+                <div className="p-3 bg-gradient-to-r from-teal-950/90 via-slate-900 to-emerald-950/90 border-2 border-teal-500/60 rounded-xl space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-xs font-bold text-white">
+                        تجربة نموذج فحص مخبري جاهز (الكيمياء الشاملة CMP):
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
+                      نموذج تجريبي
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    فحص مؤشرات الكيمياء والأملاح النموذجية: ALT 315، AST 285، لاكتيك 3.8، بوتاسيوم 3.4، يوريا 6، صوديوم 139، كلوريد 104، بيكربونات 24، كرياتينين 0.9.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedLabCategory('cmp_electrolytes');
+                      const text = 'Sodium: 139 (136 - 145 mmol/L)\nPotassium: 3.4 L (3.5 - 5.1 mmol/L)\nChloride: 104 (98 - 107 mmol/L)\nCO2: 24 (22 - 29 mmol/L)\nBlood Urea Nitrogen: 6 L (8 - 23 mg/dL)\nCreatinine: 0.9 (0.7 - 1.3 mg/dL)\nAST: 285 H (10 - 40 U/L)\nALT: 315 H (7 - 56 U/L)\nLactic Acid: 3.8 H (0.5 - 2.2 mmol/L)';
+                      setTextNotes(text);
+                      handleRunAnalysis(text);
+                    }}
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>⚡ تجربة الفحص بالنموذج الجاهز (9 مؤشرات)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3 bg-gradient-to-r from-teal-950/90 via-slate-900 to-blue-950/90 border-2 border-teal-500/60 rounded-xl space-y-2 shadow-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
+                      <span className="text-xs font-bold text-white">
+                        تم تحميل صورة التقرير المخبري بنجاح 📷
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-mono font-bold border border-teal-500/40">
+                      تقرير مخصص
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 leading-relaxed">
+                    جاهز لقراءة واستخراج كافة الفحوصات والنسب العشرية ومطابقتها مع النطاق المرجعي السليم.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleRunAnalysis()}
+                    disabled={isAnalyzing}
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>⚡ بدء فحص واستخراج بيانات صورتك الآن</span>
+                  </button>
+                </div>
+              )}
+
               {/* Dropzone with Camera & File */}
               <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
                 <input
@@ -1114,6 +1135,7 @@ ${recsText}
                 <div className="grid grid-cols-2 gap-1.5">
                   {[
                     { id: 'all', label: '📑 فحص شامل لكافة المؤشرات' },
+                    { id: 'cmp_electrolytes', label: '⚗️ الكيمياء الشاملة والأملاح والإنزيمات (CMP)' },
                     { id: 'hormones', label: '🧬 هرمونات ومقاومة إنسولين وفيتامينات' },
                     { id: 'cbc', label: '🩸 صورة الدم والأنيميا (CBC)' },
                     { id: 'kidney', label: '🧪 وظائف الكلى والأملاح' },
@@ -1141,27 +1163,16 @@ ${recsText}
                 </div>
               </div>
 
-              {/* OCR Scanning Status Banner */}
-              {isOcrProcessing && (
-                <div className="p-3 bg-teal-950/40 border border-teal-500/40 rounded-xl flex items-center gap-2.5 text-xs text-teal-300 animate-pulse">
-                  <RefreshCw className="w-4 h-4 animate-spin text-teal-400 shrink-0" />
-                  <div>
-                    <span className="font-bold block">جارٍ قراءة النصوص والأرقام من صورة التحليل بالذكاء البصري OCR...</span>
-                    <span className="text-[10px] text-teal-400/80">التقدم: {ocrProgress}% - استخراج أسماء التحاليل والنتائج والمدى المرجعي</span>
-                  </div>
-                </div>
-              )}
-
               {/* Extracted Values & Quick Clinical Tags */}
               <div className="space-y-2 p-3 bg-slate-950/80 rounded-xl border border-slate-800">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
                     <Activity className="w-3.5 h-3.5 text-teal-400" />
-                    <span>المؤشرات والرموز المقروءة من الصورة (قابلة للتعديل والتحرير):</span>
+                    <span>المؤشرات والرموز المقروءة أو المدخلة (قابلة للتعديل والتحرير):</span>
                   </span>
-                  {extractedOcrText && (
+                  {textNotes.trim() && (
                     <span className="text-[10px] text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
-                      تم استخراج النص بالـ OCR
+                      جاهز للتحليل
                     </span>
                   )}
                 </div>
@@ -1169,6 +1180,8 @@ ${recsText}
                 {/* Quick Presets for common tests */}
                 <div className="flex flex-wrap gap-1 text-[10px]">
                   {[
+                    { label: '⚗️ كيمياء وأملاح وإنزيمات: ALT 315 وAST 285 ولاكتيك 3.8 وبوتاسيوم 3.4', text: 'Sodium: 139 (136 - 145 mmol/L)\nPotassium: 3.4 L (3.5 - 5.1 mmol/L)\nChloride: 104 (98 - 107 mmol/L)\nCO2: 24 (22 - 29 mmol/L)\nBlood Urea Nitrogen: 6 L (8 - 23 mg/dL)\nCreatinine: 0.9 (0.7 - 1.3 mg/dL)\nAST: 285 H (10 - 40 U/L)\nALT: 315 H (7 - 56 U/L)\nLactic Acid: 3.8 H (0.5 - 2.2 mmol/L)' },
+                    { label: '🩺 عينة التقرير الشامل (15 مؤشراً: صوديوم 142، يوريا 0.7، إنزيمات 77/79)', text: 'Sodium: 142 mmol/L (135 - 148)\nPotassium: 3.4 mmol/L (3.5 - 5.1)\nChloride: 107 mmol/L (99 - 111)\nCO2: 20 mmol/L (21 - 31)\nBlood urea nitrogen: 0.7 mmol/L (2.5 - 7.9)\nCreatinine: 27 µmol/L (27 - 62)\nCalcium: 2.2 mmol/L (2.0 - 2.6)\nTotal protein: 65 g/L (60 - 82)\nGlucose: 4.7 mmol/L (3.3 - 5.5)\nAlanine aminotransferase (ALT): 77 U/L (0 - 31)\nAspartate aminotransferase (AST): 79 U/L (0 - 31)\nLactic acid: 2.7 mmol/L (0.5 - 2.2)\nCarboxyhemoglobin: 1.2 % (0 - 2.0)\nAcetaminophen: < 6.614 µmol/L (66 - 132)\nSalicylate: < 0.22 mmol/L (0.14 - 0.72)' },
                     { label: '⚡ مقاومة إنسولين 2.89 + فيريتين <5 + فيتامين د 10.87', text: 'Insulin Resistance (HOMA-IR): 2.89 H (0.5 - 1.8 index)\nFerritin: < 5 ng/ml L (12 - 290 ng/ml)\n25-Hydroxyvitamin D3: 10.87 ng/ml L (Desirable > 32 ng/ml)' },
                     { label: '🩸 خضاب دم CBC 9.4 وكرات بيضاء 6400', text: 'Hemoglobin: 9.4 g/dL L (13.0 - 17.5)\nWBC: 6,400 /µL (4,000 - 11,000)\nPlatelets: 295,000 /µL (150,000 - 450,000)' },
                     { label: '🧪 وظائف كلى: كرياتينين 1.75 ويوريا 44', text: 'Serum Creatinine: 1.75 mg/dL H (0.70 - 1.20)\nBlood Urea: 44 mg/dL H (15 - 45)\neGFR: 44 mL/min L' },
@@ -1180,7 +1193,6 @@ ${recsText}
                       type="button"
                       onClick={() => {
                         setTextNotes(p.text);
-                        setExtractedOcrText(p.text);
                         handleRunAnalysis(p.text);
                       }}
                       className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-300 hover:text-teal-200 border border-slate-800 transition-all font-medium text-right"
@@ -1193,10 +1205,7 @@ ${recsText}
                 <textarea
                   id="textNotesInput"
                   value={textNotes}
-                  onChange={(e) => {
-                    setTextNotes(e.target.value);
-                    setExtractedOcrText(e.target.value);
-                  }}
+                  onChange={(e) => setTextNotes(e.target.value)}
                   placeholder="النصوص أو الرموز المقروءة تظهر هنا تلقائياً، أو يمكنك كتابة الفحوصات يدوياً مباشرة (مثل: HOMA 2.89 أو Ferritin < 5 أو سكر صائم 140)..."
                   rows={3}
                   className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg p-2 text-xs text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
@@ -1207,12 +1216,12 @@ ${recsText}
               <button
                 onClick={() => handleRunAnalysis()}
                 disabled={isAnalyzing || (!previewUrl && !textNotes.trim())}
-                className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {isAnalyzing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>جارٍ قراءة واستخراج نتائج صورة التحليل المخبري...</span>
+                    <RefreshCw className="w-4 h-4 animate-spin text-teal-300" />
+                    <span>جارٍ فحص وتحليل المؤشرات واستخراج التقرير السريري...</span>
                   </>
                 ) : (
                   <>
@@ -1560,6 +1569,35 @@ ${recsText}
                       <li>استخدام إضاءة جيدة وتجنب انعكاسات الفلاش أو تشويش الكاميرا لتسهيل قراءة الفواصل العشرية بدقة.</li>
                       <li>تجنب رفع صور لأشياء أو وثائق غير طبية لمنع التفسير الخاطئ.</li>
                     </ul>
+                  </div>
+
+                  {/* Instant Analysis Options */}
+                  <div className="p-3.5 bg-slate-950/70 border border-teal-500/30 rounded-xl space-y-2">
+                    <span className="text-xs font-bold text-teal-300 block">
+                      ⚡ أو اختر تحليل فوري جاهز لمقارنة مؤشراتك المخبرية بدقة كاملة:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'cmp_electrolytes');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 text-teal-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>⚗️ لوحة الكيمياء والأملاح (CMP & LFT)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'cbc');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🩸 فحص صورة الدم الكاملة (CBC)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Actions */}

@@ -76,10 +76,8 @@ export function normalizeLineSeparators(line: string): string {
   cleaned = cleaned.replace(/([<>≤≥])\s*0\s*([1-9]\d*)/g, '$1 0.$2');
 
   // 5. Recover range boundaries where single-digit decimal separator was lost or read as space:
-  // e.g. "2 5 - 7 9" -> "2.5 - 7.9", "0.5 - 1 8" -> "0.5 - 1.8", "3 5 - 5 1" -> "3.5 - 5.1"
+  // ONLY match when BOTH boundaries have a space between digits (e.g. "2 5 - 7 9" -> "2.5 - 7.9", "3 5 - 5 1" -> "3.5 - 5.1")
   cleaned = cleaned.replace(/(?<![\.\d])(\d{1,2})\s+(\d)\s*-\s*(\d{1,2})\s+(\d)\b/g, '$1.$2 - $3.$4');
-  cleaned = cleaned.replace(/(?<![\.\d])(\d{1,2})\s+(\d)\s*-\s*(\d+(?:\.\d+)?)\b/g, '$1.$2 - $3');
-  cleaned = cleaned.replace(/\b(\d+(?:\.\d+)?)\s*-\s*(\d{1,2})\s+(\d)\b/g, '$1 - $2.$3');
 
   return cleaned;
 }
@@ -127,15 +125,15 @@ export function sanitizeReferenceRange(rawRange: string | undefined, defaultRang
   let n1 = parseFloat(m[1]);
   let n2 = parseFloat(m[2]);
 
-  // Fix reversed range (e.g. 1.8 - 0.5 -> 0.5 - 1.8, 7.9 - 2.5 -> 2.5 - 7.9, 26 - 20 -> 20 - 26)
+  // Fix reversed range (e.g. 1.8 - 0.5 -> 0.5 - 1.8, 7.9 - 2.5 -> 2.5 - 7.9)
   if (n1 > n2) {
     const tmp = n1;
     n1 = n2;
     n2 = tmp;
   }
 
-  // Dropped decimal recovery based on test type and physiology
-  if (testId === 'potassium' || (n1 >= 25 && n2 <= 90)) {
+  // Dropped decimal recovery strictly based on test type
+  if (testId === 'potassium' || (testId === undefined && n1 >= 32 && n2 <= 55 && unit?.toLowerCase().includes('mmol'))) {
     if (n1 >= 25) n1 = Number((n1 / 10).toFixed(1));
     if (n2 >= 25) n2 = Number((n2 / 10).toFixed(1));
     if (n2 <= n1) n2 = 5.1;
@@ -148,19 +146,19 @@ export function sanitizeReferenceRange(rawRange: string | undefined, defaultRang
     return `${n1} - ${n2} index`;
   }
 
-  if ((testId === 'calcium' || unit?.toLowerCase().includes('mmol')) && (n1 >= 18 && n2 <= 30)) {
+  if (testId === 'calcium' && (n1 >= 18 && n2 <= 30)) {
     n1 = Number((n1 / 10).toFixed(1));
     n2 = Number((n2 / 10).toFixed(1));
     return `${n1} - ${n2}${unit ? ` ${unit}` : ' mmol/L'}`;
   }
 
-  if ((testId === 'urea' || testId === 'bun' || unit?.toLowerCase().includes('mmol')) && (n1 >= 20 && n2 <= 100)) {
+  if ((testId === 'urea' || testId === 'bun') && (n1 >= 20 && n2 <= 100)) {
     n1 = Number((n1 / 10).toFixed(1));
     n2 = Number((n2 / 10).toFixed(1));
     return `${n1} - ${n2}${unit ? ` ${unit}` : ' mmol/L'}`;
   }
 
-  if (testId === 'glucose' && (unit?.toLowerCase().includes('mmol') || (n1 >= 30 && n2 <= 60))) {
+  if (testId === 'glucose' && (n1 >= 30 && n2 <= 60 && unit?.toLowerCase().includes('mmol'))) {
     n1 = Number((n1 / 10).toFixed(1));
     n2 = Number((n2 / 10).toFixed(1));
     return `${n1} - ${n2}${unit ? ` ${unit}` : ' mmol/L'}`;
@@ -184,6 +182,13 @@ export function cleanLineForValueExtraction(line: string, testPatterns?: RegExp[
   cleaned = cleaned.replace(/^\s*(?:[#|]?\s*\d+\s*[\.\-\)\:]\s+)(?![0-9])/i, ' ');
   cleaned = cleaned.replace(/^\s*(?:\|\s*\d+\s*\|\s*)/i, ' ');
 
+  // 1b. Strip dates, timestamps, page markers, and ID codes so they are never misread as test values
+  cleaned = cleaned.replace(/\b\d{4}[-/.]\d{1,2}[-/.]\d{1,2}\b/g, ' ');
+  cleaned = cleaned.replace(/\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b/g, ' ');
+  cleaned = cleaned.replace(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g, ' ');
+  cleaned = cleaned.replace(/\b(?:page|صفحة)\s*\d+(?:\s*(?:of|\/)\s*\d+)?\b/gi, ' ');
+  cleaned = cleaned.replace(/\b(?:id|mrn|reg|sample|ref|no|كود|رقم|عينة)[:#\s]*\d+\b/gi, ' ');
+
   // 2. Strip test patterns matching this specific test (e.g. "HbA1c", "Vitamin D3", "B12")
   if (testPatterns) {
     for (const pat of testPatterns) {
@@ -197,8 +202,13 @@ export function cleanLineForValueExtraction(line: string, testPatterns?: RegExp[
   cleaned = cleaned.replace(/\b(?:vit(?:amin)?|فيتامين)\s*(?:[dD]|[د]|[bB]|[ب])\b/gi, ' ');
   cleaned = cleaned.replace(/\b(?:d[123]|b12|b6|b1|b2|b3|b9|hba1c|a1c|ft4|ft3|t4|t3|ca125|ca19-9|ca15-3|cd4|cd8)\b/gi, ' ');
 
-  // 4. Strip units before checking for values / flags
-  cleaned = cleaned.replace(/\b(?:mg\/d[lL]|g\/d[lL]|g\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|ng\/m[lL]|pg\/m[lL]|µg\/d[lL]|ug\/d[lL]|mmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|u\/[lL]|iu\/[lL]|fl|pg|index|ratio|%|\/hpf|\/µl|\/ul)\b/gi, ' ');
+  // 4. Strip scientific multiplier power prefixes (e.g. 10^3/uL, 10^6/cumm, *1000/ul) so their digits are not read as the patient value
+  cleaned = cleaned.replace(/(?:x|×|\*)?\s*10\s*[\^~*eE]?\s*[0-9]+(?:\s*\/\s*[a-zA-Zµ\^0-9]+)?/gi, ' ');
+  cleaned = cleaned.replace(/\b(?:million|millon|lakh)\s*\/\s*(?:cumm|µl|ul|l)\b/gi, ' ');
+  cleaned = cleaned.replace(/\*(?:1000|100)\s*\/\s*(?:cumm|µl|ul|l)\b/gi, ' ');
+
+  // 5. Strip standard laboratory units before checking for values / flags
+  cleaned = cleaned.replace(/\b(?:mg\/d[lL]|g\/d[lL]|g\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|ng\/m[lL]|pg\/m[lL]|µg\/d[lL]|ug\/d[lL]|mmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|u\/[lL]|iu\/[lL]|fl|pg|index|ratio|%|\/hpf|\/µl|\/ul|cumm)\b/gi, ' ');
 
   return cleaned;
 }
@@ -315,6 +325,10 @@ export function normalizeClinicalValue(val: number, labId: string, minNormal?: n
     case 'total_protein':
     case 'magnesium':
     case 'phosphorus':
+      // Do not divide if unit is g/L (Total protein in g/L is 60 - 82)
+      if (u.includes('g/l') || (maxNormal && maxNormal > 20)) {
+        return { num: val, raw: String(val) };
+      }
       if (val >= 15 && val <= 99) {
         const c = Number((val / 10).toFixed(1));
         return { num: c, raw: String(c) };
@@ -373,11 +387,23 @@ export function autoCorrectByRange(val: number, rangeStr?: string): { num: numbe
     return { num: val, raw: String(val) };
   }
 
+  // Handle inequality reference range e.g. "< 7 %", "< 1 %", "< 6 %"
+  const ineqRange = rangeStr.match(/[<>≤≥]\s*([0-9]+(?:\.[0-9]+)?)/);
+  if (ineqRange) {
+    const bound = parseFloat(ineqRange[1]);
+    if (!isNaN(bound) && bound > 0 && val > bound * 3) {
+      const d10 = Number((val / 10).toFixed(1));
+      if (d10 <= bound * 1.5) return { num: d10, raw: String(d10) };
+      const d100 = Number((val / 100).toFixed(2));
+      if (d100 <= bound * 1.5) return { num: d100, raw: String(d100) };
+    }
+    return { num: val, raw: String(val) };
+  }
+
   const matches = rangeStr.match(/([0-9]+(?:\.[0-9]+)?)/g);
   if (!matches || matches.length < 2) {
     return { num: val, raw: String(val) };
   }
-
   const rMin = parseFloat(matches[0]);
   const rMax = parseFloat(matches[1]);
   if (isNaN(rMin) || isNaN(rMax) || rMin >= rMax) {
@@ -400,8 +426,13 @@ export function autoCorrectByRange(val: number, rangeStr?: string): { num: numbe
   }
 
   // If val/100 fits the reference range magnitude
-  // e.g. HOMA-IR 289 with range 0.5-1.8 -> 2.89
-  // Vitamin D 1087 with range 30-100 -> 10.87
+  // e.g. Neutrophils 6112 with range 30-70 -> 61.12
+  // MCV 8760 with range 74-96 -> 87.60
+  // MCH 3010 with range 26-33 -> 30.10
+  // MCHC 3400 with range 27-36 -> 34.00
+  // HCT 4020 with range 36-46 -> 40.20
+  // Hemoglobin 1380 with range 12-16 -> 13.80
+  // RBC 459 with range 4-6 -> 4.59
   const div100 = Number((val / 100).toFixed(2));
   if (div100 >= rMin * 0.1 && div100 <= rMax * 2.5) {
     return { num: div100, raw: String(div100) };
@@ -433,14 +464,22 @@ export function extractNumericInfo(
   let lineForNumbers = normLine;
   let detectedRange: string | undefined = undefined;
 
-  const rangeMatch = normLine.match(/\b(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\b/);
+  // 2A. Standard dash range: e.g. "30 - 70", "4000 - 11000", "12 - 16", "2.5 - 7.9"
+  const rangeMatch = normLine.match(/\b(\d+(?:\.\d+)?)\s*[-–~]\s*(\d+(?:\.\d+)?)\b/);
   if (rangeMatch && rangeMatch.index !== undefined) {
     detectedRange = sanitizeReferenceRange(rangeMatch[0], undefined, undefined, detectedUnit);
     // Remove range from line so its numbers cannot be confused with the patient value
     lineForNumbers = normLine.slice(0, rangeMatch.index) + ' ' + normLine.slice(rangeMatch.index + rangeMatch[0].length);
+  } else {
+    // 2B. Trailing inequality reference interval: e.g. "Monocytes 6.79 % < 7 %" -> "< 7 %" is the range!
+    const endIneqMatch = lineForNumbers.match(/([0-9]+(?:\.[0-9]+)?)\s*([%a-zA-Z/]*)\s+([<>≤≥]\s*[0-9]+(?:\.[0-9]+)?\s*[%a-zA-Z/]*)\s*$/);
+    if (endIneqMatch) {
+      detectedRange = endIneqMatch[3].trim();
+      lineForNumbers = lineForNumbers.slice(0, lineForNumbers.lastIndexOf(endIneqMatch[3]));
+    }
   }
 
-  // 3. Check for inequality e.g. "< 5.0", "< 0.22", "<022", "> 100", "أقل من 5"
+  // 3. Check for inequality patient value e.g. "< 0.22", "< 6.614", "أقل من 5" ONLY when it is the patient value (not trailing range)
   const ineqMatch = lineForNumbers.match(/([<>≤≥]|أقل من|اقل من|أكبر من|اكبر من)\s*([0-9]+(?:\.[0-9]+|\s+[0-9]+)?)/);
   if (ineqMatch) {
     const sym = ineqMatch[1];
@@ -641,13 +680,33 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
         : `سكر الدم الصائم طبيعي ومتزن (${val} mg/dL).`
   },
   {
+    id: 'carboxyhemoglobin',
+    patterns: [
+      /\bcarboxy[\s_-]*hemoglobin\b/i,
+      /\bcohb\b/i,
+      /كربوكسي[\s_]*هيموجلوبين/i
+    ],
+    nameAr: 'Carboxyhemoglobin (كربوكسي هيموجلوبين / COHb)',
+    nameEn: 'Carboxyhemoglobin (COHb)',
+    category: 'biochemistry',
+    defaultRefRange: '0 - 2.0 %',
+    defaultUnit: '%',
+    minNormal: 0,
+    maxNormal: 2.0,
+    criticalHigh: 5.0,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `ارتفاع كربوكسي هيموجلوبين (${val}%) يتطلب فحص التعرض لأول أكسيد الكربون أو التدخين.`
+        : `نسبة كربوكسي هيموجلوبين طبيعية وسليمة (${val}%).`
+  },
+  {
     id: 'hemoglobin',
     patterns: [
-      /hemoglobin/i,
-      /haemoglobin/i,
+      /(?<!carboxy[\s_-]*|glyco[\s_-]*|a1c[\s_-]*)\bhemoglobin\b/i,
+      /(?<!carboxy[\s_-]*|glyco[\s_-]*|a1c[\s_-]*)\bhaemoglobin\b/i,
       /\bhb\b/i,
       /خضاب[\s_]*الدم/i,
-      /الهيموجلوبين/i
+      /(?<!كربوكسي[\s_]*)الهيموجلوبين/i
     ],
     nameAr: 'Hemoglobin (خضاب الدم / Hb)',
     nameEn: 'Hemoglobin (Hb)',
@@ -665,13 +724,16 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'wbc',
     patterns: [
+      /total[\s_-]*leukocyte[\s_-]*count/i,
+      /\btlc\b/i,
       /white[\s_-]*blood[\s_-]*cells/i,
       /\bwbc\b/i,
       /leukocytes/i,
-      /كريات[\s_]*الدم[\s_]*البيضاء/i
+      /كريات[\s_]*الدم[\s_]*البيضاء/i,
+      /تعداد[\s_]*الكريات[\s_]*البيضاء/i
     ],
-    nameAr: 'WBC (كريات الدم البيضاء)',
-    nameEn: 'White Blood Cell Count (WBC)',
+    nameAr: 'WBC (كريات الدم البيضاء / TLC)',
+    nameEn: 'White Blood Cell Count (WBC / TLC)',
     category: 'hematology',
     defaultRefRange: '4,000 - 11,000 /µL',
     defaultUnit: '/µL',
@@ -684,9 +746,11 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
     id: 'rbc',
     patterns: [
       /red[\s_-]*blood[\s_-]*cells/i,
+      /rbc[\s_-]*count/i,
       /\brbc\b/i,
       /erythrocytes/i,
-      /خلايا[\s_]*الدم[\s_]*الحمراء/i
+      /خلايا[\s_]*الدم[\s_]*الحمراء/i,
+      /كريات[\s_]*الدم[\s_]*الحمراء/i
     ],
     nameAr: 'RBC (كريات الدم الحمراء)',
     nameEn: 'Red Blood Cell Count (RBC)',
@@ -701,12 +765,13 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'platelets',
     patterns: [
-      /platelets/i,
+      /platelet[\s_-]*count/i,
       /\bplt\b/i,
+      /platelets/i,
       /thrombocytes/i,
       /الصفائح[\s_]*الدموية/i
     ],
-    nameAr: 'Platelets (الصفائح الدموية)',
+    nameAr: 'Platelets (الصفائح الدموية / PLT)',
     nameEn: 'Platelet Count (PLT)',
     category: 'hematology',
     defaultRefRange: '150,000 - 450,000 /µL',
@@ -1117,10 +1182,177 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
       status === 'high' ? `ارتفاع RDW (${val}%) مؤشر كلاسيكي لتباين أحجام الكريات (Anisocytosis) الشائع في نقص الحديد المبكر.` : `مؤشر تفاوت الكريات RDW طبيعي (${val}%).`
   },
   {
+    id: 'mchc',
+    patterns: [
+      /\bmchc\b/i,
+      /mean[\s_-]*corpuscular[\s_-]*hemoglobin[\s_-]*conc/i,
+      /تركيز[\s_]*هيموجلوبين[\s_]*الكرية/i
+    ],
+    nameAr: 'MCHC (متوسط تركيز هيموجلوبين الكريات)',
+    nameEn: 'Mean Corpuscular Hemoglobin Concentration (MCHC)',
+    category: 'hematology',
+    defaultRefRange: '32.0 - 36.0 g/dL',
+    defaultUnit: 'g/dL',
+    minNormal: 32.0,
+    maxNormal: 36.0,
+    explanationNote: (val, status) =>
+      status === 'low' ? `انخفاض MCHC (${val} g/dL) مؤشر على نقص الصباغ (Hypochromia) الشائع في فقر الدم بنقص الحديد.` :
+      `تركيز هيموجلوبين الكريات MCHC طبيعي (${val} g/dL).`
+  },
+  {
+    id: 'neutrophils',
+    patterns: [
+      /neutrophil/i,
+      /\banc\b/i,
+      /عدلات/i,
+      /خلايا[\s_]*متعادلة/i
+    ],
+    nameAr: 'Neutrophils (العدلات / الخلايا المتعادلة)',
+    nameEn: 'Neutrophils',
+    category: 'hematology',
+    defaultRefRange: '40.0 - 70.0 %',
+    defaultUnit: '%',
+    minNormal: 30.0,
+    maxNormal: 70.0,
+    explanationNote: (val, status) =>
+      status === 'high' ? `ارتفاع العدلات (${val}%) مؤشر كلاسيكي للعدوى البكتيرية أو الالتهاب الحاد.` :
+      status === 'low' ? `انخفاض العدلات (${val}%) يتطلب فحص المناعة وتقييم احتمالية نقص العدلات (Neutropenia).` :
+      `نسبة العدلات متوازنة وطبيعية (${val}%).`
+  },
+  {
+    id: 'lymphocytes',
+    patterns: [
+      /lymphocyte/i,
+      /\blym\b/i,
+      /لمفاويات/i,
+      /خلايا[\s_]*لمفاوية/i
+    ],
+    nameAr: 'Lymphocytes (الخلايا اللمفاوية)',
+    nameEn: 'Lymphocytes',
+    category: 'hematology',
+    defaultRefRange: '20.0 - 45.0 %',
+    defaultUnit: '%',
+    minNormal: 20.0,
+    maxNormal: 50.0,
+    explanationNote: (val, status) =>
+      status === 'high' ? `ارتفاع الخلايا اللمفاوية (${val}%) شائع في حالات العدوى الفيروسية.` :
+      status === 'low' ? `انخفاض اللمفاويات (${val}%) يستدعي متابعة الكريات البيضاء ونشاط الجهاز المناعي.` :
+      `نسبة الخلايا اللمفاوية طبيعية (${val}%).`
+  },
+  {
+    id: 'monocytes',
+    patterns: [
+      /monocyte/i,
+      /\bmono\b/i,
+      /وحيدات/i,
+      /خلايا[\s_]*وحيدة/i
+    ],
+    nameAr: 'Monocytes (الخلايا الوحيدة)',
+    nameEn: 'Monocytes',
+    category: 'hematology',
+    defaultRefRange: '2.0 - 10.0 %',
+    defaultUnit: '%',
+    minNormal: 2.0,
+    maxNormal: 10.0,
+    explanationNote: (val, status) =>
+      status === 'high' ? `ارتفاع الوحيدات (${val}%) يرتبط بالتعافي من الالتهابات أو العدوى المزمنة.` :
+      `نسبة الوحيدات طبيعية ومستقرة (${val}%).`
+  },
+  {
+    id: 'eosinophils',
+    patterns: [
+      /eosinophil/i,
+      /\beos\b/i,
+      /حمضات/i,
+      /خلايا[\s_]*حمضية/i
+    ],
+    nameAr: 'Eosinophils (الخلايا الحمضية / إيوزينوفيل)',
+    nameEn: 'Eosinophils',
+    category: 'hematology',
+    defaultRefRange: '1.0 - 6.0 %',
+    defaultUnit: '%',
+    minNormal: 1.0,
+    maxNormal: 6.0,
+    explanationNote: (val, status) =>
+      status === 'high' ? `ارتفاع الحمضات (${val}%) يرجح حالات الحساسية والربو أو الطفيليات.` :
+      `نسبة الخلايا الحمضية طبيعية (${val}%).`
+  },
+  {
+    id: 'basophils',
+    patterns: [
+      /basophil/i,
+      /\bbaso\b/i,
+      /قعدات/i,
+      /خلايا[\s_]*قاعدية/i
+    ],
+    nameAr: 'Basophils (الخلايا القاعدية / بازوفيل)',
+    nameEn: 'Basophils',
+    category: 'hematology',
+    defaultRefRange: '0.0 - 2.0 %',
+    defaultUnit: '%',
+    minNormal: 0.0,
+    maxNormal: 2.0,
+    explanationNote: (val, status) =>
+      `نسبة الخلايا القاعدية (${val}%) ضمن النطاق الطبيعي.`
+  },
+  {
+    id: 'mpv',
+    patterns: [
+      /\bmpv\b/i,
+      /mean[\s_-]*platelet[\s_-]*volume/i,
+      /متوسط[\s_]*حجم[\s_]*الصفائح/i
+    ],
+    nameAr: 'MPV (متوسط حجم الصفائح الدموية)',
+    nameEn: 'Mean Platelet Volume (MPV)',
+    category: 'hematology',
+    defaultRefRange: '7.0 - 11.5 fL',
+    defaultUnit: 'fL',
+    minNormal: 7.0,
+    maxNormal: 11.5,
+    explanationNote: (val, status) =>
+      `متوسط حجم الصفائح الدموية MPV يسجل (${val} fL).`
+  },
+  {
+    id: 'pdw',
+    patterns: [
+      /\bpdw\b/i,
+      /platelet[\s_-]*distribution[\s_-]*width/i,
+      /تفاوت[\s_]*أحجام[\s_]*الصفائح/i
+    ],
+    nameAr: 'PDW (تفاوت أحجام الصفائح الدموية)',
+    nameEn: 'Platelet Distribution Width (PDW)',
+    category: 'hematology',
+    defaultRefRange: '9.0 - 17.0 fL',
+    defaultUnit: 'fL',
+    minNormal: 9.0,
+    maxNormal: 17.0,
+    explanationNote: (val, status) =>
+      `مؤشر تباين الصفائح الدموية PDW يسجل (${val}).`
+  },
+  {
+    id: 'pct',
+    patterns: [
+      /\bpct\b/i,
+      /plateletcrit/i,
+      /مكداس[\s_]*الصفائح/i
+    ],
+    nameAr: 'PCT (مكداس الصفائح الدموية / Plateletcrit)',
+    nameEn: 'Plateletcrit (PCT)',
+    category: 'hematology',
+    defaultRefRange: '0.15 - 0.40 %',
+    defaultUnit: '%',
+    minNormal: 0.15,
+    maxNormal: 0.40,
+    explanationNote: (val, status) =>
+      `مكداس الصفائح PCT يسجل (${val}%).`
+  },
+  {
     id: 'sodium',
     patterns: [
+      /serum[\s_-]*sodium/i,
+      /\bs\.\s*na\b/i,
+      /\bna\+\b/i,
       /\bsodium\b/i,
-      /\bna\+?\b/i,
       /صوديوم/i
     ],
     nameAr: 'Serum Sodium (الصوديوم في الدم)',
@@ -1138,8 +1370,10 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'chloride',
     patterns: [
+      /serum[\s_-]*chloride/i,
+      /\bs\.\s*cl\b/i,
+      /\bcl-\b/i,
       /\bchloride\b/i,
-      /\bcl-?\b/i,
       /كلور/i
     ],
     nameAr: 'Serum Chloride (الكلوريد)',
@@ -1677,21 +1911,29 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
         if (numInfo.flag === 'H') status = 'high';
         else if (numInfo.flag === 'L') status = 'low';
         else {
+          let testVal = numInfo.num;
           const rangeNums = effectiveRefRange.match(/([0-9]+(?:\.[0-9]+)?)/g);
           if (rangeNums && rangeNums.length >= 2) {
-            const rMin = parseFloat(rangeNums[0]);
-            const rMax = parseFloat(rangeNums[1]);
+            let rMin = parseFloat(rangeNums[0]);
+            let rMax = parseFloat(rangeNums[1]);
+
+            if (lab.id === 'wbc' && testVal <= 50 && rMax >= 1000) {
+              testVal = testVal * 1000;
+            } else if (lab.id === 'platelets' && testVal <= 1000 && rMax >= 10000) {
+              testVal = testVal * 1000;
+            }
+
             if (!isNaN(rMin) && !isNaN(rMax) && rMin < rMax) {
-              if (numInfo.num < rMin * 0.5) status = 'critical';
-              else if (numInfo.num > rMax * 2) status = 'critical';
-              else if (numInfo.num < rMin) status = 'low';
-              else if (numInfo.num > rMax) status = 'high';
+              if (testVal < rMin * 0.5) status = 'critical';
+              else if (testVal > rMax * 2) status = 'critical';
+              else if (testVal < rMin) status = 'low';
+              else if (testVal > rMax) status = 'high';
             }
           } else {
-            if (lab.criticalLow !== undefined && numInfo.num < lab.criticalLow) status = 'critical';
-            else if (lab.criticalHigh !== undefined && numInfo.num > lab.criticalHigh) status = 'critical';
-            else if (numInfo.num < lab.minNormal) status = 'low';
-            else if (numInfo.num > lab.maxNormal) status = 'high';
+            if (lab.criticalLow !== undefined && testVal < lab.criticalLow) status = 'critical';
+            else if (lab.criticalHigh !== undefined && testVal > lab.criticalHigh) status = 'critical';
+            else if (testVal < lab.minNormal) status = 'low';
+            else if (testVal > lab.maxNormal) status = 'high';
           }
         }
 
@@ -1912,9 +2154,10 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
       const nameLettersOnly = cleanName.toLowerCase().replace(/[^a-z\u0600-\u06ff]/g, '');
       if (nameLettersOnly.length < 2) continue;
 
-      // 3. Strict blacklist of units, headers, administrative words
-      const UNIT_OR_HEADER_REGEX = /^(mmol\/?[lL]|mmolll?|µmol\/?[lL]|umol\/?[lL]|pmol\/?[lL]|pmolil|mg\/?[dD]?[lL]|g\/?[dD]?[lL]|g\/?[lL]|u\/?[lL]|ul|iu\/?[lL]|ng\/?[mM][lL]|pg\/?[mM][lL]|µiu\/?[mM][lL]|fl|index|ratio|analyte|analytes|test|tests|result|results|unit|units|reference|ref|interval|intervals|range|ranges|biochemistry|hormones|hematology|serology|urinalysis|flag|status|desirable|normal|negative|positive|last[\s_]*test|فحص|تحليل|تحاليل|نتيجة|نتائج|وحدة|الوحدة|المعدل|المرجع|النطاق|المجال|طبيعي|سليم|الهرمونات|الكيمياء|الدم|مخبر|طبيب|مريض)$/i;
+      // 3. Strict blacklist of units, headers, table noise, fragments
+      const UNIT_OR_HEADER_REGEX = /^(mmol\/?[lL]|mmolll?|µmol\/?[lL]|umol\/?[lL]|pmol\/?[lL]|pmolil|mg\/?[dD]?[lL]|gldl|g\/?[dD]?[lL]|g\/?[lL]|u\/?[lL]|ul|iu\/?[lL]|ng\/?[mM][lL]|pg\/?[mM][lL]|µiu\/?[mM][lL]|fl|fo|pa|pg|dl|cc|cumm|millon|million|index|ratio|analyte|analytes|test|tests|result|results|unit|units|reference|ref|interval|intervals|range|ranges|biochemistry|hormones|hematology|serology|urinalysis|flag|status|desirable|normal|negative|positive|last[\s_]*test|differential|count|indices|cell's|cells|rbc's|wbc's|فحص|تحليل|تحاليل|نتيجة|نتائج|وحدة|الوحدة|المعدل|المرجع|النطاق|المجال|طبيعي|سليم|الهرمونات|الكيمياء|الدم|مخبر|طبيب|مريض)$/i;
       if (UNIT_OR_HEADER_REGEX.test(nameLettersOnly)) continue;
+      if (/^(fo|fl|pa|pg|cc|dl|ul|gldl|cumm|millon|pct|pdw|mpv)\b/i.test(cleanName)) continue;
 
       // 3b. Blacklist administrative / patient document words
       const ADMIN_REGEX = /(patient|doctor|physician|hospital|clinic|specimen|sample|order|date|time|age\b|gender|sex\b|mrn|phone|tel|address|invoice|receipt|page\b|room|bed\b|id\b|reg\b|مريض|طبيب|دكتور|مستشفى|عيادة|عينة|طلب|تاريخ|وقت|العمر|عمر\b|جنس|ذكر|انثى|هاتف|جوال|عنوان|فاتورة|ايصال|صفحة|غرفة|سرير|رقم[_\s]*الملف)/i;
@@ -1924,7 +2167,7 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
       const effUnit = detectUnitInText(extractedUnit) || extractedUnit || '';
       const hasRealRange = Boolean(extractedRange && extractedRange.length >= 2 && /\d/.test(extractedRange));
       const isKnownMedical = KNOWN_LAB_DATABASE.some(k => k.patterns.some(p => p.test(cleanName)));
-      if (!effUnit && !hasRealRange && !isKnownMedical) {
+      if (!isKnownMedical && (!effUnit || !hasRealRange || nameLettersOnly.length < 4)) {
         continue;
       }
 
