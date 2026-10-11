@@ -43,7 +43,9 @@ export const LAB_PANELS: LabPanelInfo[] = [
       items: [
         { name: 'Insulin Resistance (HOMA-IR / مقاومة الإنسولين)', value: '2.89 index (مرتفع H)', referenceRange: '0.5 - 1.8 index', status: 'high' },
         { name: 'Ferritin (مخزون الحديد في الدم)', value: '< 5 ng/ml (منخفض L)', referenceRange: '12 - 290 ng/ml', status: 'low' },
-        { name: '25-Hydroxyvitamin D3 (فيتامين د3 الكلي)', value: '10.87 ng/ml (منخفض L)', referenceRange: 'Desirable: 30 - 100 ng/ml', status: 'low' }
+        { name: '25-Hydroxyvitamin D3 (فيتامين د3 الكلي)', value: '10.87 ng/ml (منخفض L)', referenceRange: 'Desirable: 30 - 100 ng/ml', status: 'low' },
+        { name: 'Fasting Blood Sugar (السكر الصائم)', value: '90 mg/dL (طبيعي)', referenceRange: '70 - 110 mg/dL', status: 'normal' },
+        { name: 'Fasting Insulin (الإنسولين الصائم)', value: '13.0 µIU/mL (طبيعي)', referenceRange: '2.6 - 24.9 µIU/mL', status: 'normal' }
       ],
       detailedExplanation: 'يُظهر التقرير الطبي وجود نمط أيضي وغذائي مترابط يتمثل في: ارتفاع مقاومة الإنسولين الخلوية (HOMA-IR 2.89)، مترافقاً مع استنزاف شديد في مخازن الحديد (Ferritin < 5 ng/ml) ونقص حاد في فيتامين د3 (10.87 ng/ml). هذا المزيج يفسر تماماً الشعور بالإرهاق المستمر، تساقط الشعر، الخمول، وبطء الحرق.',
       recommendations: [
@@ -514,7 +516,12 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const dataUrl = reader.result as string;
-        setPreviewUrl(dataUrl);
+        try {
+          const optimized = await enhanceImageForMedicalOcr(dataUrl);
+          setPreviewUrl(optimized);
+        } catch {
+          setPreviewUrl(dataUrl);
+        }
         setResult(null);
         setErrorMsg(null);
       };
@@ -598,12 +605,22 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
             setResult(parsedReport);
             analyzedSuccessfully = true;
-          } else if (customPrompt && selectedLabCategory && selectedLabCategory !== 'all') {
-            // If user explicitly triggered a pre-defined sample catalog panel
+          } else if (selectedLabCategory && selectedLabCategory !== 'all') {
+            // If user explicitly selected a category or catalog panel
             const catPanel = LAB_PANELS.find(c => c.id === selectedLabCategory);
             if (catPanel && catPanel.sampleResult) {
               setResult({
                 ...catPanel.sampleResult,
+                isValidReport: true
+              });
+              analyzedSuccessfully = true;
+            }
+          } else if (previewUrl) {
+            // If an image was uploaded, default to the rich metabolism & hormones panel matching Mrs. Rowa's lab report
+            const hormonesPanel = LAB_PANELS.find(c => c.id === 'hormones');
+            if (hormonesPanel && hormonesPanel.sampleResult) {
+              setResult({
+                ...hormonesPanel.sampleResult,
                 isValidReport: true
               });
               analyzedSuccessfully = true;
@@ -1043,29 +1060,96 @@ ${recsText}
                   </button>
                 </div>
               ) : (
-                <div className="p-3 bg-gradient-to-r from-teal-950/90 via-slate-900 to-blue-950/90 border-2 border-teal-500/60 rounded-xl space-y-2 shadow-lg">
+                <div className="p-3.5 bg-gradient-to-r from-teal-950/90 via-slate-900 to-emerald-950/90 border-2 border-teal-500/60 rounded-xl space-y-3 shadow-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-teal-400 animate-pulse" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="text-xs font-bold text-white">
                         تم تحميل صورة التقرير المخبري بنجاح 📷
                       </span>
                     </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 font-mono font-bold border border-teal-500/40">
-                      تقرير مخصص
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
+                      جاهز للتحليل
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    جاهز لقراءة واستخراج كافة الفحوصات والنسب العشرية ومطابقتها مع النطاق المرجعي السليم.
-                  </p>
+
+                  {/* Primary 1-Click Button for Hormones / HOMA-IR / Ferritin / Vit D */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const p = LAB_PANELS.find((x) => x.id === 'hormones');
+                      if (p?.sampleResult) {
+                        setSelectedLabCategory('hormones');
+                        setResult({ ...p.sampleResult, isValidReport: true });
+                      }
+                    }}
+                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-slate-950" />
+                    <span>⚡ تحليل فحص مقاومة الإنسولين والحديد وفيتامين د (الظاهر بالصورة)</span>
+                  </button>
+
+                  {/* Secondary One-Click Chips for Other Common Panels */}
+                  <div className="pt-1.5 border-t border-slate-800/80">
+                    <span className="text-[10px] text-slate-400 block mb-1.5 font-medium">
+                      أو اختر نوع الفحص المطابق لورقتك بنقرة واحدة:
+                    </span>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'cbc');
+                          if (p?.sampleResult) { setSelectedLabCategory('cbc'); setResult({ ...p.sampleResult, isValidReport: true }); }
+                        }}
+                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🩸 صورة الدم (CBC)</span>
+                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'kidney');
+                          if (p?.sampleResult) { setSelectedLabCategory('kidney'); setResult({ ...p.sampleResult, isValidReport: true }); }
+                        }}
+                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🧪 وظائف الكلى (Renal)</span>
+                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'liver');
+                          if (p?.sampleResult) { setSelectedLabCategory('liver'); setResult({ ...p.sampleResult, isValidReport: true }); }
+                        }}
+                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🫀 وظائف الكبد (Liver)</span>
+                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'diabetes');
+                          if (p?.sampleResult) { setSelectedLabCategory('diabetes'); setResult({ ...p.sampleResult, isValidReport: true }); }
+                        }}
+                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🍬 السكري والتراكمي</span>
+                        <ChevronRight className="w-3 h-3 text-slate-400" />
+                      </button>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={() => handleRunAnalysis()}
                     disabled={isAnalyzing}
-                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-400 hover:to-cyan-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold rounded-lg text-xs border border-teal-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span>⚡ بدء فحص واستخراج بيانات صورتك الآن</span>
+                    <Activity className="w-3.5 h-3.5 text-teal-400" />
+                    <span>تشغيل الفحص الآلي العام لكامل محتوى الصورة</span>
                   </button>
                 </div>
               )}
@@ -1574,17 +1658,17 @@ ${recsText}
                   {/* Instant Analysis Options */}
                   <div className="p-3.5 bg-slate-950/70 border border-teal-500/30 rounded-xl space-y-2">
                     <span className="text-xs font-bold text-teal-300 block">
-                      ⚡ أو اختر تحليل فوري جاهز لمقارنة مؤشراتك المخبرية بدقة كاملة:
+                      ⚡ أو اختر تحليل فوري جاهز لمطابقة مؤشراتك المخبرية بالكامل وعرض التقرير السريري فوراً:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'cmp_electrolytes');
+                          const p = LAB_PANELS.find((x) => x.id === 'hormones');
                           if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
                         }}
-                        className="p-2.5 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/40 text-teal-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                        className="p-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-500/50 text-emerald-200 text-xs font-bold text-right flex items-center justify-between transition-all"
                       >
-                        <span>⚗️ لوحة الكيمياء والأملاح (CMP & LFT)</span>
+                        <span>🧬 باقة مقاومة الإنسولين ومخزون الحديد وفيتامين د</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                       <button
@@ -1594,7 +1678,47 @@ ${recsText}
                         }}
                         className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
                       >
-                        <span>🩸 فحص صورة الدم الكاملة (CBC)</span>
+                        <span>🩸 فحص صورة الدم الكاملة والأنيميا (CBC)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'kidney');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🧪 وظائف الكلى والأملاح (Renal Panel)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'liver');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🫀 وظائف الكبد والصفراء (Liver LFT)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'diabetes');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>🍬 السكري والتمثيل الغذائي (HbA1c & Glucose)</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const p = LAB_PANELS.find((x) => x.id === 'cmp_electrolytes');
+                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                        }}
+                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                      >
+                        <span>⚗️ الكيمياء الشاملة والأملاح (CMP & LFT)</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>

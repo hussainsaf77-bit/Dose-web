@@ -198,6 +198,7 @@ export function cleanLineForValueExtraction(line: string, testPatterns?: RegExp[
 
   // 3. Strip alphanumeric vitamin/test codes that have digits attached
   // Must NOT strip 'd' in 'mg/dL' or 'g/dL'!
+  cleaned = cleaned.replace(/\b(?:1\s*,\s*)?25\s*[-–—_]?\s*(?:oh|hydroxy)?\b/gi, ' ');
   cleaned = cleaned.replace(/\b(?:vit(?:amin)?|فيتامين)?\s*(?:[dD][123١٢٣]|[د][123١٢٣]|[bB](?:12|١٢|6|٦|1|١|2|٢|3|٣|9|٩)|[ب](?:12|١٢|6|٦))\b/gi, ' ');
   cleaned = cleaned.replace(/\b(?:vit(?:amin)?|فيتامين)\s*(?:[dD]|[د]|[bB]|[ب])\b/gi, ' ');
   cleaned = cleaned.replace(/\b(?:d[123]|b12|b6|b1|b2|b3|b9|hba1c|a1c|ft4|ft3|t4|t3|ca125|ca19-9|ca15-3|cd4|cd8)\b/gi, ' ');
@@ -226,12 +227,18 @@ export function normalizeClinicalValue(val: number, labId: string, minNormal?: n
   // If val is an integer, check if OCR accidentally dropped the decimal point
   switch (labId) {
     case 'homa_ir':
-    case 'fasting_insulin':
       if (val >= 50 && val <= 3000) {
         const c = Number((val / 100).toFixed(2));
         return { num: c, raw: String(c) };
       }
       if (val >= 20 && val < 50) {
+        const c = Number((val / 10).toFixed(1));
+        return { num: c, raw: String(c) };
+      }
+      break;
+
+    case 'fasting_insulin':
+      if (val >= 100 && val <= 1000) {
         const c = Number((val / 10).toFixed(1));
         return { num: c, raw: String(c) };
       }
@@ -590,6 +597,9 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'vitamin_d',
     patterns: [
+      /\b(?:1\s*,\s*)?25[\s_-]*(?:oh|hydroxy)?[\s_-]*(?:vitamin)?[\s_-]*d3?\b/i,
+      /\b25[\s_-]*oh\b/i,
+      /\b25[\s_-]*hydroxy\b/i,
       /25[\s_-]*hydroxyvitamin[\s_-]*d3?/i,
       /vitamin[\s_-]*d3?/i,
       /vit[\s_.]*d3?/i,
@@ -656,6 +666,8 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'glucose_fasting',
     patterns: [
+      /\b(?:fasting[\s_-]*)?blood[\s_-]*sugar\b/i,
+      /\bfasting[\s_-]*(?:blood[\s_-]*)?(?:glucose|sugar)\b/i,
       /\b(?:fasting[\s_-]*)?blood[\s_-]*glucose\b/i,
       /\bglucose\b/i,
       /\bgluc\b/i,
@@ -1851,13 +1863,30 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
     let matchedLine: string | null = null;
     let matchedLineIndex = -1;
 
+    // 1. Prefer a line matching patterns that directly contains a numeric result
     for (let i = 0; i < lines.length; i++) {
       if (consumedLineIndices.has(i)) continue;
       const line = lines[i];
       if (lab.patterns.some(pattern => pattern.test(line))) {
-        matchedLine = line;
-        matchedLineIndex = i;
-        break;
+        const hasNum = extractNumericInfo(line, lab.patterns);
+        if (hasNum) {
+          matchedLine = line;
+          matchedLineIndex = i;
+          break;
+        }
+      }
+    }
+
+    // 2. Otherwise pick the first matching line
+    if (!matchedLine) {
+      for (let i = 0; i < lines.length; i++) {
+        if (consumedLineIndices.has(i)) continue;
+        const line = lines[i];
+        if (lab.patterns.some(pattern => pattern.test(line))) {
+          matchedLine = line;
+          matchedLineIndex = i;
+          break;
+        }
       }
     }
 
