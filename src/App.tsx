@@ -22,7 +22,7 @@ import { ClinicalSymptomChecker } from './components/ClinicalSymptomChecker';
 import { MedicalUserGuideSection } from './components/MedicalUserGuideSection';
 import { Language, TRANSLATIONS } from './utils/translations';
 
-import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope } from 'lucide-react';
+import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope, Download } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
   const clean = h.replace(/^#\/?/, '').split('?')[0].toLowerCase();
@@ -287,6 +287,17 @@ export default function App() {
                 <Crown className="w-4 h-4 text-amber-400" />
                 <span>{t.quick_plans}</span>
               </button>
+
+              <a
+                id="hero-quick-download"
+                href="/dose_v36_final.zip"
+                download="dose_v36_final.zip"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-sm"
+                title="تحميل ملف التحديث المباشر dose_v36_final.zip"
+              >
+                <Download className="w-4 h-4 text-emerald-400" />
+                <span>{language === 'ar' ? 'تحميل التحديث (dose_v36_final.zip)' : 'Download Update ZIP'}</span>
+              </a>
 
               <a
                 id="hero-quick-telegram"

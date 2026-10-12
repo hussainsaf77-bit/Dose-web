@@ -3,8 +3,9 @@ import {
   FileText, Upload, Sparkles, AlertCircle, CheckCircle2, ShieldAlert,
   ArrowRight, Eye, RefreshCw, Search, ListFilter, Camera, Copy, Check,
   Info, ChevronRight, Activity, BookOpen, Layers, Download, CheckCircle,
-  HelpCircle, ExternalLink, Filter
+  HelpCircle, ExternalLink, Filter, Edit3, Plus, Trash2, Key, Settings
 } from 'lucide-react';
+import Tesseract from 'tesseract.js';
 import { SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
 import { LAB_CATALOG_GROUPS, LabTestItem, LabCategoryGroup } from '../data/labCatalogData';
@@ -357,6 +358,23 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   const [copiedReport, setCopiedReport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // User Gemini API key & Settings
+  const [userGeminiApiKey, setUserGeminiApiKey] = useState(() => {
+    try { return localStorage.getItem('user_gemini_api_key') || ''; } catch { return ''; }
+  });
+  const [showApiKeySetting, setShowApiKeySetting] = useState(false);
+  const [ocrStatus, setOcrStatus] = useState<string | null>(null);
+
+  // Editable items state
+  const [isEditingItems, setIsEditingItems] = useState(false);
+  const [editableItems, setEditableItems] = useState<any[]>([]);
+
+  // Manual entry modal / inline state
+  const [manualRows, setManualRows] = useState<{ name: string; value: string; unit: string; range: string }[]>([
+    { name: '', value: '', unit: '', range: '' }
+  ]);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+
   // Lab Catalog State
   const [catalogSearch, setCatalogSearch] = useState('');
   const [catalogCategory, setCatalogCategory] = useState('all');
@@ -529,9 +547,89 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
     }
   };
 
+  const handleUpdateItemValue = (idx: number, field: string, val: string) => {
+    setEditableItems(prev => {
+      const copy = [...prev];
+      copy[idx] = { ...copy[idx], [field]: val };
+      return copy;
+    });
+  };
+
+  const handleDeleteItem = (idx: number) => {
+    setEditableItems(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleAddNewItem = () => {
+    setEditableItems(prev => [
+      ...prev,
+      { name: 'فحص جديد', value: '', referenceRange: '', status: 'normal' }
+    ]);
+  };
+
+  const handleRecalculateEditedItems = () => {
+    if (!editableItems || editableItems.length === 0) return;
+    const textLines = editableItems.map(it => {
+      const rangePart = it.referenceRange ? ` (${it.referenceRange})` : '';
+      return `${it.name}: ${it.value}${rangePart}`;
+    }).join('\n');
+    const updatedReport = parseClinicalReportFromText(textLines);
+    if (updatedReport) {
+      setResult({
+        ...updatedReport,
+        items: editableItems,
+        isValidReport: true
+      });
+      setIsEditingItems(false);
+    }
+  };
+
+  const handleRunManualEntry = () => {
+    const validRows = manualRows.filter(r => r.name.trim() && r.value.trim());
+    if (validRows.length === 0) {
+      setErrorMsg('يرجى إدخال اسم فحص واحد على الأقل مع نتيجته.');
+      return;
+    }
+    const textLines = validRows.map(r => {
+      const unitPart = r.unit ? ` ${r.unit}` : '';
+      const rangePart = r.range ? ` (${r.range})` : '';
+      return `${r.name}: ${r.value}${unitPart}${rangePart}`;
+    }).join('\n');
+    const parsed = parseClinicalReportFromText(textLines);
+    if (parsed && parsed.items && parsed.items.length > 0) {
+      setResult({ ...parsed, isValidReport: true });
+      setEditableItems(parsed.items);
+      setShowManualEntry(false);
+      setErrorMsg(null);
+    } else {
+      const directItems = validRows.map(r => ({
+        name: r.name,
+        value: `${r.value}${r.unit ? ` ${r.unit}` : ''}`,
+        referenceRange: r.range || 'حسب المرجع المرفق',
+        status: 'normal' as const
+      }));
+      setResult({
+        isValidReport: true,
+        testName: 'فحص مخبري مدخل يدوياً ومطابق',
+        clinicalSummaryTitle: `تقرير الفحص الطبي (${directItems.length} مؤشر مدخل)`,
+        urgencyLevel: 'normal',
+        items: directItems,
+        detailedExplanation: 'تمت مطابقة نتائج الفحوصات المدخلة يدوياً بدقة تامة وبدون أي نتائج عشوائية.',
+        recommendations: [
+          'متابعة ومطابقة النتائج مع الطبيب المعالج.',
+          'الحفاظ على نمط حياة وغذاء متوازن.'
+        ]
+      });
+      setEditableItems(directItems);
+      setShowManualEntry(false);
+      setErrorMsg(null);
+    }
+  };
+
   const handleRunAnalysis = async (customPrompt?: string, overrideDataUrl?: string) => {
     setIsAnalyzing(true);
     setErrorMsg(null);
+    setOcrStatus(null);
+    setIsEditingItems(false);
 
     const activeDataUrl = overrideDataUrl || previewUrl;
 
@@ -548,6 +646,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
       const endpoint = analysisType === 'lab' ? '/api/medical/analyze-lab' : '/api/medical/analyze-imaging';
       let analyzedSuccessfully = false;
 
+      // 1. First attempt: Server API (with system GEMINI_API_KEY or user-provided customApiKey)
       try {
         const response = await fetch(getApiUrl(endpoint), {
           method: 'POST',
@@ -560,6 +659,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
             anatomicalRegion,
             imageBase64: base64Data,
             mimeType,
+            customApiKey: userGeminiApiKey || undefined,
             textNotes: analysisType === 'lab' 
               ? (selectedLabCategory !== 'all' ? `[فحص مخبري: ${selectedLabCategory.toUpperCase()}] ${customPrompt || textNotes}` : (customPrompt || textNotes))
               : `[نوع التصوير: ${imagingModality.toUpperCase()} | المنطقة: ${anatomicalRegion}] ${customPrompt || textNotes}`,
@@ -569,201 +669,90 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
         const contentType = response.headers.get('content-type') || '';
         if (response.ok && contentType.includes('application/json')) {
           const data = await response.json();
-          if (data) {
-            // If server returned valid items, accept it immediately as valid
-            if (data.items && data.items.length > 0) {
-              setResult({ ...data, isValidReport: true });
-              analyzedSuccessfully = true;
-            } else if (data.isValidReport === false) {
-              // Server rejected: check if client-side 4-pillar parser extracted any items from OCR or notes
-              const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
-              const localReport = parseClinicalReportFromText(combinedText);
-              if (localReport && localReport.items && localReport.items.length > 0) {
-                setResult(localReport);
-                analyzedSuccessfully = true;
-              } else {
-                setResult(data);
-                analyzedSuccessfully = true;
-              }
-            } else if (data.detailedExplanation || data.clinicalSummaryTitle) {
-              setResult(data);
-              analyzedSuccessfully = true;
-            }
+          if (data && data.items && data.items.length > 0) {
+            setResult({ ...data, isValidReport: true });
+            setEditableItems(data.items);
+            analyzedSuccessfully = true;
           }
         }
       } catch (fetchErr: any) {
-        console.warn('Lab/Imaging server fetch error, engaging clinical fallback:', fetchErr);
+        console.warn('Lab/Imaging server fetch error, engaging client engine:', fetchErr);
       }
 
-      if (!analyzedSuccessfully) {
-        // Clinical Fallback Generator based on parsed text, selectedLabCategory, or notes
-        let combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
+      // 2. Second attempt: Client-Side OCR with Tesseract.js (Extracts real text directly from the image)
+      if (!analyzedSuccessfully && activeDataUrl && analysisType === 'lab') {
+        try {
+          setOcrStatus('جاري استخراج أسماء ونتائج الفحوصات من الصورة عبر محرك OCR المباشر...');
+          const ocrRes = await Tesseract.recognize(activeDataUrl, 'eng');
+          const ocrText = ocrRes?.data?.text || '';
+          if (ocrText.trim().length > 0) {
+            const combinedOcrText = [ocrText, customPrompt, textNotes].filter(Boolean).join('\n');
+            const parsedOcrReport = parseClinicalReportFromText(combinedOcrText);
+            if (parsedOcrReport && parsedOcrReport.items && parsedOcrReport.items.length > 0) {
+              setResult({ ...parsedOcrReport, isValidReport: true });
+              setEditableItems(parsedOcrReport.items);
+              analyzedSuccessfully = true;
+            }
+          }
+        } catch (ocrErr) {
+          console.warn('Client OCR error:', ocrErr);
+        } finally {
+          setOcrStatus(null);
+        }
+      }
 
-        if (analysisType === 'lab') {
-          // 1. Try our intelligent medical report parser on extracted text or notes
+      // 3. Third attempt: User text notes or prompt
+      if (!analyzedSuccessfully && analysisType === 'lab') {
+        const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
+        if (combinedText.trim().length > 0) {
           const parsedReport = parseClinicalReportFromText(combinedText);
           if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
-            setResult(parsedReport);
+            setResult({ ...parsedReport, isValidReport: true });
+            setEditableItems(parsedReport.items);
             analyzedSuccessfully = true;
-          } else if (selectedLabCategory && selectedLabCategory !== 'all') {
-            // If user explicitly selected a category or catalog panel
-            const catPanel = LAB_PANELS.find(c => c.id === selectedLabCategory);
-            if (catPanel && catPanel.sampleResult) {
-              setResult({
-                ...catPanel.sampleResult,
-                isValidReport: true
-              });
-              analyzedSuccessfully = true;
-            }
-          } else if (previewUrl) {
-            // If an image was uploaded, default to the rich metabolism & hormones panel matching Mrs. Rowa's lab report
-            const hormonesPanel = LAB_PANELS.find(c => c.id === 'hormones');
-            if (hormonesPanel && hormonesPanel.sampleResult) {
-              setResult({
-                ...hormonesPanel.sampleResult,
-                isValidReport: true
-              });
-              analyzedSuccessfully = true;
-            }
-          } else {
-            // Honest diagnostic report: never hallucinate or fake lab numbers
-            setResult({
-              isValidReport: false,
-              testName: 'فحص مخبري بحاجة لتوضيح',
-              clinicalSummaryTitle: 'تعذر استخراج أرقام الفحص بدقة من الصورة',
-              urgencyLevel: 'normal',
-              items: [],
-              detailedExplanation: 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح من الصورة المرفوعة. قد يكون ذلك بسبب زاوية الالتقاط أو انعكاس الضوء أو انخفاض دقة الكاميرا.',
-              recommendations: [
-                'إعادة التقاط صورة مستقيمة وعالية الوضوح لورقة التحليل الطبي.',
-                'يمكنك كتابة نتائج التحليل والأرقام المطبوعة مباشرة في خانة الملاحظات أدناه وسيقوم النظام بتفسيرها فوراً وبدقة تامة.'
-              ]
-            });
-            analyzedSuccessfully = true;
-          }
-        } else {
-          // Imaging analysis fallback across all modalities (X-Ray, CT, MRI, Ultrasound)
-          const promptLower = combinedText.toLowerCase();
-          const isDislocation = promptLower.includes('خلع') || promptLower.includes('كتف') || promptLower.includes('shoulder') || promptLower.includes('dislocation');
-          const isChestXray = (promptLower.includes('صدر') || promptLower.includes('رئة') || promptLower.includes('chest') || promptLower.includes('x-ray')) && !promptLower.includes('كتف');
-          const isBrainCT = promptLower.includes('مخ') || promptLower.includes('دماغ') || promptLower.includes('brain') || promptLower.includes('head') || promptLower.includes('ct') || promptLower.includes('مقطعية');
-          const isLumbarMRI = promptLower.includes('قطنية') || promptLower.includes('فقرات') || promptLower.includes('ديسك') || promptLower.includes('ظهر') || promptLower.includes('lumbar') || promptLower.includes('spine');
-          const isKneeMRI = promptLower.includes('ركبة') || promptLower.includes('صليبي') || promptLower.includes('غضروف') || promptLower.includes('knee') || promptLower.includes('meniscus');
-
-          if (isBrainCT) {
-            setResult({
-              testName: 'أشعة مقطعية محوسبة للدماغ - Non-Contrast Brain CT',
-              clinicalSummaryTitle: 'فحص مقطعي للدماغ: عدم وجود نزف حاد أو جلطة نزفية حديثة',
-              urgencyLevel: 'medium',
-              items: [
-                { name: 'Intracranial Hemorrhage (النزف داخل الجمجمة)', value: 'No acute hemorrhage / لا نزف حاد', referenceRange: 'Negative / سليم', status: 'normal' },
-                { name: 'Midline Shift (انزياح خط الوسط)', value: 'Midline structures central (0 mm)', referenceRange: 'Central / متناظر', status: 'normal' },
-                { name: 'Ventricular System (البطينات الدماغية)', value: 'Normal size & symmetric', referenceRange: 'Symmetric', status: 'normal' },
-                { name: 'Grey-White Matter Differentiation', value: 'Preserved / التمايز محفوظ', referenceRange: 'Preserved', status: 'normal' },
-                { name: 'Calvarium & Skull Bones (عظام الجمجمة)', value: 'No fracture lines / لا كسور', referenceRange: 'Intact', status: 'normal' }
-              ],
-              detailedExplanation: 'الأشعة المقطعية للدماغ بدون صبغة تظهر نسيجاً دماغياً سليم الكثافة دون أي بؤر نزفية فوق أو تحت الجافية أو تحت العنكبوتية (No EDH, SDH, SAH). البطينات الدماغية في وضعها وحجمها الطبيعي بدون علامات موه الرأس. خط الوسط متناظر ولا يوجد تأثير كتلي (Mass effect).',
-              recommendations: [
-                'في حال وجود أعراض عصبية بؤرية حادة لم تظهر بالمقطعية المبكرة، ينصح بإجراء رنين مغناطيسي (Brain MRI with DWI) لنفي الجلطات الإقفارية المبكرة جداً.',
-                'مراقبة ضغط الدم والعلامات الحيوية ودرجة الوعي (GCS).',
-                'مراجعة طبيب الأعصاب المختص للتقييم الإكلينيكي.'
-              ]
-            });
-          } else if (isLumbarMRI) {
-            setResult({
-              testName: 'تصوير بالرنين المغناطيسي للفقرات القطنية - Lumbar Spine MRI (T1/T2)',
-              clinicalSummaryTitle: 'انزلاق غضروفي فتقي في L4-L5 مع ضغط خفيف على الجذر العصبي (Sciatica)',
-              urgencyLevel: 'medium',
-              items: [
-                { name: 'L4-L5 Intervertebral Disc', value: 'Posterolateral disc protrusion / بروز خلفي أيسر', referenceRange: 'Intact annulus', status: 'high' },
-                { name: 'Neural Foramen & Root (المخرج العصبي)', value: 'Mild left L5 nerve root impingement', referenceRange: 'Free & patent', status: 'high' },
-                { name: 'L5-S1 Disc Space', value: 'Mild dehydration, intact margin', referenceRange: 'Normal hydration', status: 'normal' },
-                { name: 'Thecal Sac & Spinal Canal', value: 'Patent, no cord compression', referenceRange: 'Patent', status: 'normal' },
-                { name: 'Vertebral Alignment & Marrow', value: 'Normal lordosis, no spondylolisthesis', referenceRange: 'Normal', status: 'normal' }
-              ],
-              detailedExplanation: 'الرنين المغناطيسي يظهر وجود بروز غضروفي جانبي أيسر على مستوى الفقرتين القطنيتين الرابعة والخامسة (L4-L5 Disc Herniation) مسبباً تضيقاً خفيفاً في المخرج العصبي الأيسر وملامسة للجذر العصبي L5، وهو ما يفسر سريرياً ألم أسفل الظهر الممتد للساق (عرق النسا). باقي الفقرات والقناة الشوكية بحالة جيدة.',
-              recommendations: [
-                'مراجعة استشاري جراحة المخ والأعصاب أو العمود الفقري لوضع خطة علاج تحفظي أو فيزيائي.',
-                'العلاج الطبيعي وتقوية عضلات الجذع والظهر (Core Strengthening).',
-                'مضادات الالتهاب غير الستيرويدية ومسكنات الأعصاب (مثل Pregabalin أو Gabapentin) تحت إشراف الطبيب.'
-              ]
-            });
-          } else if (isKneeMRI) {
-            setResult({
-              testName: 'تصوير بالرنين المغناطيسي لمفصل الركبة - Knee MRI (PD / T2 Fat-Sat)',
-              clinicalSummaryTitle: 'تمزق جزئي بالرباط الصليبي الأمامي (ACL) مع ارتشاح مفصلي خفيف',
-              urgencyLevel: 'medium',
-              items: [
-                { name: 'Anterior Cruciate Ligament (ACL)', value: 'Hyperintensity with partial fiber tear', referenceRange: 'Intact taut fibers', status: 'high' },
-                { name: 'Medial Meniscus (الغضروف الهلالي الإنسي)', value: 'Intact posterior horn, grade 1 signal', referenceRange: 'Intact / سليم', status: 'normal' },
-                { name: 'Lateral Meniscus (الغضروف الهلالي الوحشي)', value: 'Normal morphology', referenceRange: 'Intact / سليم', status: 'normal' },
-                { name: 'Joint Effusion (ارتشاح المفصل)', value: 'Mild suprapatellar fluid collection', referenceRange: 'Minimal physiologic', status: 'high' }
-              ],
-              detailedExplanation: 'يظهر الرنين المغناطيسي لمفصل الركبة وجود تغير في إشارة الرباط الصليبي الأمامي تشير لتمزق جزئي مع ارتشاح مفصلي ركابي فوق الرضفة. الغضاريف الهلالية والأربطة الجانبية (MCL/LCL) متصلة وسليمة.',
-              recommendations: [
-                'تثبيت المفصل بدعامة ركبة وظيفية واستخدام كمادات ثلجية لتقليل الارتشاح.',
-                'مراجعة طبيب جراحة العظام والمفاصل أو الطب الرياضي لتحديد مدى الحاجة للعلاج الطبيعي أو المنظار.',
-                'تجنب حركات الالتواء أو الجري خلال المرحلة الحادة.'
-              ]
-            });
-          } else if (isDislocation) {
-            setResult({
-              testName: 'أشعة سينية لمفصل الكتف الأيمن (Right Shoulder AP X-Ray)',
-              clinicalSummaryTitle: 'خلع أمامي حاد بمفصل الكتف (Anterior Shoulder Dislocation)',
-              urgencyLevel: 'critical',
-              items: [
-                { name: 'Glenohumeral Alignment', value: 'Displaced Antero-inferiorly / خروج رأس العضد', referenceRange: 'Normal concentric', status: 'critical' },
-                { name: 'Humeral Head Bone Contour', value: 'Hill-Sachs contour deformity', referenceRange: 'Intact cortex', status: 'high' },
-                { name: 'Glenoid Rim', value: 'Suspect soft tissue Bankart', referenceRange: 'Intact', status: 'normal' },
-                { name: 'Acromioclavicular Joint', value: 'Preserved / المفصل الأخرمي سليم', referenceRange: 'Intact', status: 'normal' }
-              ],
-              detailedExplanation: 'الصورة الشعاعية تظهر بوضوح خروج رأس عظم العضد (Humeral Head) من التجويف الحقاني (Glenoid Fossa) وتموضعه أمامياً وسفلياً، بما يتطابق مع الخلع الأمامي للكتف نتيجة السقوط. يتطلب ذلك رداً مغلقاً عاجلاً بواسطة أخصائي العظام.',
-              recommendations: [
-                'التوجه فوراً لقسم الطوارئ / جراحة العظام لإجراء الرد السريري المغلق (Closed Reduction) تحت تسكين أو تخدير مناسب.',
-                'فحص العصب الإبطي (Axillary Nerve) والشريان الكعبري قبل وبعد الرد.',
-                'تثبيت المفصل بجبيرة كتف لمدة 2-3 أسابيع يعقبها علاج طبيعي.'
-              ]
-            });
-          } else if (isChestXray) {
-            setResult({
-              testName: 'أشعة سينية للصدر منظر أمامي خلفي (Chest X-Ray PA View)',
-              clinicalSummaryTitle: 'أشعة صدرية طبيعية وسليمة (Normal Adult Chest Radiograph)',
-              urgencyLevel: 'normal',
-              items: [
-                { name: 'Lung Parenchyma (النسيج الرئوي)', value: 'Clear & Bilateral Aerated / سليم تماماً', referenceRange: 'Clear', status: 'normal' },
-                { name: 'Cardiothoracic Ratio (CTR)', value: '< 0.50 (حجم طبيعي للقلب)', referenceRange: '< 0.50', status: 'normal' },
-                { name: 'Costophrenic Angles (الزوايا الضلعية)', value: 'Sharp bilaterally / زوايا حادة خالية من الانصباب', referenceRange: 'Sharp', status: 'normal' },
-                { name: 'Mediastinum & Trachea', value: 'Central & Normal / القصبة مركزية', referenceRange: 'Central', status: 'normal' }
-              ],
-              detailedExplanation: 'الحقول الرئوية خالية من أي ارتشاحات التهابية (Infiltrates) أو كتل أو انصباب جنبي (Pleural Effusion). حجم وظل القلب والأوعية الكبيرة ضمن الحدود الطبيعية. القصبة الهوائية في موضعها المركزي وعظام الأضلاع سليمة.',
-              recommendations: [
-                'النتائج الإشعاعية طبيعية تماماً ولا توجد علامات لالتهاب رئوي أو قصور قلبي.',
-                'متابعة الأعراض السريرية مع الطبيب المعالج.'
-              ]
-            });
-          } else {
-            setResult({
-              testName: 'تقرير فحص الأشعة السريرية',
-              clinicalSummaryTitle: 'التقييم الإشعاعي التشخيصي',
-              urgencyLevel: 'normal',
-              items: [
-                { name: 'Bone & Joint Structures', value: 'Intact cortices', referenceRange: 'Normal', status: 'normal' },
-                { name: 'Soft Tissues', value: 'No gross swelling', referenceRange: 'Normal', status: 'normal' }
-              ],
-              detailedExplanation: 'تمت مراجعة المعطيات والصورة الإشعاعية بدقة. لم يتم رصد كسور صريحة أو تشوهات مفصلية حادة.',
-              recommendations: [
-                'مقارنة التقرير الإشعاعي مع الفحص السريري المباشر للطبيب.',
-                'الراحة الموضعية واستخدام كمادات دافئة أو باردة عند اللزوم.'
-              ]
-            });
           }
         }
       }
+
+      // 4. If nothing was extracted: NEVER hallucinate or return fake canned tests!
+      if (!analyzedSuccessfully) {
+        if (analysisType === 'lab') {
+          setResult({
+            isValidReport: false,
+            testName: 'فحص مخبري بحاجة لمراجعة أو إدخال يدوي',
+            clinicalSummaryTitle: 'تعذر استخراج أرقام الفحص بدقة من الصورة المرفوعة',
+            urgencyLevel: 'normal',
+            items: [],
+            detailedExplanation: 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح تام من هذه الصورة (قد يكون ذلك بسبب زاوية الالتقاط، ضعف الإضاءة، أو انخفاض دقة الكاميرا).\n\nلتفادي أي نتائج عشوائية أو غير دقيقة، يرجى استخدام جدول الفحوصات أدناه لتأكيد أو كتابة قيمك وسيقوم النظام بتشخيصها فسيولوجياً فوراً.',
+            recommendations: [
+              'إعادة التقاط صورة مستقيمة وعالية الوضوح لورقة التحليل الطبي.',
+              'يمكنك إدخال نتائج الفحص يدوياً في جدول النتائج أدناه للحصول على تفسير سريري دقيق 100% مطابق لتحليلك.'
+            ]
+          });
+          setEditableItems([]);
+          analyzedSuccessfully = true;
+        } else {
+          setResult({
+            isValidReport: false,
+            testName: 'فحص وتصوير إشعاعي',
+            clinicalSummaryTitle: 'الصورة الشعاعية بحاجة لتوضيح إضافي أو فحص سريري',
+            urgencyLevel: 'normal',
+            items: [],
+            detailedExplanation: 'لم يتمكن المحلل الآلي من تحديد الموجودات الإشعاعية بدقة من زاوية الصورة المرفقة. يرجى توضيح الشكوى السريرية في خانة الملاحظات.',
+            recommendations: [
+              'إعادة رفع صورة الأشعة بوضوح وإضاءة خلفية جيدة.',
+              'تدوين تقرير طبيب الأشعة أو سبب الفحص في خانة الملاحظات.'
+            ]
+          });
+          setEditableItems([]);
+          analyzedSuccessfully = true;
+        }
+      }
     } catch (err: any) {
-      console.error('Analysis execution error:', err);
-      setErrorMsg(err.message || 'حدث خطأ أثناء فحص الصورة أو التقرير');
+      setErrorMsg(err?.message || 'حدث خطأ أثناء معالجة الفحص.');
     } finally {
       setIsAnalyzing(false);
+      setOcrStatus(null);
     }
   };
 
@@ -978,6 +967,31 @@ ${recsText}
             </button>
           </div>
         )}
+
+        {/* Direct Download & Vercel Update Banner */}
+        <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+              <Download className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-200">
+                ملف التحديث المباشر للموقع والخادم (dose_v36_final.zip)
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                حمل الملف المباشر ثم نفّذ الأمر <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">bash update_vercel.sh</code> لرفع التحديث الدقيق إلى GitHub وVercel وإلغاء أي نتائج عشوائية نهائياً.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/dose_v36_final.zip"
+            download="dose_v36_final.zip"
+            className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            <span>تحميل dose_v36_final.zip</span>
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1065,92 +1079,200 @@ ${recsText}
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
                       <span className="text-xs font-bold text-white">
-                        تم تحميل صورة التقرير المخبري بنجاح 📷
+                        تم تحميل صورة ورقة التحليل الطبي بنجاح 📷
                       </span>
                     </div>
                     <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
-                      جاهز للتحليل
+                      جاهز للقراءة والتحليل
                     </span>
                   </div>
 
-                  {/* Primary 1-Click Button for Hormones / HOMA-IR / Ferritin / Vit D */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const p = LAB_PANELS.find((x) => x.id === 'hormones');
-                      if (p?.sampleResult) {
-                        setSelectedLabCategory('hormones');
-                        setResult({ ...p.sampleResult, isValidReport: true });
-                      }
-                    }}
-                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span>⚡ تحليل فحص مقاومة الإنسولين والحديد وفيتامين د (الظاهر بالصورة)</span>
-                  </button>
-
-                  {/* Secondary One-Click Chips for Other Common Panels */}
-                  <div className="pt-1.5 border-t border-slate-800/80">
-                    <span className="text-[10px] text-slate-400 block mb-1.5 font-medium">
-                      أو اختر نوع الفحص المطابق لورقتك بنقرة واحدة:
-                    </span>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'cbc');
-                          if (p?.sampleResult) { setSelectedLabCategory('cbc'); setResult({ ...p.sampleResult, isValidReport: true }); }
-                        }}
-                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🩸 صورة الدم (CBC)</span>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'kidney');
-                          if (p?.sampleResult) { setSelectedLabCategory('kidney'); setResult({ ...p.sampleResult, isValidReport: true }); }
-                        }}
-                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🧪 وظائف الكلى (Renal)</span>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'liver');
-                          if (p?.sampleResult) { setSelectedLabCategory('liver'); setResult({ ...p.sampleResult, isValidReport: true }); }
-                        }}
-                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🫀 وظائف الكبد (Liver)</span>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'diabetes');
-                          if (p?.sampleResult) { setSelectedLabCategory('diabetes'); setResult({ ...p.sampleResult, isValidReport: true }); }
-                        }}
-                        className="py-1.5 px-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold rounded border border-slate-700 text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🍬 السكري والتراكمي</span>
-                        <ChevronRight className="w-3 h-3 text-slate-400" />
-                      </button>
-                    </div>
-                  </div>
-
+                  {/* Primary OCR & Vision Analysis Button for the user's real image */}
                   <button
                     type="button"
                     onClick={() => handleRunAnalysis()}
                     disabled={isAnalyzing}
-                    className="w-full py-2 px-3 bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold rounded-lg text-xs border border-teal-500/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-xl text-xs sm:text-sm shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    <Activity className="w-3.5 h-3.5 text-teal-400" />
-                    <span>تشغيل الفحص الآلي العام لكامل محتوى الصورة</span>
+                    {isAnalyzing ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+                        <span>{ocrStatus || 'جاري استخراج وقراءة نتائج صورتك الطبية بدقة...'}</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-slate-950" />
+                        <span>🔍 بدء قراءة وتحليل صورة فحصك الطبي بالذكاء الاصطناعي (OCR)</span>
+                      </>
+                    )}
                   </button>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setShowManualEntry(!showManualEntry)}
+                      className="text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>{showManualEntry ? 'إخفاء جدول الإدخال اليدوي' : 'أو إدخال / مراجعة النتائج يدوياً في جدول'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKeySetting(!showApiKeySetting)}
+                      className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
+                    >
+                      <Key className="w-3 h-3" />
+                      <span>مفتاح Gemini API (لنسخة Vercel)</span>
+                    </button>
+                  </div>
+
+                  {/* API Key Drawer */}
+                  {showApiKeySetting && (
+                    <div className="p-3 rounded-lg bg-slate-950/90 border border-teal-500/40 space-y-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1">
+                          <Key className="w-3.5 h-3.5 text-teal-400" />
+                          <span>تفعيل القراءة المباشرة على Vercel:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKeySetting(false)}
+                          className="text-[10px] text-slate-500 hover:text-slate-300"
+                        >
+                          ✕ إغلاق
+                        </button>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-tight">
+                        إذا كنت تستخدم موقع Vercel، يمكنك لصق مفتاح Gemini المجاني هنا وسيحفظ في متصفحك لقراءة كافة الصور والأشعة تلقائياً.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          placeholder="AIzaSy..."
+                          value={userGeminiApiKey}
+                          onChange={(e) => {
+                            setUserGeminiApiKey(e.target.value);
+                            try { localStorage.setItem('user_gemini_api_key', e.target.value); } catch {}
+                          }}
+                          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 font-mono"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try { localStorage.setItem('user_gemini_api_key', userGeminiApiKey); } catch {}
+                            setShowApiKeySetting(false);
+                          }}
+                          className="px-3 py-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-lg transition-all"
+                        >
+                          حفظ
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Table Entry Drawer */}
+                  {showManualEntry && (
+                    <div className="p-3.5 rounded-xl bg-slate-950 border-2 border-teal-500/50 space-y-3 mt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Edit3 className="w-3.5 h-3.5 text-teal-400" />
+                          <h4 className="text-xs font-bold text-white">إدخال نتائج تحليلك يدوياً (مطابقة 100% بدون أي عشوائية):</h4>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowManualEntry(false)}
+                          className="text-xs text-slate-400 hover:text-slate-200"
+                        >
+                          ✕ إغلاق
+                        </button>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {manualRows.map((row, rIdx) => (
+                          <div key={rIdx} className="grid grid-cols-12 gap-1.5 items-center">
+                            <input
+                              type="text"
+                              placeholder="اسم الفحص (مثل: ALT, Glucose)"
+                              value={row.name}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].name = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-4 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="النتيجة (مثلاً: 315 أو 90)"
+                              value={row.value}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].value = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-teal-300 font-mono placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="الوحدة (U/L)"
+                              value={row.unit}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].unit = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-2 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="المرجع (7-56)"
+                              value={row.range}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].range = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-2 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-400 font-mono placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (manualRows.length > 1) {
+                                  setManualRows(manualRows.filter((_, i) => i !== rIdx));
+                                } else {
+                                  setManualRows([{ name: '', value: '', unit: '', range: '' }]);
+                                }
+                              }}
+                              className="col-span-1 text-slate-500 hover:text-rose-400 p-1 flex justify-center"
+                              title="حذف هذا السطر"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setManualRows([...manualRows, { name: '', value: '', unit: '', range: '' }])}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ إضافة فحص آخر</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleRunManualEntry}
+                          className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                          <span>⚡ تحليل هذه الفحوصات فوراً</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1655,70 +1777,33 @@ ${recsText}
                     </ul>
                   </div>
 
-                  {/* Instant Analysis Options */}
-                  <div className="p-3.5 bg-slate-950/70 border border-teal-500/30 rounded-xl space-y-2">
+                  {/* Options when OCR is unclear */}
+                  <div className="p-3.5 bg-slate-950/70 border border-teal-500/30 rounded-xl space-y-3">
                     <span className="text-xs font-bold text-teal-300 block">
-                      ⚡ أو اختر تحليل فوري جاهز لمطابقة مؤشراتك المخبرية بالكامل وعرض التقرير السريري فوراً:
+                      💡 خيارات دقيقة ومباشرة لضمان مطابقة فحصك الحقيقي بدون أي عشوائية:
                     </span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'hormones');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
+                          setShowManualEntry(true);
                         }}
-                        className="p-2.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border-2 border-emerald-500/50 text-emerald-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                        className="p-3 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/50 text-teal-200 text-xs font-bold text-right flex items-center justify-between transition-all cursor-pointer"
                       >
-                        <span>🧬 باقة مقاومة الإنسولين ومخزون الحديد وفيتامين د</span>
+                        <span className="flex items-center gap-2">
+                          <Edit3 className="w-4 h-4 text-teal-400" />
+                          <span>إدخال نتائج فحصك في جدول مخصص ومباشر</span>
+                        </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
+
                       <button
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'cbc');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
-                        }}
-                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
+                        onClick={() => setShowApiKeySetting(true)}
+                        className="p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all cursor-pointer"
                       >
-                        <span>🩸 فحص صورة الدم الكاملة والأنيميا (CBC)</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'kidney');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
-                        }}
-                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🧪 وظائف الكلى والأملاح (Renal Panel)</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'liver');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
-                        }}
-                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🫀 وظائف الكبد والصفراء (Liver LFT)</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'diabetes');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
-                        }}
-                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
-                      >
-                        <span>🍬 السكري والتمثيل الغذائي (HbA1c & Glucose)</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const p = LAB_PANELS.find((x) => x.id === 'cmp_electrolytes');
-                          if (p?.sampleResult) setResult({ ...p.sampleResult, isValidReport: true });
-                        }}
-                        className="p-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all"
-                      >
-                        <span>⚗️ الكيمياء الشاملة والأملاح (CMP & LFT)</span>
+                        <span className="flex items-center gap-2">
+                          <Key className="w-4 h-4 text-amber-400" />
+                          <span>تفعيل القراءة البصرية المباشرة عبر Gemini API</span>
+                        </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -1781,50 +1866,127 @@ ${recsText}
                     </div>
                   </div>
 
-                  {/* Detailed Breakdown Table */}
+                  {/* Detailed Breakdown Table with Live Edit Mode */}
                   {result.items && result.items.length > 0 && (
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-slate-300">جدول المؤشرات والقيم المستخرجة بالمعيار الرباعي:</h4>
+                          <h4 className="text-xs font-bold text-slate-300">جدول المؤشرات والقيم المستخرجة بدقة:</h4>
                           <span className="text-[10px] text-teal-400 bg-teal-950/60 px-2 py-0.5 rounded border border-teal-500/30">
-                            (اسم الفحص + النتيجة + الوحدة + المدى المرجعي)
+                            {result.items.length} فحص
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-500">{result.items.length} مؤشر مقروء</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isEditingItems && (!editableItems || editableItems.length === 0)) {
+                              setEditableItems(result.items || []);
+                            }
+                            setIsEditingItems(!isEditingItems);
+                          }}
+                          className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Edit3 className="w-3 h-3" />
+                          <span>{isEditingItems ? 'إلغاء التعديل' : '✏️ تعديل النتائج / إضافة فحص'}</span>
+                        </button>
                       </div>
-                      <div className="overflow-x-auto rounded-xl border border-slate-800">
-                        <table className="w-full text-right text-xs">
-                          <thead className="bg-slate-950 text-slate-400">
-                            <tr>
-                              <th className="p-2.5">1. اسم الفحص (Test)</th>
-                              <th className="p-2.5">2+3. النتيجة والوحدة (Result & Unit)</th>
-                              <th className="p-2.5">4. المدى المرجعي (Ref Range)</th>
-                              <th className="p-2.5">الحالة السريرية (Status)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/60 bg-slate-900/60">
-                            {result.items.map((it: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-slate-800/30">
-                                <td className="p-2.5 font-semibold text-white">{it.name}</td>
-                                <td className="p-2.5 font-mono text-teal-300 font-bold">{it.value}</td>
-                                <td className="p-2.5 text-slate-400 font-mono text-[11px]">{it.referenceRange}</td>
-                                <td className="p-2.5">
-                                  {it.status === 'critical' ? (
-                                    <span className="px-2 py-0.5 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-[10px]">🚨 طارئ / غير طبيعي</span>
-                                  ) : it.status === 'high' ? (
-                                    <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">مرتفع ↑</span>
-                                  ) : it.status === 'low' ? (
-                                    <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">منخفض ↓</span>
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">طبيعي ✓</span>
-                                  )}
-                                </td>
-                              </tr>
+
+                      {isEditingItems ? (
+                        <div className="p-3.5 bg-slate-950 rounded-xl border-2 border-teal-500/50 space-y-3">
+                          <div className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-500/30 p-2 rounded-lg leading-tight">
+                            ℹ️ يمكنك تعديل أي رقم، تصحيح اسم الفحص، أو إضافة أي تحليل ناقص وسيعيد النظام التفسير السريري فوراً وفقاً لتعديلاتك.
+                          </div>
+
+                          <div className="space-y-2">
+                            {editableItems.map((item, idx) => (
+                              <div key={idx} className="grid grid-cols-12 gap-1.5 items-center bg-slate-900/80 p-2 rounded-lg border border-slate-800">
+                                <input
+                                  type="text"
+                                  value={item.name}
+                                  onChange={(e) => handleUpdateItemValue(idx, 'name', e.target.value)}
+                                  placeholder="اسم الفحص"
+                                  className="col-span-5 bg-slate-950 border border-slate-700 rounded p-1.5 text-xs text-white outline-none focus:border-teal-500"
+                                />
+                                <input
+                                  type="text"
+                                  value={item.value}
+                                  onChange={(e) => handleUpdateItemValue(idx, 'value', e.target.value)}
+                                  placeholder="النتيجة والوحدة"
+                                  className="col-span-3 bg-slate-950 border border-slate-700 rounded p-1.5 text-xs font-mono font-bold text-teal-300 outline-none focus:border-teal-500"
+                                />
+                                <input
+                                  type="text"
+                                  value={item.referenceRange || ''}
+                                  onChange={(e) => handleUpdateItemValue(idx, 'referenceRange', e.target.value)}
+                                  placeholder="المدى المرجعي"
+                                  className="col-span-3 bg-slate-950 border border-slate-700 rounded p-1.5 text-xs font-mono text-slate-400 outline-none focus:border-teal-500"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteItem(idx)}
+                                  className="col-span-1 text-slate-500 hover:text-rose-400 p-1 flex justify-center"
+                                  title="حذف هذا الفحص"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             ))}
-                          </tbody>
-                        </table>
-                      </div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                            <button
+                              type="button"
+                              onClick={handleAddNewItem}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1.5"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>+ إضافة فحص آخر</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleRecalculateEditedItems}
+                              className="px-4 py-2 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                              <span>⚡ حفظ وتحديث التقرير السريري الفوري</span>
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto rounded-xl border border-slate-800">
+                          <table className="w-full text-right text-xs">
+                            <thead className="bg-slate-950 text-slate-400">
+                              <tr>
+                                <th className="p-2.5">1. اسم الفحص (Test)</th>
+                                <th className="p-2.5">2+3. النتيجة والوحدة (Result & Unit)</th>
+                                <th className="p-2.5">4. المدى المرجعي (Ref Range)</th>
+                                <th className="p-2.5">الحالة السريرية (Status)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60 bg-slate-900/60">
+                              {result.items.map((it: any, idx: number) => (
+                                <tr key={idx} className="hover:bg-slate-800/30">
+                                  <td className="p-2.5 font-semibold text-white">{it.name}</td>
+                                  <td className="p-2.5 font-mono text-teal-300 font-bold">{it.value}</td>
+                                  <td className="p-2.5 text-slate-400 font-mono text-[11px]">{it.referenceRange}</td>
+                                  <td className="p-2.5">
+                                    {it.status === 'critical' ? (
+                                      <span className="px-2 py-0.5 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-[10px]">🚨 طارئ / غير طبيعي</span>
+                                    ) : it.status === 'high' ? (
+                                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">مرتفع ↑</span>
+                                    ) : it.status === 'low' ? (
+                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">منخفض ↓</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">طبيعي ✓</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   )}
 

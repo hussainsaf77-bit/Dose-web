@@ -19,8 +19,8 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); } catch (e) {}
   }
 
-  const { imageBase64, mimeType, textNotes = '', imagingModality = 'xray', anatomicalRegion = 'chest' } = body;
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const { imageBase64, mimeType, textNotes = '', imagingModality = 'xray', anatomicalRegion = 'chest', customApiKey } = body;
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
     const prompt = `أنت استشاري التشخيص الإشعاعي والتصوير الطبي (Consultant Diagnostic Radiologist).

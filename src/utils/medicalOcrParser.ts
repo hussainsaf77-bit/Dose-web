@@ -385,11 +385,30 @@ export function normalizeClinicalValue(val: number, labId: string, minNormal?: n
 }
 
 // Auto-correct missing OCR decimals by comparing candidate value to its reference range
-export function autoCorrectByRange(val: number, rangeStr?: string): { num: number; raw: string } {
-  // If val already has decimals, keep it unchanged
+export function autoCorrectByRange(val: number, rangeStr?: string, labId?: string, flag?: string): { num: number; raw: string } {
+  // If val already has decimals, keep it unchanged with absolute fidelity
   if (val % 1 !== 0) {
     return { num: val, raw: String(val) };
   }
+  // NEVER alter a value if there is an explicit High, Low, or Abnormal flag!
+  if (flag === 'H' || flag === 'L' || flag === 'High' || flag === 'Low' || flag === 'critical' || flag === 'high' || flag === 'low') {
+    return { num: val, raw: String(val) };
+  }
+
+  // Tests measured in integer units that must NEVER be divided
+  const NEVER_SCALE_DOWN_LABS = new Set([
+    'alt', 'ast', 'alp', 'ggt', 'ldh', 'ck', 'ck_mb', 'amylase', 'lipase',
+    'glucose', 'glucose_fasting', 'glucose_random',
+    'cholesterol', 'triglycerides', 'hdl', 'ldl', 'vldl',
+    'ferritin', 'iron', 'tibc',
+    'sodium', 'chloride', 'co2',
+    'wbc', 'platelets', 'platelet',
+    'uric_acid', 'lactic_acid'
+  ]);
+  if (labId && NEVER_SCALE_DOWN_LABS.has(labId)) {
+    return { num: val, raw: String(val) };
+  }
+
   if (!rangeStr) {
     return { num: val, raw: String(val) };
   }
@@ -399,10 +418,13 @@ export function autoCorrectByRange(val: number, rangeStr?: string): { num: numbe
   if (ineqRange) {
     const bound = parseFloat(ineqRange[1]);
     if (!isNaN(bound) && bound > 0 && val > bound * 3) {
-      const d10 = Number((val / 10).toFixed(1));
-      if (d10 <= bound * 1.5) return { num: d10, raw: String(d10) };
-      const d100 = Number((val / 100).toFixed(2));
-      if (d100 <= bound * 1.5) return { num: d100, raw: String(d100) };
+      // Only scale if the bound itself is small / decimal-like
+      if (bound <= 15) {
+        const d10 = Number((val / 10).toFixed(1));
+        if (d10 <= bound * 1.5) return { num: d10, raw: String(d10) };
+        const d100 = Number((val / 100).toFixed(2));
+        if (d100 <= bound * 1.5) return { num: d100, raw: String(d100) };
+      }
     }
     return { num: val, raw: String(val) };
   }
@@ -417,29 +439,26 @@ export function autoCorrectByRange(val: number, rangeStr?: string): { num: numbe
     return { num: val, raw: String(val) };
   }
 
+  // If both range bounds are integers and rMax is substantial (e.g. AST 10-40, Glucose 70-100, Platelets 150-450)
+  // This test is strictly integer-based: NEVER scale it down!
+  const isPureIntegerRange = (rMin % 1 === 0 && rMax % 1 === 0 && rMax >= 20);
+  if (isPureIntegerRange) {
+    return { num: val, raw: String(val) };
+  }
+
   // If val is already reasonably within or adjacent to reference range
-  // e.g. Glucose 95 with range 70-100, Creatinine 88 with range 59-104
   if (val >= rMin * 0.3 && val <= rMax * 2.5) {
     return { num: val, raw: String(val) };
   }
 
   // If val/10 fits the reference range magnitude
-  // e.g. Hemoglobin 135 with range 12-16 -> 13.5
-  // Potassium 42 with range 3.5-5.1 -> 4.2
-  // BUN 70 with range 2.5-7.9 -> 7.0
+  // ONLY for tests whose reference range has decimals or small units (e.g. Hemoglobin 12-16, Potassium 3.5-5.1)
   const div10 = Number((val / 10).toFixed(1));
   if (div10 >= rMin * 0.25 && div10 <= rMax * 2.5) {
     return { num: div10, raw: String(div10) };
   }
 
   // If val/100 fits the reference range magnitude
-  // e.g. Neutrophils 6112 with range 30-70 -> 61.12
-  // MCV 8760 with range 74-96 -> 87.60
-  // MCH 3010 with range 26-33 -> 30.10
-  // MCHC 3400 with range 27-36 -> 34.00
-  // HCT 4020 with range 36-46 -> 40.20
-  // Hemoglobin 1380 with range 12-16 -> 13.80
-  // RBC 459 with range 4-6 -> 4.59
   const div100 = Number((val / 100).toFixed(2));
   if (div100 >= rMin * 0.1 && div100 <= rMax * 2.5) {
     return { num: div100, raw: String(div100) };
@@ -1927,7 +1946,7 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
 
             // Also check against reference range if available
             const effectiveRangeStr = numInfo.detectedRange || lab.defaultRefRange;
-            const autoCorr = autoCorrectByRange(numInfo.num, effectiveRangeStr);
+            const autoCorr = autoCorrectByRange(numInfo.num, effectiveRangeStr, lab.id, numInfo.flag);
             numInfo.num = autoCorr.num;
             numInfo.raw = autoCorr.raw;
           }
@@ -2186,7 +2205,7 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
       // 3. Strict blacklist of units, headers, table noise, fragments
       const UNIT_OR_HEADER_REGEX = /^(mmol\/?[lL]|mmolll?|µmol\/?[lL]|umol\/?[lL]|pmol\/?[lL]|pmolil|mg\/?[dD]?[lL]|gldl|g\/?[dD]?[lL]|g\/?[lL]|u\/?[lL]|ul|iu\/?[lL]|ng\/?[mM][lL]|pg\/?[mM][lL]|µiu\/?[mM][lL]|fl|fo|pa|pg|dl|cc|cumm|millon|million|index|ratio|analyte|analytes|test|tests|result|results|unit|units|reference|ref|interval|intervals|range|ranges|biochemistry|hormones|hematology|serology|urinalysis|flag|status|desirable|normal|negative|positive|last[\s_]*test|differential|count|indices|cell's|cells|rbc's|wbc's|فحص|تحليل|تحاليل|نتيجة|نتائج|وحدة|الوحدة|المعدل|المرجع|النطاق|المجال|طبيعي|سليم|الهرمونات|الكيمياء|الدم|مخبر|طبيب|مريض)$/i;
       if (UNIT_OR_HEADER_REGEX.test(nameLettersOnly)) continue;
-      if (/^(fo|fl|pa|pg|cc|dl|ul|gldl|cumm|millon|pct|pdw|mpv)\b/i.test(cleanName)) continue;
+      if (/^(fo|fl|pa|pg|cc|dl|ul|gldl|cumm|millon)\b/i.test(cleanName)) continue;
 
       // 3b. Blacklist administrative / patient document words
       const ADMIN_REGEX = /(patient|doctor|physician|hospital|clinic|specimen|sample|order|date|time|age\b|gender|sex\b|mrn|phone|tel|address|invoice|receipt|page\b|room|bed\b|id\b|reg\b|مريض|طبيب|دكتور|مستشفى|عيادة|عينة|طلب|تاريخ|وقت|العمر|عمر\b|جنس|ذكر|انثى|هاتف|جوال|عنوان|فاتورة|ايصال|صفحة|غرفة|سرير|رقم[_\s]*الملف)/i;
@@ -2216,7 +2235,7 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
 
         // Auto-correct missing decimal if reference range is available
         if (!numInfo.isLessThan && !numInfo.isGreaterThan) {
-          const autoCorr = autoCorrectByRange(numInfo.num, finalRange);
+          const autoCorr = autoCorrectByRange(numInfo.num, finalRange, undefined, numInfo.flag);
           numInfo.num = autoCorr.num;
           numInfo.raw = autoCorr.raw;
         }

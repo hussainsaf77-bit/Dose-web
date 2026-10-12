@@ -20,8 +20,8 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); } catch (e) {}
   }
 
-  const { imageBase64, mimeType, textNotes = '', labCategory = 'all' } = body;
-  const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+  const { imageBase64, mimeType, textNotes = '', labCategory = 'all', customApiKey } = body;
+  const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   // 1. If GEMINI_API_KEY is available, use Gemini Vision for real-time visual parsing
   if (apiKey) {
@@ -213,25 +213,23 @@ export default async function handler(req, res) {
     });
   }
 
-  // F) Default / Hormones / Metabolism (Exact match for HOMA-IR 2.89, Ferritin < 5, Vitamin D 10.87, Fasting Sugar 90, Insulin 13)
+  // F) If neither AI nor specific test notes were detected:
+  // NEVER fabricate fake lab results or hallucinate numbers!
   return res.status(200).json({
-    isValidReport: true,
-    testName: 'تقرير الفحوصات الهرمونية والكيمياء الحيوية (Hormones & Biochemistry)',
-    clinicalSummaryTitle: 'ثلاثي اضطراب الأيض: مقاومة إنسولين مرتفعة مع استنزاف حاد بمخزون الحديد ونقص فيتامين د3',
-    urgencyLevel: 'high',
-    items: [
-      { name: 'Insulin Resistance (HOMA-IR / مقاومة الإنسولين)', value: '2.89 index (مرتفع H)', referenceRange: '0.5 - 1.8 index', status: 'high' },
-      { name: 'Ferritin (مخزون الحديد في الدم)', value: '< 5 ng/ml (منخفض L)', referenceRange: '12 - 290 ng/ml', status: 'low' },
-      { name: '25-Hydroxyvitamin D3 (فيتامين د3 الكلي)', value: '10.87 ng/ml (منخفض L)', referenceRange: 'Desirable: 30 - 100 ng/ml', status: 'low' },
-      { name: 'Fasting Blood Sugar (السكر الصائم)', value: '90 mg/dL (طبيعي)', referenceRange: '70 - 110 mg/dL', status: 'normal' },
-      { name: 'Fasting Insulin (الإنسولين الصائم)', value: '13.0 µIU/mL (طبيعي)', referenceRange: '2.6 - 24.9 µIU/mL', status: 'normal' }
-    ],
-    detailedExplanation: 'يُظهر التقرير الطبي وجود نمط أيضي وغذائي مترابط يتمثل في: ارتفاع مقاومة الإنسولين الخلوية (HOMA-IR 2.89) بالرغم من بقاء السكر الصائم والإنسولين ضمن الحدود الطبيعية، مترافقاً مع استنزاف شديد في مخازن الحديد (Ferritin < 5 ng/ml) ونقص حاد في فيتامين د3 (10.87 ng/ml). هذا المزيج الثلاثي يفسر تماماً الشعور بالإرهاق المستمر، تساقط الشعر، الخمول، وبطء الحرق وصعوبة نزول الوزن.',
+    isValidReport: false,
+    hasApiKey: Boolean(apiKey),
+    testName: 'فحص مخبري بحاجة لمراجعة أو إدخال يدوي',
+    clinicalSummaryTitle: apiKey 
+      ? 'تعذر استخراج الأرقام بوضوح تام من هذه الصورة (تأكد من وضوح الإضاءة واستقامة التصوير)'
+      : 'لقراءة الصور تلقائياً على Vercel، يمكنك إضافة مفتاح Gemini API في الإعدادات أو إدخال القيم يدوياً',
+    urgencyLevel: 'normal',
+    items: [],
+    detailedExplanation: apiKey
+      ? 'لم يتمكن المحلل البصري من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح كافٍ من الصورة المرفوعة لتفادي أي تشخيص عشوائي غير دقيق.'
+      : 'خادم Vercel لا يحتوي على مفتاح Gemini API لقراءة الصور مباشرة. يمكنك وضع مفتاحك المجاني في إعدادات التطبيق أو كتابة نتائج فحصك في الجدول للحصول على تقرير طبي فوري ودقيق 100%.',
     recommendations: [
-      '💊 البدء الفوري بكورس تعويضي لمخزون الحديد بمكملات حديد فموية عالية الامتصاص (مثل Ferrous Bisglycinate) أو حقن وريدية حسب تقييم الطبيب المعالج.',
-      '☀️ تعويض نقص فيتامين د3 بجرعة علاجية (50,000 وحدة دولية أسبوعياً لمدة 8 أسابيع) تؤخذ مع وجبة دسمة، يعقبها جرعة وقائية يومية.',
-      '🥗 اتباع حمية منخفضة المؤشر الجلايسيمي وتقليل السكريات والنشويات المكررة مع ممارسة رياضة المقاومة لتحسين حساسية مستقبلات الإنسولين.',
-      '🩺 مراجعة استشاري الغدد الصماء والباطنية لمتابعة الحالة واستبعاد تكيس المبايض أو متلازمة الأيض.'
+      'التأكد من التقاط صورة مستقيمة وعالية الإضاءة لورقة المختبر الطبي.',
+      'استخدام جدول الفحوصات لكتابة نتائج تحليلك وسيقوم النظام بتشخيصها فسيولوجياً على الفور.'
     ]
   });
 }
