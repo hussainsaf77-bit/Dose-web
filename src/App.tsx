@@ -53,9 +53,23 @@ export default function App() {
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [showAdminTools, setShowAdminTools] = useState(false);
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
-  const [onboardingTgId, setOnboardingTgId] = useState('');
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash;
+      const isRequested = 
+        urlParams.get('welcome') === '1' || 
+        urlParams.get('onboarding') === '1' ||
+        urlParams.get('start') === 'onboarding' ||
+        urlParams.has('v') ||
+        hash.includes('welcome') ||
+        hash.includes('onboarding');
+      if (isRequested) return true;
+      return !localStorage.getItem('dose_onboarding_completed');
+    } catch {
+      return true;
+    }
+  });
   const [onboardingUsername, setOnboardingUsername] = useState('');
 
   const t = TRANSLATIONS[language];
@@ -129,9 +143,11 @@ export default function App() {
         urlParams.get('onboarding') === '1' || 
         urlParams.get('welcome') === '1' || 
         urlParams.get('start') === 'onboarding' ||
+        urlParams.has('v') ||
         hashParams.get('onboarding') === '1' || 
-        hashParams.get('welcome') === '1' ||
+        hashParams.get('welcome') === '1' || 
         hashParams.get('start') === 'onboarding' ||
+        hashParams.has('v') ||
         window.location.hash.includes('welcome') ||
         window.location.hash.includes('onboarding');
 

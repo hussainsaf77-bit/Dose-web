@@ -53,8 +53,8 @@ except ImportError:
 # -------------------------------------------------------------
 # 1. إعدادات الخادم السحابي والتوكن
 # -------------------------------------------------------------
-WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://web-dose.vercel.app/?v=3.8").rstrip("/")
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://web-dose.vercel.app/?v=3.8").rstrip("/")
+WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8").rstrip("/")
+API_BASE_URL = os.environ.get("API_BASE_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8").rstrip("/")
 
 TOKEN_FILE = ".token.txt"
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()

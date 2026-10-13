@@ -11,7 +11,7 @@ async def handle_symptoms_action(update, context):
         msg = "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (DDx):*\n\nاكتب الآن أعراضك بالتفصيل في رسالة، أو افتح الفاحص التفاعلي بالموقع:"
         btn = "🖥️ فتح فاحص الأعراض الشامل بالموقع"
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?v=3.8")]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
     await query.message.reply_text(msg, reply_markup=kb, parse_mode="Markdown")
 
 
@@ -51,7 +51,7 @@ def api_check_sub(telegram_id: str) -> dict:
     except:
         return {"linked": False, "has_sub": False, "plan": "Free",
                 "search_limit": 5, "reminder_limit": 0,
-                "register_url": "https://web-dose.vercel.app/?v=3.8"}
+                "register_url": "https://web-dose.vercel.app/?welcome=1&v=3.8"}
 
 def api_track_usage(telegram_id: str, action: str = "search") -> dict:
     """يسجّل استخدام ويعيد هل مسموح أم لا"""
@@ -70,7 +70,7 @@ LINK_MSG = {
     "ar": "🔗 *ربط حساب الموقع*\n\nبربط حسابك ستحصل على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n\n👇 سجّل من هنا:",
     "en": "🔗 *Link Website Account*\n\nBy linking you get:\n✅ Unified subscription\n✅ Full dashboard\n✅ Saved history\n\n👇 Register here:"
 }
-LINK_URL = "https://web-dose.vercel.app/?v=3.8"
+LINK_URL = "https://web-dose.vercel.app/?welcome=1&v=3.8"
 
 
 # قاموس الدول والمناطق الزمنية
@@ -183,9 +183,9 @@ async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         email = sub.get("email","")
         plan = sub.get("plan_ar", sub.get("plan","Free"))
         if lang == "ar":
-            msg = f"✅ *حسابك مرتبط*\n\n📧 البريد: {email}\n💳 الخطة: {plan}\n\n[🌐 فتح لوحة التحكم](https://web-dose.vercel.app/?v=3.8"
+            msg = f"✅ *حسابك مرتبط*\n\n📧 البريد: {email}\n💳 الخطة: {plan}\n\n[🌐 فتح لوحة التحكم](https://web-dose.vercel.app/?welcome=1&v=3.8"
         else:
-            msg = f"✅ *Account Linked*\n\n📧 Email: {email}\n💳 Plan: {plan}\n\n[🌐 Open Dashboard](https://web-dose.vercel.app/?v=3.8"
+            msg = f"✅ *Account Linked*\n\n📧 Email: {email}\n💳 Plan: {plan}\n\n[🌐 Open Dashboard](https://web-dose.vercel.app/?welcome=1&v=3.8"
     else:
         if lang == "ar":
             msg = f"🔗 *ربط حساب الموقع*\n\nاربط حسابك للحصول على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n✅ تذكيرات متقدمة\n\n👇 سجّل أو ادخل من هنا:"
@@ -194,7 +194,7 @@ async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     keyboard = [[InlineKeyboardButton(
         "🌐 تسجيل / دخول" if lang=="ar" else "🌐 Register / Login",
-        url="https://web-dose.vercel.app/?v=3.8"
+        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
     )]]
     
     await update.message.reply_text(
@@ -217,7 +217,7 @@ async def upgrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [[InlineKeyboardButton(
         "⭐ الترقية الآن" if lang=="ar" else "⭐ Upgrade Now",
-        url="https://web-dose.vercel.app/?v=3.8"
+        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
     )]]
     
     await update.message.reply_text(

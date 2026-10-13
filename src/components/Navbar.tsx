@@ -127,7 +127,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {t.brand_title}
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
-                  v3.6 Live
+                  v3.8 Live
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 hidden md:block">
@@ -139,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Center / Right Actions: Language + Auth + Mobile Menu */}
           <div className="flex items-center gap-2">
             
-            {/* Direct V3.6 Zip Download Button */}
+            {/* Direct V3.8 Zip Download Button */}
             <a
               id="header-download-v36-zip"
               href="/dose_v36_final.zip"
@@ -148,8 +148,8 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="تحميل ملف التحديث dose_v36_final.zip إلى جهازك"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">تحميل V3.6 Zip</span>
-              <span className="sm:hidden">تحديث V3.6</span>
+              <span className="hidden sm:inline">تحميل V3.8 Zip</span>
+              <span className="sm:hidden">تحديث V3.8</span>
             </a>
 
             {/* Direct Telegram Bot Link */}

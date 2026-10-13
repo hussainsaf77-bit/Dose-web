@@ -1014,7 +1014,7 @@ ${recsText}
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-[11px] font-mono font-bold shadow-sm">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>إصدار التحديث: v3.6 Live (محرك CMP السريري + الفواصل العشرية الدقيقة)</span>
+                <span>إصدار التحديث: v3.8 Live (التقرير السريري الشامل والمطمئن + خيارات الجنس والعمر)</span>
               </div>
             </div>
             <h2 className="text-2xl font-black text-white">المختبر والتحاليل الطبية وقراءة الأشعة</h2>
