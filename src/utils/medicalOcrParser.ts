@@ -1848,7 +1848,10 @@ export function validateClinicalOcrText(text: string): ValidationResult {
 }
 
 // Master parsing function for raw OCR text or user text notes
-export function parseClinicalReportFromText(rawText: string): ParsedClinicalReport | null {
+export function parseClinicalReportFromText(
+  rawText: string,
+  patientDemographics?: { gender?: 'male' | 'female' | 'unspecified'; age?: number }
+): ParsedClinicalReport | null {
   if (!rawText || rawText.trim().length === 0) return null;
 
   // Validation: Reject text if not medical or lacks digits
@@ -2356,9 +2359,13 @@ export function parseClinicalReportFromText(rawText: string): ParsedClinicalRepo
     }
   }
 
+  const demoTag = patientDemographics && (patientDemographics.gender || patientDemographics.age)
+    ? ` (المريض: ${patientDemographics.gender === 'female' ? 'أنثى' : patientDemographics.gender === 'male' ? 'ذكر' : 'غير محدد'}${patientDemographics.age ? `، ${patientDemographics.age} سنة` : ''})`
+    : '';
+
   return {
     isValidReport: true,
-    testName: detectedPanelName,
+    testName: `${detectedPanelName}${demoTag}`,
     clinicalSummaryTitle: summaryTitle,
     urgencyLevel,
     items: matchedItems,

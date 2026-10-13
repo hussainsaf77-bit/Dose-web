@@ -288,16 +288,7 @@ export default function App() {
                 <span>{t.quick_plans}</span>
               </button>
 
-              <a
-                id="hero-quick-download"
-                href="/dose_v36_final.zip"
-                download="dose_v36_final.zip"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-sm"
-                title="تحميل ملف التحديث المباشر dose_v36_final.zip"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>{language === 'ar' ? 'تحميل التحديث (dose_v36_final.zip)' : 'Download Update ZIP'}</span>
-              </a>
+
 
               <a
                 id="hero-quick-telegram"
@@ -320,6 +311,17 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-teal-400" />
                 <span>{language === 'ar' ? 'شاشة الترحيب والتسجيل' : 'Welcome & Register'}</span>
               </button>
+
+              <a
+                id="hero-download-vercel-update"
+                href="/dose_v36_final.zip"
+                download="dose_v36_final.zip"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-amber-400"
+                title="تنزيل ملف تحديث Vercel لنقله إلى المستودع"
+              >
+                <Download className="w-4 h-4 text-amber-400" />
+                <span>{language === 'ar' ? 'تحميل حزمة تحديث Vercel (ZIP)' : 'Download Vercel ZIP'}</span>
+              </a>
             </div>
 
           </div>
