@@ -2240,16 +2240,18 @@ ${recsText}
                       </div>
                       <h3 className="text-lg font-bold text-white mt-1.5">{result.clinicalSummaryTitle || 'الخلاصة الإكلينيكية الأولية'}</h3>
                     </div>
-                    <div className={`p-2 rounded-xl text-xs font-mono font-bold shrink-0 ${
-                      result.urgencyLevel === 'critical'
-                        ? 'bg-rose-950/80 border border-rose-500/50 text-rose-400 animate-pulse'
-                        : result.urgencyLevel === 'high'
+                    <div className={`p-2 rounded-xl text-xs font-sans font-bold shrink-0 ${
+                      result.urgencyLevel === 'critical' || result.urgencyLevel === 'high'
                         ? 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
                         : result.urgencyLevel === 'medium'
                         ? 'bg-slate-800 text-teal-300'
                         : 'bg-emerald-950/50 text-emerald-300 border border-emerald-500/30'
                     }`}>
-                      {result.urgencyLevel === 'critical' ? '🚨 حالة إسعافية / طارئة' : result.urgencyLevel === 'high' ? '⚠️ استشارة عاجلة' : result.urgencyLevel === 'medium' ? 'متابعة طبية' : 'مطمئن / طبيعي'}
+                      {result.urgencyLevel === 'critical' || result.urgencyLevel === 'high'
+                        ? '⚠️ انحرافات تستدعي المتابعة'
+                        : result.urgencyLevel === 'medium'
+                        ? 'متابعة طبية اعتيادية'
+                        : 'مطمئن / طبيعي ✓'}
                     </div>
                   </div>
 
@@ -2355,17 +2357,15 @@ ${recsText}
                               {result.items.map((it: any, idx: number) => (
                                 <tr key={idx} className="hover:bg-slate-800/30">
                                   <td className="p-2.5 font-semibold text-white">{it.name}</td>
-                                  <td className="p-2.5 font-mono text-teal-300 font-bold">{it.value}</td>
-                                  <td className="p-2.5 text-slate-400 font-mono text-[11px]">{it.referenceRange}</td>
+                                  <td className="p-2.5 font-mono text-teal-300 font-bold" dir="ltr">{it.value}</td>
+                                  <td className="p-2.5 text-slate-400 font-mono text-[11px]" dir="ltr">{it.referenceRange}</td>
                                   <td className="p-2.5">
-                                    {it.status === 'critical' ? (
-                                      <span className="px-2 py-0.5 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-[10px]">🚨 طارئ / غير طبيعي</span>
-                                    ) : it.status === 'high' ? (
-                                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">مرتفع ↑</span>
+                                    {it.status === 'critical' || it.status === 'high' ? (
+                                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]">مرتفع ↑</span>
                                     ) : it.status === 'low' ? (
-                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">منخفض ↓</span>
+                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[10px]">منخفض ↓</span>
                                     ) : (
-                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">طبيعي ✓</span>
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-[10px]">طبيعي ✓</span>
                                     )}
                                   </td>
                                 </tr>

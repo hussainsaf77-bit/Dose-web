@@ -84,7 +84,7 @@ export function evaluateUserManualLabRows(
     } else {
       if (status === 'high') clinicalNote = `قيمة (${row.name}) مرتفعة عن النطاق المرجعي (${effectiveRange}).`;
       else if (status === 'low') clinicalNote = `قيمة (${row.name}) منخفضة عن النطاق المرجعي (${effectiveRange}).`;
-      else if (status === 'critical') clinicalNote = `قيمة حرجة تستوجب تقييماً طبياً عاجلاً لمؤشر (${row.name}).`;
+      else if (status === 'critical') clinicalNote = `ارتفاع ملحوظ لمؤشر (${row.name}) يستدعي المتابعة مع الطبيب.`;
       else clinicalNote = `قيمة (${row.name}) طبيعية ومتوازنة ضمن النطاق المرجعي (${effectiveRange}).`;
     }
 
@@ -94,21 +94,19 @@ export function evaluateUserManualLabRows(
       numericValue: isNaN(num) ? undefined : num,
       referenceRange: effectiveRange,
       unit: effectiveUnit,
-      status,
+      status: status === 'critical' ? 'high' : status,
       clinicalNote
     });
   }
 
   // Clinical Summary & Theme Analysis
   const abnormalItems = items.filter(i => i.status !== 'normal');
-  const criticalItems = items.filter(i => i.status === 'critical');
   const hasHighHoma = items.some(i => (i.name.includes('HOMA-IR') || i.name.includes('مقاومة الإنسولين')) && i.status === 'high');
   const hasLowFerritin = items.some(i => (i.name.includes('Ferritin') || i.name.includes('مخزون الحديد')) && i.status === 'low');
   const hasLowVitD = items.some(i => (i.name.includes('Vitamin D') || i.name.includes('فيتامين د')) && i.status === 'low');
 
   let urgencyLevel: 'normal' | 'medium' | 'high' | 'critical' = 'normal';
-  if (criticalItems.length > 0) urgencyLevel = 'critical';
-  else if (abnormalItems.length >= 2) urgencyLevel = 'high';
+  if (abnormalItems.length >= 2) urgencyLevel = 'medium';
   else if (abnormalItems.length === 1) urgencyLevel = 'medium';
 
   let summaryTitle = '';

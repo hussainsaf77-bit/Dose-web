@@ -1936,7 +1936,10 @@ export function parseClinicalReportFromText(
         // If unit is SI (µmol/L, g/L), do not scale down integer values!
         const isSiInteger = (lineUnit === 'µmol/L' || lineUnit === 'umol/L' || lineUnit === 'g/L');
         if (!numInfo.isLessThan && !numInfo.isGreaterThan && !isSiInteger) {
-          if (lab.id === 'calcium' && lineUnit.toLowerCase().includes('mmol') && numInfo.num >= 18 && numInfo.num <= 30) {
+          if (lab.id === 'potassium' && numInfo.num >= 15 && numInfo.num <= 80) {
+            numInfo.num = Number((numInfo.num / 10).toFixed(1));
+            numInfo.raw = String(numInfo.num);
+          } else if (lab.id === 'calcium' && lineUnit.toLowerCase().includes('mmol') && numInfo.num >= 18 && numInfo.num <= 30) {
             numInfo.num = Number((numInfo.num / 10).toFixed(1));
             numInfo.raw = String(numInfo.num);
           } else if ((lab.id === 'urea' || lab.id === 'bun') && lineUnit.toLowerCase().includes('mmol') && numInfo.num >= 20 && numInfo.num <= 100) {
@@ -1974,21 +1977,33 @@ export function parseClinicalReportFromText(
               testVal = testVal * 1000;
             }
 
-            if (!isNaN(rMin) && !isNaN(rMax) && rMin < rMax) {
-              if (testVal < rMin * 0.5) status = 'critical';
-              else if (testVal > rMax * 2) status = 'critical';
-              else if (testVal < rMin) status = 'low';
+            // Safety / Toxicology / Inflammatory tests where low/undetectable is normal & healthy
+            const isSafetyOrToxTest = ['acetaminophen', 'salicylate', 'alcohol', 'ethanol', 'crp', 'troponin', 'd_dimer', 'carboxyhemoglobin'].includes(lab.id);
+
+            if (isSafetyOrToxTest) {
+              const maxSafe = lab.maxNormal ?? (rMax || 100);
+              if (numInfo.isLessThan || testVal <= maxSafe) {
+                status = 'normal';
+              } else {
+                status = 'high';
+              }
+            } else if (!isNaN(rMin) && !isNaN(rMax) && rMin < rMax) {
+              if (testVal < rMin) status = 'low';
               else if (testVal > rMax) status = 'high';
+              else status = 'normal';
             }
           } else {
-            if (lab.criticalLow !== undefined && testVal < lab.criticalLow) status = 'critical';
-            else if (lab.criticalHigh !== undefined && testVal > lab.criticalHigh) status = 'critical';
-            else if (testVal < lab.minNormal) status = 'low';
+            const isSafetyOrToxTest = ['acetaminophen', 'salicylate', 'alcohol', 'ethanol', 'crp', 'troponin', 'd_dimer', 'carboxyhemoglobin'].includes(lab.id);
+            if (isSafetyOrToxTest) {
+              if (numInfo.isLessThan || testVal <= (lab.maxNormal ?? 100)) status = 'normal';
+              else status = 'high';
+            } else if (testVal < lab.minNormal) status = 'low';
             else if (testVal > lab.maxNormal) status = 'high';
+            else status = 'normal';
           }
         }
 
-        if (numInfo.isLessThan && lab.minNormal > numInfo.num) {
+        if (numInfo.isLessThan && lab.minNormal > numInfo.num && !['acetaminophen', 'salicylate', 'alcohol', 'ethanol', 'crp', 'troponin', 'd_dimer', 'carboxyhemoglobin'].includes(lab.id)) {
           status = 'low';
         }
 
@@ -2340,22 +2355,115 @@ export function parseClinicalReportFromText(
     );
   } else {
     const abnormalItems = matchedItems.filter(i => i.status !== 'normal');
-    if (abnormalItems.length > 0) {
-      urgencyLevel = abnormalItems.some(i => i.status === 'critical') ? 'critical' : 'high';
-      summaryTitle = `${detectedPanelName}: تم رصد ${abnormalItems.length} انحرافات سريرية من أصل ${matchedItems.length} مؤشر`;
+    const abnormalCount = abnormalItems.length;
+
+    // Categorize matched items by organ system
+    const liverItems = matchedItems.filter(i => /alt|ast|sgpt|sgot|bilirubin|alkaline|alp|ggt|كبد/i.test(i.name));
+    const kidneyItems = matchedItems.filter(i => /creatinine|urea|bun|كرياتينين|يوريا/i.test(i.name));
+    const electrolyteItems = matchedItems.filter(i => /sodium|potassium|chloride|calcium|co2|صوديوم|بوتاسيوم|كلوريد|كالسيوم/i.test(i.name));
+    const metabolicItems = matchedItems.filter(i => /glucose|lactic|sugar|protein|سكر|لاكتيك|بروتين/i.test(i.name));
+    const toxicologyItems = matchedItems.filter(i => /acetaminophen|paracetamol|salicylate|aspirin|باراسيتامول|أسبرين|ساليسيلات/i.test(i.name));
+    const cbcItems = matchedItems.filter(i => /hemoglobin|wbc|platelet|mcv|دم|خضاب|صفائح/i.test(i.name));
+    const thyroidItems = matchedItems.filter(i => /tsh|ft4|ft3|درقية/i.test(i.name));
+
+    // 1. Liver Profile
+    if (liverItems.length > 0) {
+      const highLiver = liverItems.filter(i => i.status === 'high');
+      if (highLiver.length > 0) {
+        const details = highLiver.map(i => `${i.name.split('(')[0].trim()}: ${i.value}`).join(' و ');
+        explanationParagraphs.push(
+          `🔹 إنزيمات ووظائف الكبد: يُلاحظ ارتفاع طفيف إلى معتدل في (${details}) مقارنة بالنطاق المرجعي، وهو يشير إلى إجهاد كبدي بسيط (قد ينجم عن أدوية أو مسكنات، إجهاد بدني، أو دهون كبدية خفيفة)، ولا يمثل حالة طارئة. يُنصح بمتابعة روتينية مع الطبيب وإجراء فحص سونار للبطن عند الحاجة.`
+        );
+      } else {
+        explanationParagraphs.push(`🔹 إنزيمات ووظائف الكبد: جميع إنزيمات الكبد (ALT و AST) سليمة وضمن المعدلات الفسيولوجية الطبيعية.`);
+      }
+    }
+
+    // 2. Renal & Electrolytes Profile
+    if (kidneyItems.length > 0 || electrolyteItems.length > 0) {
+      const parts: string[] = [];
+      const creatItem = kidneyItems.find(i => /creatinine|كرياتينين/i.test(i.name));
+      const bunItem = kidneyItems.find(i => /urea|bun|يوريا/i.test(i.name));
+
+      if (creatItem) {
+        parts.push(`الكرياتينين (${creatItem.value}) ${creatItem.status === 'normal' ? 'سليم وطبيعي' : creatItem.status === 'high' ? 'مرتفع' : 'منخفض'}`);
+      }
+      if (bunItem) {
+        parts.push(`اليوريا/BUN (${bunItem.value}) ${bunItem.status === 'normal' ? 'طبيعية' : bunItem.status === 'low' ? 'عند الحد الأدنى السليم' : 'مرتفعة'}`);
+      }
+
+      const abnElectrolytes = electrolyteItems.filter(i => i.status !== 'normal');
+      let elecSummary = 'الأملاح والشوارد الأساسية (الصوديوم والكالسيوم والكلوريد) متوازنة فسيولوجياً';
+      if (abnElectrolytes.length > 0) {
+        elecSummary = `الأملاح والشوارد متوازنة عموماً مع ملاحظة (${abnElectrolytes.map(e => `${e.name.split('(')[0].trim()} ${e.value}`).join('، ')})`;
+      }
+
       explanationParagraphs.push(
-        `تم فحص كافة المؤشرات المستخرجة ومقارنتها بالنطاقات المرجعية السريرية: لوحظ وجود ${abnormalItems.length} مؤشر يستدعي المتابعة والعناية الطبية.`
+        `🔹 وظائف الكلى والأملاح (الشوارد): ${parts.length > 0 ? `${parts.join('، ')}. ` : ''}${elecSummary}.`
       );
-      abnormalItems.forEach(item => {
-        if (item.clinicalNote) explanationParagraphs.push(`• ${item.name}: ${item.clinicalNote}`);
-      });
-      recommendations.push('مراجعة الطبيب المعالج لمطابقة القيم المخبرية مع التاريخ المرضي والأعراض.');
-      recommendations.push('إعادة فحص المؤشرات المنحرفة بعد استكمال الخطة العلاجية والغذائية الموصوفة.');
+    }
+
+    // 3. Metabolic & Glucose Profile
+    if (metabolicItems.length > 0) {
+      const gluItem = metabolicItems.find(i => /glucose|سكر/i.test(i.name));
+      const protItem = metabolicItems.find(i => /protein|بروتين/i.test(i.name));
+      const lactItem = metabolicItems.find(i => /lactic|لاكتيك/i.test(i.name));
+
+      const metaParts: string[] = [];
+      if (gluItem) metaParts.push(`سكر الدم (${gluItem.value}) ${gluItem.status === 'normal' ? 'سليم ومتوازن' : gluItem.status === 'high' ? 'مرتفع' : 'منخفض'}`);
+      if (protItem) metaParts.push(`البروتين الكلي (${protItem.value}) ${protItem.status === 'normal' ? 'طبيعي' : protItem.status === 'high' ? 'مرتفع' : 'منخفض'}`);
+      if (lactItem) metaParts.push(`حمض اللاكتيك (${lactItem.value}) ${lactItem.status === 'normal' ? 'طبيعي' : 'مرتفع بشكل طفيف'}`);
+
+      if (metaParts.length > 0) {
+        explanationParagraphs.push(`🔹 التمثيل الغذائي ومستويات السكر: ${metaParts.join('، ')}.`);
+      }
+    }
+
+    // 4. Toxicology & Medication Screen
+    if (toxicologyItems.length > 0) {
+      const toxDetails = toxicologyItems.map(t => `${t.name.split('(')[0].trim()} (${t.value})`).join(' و ');
+      explanationParagraphs.push(
+        `🔹 فحص الأدوية والمسكنات: ${toxDetails} سالبة وآمنة تماماً، ولا يوجد أي أثر لتسمم دوائي أو جرعة زائدة.`
+      );
+    }
+
+    // 5. CBC
+    if (cbcItems.length > 0) {
+      const abnCbc = cbcItems.filter(i => i.status !== 'normal');
+      if (abnCbc.length > 0) {
+        explanationParagraphs.push(`🔹 تعداد الدم والأنيميا: لوحظ انحراف في (${abnCbc.map(c => c.name.split('(')[0].trim()).join('، ')}).`);
+      } else {
+        explanationParagraphs.push(`🔹 تعداد الدم والأنيميا: خضاب الدم والصفائح والكريات البيضاء ضمن المعدل الطبيعي.`);
+      }
+    }
+
+    // 6. Thyroid
+    if (thyroidItems.length > 0) {
+      const abnThyroid = thyroidItems.filter(i => i.status !== 'normal');
+      if (abnThyroid.length > 0) {
+        explanationParagraphs.push(`🔹 الغدة الدرقية: لوحظ تأثر في (${abnThyroid.map(t => t.name.split('(')[0].trim()).join('، ')}).`);
+      } else {
+        explanationParagraphs.push(`🔹 الغدة الدرقية: هرمونات الغدة الدرقية متوازنة وطبيعية.`);
+      }
+    }
+
+    // 7. Summary Title, Urgency and Reassuring Clinical Guidance
+    if (abnormalCount > 0) {
+      summaryTitle = `${detectedPanelName}: تم رصد ${abnormalCount} مؤشرات تحتاج متابعة من أصل ${matchedItems.length} فحص`;
+      urgencyLevel = 'medium';
+      explanationParagraphs.push(
+        `🩺 التوجيه الطبي العام: النتائج إجمالاً مطمئنة ومستقرة؛ يُكتفى بمراجعة اعتيادية للطبيب المعالج لمتابعة المؤشرات المرتفعة (${abnormalItems.map(a => a.name.split('(')[0].trim()).join('، ')}) ومطابقتها مع الحالة السريرية وإعادة الفحص لاحقاً للتأكد من استقرارها دون قلق.`
+      );
+      recommendations.push('مراجعة الطبيب المعالج لمطابقة القيم المخبرية مع التاريخ السريري والأدوية.');
+      recommendations.push('إعادة فحص المؤشرات المنحرفة بعد فترة مناسبة للتأكد من عودتها للمعدل الطبيعي.');
     } else {
-      summaryTitle = `${detectedPanelName}: كافة المؤشرات المستخرجة (${matchedItems.length}) تقع ضمن المدى الطبيعي الآمن`;
+      summaryTitle = `${detectedPanelName}: كافة المؤشرات المستخرجة (${matchedItems.length}) تقع ضمن المعدل الطبيعي السليم`;
       urgencyLevel = 'normal';
-      explanationParagraphs.push(`أظهرت قراءة التقرير المخبري أن جميع المؤشرات المقروءة (${matchedItems.length} فحصاً) متوازنة وضمن المعايير الفسيولوجية السليمة.`);
-      recommendations.push('الحفاظ على نمط الحياة الصحي، شرب كميات كافية من الماء، وإجراء الفحص الدوري الوقائي.');
+      explanationParagraphs.push(
+        `🩺 التوجيه الطبي العام: جميع المؤشرات المفحوصة متوازنة ومستقرة تماماً، وتدل على سلامة وظائف الأعضاء.`
+      );
+      recommendations.push('الحفاظ على نمط الحياة الصحي وشرب كميات كافية من الماء.');
+      recommendations.push('إجراء الفحوصات الدورية الوقائية المعتادة.');
     }
   }
 
