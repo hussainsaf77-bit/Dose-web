@@ -71,6 +71,7 @@ export default function App() {
     }
   });
   const [onboardingUsername, setOnboardingUsername] = useState('');
+  const [onboardingTgId, setOnboardingTgId] = useState('');
 
   const t = TRANSLATIONS[language];
 
