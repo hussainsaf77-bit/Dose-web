@@ -53,10 +53,25 @@ export default function App() {
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [showAdminTools, setShowAdminTools] = useState(false);
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
-  const [onboardingTgId, setOnboardingTgId] = useState('');
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const hash = window.location.hash;
+      const isRequested = 
+        urlParams.get('welcome') === '1' || 
+        urlParams.get('onboarding') === '1' ||
+        urlParams.get('start') === 'onboarding' ||
+        urlParams.has('v') ||
+        hash.includes('welcome') ||
+        hash.includes('onboarding');
+      if (isRequested) return true;
+      return !localStorage.getItem('dose_onboarding_completed');
+    } catch {
+      return true;
+    }
+  });
   const [onboardingUsername, setOnboardingUsername] = useState('');
+  const [onboardingTgId, setOnboardingTgId] = useState('');
 
   const t = TRANSLATIONS[language];
 
@@ -129,9 +144,11 @@ export default function App() {
         urlParams.get('onboarding') === '1' || 
         urlParams.get('welcome') === '1' || 
         urlParams.get('start') === 'onboarding' ||
+        urlParams.has('v') ||
         hashParams.get('onboarding') === '1' || 
-        hashParams.get('welcome') === '1' ||
+        hashParams.get('welcome') === '1' || 
         hashParams.get('start') === 'onboarding' ||
+        hashParams.has('v') ||
         window.location.hash.includes('welcome') ||
         window.location.hash.includes('onboarding');
 
@@ -288,16 +305,7 @@ export default function App() {
                 <span>{t.quick_plans}</span>
               </button>
 
-              <a
-                id="hero-quick-download"
-                href="/dose_v36_final.zip"
-                download="dose_v36_final.zip"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-sm"
-                title="تحميل ملف التحديث المباشر dose_v36_final.zip"
-              >
-                <Download className="w-4 h-4 text-emerald-400" />
-                <span>{language === 'ar' ? 'تحميل التحديث (dose_v36_final.zip)' : 'Download Update ZIP'}</span>
-              </a>
+
 
               <a
                 id="hero-quick-telegram"
@@ -320,6 +328,17 @@ export default function App() {
                 <Sparkles className="w-4 h-4 text-teal-400" />
                 <span>{language === 'ar' ? 'شاشة الترحيب والتسجيل' : 'Welcome & Register'}</span>
               </button>
+
+              <a
+                id="hero-download-vercel-update"
+                href="/dose_v36_final.zip"
+                download="dose_v36_final.zip"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-amber-400"
+                title="تنزيل ملف تحديث Vercel لنقله إلى المستودع"
+              >
+                <Download className="w-4 h-4 text-amber-400" />
+                <span>{language === 'ar' ? 'تحميل حزمة تحديث Vercel (ZIP)' : 'Download Vercel ZIP'}</span>
+              </a>
             </div>
 
           </div>

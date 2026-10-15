@@ -36,7 +36,7 @@ TIMEZONE = pytz.timezone("Asia/Riyadh")
 import urllib.request as _ur
 import json as _json
 
-API_BASE = os.environ.get("API_BASE", "https://web-dose.vercel.app/?welcome=1&v=3.8")
+API_BASE = os.environ.get("API_BASE", "https://web-dose.vercel.app")
 BOT_SECRET = os.environ.get("BOT_SECRET", "bot-secret-key-123")
 
 def api_check_sub(telegram_id: str) -> dict:

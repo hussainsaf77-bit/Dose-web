@@ -180,3 +180,62 @@ export interface PatientProfile {
   currentMedications: string;
   notes: string;
 }
+
+// ── Pediatric Dosing Types ──
+export type PediatricFormulationType = 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection';
+
+export type PediatricInfectionSite = 'general' | 'ear' | 'lung' | 'pharynx' | 'urinary' | 'skin';
+
+export interface PediatricFormulationConfig {
+  id: PediatricFormulationType;
+  labelAr: string;
+  labelEn: string;
+  icon: string;
+  unitAr: string;
+  unitEn: string;
+  descriptionAr: string;
+  descriptionEn: string;
+}
+
+export interface CommercialConcentrationOption {
+  labelAr: string;
+  labelEn: string;
+  value: number;
+  unit: string;
+  tradeExampleAr?: string;
+  tradeExampleEn?: string;
+  formulation: PediatricFormulationType;
+}
+
+export interface PediatricApiDoseResult {
+  success: boolean;
+  drugNameAr: string;
+  drugNameEn: string;
+  formulation: PediatricFormulationType;
+  minMpk: number;
+  maxMpk: number;
+  dosesPerDay: number;
+  intervalHours: number;
+  dailyTotalMgMin: number;
+  dailyTotalMgMax: number;
+  singleDoseMgMin: number;
+  singleDoseMgMax: number;
+  volumeUnit: string;
+  singleDoseVolumeMin?: number;
+  singleDoseVolumeMax?: number;
+  volumeTextAr: string;
+  volumeTextEn: string;
+  frequencyTextAr: string;
+  frequencyTextEn: string;
+  measuringAdviceAr?: string;
+  measuringAdviceEn?: string;
+  infectionSiteEffectAr?: string;
+  infectionSiteEffectEn?: string;
+  maxDailyCapAr?: string;
+  maxDailyCapEn?: string;
+  warningsAr?: string[];
+  warningsEn?: string[];
+  scientificReference?: string;
+  source?: string;
+}
+
