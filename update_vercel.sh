@@ -57,10 +57,9 @@ else
 fi
 
 echo "🔄 جاري رفع التحديث المكتمل إلى GitHub..."
-git rm --cached *.zip 2>/dev/null || true
 git add -A
-git commit -m "feat: pediatric AI vision recognition & clinical dosing engine" || true
-git push origin main || git push origin main --force || git push origin master --force
+git commit -m "feat(v3.6): clean production bundle, fixed 25-OH/HOMA-IR parser, and Vercel serverless integration" || true
+git push origin main || git push origin master
 
 echo ""
 echo "=============================================="

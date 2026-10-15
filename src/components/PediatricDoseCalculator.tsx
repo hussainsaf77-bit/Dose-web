@@ -887,76 +887,26 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                   </select>
                 </div>
 
-                {/* Categorized Popular Drug Quick Pills */}
-                <div className="space-y-2 pt-1">
-                  <span className="text-[11px] text-slate-400 block font-medium">
-                    {isAr ? 'أدوية جاهزة للتجربة السريعة بنقرة واحدة:' : 'Quick Select Pediatric Medications:'}
+                {/* Popular Drug Quick Pills */}
+                <div>
+                  <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">
+                    {isAr ? 'أدوية الأطفال الأكثر استخداماً:' : 'Frequent Pediatric Medications:'}
                   </span>
-                  
-                  {/* Category 1: Antibiotics */}
-                  <div>
-                    <span className="text-[10px] text-amber-400/90 font-bold block mb-1">
-                      {isAr ? '🦠 المضادات الحيوية الشائعة:' : 'Antibiotics:'}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { id: 'amoxicillin_clavulanate', labelAr: 'أوجمنتين (Augmentin)' },
-                        { id: 'amoxicillin', labelAr: 'أموكسيل (Amoxil)' },
-                        { id: 'cefixime', labelAr: 'سوبراكس (Suprax)' },
-                        { id: 'azithromycin', labelAr: 'زيثروماكس (Zithromax)' },
-                        { id: 'clarithromycin', labelAr: 'كلاسيد (Klacid)' },
-                        { id: 'cefuroxime', labelAr: 'زينات (Zinnat)' },
-                        { id: 'cefaclor', labelAr: 'سيكلور (Ceclor)' },
-                        { id: 'metronidazole', labelAr: 'فلاجيل (Flagyl)' },
-                        { id: 'ceftriaxone', labelAr: 'روسيفين (Rocephin IV)' }
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleDrugSelect(item.id)}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] font-medium border transition-all ${
-                            selectedDrugId === item.id
-                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/60 font-bold ring-1 ring-amber-500'
-                              : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                          }`}
-                        >
-                          {item.labelAr}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Category 2: Antipyretics, Respiratory & Gastro */}
-                  <div>
-                    <span className="text-[10px] text-teal-400/90 font-bold block mb-1">
-                      {isAr ? '💊 مسكنات، ربو، ونزلات معوية:' : 'Antipyretics, Respiratory & GI:'}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {[
-                        { id: 'paracetamol', labelAr: 'أدول / بنادول (Paracetamol)' },
-                        { id: 'ibuprofen', labelAr: 'بروفين (Brufen)' },
-                        { id: 'ondansetron', labelAr: 'زوفران ترجيع (Zofran)' },
-                        { id: 'domperidone', labelAr: 'موتيلوم (Motilium)' },
-                        { id: 'salbutamol', labelAr: 'فنتولين ربو (Ventolin)' },
-                        { id: 'budesonide', labelAr: 'بالميكورت بخار (Pulmicort)' },
-                        { id: 'prednisolone', labelAr: 'بريدسول كورتيزون (Predsol)' },
-                        { id: 'cetirizine', labelAr: 'زيرتيك حساسية (Zyrtec)' },
-                        { id: 'tobramycin', labelAr: 'توبريكس عين (Tobrex Drops)' }
-                      ].map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleDrugSelect(item.id)}
-                          className={`px-2.5 py-1 rounded-xl text-[11px] font-medium border transition-all ${
-                            selectedDrugId === item.id
-                              ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 font-bold ring-1 ring-teal-500'
-                              : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                          }`}
-                        >
-                          {item.labelAr}
-                        </button>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {EXTENDED_PEDIATRIC_DRUGS.slice(0, 6).map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => handleDrugSelect(d.id)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-medium border transition-all ${
+                          selectedDrugId === d.id
+                            ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 font-bold'
+                            : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        {isAr ? d.name_ar.split(' ')[0] : d.name_en.split(' ')[0]}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </>
