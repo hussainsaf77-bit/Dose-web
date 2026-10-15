@@ -20,29 +20,23 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); } catch (e) {}
   }
 
-  const { imageBase64, mimeType, textNotes = '', labCategory = 'all', customApiKey, patientGender, patientAge } = body;
+  const { imageBase64, mimeType, textNotes = '', labCategory = 'all', customApiKey } = body;
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-
-  const genderLabel = patientGender === 'female' ? 'أنثى' : patientGender === 'male' ? 'ذكر' : 'غير محدد';
-  const ageLabel = patientAge ? `${patientAge} سنة` : 'غير محدد';
-  const patientNotice = `[بيانات المريض: الجنس: ${genderLabel} | العمر: ${ageLabel} - راعِ النطاقات المرجعية الخاصة بهذا الجنس والعمر بدقة مثل الهيموجلوبين ومخزون الحديد والكرياتينين]`;
 
   // 1. If GEMINI_API_KEY is available, use Gemini Vision for real-time visual parsing
   if (apiKey) {
     const prompt = `أنت استشاري الطب المخبري والتحاليل السريرية وعلم الأمراض (Consultant Clinical Pathologist).
 قم بقراءة وتحليل صورة الفحص المخبري المرفقة (ورقة التحليل الطبي) واستخراج كافة النتائج بدقة متناهية.
-${patientNotice}
 
 قواعد ومعايير التعرف السريري:
 1. استخرج كل فحص ظهر في الصورة: اسم الفحص، القيمة المقروءة، الوحدة، والمدى المرجعي.
 2. الدقة التامة في الأرقام والفواصل العشرية (مثلاً: 2.89 أو 10.87 أو 1.5 أو 8.71).
-3. مراعاة الجنس والعمر: المريض (${genderLabel})، العمر (${ageLabel}).
-4. سياق المريض أو الملاحظات: ${textNotes || 'قراءة وتحليل صورة فحص مخبري'}.
+3. سياق المريض أو الملاحظات: ${textNotes || 'قراءة وتحليل صورة فحص مخبري'}.
 
 المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
 {
   "isValidReport": true,
-  "testName": "اسم التقرير أو باقة الفحوصات بدقة (المريض: ${genderLabel}${patientAge ? `، ${patientAge} سنة` : ''})",
+  "testName": "اسم التقرير أو باقة الفحوصات بدقة",
   "clinicalSummaryTitle": "الخلاصة الإكلينيكية والتشخيص المرجح بدقة",
   "urgencyLevel": "normal أو medium أو high أو critical",
   "items": [

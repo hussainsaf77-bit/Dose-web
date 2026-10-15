@@ -10,8 +10,6 @@ import { SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
 import { LAB_CATALOG_GROUPS, LabTestItem, LabCategoryGroup } from '../data/labCatalogData';
 import { parseClinicalReportFromText } from '../utils/medicalOcrParser';
-import { MANUAL_LAB_TEST_OPTIONS, UserManualRow, getTestRefRangeForPatient, PatientDemographics } from '../data/manualLabOptions';
-import { evaluateUserManualLabRows } from '../utils/manualLabEvaluator';
 
 interface LabAndImagingAnalyzerProps {
   userTier?: SubscriptionTier;
@@ -347,7 +345,7 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   onUpgradeClick,
 }) => {
   const [analysisType, setAnalysisType] = useState<'lab' | 'imaging'>('lab');
-  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('image_ocr');
+  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'catalog'>('image_ocr');
   const [selectedLabCategory, setSelectedLabCategory] = useState<string>('all');
   const [imagingModality, setImagingModality] = useState<'xray' | 'ct' | 'mri' | 'ultrasound'>('xray');
   const [anatomicalRegion, setAnatomicalRegion] = useState<'chest' | 'brain' | 'spine' | 'joints' | 'abdomen'>('chest');
@@ -367,42 +365,15 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   const [showApiKeySetting, setShowApiKeySetting] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<string | null>(null);
 
-  // Patient Demographics (Gender & Age) - Requested for both manual and image OCR analysis
-  const [patientGender, setPatientGender] = useState<'male' | 'female'>('female');
-  const [patientAge, setPatientAge] = useState<string>('28');
-
-  const getPatientDemographicsObj = (): PatientDemographics => ({
-    gender: patientGender,
-    age: patientAge.trim() ? parseInt(patientAge, 10) : undefined
-  });
-
   // Editable items state
   const [isEditingItems, setIsEditingItems] = useState(false);
   const [editableItems, setEditableItems] = useState<any[]>([]);
 
-  // Manual Lab Entry (Feature 2): Select test from dropdown, select unit, enter number
-  const [selectedManualTestId, setSelectedManualTestId] = useState<string>('fbs');
-  const [selectedManualUnit, setSelectedManualUnit] = useState<string>('mg/dL');
-  const [enteredManualValue, setEnteredManualValue] = useState<string>('95');
-  const [manualCustomRange, setManualCustomRange] = useState<string>('70 - 100 mg/dL');
-  const [userManualRows, setUserManualRows] = useState<UserManualRow[]>([
-    {
-      testId: 'fbs',
-      name: 'سكر الدم الصائم (Glucose Fasting)',
-      value: '95',
-      unit: 'mg/dL',
-      range: '70 - 100 mg/dL',
-      status: 'normal'
-    },
-    {
-      testId: 'hba1c',
-      name: 'السكر التراكمي (HbA1c)',
-      value: '5.4',
-      unit: '%',
-      range: '< 5.7 %',
-      status: 'normal'
-    }
+  // Manual entry modal / inline state
+  const [manualRows, setManualRows] = useState<{ name: string; value: string; unit: string; range: string }[]>([
+    { name: '', value: '', unit: '', range: '' }
   ]);
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   // Lab Catalog State
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -612,124 +583,46 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
     }
   };
 
-
-  const handleGenderChange = (newGender: 'male' | 'female') => {
-    setPatientGender(newGender);
-    const opt = MANUAL_LAB_TEST_OPTIONS.find(o => o.id === selectedManualTestId);
-    if (opt) {
-      const tailored = getTestRefRangeForPatient(opt, {
-        gender: newGender,
-        age: patientAge.trim() ? parseInt(patientAge, 10) : undefined
-      });
-      setManualCustomRange(tailored.range);
-    }
-  };
-
-  const handleAgeChange = (newAgeStr: string) => {
-    setPatientAge(newAgeStr);
-    const opt = MANUAL_LAB_TEST_OPTIONS.find(o => o.id === selectedManualTestId);
-    if (opt) {
-      const tailored = getTestRefRangeForPatient(opt, {
-        gender: patientGender,
-        age: newAgeStr.trim() ? parseInt(newAgeStr, 10) : undefined
-      });
-      setManualCustomRange(tailored.range);
-    }
-  };
-
-  const handleSelectManualTest = (testId: string) => {
-    setSelectedManualTestId(testId);
-    const opt = MANUAL_LAB_TEST_OPTIONS.find(o => o.id === testId);
-    if (opt) {
-      setSelectedManualUnit(opt.defaultUnit);
-      const tailored = getTestRefRangeForPatient(opt, getPatientDemographicsObj());
-      setManualCustomRange(tailored.range);
-      setEnteredManualValue(opt.sampleValue || '');
-    }
-  };
-
-  const handleAddManualTestRow = () => {
-    if (!enteredManualValue.trim()) {
-      setErrorMsg('يرجى كتابة نتيجة التحليل (الرقم) قبل الإضافة.');
+  const handleRunManualEntry = () => {
+    const validRows = manualRows.filter(r => r.name.trim() && r.value.trim());
+    if (validRows.length === 0) {
+      setErrorMsg('يرجى إدخال اسم فحص واحد على الأقل مع نتيجته.');
       return;
     }
-    const opt = MANUAL_LAB_TEST_OPTIONS.find(o => o.id === selectedManualTestId);
-    const testName = opt ? opt.nameAr : selectedManualTestId;
-    const newRow: UserManualRow = {
-      testId: selectedManualTestId,
-      name: testName,
-      value: enteredManualValue.trim(),
-      unit: selectedManualUnit.trim(),
-      range: manualCustomRange.trim()
-    };
-    setUserManualRows(prev => [...prev, newRow]);
-    setEnteredManualValue('');
-    setErrorMsg(null);
-  };
-
-  const handleDeleteManualRow = (index: number) => {
-    setUserManualRows(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUpdateManualRowValue = (index: number, val: string) => {
-    setUserManualRows(prev => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], value: val };
-      return copy;
-    });
-  };
-
-  const handleRunManualEvaluation = () => {
-    if (userManualRows.length === 0) {
-      setErrorMsg('يرجى إضافة تحليل واحد على الأقل للجدول قبل بدء التحليل.');
-      return;
+    const textLines = validRows.map(r => {
+      const unitPart = r.unit ? ` ${r.unit}` : '';
+      const rangePart = r.range ? ` (${r.range})` : '';
+      return `${r.name}: ${r.value}${unitPart}${rangePart}`;
+    }).join('\n');
+    const parsed = parseClinicalReportFromText(textLines);
+    if (parsed && parsed.items && parsed.items.length > 0) {
+      setResult({ ...parsed, isValidReport: true });
+      setEditableItems(parsed.items);
+      setShowManualEntry(false);
+      setErrorMsg(null);
+    } else {
+      const directItems = validRows.map(r => ({
+        name: r.name,
+        value: `${r.value}${r.unit ? ` ${r.unit}` : ''}`,
+        referenceRange: r.range || 'حسب المرجع المرفق',
+        status: 'normal' as const
+      }));
+      setResult({
+        isValidReport: true,
+        testName: 'فحص مخبري مدخل يدوياً ومطابق',
+        clinicalSummaryTitle: `تقرير الفحص الطبي (${directItems.length} مؤشر مدخل)`,
+        urgencyLevel: 'normal',
+        items: directItems,
+        detailedExplanation: 'تمت مطابقة نتائج الفحوصات المدخلة يدوياً بدقة تامة وبدون أي نتائج عشوائية.',
+        recommendations: [
+          'متابعة ومطابقة النتائج مع الطبيب المعالج.',
+          'الحفاظ على نمط حياة وغذاء متوازن.'
+        ]
+      });
+      setEditableItems(directItems);
+      setShowManualEntry(false);
+      setErrorMsg(null);
     }
-    const rep = evaluateUserManualLabRows(userManualRows, getPatientDemographicsObj());
-    setResult(rep);
-    setEditableItems(rep.items);
-    setErrorMsg(null);
-  };
-
-  const handleLoadManualPreset = (presetKey: string) => {
-    let rows: UserManualRow[] = [];
-    if (presetKey === 'cmp') {
-      rows = [
-        { testId: 'alt', name: 'إنزيم الكبد (ALT / SGPT)', value: '315', unit: 'U/L', range: '7 - 56 U/L' },
-        { testId: 'ast', name: 'إنزيم الكبد (AST / SGOT)', value: '285', unit: 'U/L', range: '10 - 40 U/L' },
-        { testId: 'lactic_acid', name: 'حمض اللاكتيك (Lactic Acid)', value: '3.8', unit: 'mmol/L', range: '0.5 - 2.2 mmol/L' },
-        { testId: 'potassium', name: 'البوتاسيوم (Potassium K+)', value: '3.4', unit: 'mmol/L', range: '3.5 - 5.0 mmol/L' },
-        { testId: 'bun', name: 'اليوريا (BUN)', value: '6', unit: 'mg/dL', range: '8 - 23 mg/dL' },
-        { testId: 'sodium', name: 'الصوديوم (Sodium Na+)', value: '139', unit: 'mmol/L', range: '135 - 145 mmol/L' },
-        { testId: 'creatinine', name: 'الكرياتينين (Creatinine)', value: '0.9', unit: 'mg/dL', range: '0.7 - 1.2 mg/dL' }
-      ];
-    } else if (presetKey === 'metabolism') {
-      rows = [
-        { testId: 'homa_ir', name: 'مؤشر مقاومة الإنسولين (HOMA-IR)', value: '2.89', unit: 'index', range: '0.5 - 1.8 index' },
-        { testId: 'ferritin', name: 'مخزون الحديد (Serum Ferritin)', value: '< 5', unit: 'ng/mL', range: '15 - 200 ng/mL' },
-        { testId: 'vitamin_d', name: 'فيتامين د3 (25-OH Vitamin D3)', value: '10.87', unit: 'ng/mL', range: '30 - 100 ng/mL' },
-        { testId: 'fbs', name: 'سكر الدم الصائم (Glucose Fasting)', value: '90', unit: 'mg/dL', range: '70 - 100 mg/dL' },
-        { testId: 'fasting_insulin', name: 'الإنسولين الصائم (Fasting Insulin)', value: '13.0', unit: 'µIU/mL', range: '2.6 - 24.9 µIU/mL' }
-      ];
-    } else if (presetKey === 'cbc') {
-      rows = [
-        { testId: 'hemoglobin', name: 'خضاب الدم (Hemoglobin Hb)', value: '9.4', unit: 'g/dL', range: '12.0 - 17.5 g/dL' },
-        { testId: 'mcv', name: 'متوسط حجم الكرية الحمراء (MCV)', value: '71.2', unit: 'fL', range: '80.0 - 100.0 fL' },
-        { testId: 'wbc', name: 'كريات الدم البيضاء (WBC Count)', value: '6400', unit: '/µL', range: '4000 - 11000 /µL' },
-        { testId: 'platelets', name: 'الصفائح الدموية (Platelets PLT)', value: '295000', unit: '/µL', range: '150000 - 450000 /µL' }
-      ];
-    } else if (presetKey === 'renal') {
-      rows = [
-        { testId: 'creatinine', name: 'الكرياتينين (Serum Creatinine)', value: '1.75', unit: 'mg/dL', range: '0.70 - 1.20 mg/dL' },
-        { testId: 'bun', name: 'اليوريا (BUN)', value: '44', unit: 'mg/dL', range: '7 - 20 mg/dL' },
-        { testId: 'egfr', name: 'معدل الترشيح الكبيبي (eGFR)', value: '44', unit: 'mL/min/1.73m²', range: '> 60 mL/min/1.73m²' },
-        { testId: 'uric_acid', name: 'حمض اليوريك (Uric Acid)', value: '8.4', unit: 'mg/dL', range: '3.5 - 7.2 mg/dL' }
-      ];
-    }
-    setUserManualRows(rows);
-    const rep = evaluateUserManualLabRows(rows);
-    setResult(rep);
-    setEditableItems(rep.items);
-    setErrorMsg(null);
   };
 
   const handleRunAnalysis = async (customPrompt?: string, overrideDataUrl?: string) => {
@@ -767,8 +660,6 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
             imageBase64: base64Data,
             mimeType,
             customApiKey: userGeminiApiKey || undefined,
-            patientGender,
-            patientAge: patientAge.trim() ? parseInt(patientAge, 10) : undefined,
             textNotes: analysisType === 'lab' 
               ? (selectedLabCategory !== 'all' ? `[فحص مخبري: ${selectedLabCategory.toUpperCase()}] ${customPrompt || textNotes}` : (customPrompt || textNotes))
               : `[نوع التصوير: ${imagingModality.toUpperCase()} | المنطقة: ${anatomicalRegion}] ${customPrompt || textNotes}`,
@@ -796,7 +687,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           const ocrText = ocrRes?.data?.text || '';
           if (ocrText.trim().length > 0) {
             const combinedOcrText = [ocrText, customPrompt, textNotes].filter(Boolean).join('\n');
-            const parsedOcrReport = parseClinicalReportFromText(combinedOcrText, getPatientDemographicsObj());
+            const parsedOcrReport = parseClinicalReportFromText(combinedOcrText);
             if (parsedOcrReport && parsedOcrReport.items && parsedOcrReport.items.length > 0) {
               setResult({ ...parsedOcrReport, isValidReport: true });
               setEditableItems(parsedOcrReport.items);
@@ -814,7 +705,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
       if (!analyzedSuccessfully && analysisType === 'lab') {
         const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
         if (combinedText.trim().length > 0) {
-          const parsedReport = parseClinicalReportFromText(combinedText, getPatientDemographicsObj());
+          const parsedReport = parseClinicalReportFromText(combinedText);
           if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
             setResult({ ...parsedReport, isValidReport: true });
             setEditableItems(parsedReport.items);
@@ -1014,7 +905,7 @@ ${recsText}
               </div>
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-[11px] font-mono font-bold shadow-sm">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>إصدار التحديث: v3.8 Live (التقرير السريري الشامل والمطمئن + خيارات الجنس والعمر)</span>
+                <span>إصدار التحديث: v3.6 Live (محرك CMP السريري + الفواصل العشرية الدقيقة)</span>
               </div>
             </div>
             <h2 className="text-2xl font-black text-white">المختبر والتحاليل الطبية وقراءة الأشعة</h2>
@@ -1049,49 +940,58 @@ ${recsText}
           </div>
         </div>
 
-        {/* Lab Sub-Modes: Exactly the 2 requested features + Catalog */}
+        {/* Sub-Tabs for Lab: Image OCR vs Selectable Catalog */}
         {analysisType === 'lab' && (
           <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
             <button
-              type="button"
-              onClick={() => { setLabSubMode('image_ocr'); setErrorMsg(null); }}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              onClick={() => setLabSubMode('image_ocr')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
                 labSubMode === 'image_ocr'
-                  ? 'bg-gradient-to-r from-teal-500/25 to-emerald-500/25 text-teal-300 border-2 border-teal-500/70 shadow-md shadow-teal-950/40'
-                  : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/50 shadow-sm'
+                  : 'bg-slate-950/60 text-slate-400 border border-slate-800 hover:text-slate-200'
               }`}
             >
-              <Camera className="w-4 h-4 text-teal-400" />
-              <span>📸 الميزة الأولى: قراءة صور التحاليل (Image OCR)</span>
+              <Camera className="w-3.5 h-3.5" />
+              <span>📸 قراءة وتحليل صورة التحليل (OCR & AI)</span>
             </button>
-
             <button
-              type="button"
-              onClick={() => { setLabSubMode('manual'); setErrorMsg(null); }}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
-                labSubMode === 'manual'
-                  ? 'bg-gradient-to-r from-teal-500/25 to-emerald-500/25 text-teal-300 border-2 border-teal-500/70 shadow-md shadow-teal-950/40'
-                  : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
-              }`}
-            >
-              <Edit3 className="w-4 h-4 text-emerald-400" />
-              <span>✍️ الميزة الثانية: إدخال يدوي (اسم التحليل + الوحدة + الرقم)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setLabSubMode('catalog'); setErrorMsg(null); }}
-              className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              onClick={() => setLabSubMode('catalog')}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
                 labSubMode === 'catalog'
-                  ? 'bg-slate-800 text-teal-300 border border-teal-500/50 shadow-sm'
-                  : 'bg-slate-950/40 text-slate-500 border border-slate-800 hover:text-slate-300'
+                  ? 'bg-teal-500/20 text-teal-300 border border-teal-500/50 shadow-sm'
+                  : 'bg-slate-950/60 text-slate-400 border border-slate-800 hover:text-slate-200'
               }`}
             >
               <ListFilter className="w-3.5 h-3.5" />
-              <span>📋 الدليل المرجعي للتحاليل</span>
+              <span>📋 قائمة التحاليل الشاملة ودليل القيم (Catalog)</span>
             </button>
           </div>
         )}
+
+        {/* Direct Download & Vercel Update Banner */}
+        <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-teal-950/70 border border-emerald-500/40 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-400 shrink-0 mt-0.5">
+              <Download className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-emerald-200">
+                ملف التحديث المباشر للموقع والخادم (dose_v36_final.zip)
+              </h4>
+              <p className="text-xs text-slate-300 mt-0.5">
+                حمل الملف المباشر ثم نفّذ الأمر <code className="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono">bash update_vercel.sh</code> لرفع التحديث الدقيق إلى GitHub وVercel وإلغاء أي نتائج عشوائية نهائياً.
+              </p>
+            </div>
+          </div>
+          <a
+            href="/dose_v36_final.zip"
+            download="dose_v36_final.zip"
+            className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            <span>تحميل dose_v36_final.zip</span>
+          </a>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1210,11 +1110,11 @@ ${recsText}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
                     <button
                       type="button"
-                      onClick={() => setLabSubMode('manual')}
-                      className="text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold cursor-pointer"
+                      onClick={() => setShowManualEntry(!showManualEntry)}
+                      className="text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold"
                     >
                       <Edit3 className="w-3.5 h-3.5" />
-                      <span>الانتقال للميزة الثانية: الإدخال اليدوي المباشر للتحاليل</span>
+                      <span>{showManualEntry ? 'إخفاء جدول الإدخال اليدوي' : 'أو إدخال / مراجعة النتائج يدوياً في جدول'}</span>
                     </button>
                     <button
                       type="button"
@@ -1270,79 +1170,111 @@ ${recsText}
                     </div>
                   )}
 
-                  </div>
-              )}
-
-              {/* Patient Demographics Selector (Gender & Age) for Image OCR */}
-              <div className="p-3 bg-slate-950/90 rounded-xl border border-teal-500/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
-                    <span>👤 بيانات المريض (لتطبيق النطاق المرجعي الفسيولوجي):</span>
-                  </span>
-                  <span className="text-[10px] text-teal-400 bg-teal-950/70 px-2 py-0.5 rounded border border-teal-500/30">
-                    ضروري للأنيميا والكلى والهرمونات
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  {/* Gender Selector */}
-                  <div className="sm:col-span-6 flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                    <span className="text-[11px] text-slate-400 font-medium px-2 shrink-0">الجنس:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleGenderChange('female')}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        patientGender === 'female'
-                          ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-200 border border-rose-500/50 shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span>👩 أنثى</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleGenderChange('male')}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        patientGender === 'male'
-                          ? 'bg-gradient-to-r from-cyan-500/30 to-teal-500/30 text-cyan-200 border border-cyan-500/50 shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span>👨 ذكر</span>
-                    </button>
-                  </div>
-
-                  {/* Age Input */}
-                  <div className="sm:col-span-6 flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
-                    <span className="text-[11px] text-slate-400 font-medium shrink-0">العمر:</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={patientAge}
-                      onChange={(e) => handleAgeChange(e.target.value)}
-                      placeholder="28"
-                      className="flex-1 bg-slate-950 border border-slate-700 focus:border-teal-400 rounded-lg px-2 py-1 text-xs text-center text-teal-300 font-mono font-bold outline-none"
-                    />
-                    <span className="text-xs text-slate-400 font-medium shrink-0">سنة</span>
-                    <div className="hidden sm:flex items-center gap-1">
-                      {['10', '28', '45', '65'].map(a => (
+                  {/* Manual Table Entry Drawer */}
+                  {showManualEntry && (
+                    <div className="p-3.5 rounded-xl bg-slate-950 border-2 border-teal-500/50 space-y-3 mt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <Edit3 className="w-3.5 h-3.5 text-teal-400" />
+                          <h4 className="text-xs font-bold text-white">إدخال نتائج تحليلك يدوياً (مطابقة 100% بدون أي عشوائية):</h4>
+                        </div>
                         <button
-                          key={a}
                           type="button"
-                          onClick={() => handleAgeChange(a)}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                            patientAge === a
-                              ? 'bg-teal-500 text-slate-950'
-                              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                          }`}
+                          onClick={() => setShowManualEntry(false)}
+                          className="text-xs text-slate-400 hover:text-slate-200"
                         >
-                          {a}
+                          ✕ إغلاق
                         </button>
-                      ))}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {manualRows.map((row, rIdx) => (
+                          <div key={rIdx} className="grid grid-cols-12 gap-1.5 items-center">
+                            <input
+                              type="text"
+                              placeholder="اسم الفحص (مثل: ALT, Glucose)"
+                              value={row.name}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].name = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-4 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-white placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="النتيجة (مثلاً: 315 أو 90)"
+                              value={row.value}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].value = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-3 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-teal-300 font-mono placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="الوحدة (U/L)"
+                              value={row.unit}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].unit = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-2 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <input
+                              type="text"
+                              placeholder="المرجع (7-56)"
+                              value={row.range}
+                              onChange={(e) => {
+                                const copy = [...manualRows];
+                                copy[rIdx].range = e.target.value;
+                                setManualRows(copy);
+                              }}
+                              className="col-span-2 bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-400 font-mono placeholder-slate-500 focus:border-teal-500 outline-none"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (manualRows.length > 1) {
+                                  setManualRows(manualRows.filter((_, i) => i !== rIdx));
+                                } else {
+                                  setManualRows([{ name: '', value: '', unit: '', range: '' }]);
+                                }
+                              }}
+                              className="col-span-1 text-slate-500 hover:text-rose-400 p-1 flex justify-center"
+                              title="حذف هذا السطر"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => setManualRows([...manualRows, { name: '', value: '', unit: '', range: '' }])}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold flex items-center gap-1 transition-all"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ إضافة فحص آخر</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleRunManualEntry}
+                          className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-slate-950" />
+                          <span>⚡ تحليل هذه الفحوصات فوراً</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
-              </div>
+              )}
 
               {/* Dropzone with Camera & File */}
               <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
@@ -1507,322 +1439,7 @@ ${recsText}
             </div>
           )}
 
-          {/* LAB SUB-MODE: MANUAL ENTRY (Feature 2: Select test name from dropdown, select unit, enter numeric value) */}
-          {analysisType === 'lab' && labSubMode === 'manual' && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div>
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Edit3 className="w-4 h-4 text-emerald-400" />
-                    <span>الميزة الثانية: إدخال يدوي لنتائج التحاليل</span>
-                  </h3>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    اختر اسم التحليل من القائمة، وحدد الوحدة، وضع الرقم ليتم تحليله ومقارنته بالنطاق المرجعي فوراً وبدقة 100%.
-                  </p>
-                </div>
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/70 border border-emerald-500/40 px-2 py-1 rounded-lg shrink-0">
-                  دقة سريرية 100%
-                </span>
-              </div>
-
-              {/* Input Card: Test Name + Unit + Value */}
-              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3.5">
-                {/* 0. Patient Demographics (Gender & Age) */}
-                <div className="p-3 bg-slate-900/90 rounded-xl border border-teal-500/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
-                      <span>👤 بيانات المريض (لتكييف النطاق المرجعي فسيولوجياً):</span>
-                    </span>
-                    <span className="text-[10px] text-teal-400 bg-teal-950/70 px-2 py-0.5 rounded border border-teal-500/30">
-                      يعدل المدى تلقائياً حسب الجنس والعمر
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                    {/* Gender Selector */}
-                    <div className="sm:col-span-6 flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium px-2 shrink-0">الجنس:</span>
-                      <button
-                        type="button"
-                        onClick={() => handleGenderChange('female')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                          patientGender === 'female'
-                            ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-200 border border-rose-500/50 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span>👩 أنثى</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleGenderChange('male')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                          patientGender === 'male'
-                            ? 'bg-gradient-to-r from-cyan-500/30 to-teal-500/30 text-cyan-200 border border-cyan-500/50 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
-                        }`}
-                      >
-                        <span>👨 ذكر</span>
-                      </button>
-                    </div>
-
-                    {/* Age Input */}
-                    <div className="sm:col-span-6 flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium shrink-0">العمر:</span>
-                      <input
-                        type="number"
-                        min="1"
-                        max="120"
-                        value={patientAge}
-                        onChange={(e) => handleAgeChange(e.target.value)}
-                        placeholder="28"
-                        className="flex-1 bg-slate-900 border border-slate-700 focus:border-teal-400 rounded-lg px-2 py-1 text-xs text-center text-teal-300 font-mono font-bold outline-none"
-                      />
-                      <span className="text-xs text-slate-400 font-medium shrink-0">سنة</span>
-                      <div className="hidden sm:flex items-center gap-1">
-                        {['10', '28', '45', '65'].map(a => (
-                          <button
-                            key={a}
-                            type="button"
-                            onClick={() => handleAgeChange(a)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                              patientAge === a
-                                ? 'bg-teal-500 text-slate-950'
-                                : 'bg-slate-850 text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            {a}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 1. Test Selection Dropdown */}
-                <div>
-                  <label className="text-xs font-bold text-teal-300 flex items-center justify-between mb-1.5">
-                    <span>1. اختر اسم التحليل المخبري:</span>
-                    <span className="text-[10px] text-slate-400 font-normal font-mono">
-                      {MANUAL_LAB_TEST_OPTIONS.length} فحص متاح
-                    </span>
-                  </label>
-                  <select
-                    value={selectedManualTestId}
-                    onChange={(e) => handleSelectManualTest(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 hover:border-teal-500 focus:border-teal-500 rounded-xl px-3 py-2.5 text-xs text-white font-medium outline-none transition-colors cursor-pointer"
-                  >
-                    {Array.from(new Set(MANUAL_LAB_TEST_OPTIONS.map(o => o.categoryAr))).map((catAr) => (
-                      <optgroup key={catAr} label={catAr} className="bg-slate-950 text-teal-400 font-bold">
-                        {MANUAL_LAB_TEST_OPTIONS.filter(o => o.categoryAr === catAr).map((opt) => (
-                          <option key={opt.id} value={opt.id} className="bg-slate-900 text-white font-normal">
-                            {opt.nameAr}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-
-                {/* 2 & 3: Unit and Value Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
-                  {/* Unit Selector */}
-                  <div className="sm:col-span-5">
-                    <label className="text-xs font-bold text-teal-300 block mb-1.5">
-                      2. وحدة القياس (Unit):
-                    </label>
-                    <select
-                      value={selectedManualUnit}
-                      onChange={(e) => setSelectedManualUnit(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 hover:border-teal-500 focus:border-teal-500 rounded-xl px-3 py-2.5 text-xs text-white font-mono outline-none transition-colors cursor-pointer"
-                    >
-                      {(() => {
-                        const curOpt = MANUAL_LAB_TEST_OPTIONS.find(o => o.id === selectedManualTestId);
-                        const units = curOpt ? curOpt.availableUnits : ['mg/dL', 'mmol/L', 'U/L', '%', 'g/dL'];
-                        return units.map(u => (
-                          <option key={u} value={u}>{u}</option>
-                        ));
-                      })()}
-                    </select>
-                  </div>
-
-                  {/* Number / Value input */}
-                  <div className="sm:col-span-7">
-                    <label className="text-xs font-bold text-teal-300 block mb-1.5">
-                      3. نتيجة التحليل (الرقم):
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={enteredManualValue}
-                        onChange={(e) => setEnteredManualValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddManualTestRow();
-                          }
-                        }}
-                        placeholder="ضع الرقم هنا (مثلاً: 95 أو 2.89 أو 315 أو < 5)"
-                        className="w-full bg-slate-900 border border-teal-500/50 focus:border-teal-400 rounded-xl px-3 py-2.5 text-xs text-emerald-300 font-mono font-bold placeholder-slate-500 outline-none transition-colors"
-                      />
-                      <span className="absolute left-3 top-2.5 text-xs text-slate-400 font-mono pointer-events-none">
-                        {selectedManualUnit}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reference Range info chip & Add Button */}
-                <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                  <div className="text-[11px] text-slate-300 flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5 text-teal-400 shrink-0" />
-                    <span>المدى المرجعي الطبيعي:</span>
-                    <span className="font-mono text-teal-300 font-bold bg-teal-950/60 px-2 py-0.5 rounded border border-teal-500/30">
-                      {manualCustomRange}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddManualTestRow}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-4 h-4 text-slate-950" />
-                    <span>➕ إضافة التحليل إلى الجدول</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Added Tests Table */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-teal-400" />
-                    <span>جدول الفحوصات المضافة للتحليل ({userManualRows.length} فحص):</span>
-                  </div>
-                  {userManualRows.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setUserManualRows([])}
-                      className="text-[11px] text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>مسح الكل</span>
-                    </button>
-                  )}
-                </div>
-
-                {userManualRows.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800 border-dashed text-center space-y-1">
-                    <p className="text-xs text-slate-400">
-                      الجدول فارغ حالياً. اختر فحصاً من القائمة أعلاه وضَع الرقم واضغط "إضافة التحليل إلى الجدول".
-                    </p>
-                    <p className="text-[11px] text-teal-400 font-medium">
-                      أو اختر أحد النماذج السريعة الجاهزة أدناه بنقرة واحدة!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950/60">
-                    <table className="w-full text-right text-xs">
-                      <thead className="bg-slate-900 text-slate-400 font-semibold border-b border-slate-800 text-[11px]">
-                        <tr>
-                          <th className="p-2.5">اسم التحليل</th>
-                          <th className="p-2.5">النتيجة والوحدة</th>
-                          <th className="p-2.5 hidden sm:table-cell">المدى المرجعي</th>
-                          <th className="p-2.5 text-center w-12">حذف</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800/80">
-                        {userManualRows.map((row, rIdx) => (
-                          <tr key={rIdx} className="hover:bg-slate-900/50 transition-colors">
-                            <td className="p-2.5 font-medium text-slate-200">
-                              <div className="font-bold text-xs">{row.name}</div>
-                              <div className="text-[10px] text-slate-500 font-mono sm:hidden">
-                                مرجع: {row.range}
-                              </div>
-                            </td>
-                            <td className="p-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <input
-                                  type="text"
-                                  value={row.value}
-                                  onChange={(e) => handleUpdateManualRowValue(rIdx, e.target.value)}
-                                  className="w-20 bg-slate-900 border border-slate-700 focus:border-teal-500 rounded px-1.5 py-0.5 text-xs text-teal-300 font-mono font-bold outline-none"
-                                />
-                                <span className="text-[11px] text-slate-400 font-mono">{row.unit}</span>
-                              </div>
-                            </td>
-                            <td className="p-2.5 text-[11px] text-slate-400 font-mono hidden sm:table-cell">
-                              {row.range}
-                            </td>
-                            <td className="p-2.5 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteManualRow(rIdx)}
-                                className="text-slate-500 hover:text-rose-400 p-1 transition-colors cursor-pointer"
-                                title="حذف هذا الفحص"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* 1-Click Clinical Presets */}
-              <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-300 block">
-                  نماذج سريعة للتعبئة بنقرة واحدة (1-Click Presets):
-                </span>
-                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('cmp')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    ⚗️ وظائف الكبد والأملاح (CMP)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('metabolism')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🧬 هرمونات ومقاومة إنسولين وفيتامينات
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('cbc')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🩸 صورة الدم الكاملة والأنيميا (CBC)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('renal')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🧪 وظائف الكلى والأملاح (Renal)
-                  </button>
-                </div>
-              </div>
-
-              {/* Master Run Analysis Button */}
-              <button
-                type="button"
-                onClick={handleRunManualEvaluation}
-                disabled={userManualRows.length === 0}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-teal-950 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
-              >
-                <Sparkles className="w-4 h-4 text-emerald-200" />
-                <span>🩺 تحليل نتائج الفحوصات وإصدار التقرير الطبي الشامل</span>
-              </button>
-            </div>
-          )}
-
-          {/* LAB SUB-MODE 3: SELECTABLE CATALOG & MANUAL READING */}
+          {/* LAB SUB-MODE 2: SELECTABLE CATALOG & MANUAL READING */}
           {analysisType === 'lab' && labSubMode === 'catalog' && (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
               <div className="flex items-center justify-between">
@@ -2168,13 +1785,13 @@ ${recsText}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <button
                         onClick={() => {
-                          setLabSubMode('manual');
+                          setShowManualEntry(true);
                         }}
                         className="p-3 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-500/50 text-teal-200 text-xs font-bold text-right flex items-center justify-between transition-all cursor-pointer"
                       >
                         <span className="flex items-center gap-2">
-                          <Edit3 className="w-4 h-4 text-emerald-400" />
-                          <span>الانتقال للميزة الثانية: إدخال الفحوصات يدوياً</span>
+                          <Edit3 className="w-4 h-4 text-teal-400" />
+                          <span>إدخال نتائج فحصك في جدول مخصص ومباشر</span>
                         </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
@@ -2228,30 +1845,24 @@ ${recsText}
                   {/* Top Summary Banner */}
                   <div className="flex items-start justify-between gap-3 border-b border-slate-800 pb-4">
                     <div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
                         <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold">
                           {result.testName || (analysisType === 'lab' ? 'تقرير الفحص المخبري' : 'تقرير الأشعة الطبية')}
                         </span>
-                        <span className="px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 border border-teal-500/40 text-[11px] font-bold flex items-center gap-1">
-                          <span>👤 {patientGender === 'female' ? 'المريضة: أنثى' : 'المريض: ذكر'}</span>
-                          {patientAge && <span>• {patientAge} سنة</span>}
-                        </span>
-                        <span className="text-[11px] text-slate-500">تم تطبيق النطاق المرجعي الفسيولوجي المعتمد</span>
+                        <span className="text-[11px] text-slate-500">تم الفحص عبر خوارزميات الذكاء الاصطناعي</span>
                       </div>
                       <h3 className="text-lg font-bold text-white mt-1.5">{result.clinicalSummaryTitle || 'الخلاصة الإكلينيكية الأولية'}</h3>
                     </div>
-                    <div className={`p-2 rounded-xl text-xs font-sans font-bold shrink-0 ${
-                      result.urgencyLevel === 'critical' || result.urgencyLevel === 'high'
+                    <div className={`p-2 rounded-xl text-xs font-mono font-bold shrink-0 ${
+                      result.urgencyLevel === 'critical'
+                        ? 'bg-rose-950/80 border border-rose-500/50 text-rose-400 animate-pulse'
+                        : result.urgencyLevel === 'high'
                         ? 'bg-amber-950/60 border border-amber-500/40 text-amber-300'
                         : result.urgencyLevel === 'medium'
                         ? 'bg-slate-800 text-teal-300'
                         : 'bg-emerald-950/50 text-emerald-300 border border-emerald-500/30'
                     }`}>
-                      {result.urgencyLevel === 'critical' || result.urgencyLevel === 'high'
-                        ? '⚠️ انحرافات تستدعي المتابعة'
-                        : result.urgencyLevel === 'medium'
-                        ? 'متابعة طبية اعتيادية'
-                        : 'مطمئن / طبيعي ✓'}
+                      {result.urgencyLevel === 'critical' ? '🚨 حالة إسعافية / طارئة' : result.urgencyLevel === 'high' ? '⚠️ استشارة عاجلة' : result.urgencyLevel === 'medium' ? 'متابعة طبية' : 'مطمئن / طبيعي'}
                     </div>
                   </div>
 
@@ -2357,15 +1968,17 @@ ${recsText}
                               {result.items.map((it: any, idx: number) => (
                                 <tr key={idx} className="hover:bg-slate-800/30">
                                   <td className="p-2.5 font-semibold text-white">{it.name}</td>
-                                  <td className="p-2.5 font-mono text-teal-300 font-bold" dir="ltr">{it.value}</td>
-                                  <td className="p-2.5 text-slate-400 font-mono text-[11px]" dir="ltr">{it.referenceRange}</td>
+                                  <td className="p-2.5 font-mono text-teal-300 font-bold">{it.value}</td>
+                                  <td className="p-2.5 text-slate-400 font-mono text-[11px]">{it.referenceRange}</td>
                                   <td className="p-2.5">
-                                    {it.status === 'critical' || it.status === 'high' ? (
-                                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]">مرتفع ↑</span>
+                                    {it.status === 'critical' ? (
+                                      <span className="px-2 py-0.5 rounded bg-rose-600/30 text-rose-300 border border-rose-500/40 font-bold text-[10px]">🚨 طارئ / غير طبيعي</span>
+                                    ) : it.status === 'high' ? (
+                                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">مرتفع ↑</span>
                                     ) : it.status === 'low' ? (
-                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-[10px]">منخفض ↓</span>
+                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-bold text-[10px]">منخفض ↓</span>
                                     ) : (
-                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-[10px]">طبيعي ✓</span>
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">طبيعي ✓</span>
                                     )}
                                   </td>
                                 </tr>
