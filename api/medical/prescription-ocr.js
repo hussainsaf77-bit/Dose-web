@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest'];
     const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading prescriptions and medicine packaging (syrup bottles, drops, ointments, inhalers, vials).
 Carefully analyze this medicine image.
 Extract the exact information from the packaging or prescription:
@@ -50,7 +50,7 @@ Output strictly valid JSON with this schema:
   "drugNameEn": "Exact Generic or Trade Name in English",
   "tradeName": "Brand name if visible (e.g. Augmentin, Amoxil, Suprax, Brufen, Panadol)",
   "genericName": "Active scientific ingredient (e.g. Amoxicillin, Paracetamol, Ibuprofen)",
-  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "other",
+  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "other",
   "formulation": "syrup" | "ointment" | "drops" | "spray" | "injection",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
@@ -96,8 +96,18 @@ Output strictly valid JSON with this schema:
           const data = await response.json();
           const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (candidateText) {
-            const parsed = JSON.parse(candidateText);
-            if (parsed && (parsed.drugNameEn || parsed.drugNameAr || parsed.tradeName)) {
+            let parsed = null;
+            try {
+              parsed = JSON.parse(candidateText.trim());
+            } catch (jsonErr) {
+              const cleaned = candidateText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+              const match = cleaned.match(/\{[\s\S]*\}/);
+              if (match) {
+                try { parsed = JSON.parse(match[0]); } catch (_) {}
+              }
+            }
+
+            if (parsed && (parsed.drugNameEn || parsed.drugNameAr || parsed.tradeName || parsed.genericName)) {
               return res.status(200).json({
                 success: true,
                 ...parsed
@@ -111,8 +121,10 @@ Output strictly valid JSON with this schema:
     }
   }
 
-  // Honest response when OCR cannot proceed
+  // Fallback response with hint for on-device engine
   return res.status(422).json({
+    success: false,
+    noApiKey: !apiKey,
     success: false,
     error: isAr
       ? "تعذر قراءة بيانات الدواء من الصورة تلقائياً. يرجى التأكد من وضوح اسم الدواء وتركيزه على العلبة، أو إدخال البيانات يدوياً."
