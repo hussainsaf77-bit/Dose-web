@@ -2,10 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { 
   Baby, AlertCircle, CheckCircle, Droplets, Clock, Calculator, ShieldAlert, 
   Sparkles, Camera, Upload, Loader2, RefreshCw, Search, Syringe, Wind, 
-  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, Key
+  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download
 } from 'lucide-react';
-import Tesseract from 'tesseract.js';
-import { parsePediatricMedicineFromText } from '../utils/pediatricMedicineParser';
 import { DrugInfo, SubscriptionTier, PediatricFormulationType, PediatricInfectionSite, PediatricApiDoseResult } from '../types';
 import { MEDICAL_DRUGS_DB } from '../data/medicalData';
 import { 
@@ -62,13 +60,8 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
 
   // 7. Prescription / Bottle OCR States
   const [isScanningOcr, setIsScanningOcr] = useState(false);
-  const [ocrStatusText, setOcrStatusText] = useState<string | null>(null);
   const [ocrSuccessMsg, setOcrSuccessMsg] = useState<string | null>(null);
   const [ocrErrorMsg, setOcrErrorMsg] = useState<string | null>(null);
-  const [userGeminiApiKey, setUserGeminiApiKey] = useState<string>(() => {
-    try { return localStorage.getItem('user_gemini_api_key') || ''; } catch { return ''; }
-  });
-  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [detectedDrugCard, setDetectedDrugCard] = useState<{
     tradeName?: string;
     genericName?: string;
@@ -205,7 +198,7 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     }
   };
 
-  // Vision AI / OCR File Handler (Dual-Engine: Cloud Vision AI + Embedded On-Device Tesseract)
+  // Vision AI / OCR File Handler
   const handleOcrFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
@@ -214,7 +207,6 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     setIsScanningOcr(true);
     setOcrSuccessMsg(null);
     setOcrErrorMsg(null);
-    setOcrStatusText(isAr ? 'جاري فحص الصورة عبر الذكاء الاصطناعي...' : 'Analyzing medicine packaging image...');
 
     reader.onloadend = async () => {
       try {
@@ -223,54 +215,26 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
         const mimeType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
         const imageBase64 = parts[1];
 
-        let data: any = null;
-        let isClientOcrUsed = false;
+        const res = await fetch(getApiUrl('/api/medical/prescription-ocr'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64,
+            mimeType,
+            lang: language,
+            weightKg: parseFloat(weightKg) || undefined,
+            ageMonths: totalAgeMonths
+          }),
+        });
 
-        // 1. Attempt 1: Cloud Vision OCR via /api/medical/prescription-ocr
-        try {
-          const res = await fetch(getApiUrl('/api/medical/prescription-ocr'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              imageBase64,
-              mimeType,
-              lang: language,
-              customApiKey: userGeminiApiKey || undefined,
-              weightKg: parseFloat(weightKg) || undefined,
-              ageMonths: totalAgeMonths
-            }),
-          });
-
-          const contentType = res.headers.get('content-type') || '';
-          if (res.ok && contentType.includes('application/json')) {
-            const cloudJson = await res.json();
-            if (cloudJson && (cloudJson.drugNameEn || cloudJson.drugNameAr || cloudJson.matchedDrugId || cloudJson.tradeName || cloudJson.genericName)) {
-              data = cloudJson;
-            }
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('application/json')) {
+          const data = await res.json();
+          
+          if (!data || (!data.drugNameEn && !data.drugNameAr && !data.matchedDrugId && !data.tradeName && !data.genericName)) {
+            throw new Error(data?.error || (isAr ? 'لم يتم العثور على اسم دواء مقروء في الصورة' : 'No readable medicine name found'));
           }
-        } catch (cloudErr) {
-          console.warn('Cloud Vision OCR request failed, switching to on-device OCR:', cloudErr);
-        }
 
-        // 2. Attempt 2: Embedded On-Device Tesseract OCR (works offline, in browser, with 0 API keys)
-        if (!data || (!data.drugNameEn && !data.drugNameAr && !data.matchedDrugId && !data.tradeName && !data.genericName)) {
-          setOcrStatusText(isAr ? 'جاري استخراج اسم الدواء والتركيز عبر محرك OCR الذاتي المباشر...' : 'Reading text with on-device OCR engine...');
-          try {
-            const ocrRes = await Tesseract.recognize(fullBase64, 'eng');
-            const ocrText = ocrRes?.data?.text || '';
-            if (ocrText && ocrText.trim().length > 0) {
-              const parsed = parsePediatricMedicineFromText(ocrText);
-              if (parsed) {
-                data = parsed;
-                isClientOcrUsed = true;
-              }
-            }
-          } catch (tessErr) {
-            console.warn('On-device Tesseract OCR error:', tessErr);
-          }
-        }
-
-        if (data && (data.drugNameEn || data.drugNameAr || data.matchedDrugId || data.tradeName || data.genericName)) {
           // 1. Detect formulation
           if (data.formulation && ['syrup', 'ointment', 'drops', 'spray', 'injection'].includes(data.formulation)) {
             setSelectedFormulation(data.formulation);
@@ -384,24 +348,24 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
 
           setOcrSuccessMsg(
             isAr
-              ? `✅ تم التعرف بنجاح على الدواء${isClientOcrUsed ? ' (محرك OCR المباشر)' : ''}: ${displayName} ${data.tradeName ? `(${data.tradeName})` : ''} ${strengthText ? `— تركيز: ${strengthText}` : ''} — الشكل: ${data.formulation || 'شراب'}`
-              : `✅ Detected${isClientOcrUsed ? ' (On-Device OCR)' : ''}: ${displayName} ${data.tradeName ? `(${data.tradeName})` : ''} ${strengthText ? `— ${strengthText}` : ''} — Form: ${data.formulation || 'syrup'}`
+              ? `✅ تم التعرف بنجاح على الدواء: ${displayName} ${data.tradeName ? `(${data.tradeName})` : ''} ${strengthText ? `— تركيز: ${strengthText}` : ''} — الشكل: ${data.formulation || 'شراب'}`
+              : `✅ Detected: ${displayName} ${data.tradeName ? `(${data.tradeName})` : ''} ${strengthText ? `— ${strengthText}` : ''} — Form: ${data.formulation || 'syrup'}`
           );
         } else {
           setDetectedDrugCard(null);
-          setOcrErrorMsg(
-            isAr
-              ? 'تعذر قراءة اسم الدواء بدقة من الصورة. يرجى اختيار الدواء من الأزرار السريعة أدناه، أو إدخال البيانات يدوياً.'
-              : 'Could not clearly recognize the medicine name. Please choose from the quick medication buttons below or enter details manually.'
-          );
+          let errMsg = isAr ? 'تعذر قراءة بيانات الدواء من الصورة تلقائياً' : 'Could not read medicine data from image';
+          try {
+            const errData = await res.json();
+            if (errData && errData.error) errMsg = errData.error;
+          } catch (_) {}
+          setOcrErrorMsg(errMsg);
         }
       } catch (err: any) {
         setDetectedDrugCard(null);
         console.error('OCR Error:', err);
-        setOcrErrorMsg(err.message || (isAr ? 'تعذر قراءة الصورة بوضوح، يرجى التأكد من الإضاءة أو اختيار الدواء مباشرة' : 'Could not read image clearly, please pick medicine directly'));
+        setOcrErrorMsg(err.message || (isAr ? 'تعذر قراءة الصورة بوضوح، يرجى التأكد من الإضاءة أو إدخال البيانات يدوياً' : 'Could not read image clearly, please enter manually'));
       } finally {
         setIsScanningOcr(false);
-        setOcrStatusText(null);
         if (fileInputRef.current) fileInputRef.current.value = '';
       }
     };
@@ -660,134 +624,16 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
 
             {/* Direct Download Update ZIP Button */}
             <a
-              id="pediatric-download-zip-btn"
               href="/dose_pediatric_update.zip"
               download="dose_pediatric_update.zip"
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs md:text-sm transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 ring-2 ring-amber-400/50 hover:scale-105 active:scale-95"
-              title={isAr ? 'تنزيل حزمة التحديث البرمجية dose_pediatric_update.zip' : 'Download Update ZIP'}
+              className="px-3.5 py-2.5 rounded-2xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs md:text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm"
+              title={isAr ? 'تنزيل حزمة التحديث البرمجية للنشر على Vercel' : 'Download Update ZIP for Vercel'}
             >
-              <Download className="w-4 h-4 text-slate-950 stroke-[2.5]" />
+              <Download className="w-4 h-4 text-amber-400" />
               <span>{isAr ? 'تحميل التحديث (ZIP)' : 'Download ZIP'}</span>
             </a>
-
-            {/* Optional Gemini API Key Settings Button */}
-            <button
-              type="button"
-              onClick={() => setShowApiKeyModal(!showApiKeyModal)}
-              className="px-3 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
-              title={isAr ? 'إعداد مفتاح Gemini API السحابي (اختياري)' : 'Cloud API Key (Optional)'}
-            >
-              <Key className="w-3.5 h-3.5 text-teal-400" />
-              <span className="hidden sm:inline">{userGeminiApiKey ? (isAr ? 'مفتاح API مفعّل' : 'API Key Active') : (isAr ? 'مفتاح API' : 'API Key')}</span>
-            </button>
           </div>
         </div>
-
-        {/* Gemini API Key Configuration Drawer */}
-        {showApiKeyModal && (
-          <div className="mt-4 p-4 rounded-2xl bg-slate-900/90 border border-teal-500/30 text-xs space-y-2 animate-fadeIn">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-teal-300 flex items-center gap-1.5">
-                <Key className="w-4 h-4 text-teal-400" />
-                <span>{isAr ? 'مفتاح Gemini API السحابي (للقراءة البصرية فائقة الدقة على Vercel):' : 'Cloud Gemini API Key (For High-Res Vercel Vision):'}</span>
-              </span>
-              <button 
-                type="button" 
-                onClick={() => setShowApiKeyModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-slate-400 text-[11px]">
-              {isAr 
-                ? 'إذا لم تقم بإدخال مفتاح، سيعمل محرك التعرف الذاتي المدمج في المتصفح تلقائياً (Offline OCR) مجاناً وبدون أي إعدادات.'
-                : 'If no key is entered, the embedded browser OCR engine operates automatically for free with 0 setup.'}
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={userGeminiApiKey}
-                onChange={(e) => {
-                  const val = e.target.value.trim();
-                  setUserGeminiApiKey(val);
-                  try { localStorage.setItem('user_gemini_api_key', val); } catch (_) {}
-                }}
-                className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
-              />
-              {userGeminiApiKey && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setUserGeminiApiKey('');
-                    try { localStorage.removeItem('user_gemini_api_key'); } catch (_) {}
-                  }}
-                  className="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold"
-                >
-                  {isAr ? 'مسح' : 'Clear'}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Quick Common Pediatric Drugs Direct Selector */}
-        <div className="mt-4 pt-3 border-t border-slate-800/80">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5">
-              <span>⚡</span>
-              <span>{isAr ? 'أدوية الأطفال الشائعة (تحديد فوري بنقرة واحدة):' : 'Top Pediatric Medications (1-Tap Selection):'}</span>
-            </span>
-            <span className="text-[10px] text-teal-400 font-medium">{isAr ? 'تحديث فوري للجرعة بـ مل' : 'Instant mL Dose'}</span>
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {[
-              { id: 'amoxicillin_clavulanate', name: isAr ? 'أوجمنتين / كيورام 457' : 'Augmentin 457', conc: 457, form: 'syrup' as const },
-              { id: 'amoxicillin', name: isAr ? 'أموكسيل 250' : 'Amoxil 250', conc: 250, form: 'syrup' as const },
-              { id: 'paracetamol', name: isAr ? 'بانادول / أدول 120' : 'Panadol 120', conc: 120, form: 'syrup' as const },
-              { id: 'ibuprofen', name: isAr ? 'بروفين 100' : 'Brufen 100', conc: 100, form: 'syrup' as const },
-              { id: 'cefixime', name: isAr ? 'سوبراكس 100' : 'Suprax 100', conc: 100, form: 'syrup' as const },
-              { id: 'cefuroxime', name: isAr ? 'زينات 125' : 'Zinnat 125', conc: 125, form: 'syrup' as const },
-              { id: 'cefaclor', name: isAr ? 'سيكلور 125' : 'Ceclor 125', conc: 125, form: 'syrup' as const },
-              { id: 'azithromycin', name: isAr ? 'زيثروماكس 200' : 'Zithromax 200', conc: 200, form: 'syrup' as const },
-              { id: 'clarithromycin', name: isAr ? 'كلاسيد 125' : 'Klacid 125', conc: 125, form: 'syrup' as const },
-              { id: 'metronidazole', name: isAr ? 'فلاجيل 125' : 'Flagyl 125', conc: 125, form: 'syrup' as const },
-              { id: 'salbutamol', name: isAr ? 'فنتولين شراب 2' : 'Ventolin 2mg', conc: 2, form: 'syrup' as const },
-            ].map(fastDrug => {
-              const isSelected = selectedDrugId === fastDrug.id && !isCustomDrugMode;
-              return (
-                <button
-                  key={fastDrug.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDrugId(fastDrug.id);
-                    setIsCustomDrugMode(false);
-                    setSelectedFormulation(fastDrug.form);
-                    setActiveConcentration(fastDrug.conc);
-                    setIsUsingCustomConc(false);
-                    setOcrErrorMsg(null);
-                  }}
-                  className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-all border ${
-                    isSelected
-                      ? 'bg-teal-500/20 border-teal-500 text-teal-300 shadow-sm'
-                      : 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700/70 text-slate-300'
-                  }`}
-                >
-                  {fastDrug.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* OCR Scanning Progress Indicator */}
-        {isScanningOcr && (
-          <div className="mt-4 p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs md:text-sm flex items-center gap-3 animate-pulse">
-            <Loader2 className="w-5 h-5 shrink-0 animate-spin text-teal-400" />
-            <span className="font-semibold">{ocrStatusText || (isAr ? 'جاري فحص الصورة واستخراج بيانات الدواء...' : 'Scanning image and extracting drug data...')}</span>
-          </div>
-        )}
 
         {/* OCR Feedback Message */}
         {ocrSuccessMsg && (

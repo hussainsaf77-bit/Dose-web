@@ -58,8 +58,8 @@ fi
 
 echo "🔄 جاري رفع التحديث المكتمل إلى GitHub..."
 git add -A
-git commit -m "feat: deploy pediatric vision AI with on-device OCR and instant dosing" || true
-git push origin main --force || git push origin master --force || git push origin HEAD --force
+git commit -m "feat(v3.6): clean production bundle, fixed 25-OH/HOMA-IR parser, and Vercel serverless integration" || true
+git push origin main || git push origin master
 
 echo ""
 echo "=============================================="
