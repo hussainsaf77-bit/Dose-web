@@ -182,7 +182,7 @@ export interface PatientProfile {
 }
 
 // ── Pediatric Dosing Types ──
-export type PediatricFormulationType = 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection';
+export type PediatricFormulationType = 'syrup' | 'drops' | 'suppository' | 'ointment' | 'spray' | 'injection' | 'sachet';
 
 export type PediatricInfectionSite = 'general' | 'ear' | 'lung' | 'pharynx' | 'urinary' | 'skin';
 

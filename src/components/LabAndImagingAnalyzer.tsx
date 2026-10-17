@@ -362,7 +362,10 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
 
   // User Gemini API key & Settings
   const [userGeminiApiKey, setUserGeminiApiKey] = useState(() => {
-    try { return localStorage.getItem('user_gemini_api_key') || ''; } catch { return ''; }
+    try { return localStorage.getItem('user_gemini_api_key') || localStorage.getItem('gemini_api_key') || ''; } catch { return ''; }
+  });
+  const [tempApiKey, setTempApiKey] = useState(() => {
+    try { return localStorage.getItem('user_gemini_api_key') || localStorage.getItem('gemini_api_key') || ''; } catch { return ''; }
   });
   const [showApiKeySetting, setShowApiKeySetting] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<string | null>(null);
@@ -778,7 +781,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
         const contentType = response.headers.get('content-type') || '';
         if (response.ok && contentType.includes('application/json')) {
           const data = await response.json();
-          if (data && data.items && data.items.length > 0) {
+          if (data && data.isValidReport !== false && data.items && data.items.length > 0) {
             setResult({ ...data, isValidReport: true });
             setEditableItems(data.items);
             analyzedSuccessfully = true;
@@ -786,6 +789,119 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
         }
       } catch (fetchErr: any) {
         console.warn('Lab/Imaging server fetch error, engaging client engine:', fetchErr);
+      }
+
+      // 1.5. Direct Client-Side Gemini Vision Call (If user has Gemini API Key or VITE_GEMINI_API_KEY)
+      const directKey = userGeminiApiKey?.trim() || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      if (!analyzedSuccessfully && directKey && activeDataUrl) {
+        try {
+          setOcrStatus('جاري القراءة والتشخيص المباشر بالرؤية البصرية عبر Gemini Vision...');
+          let base64Clean = activeDataUrl;
+          let mime = 'image/jpeg';
+          if (activeDataUrl.startsWith('data:')) {
+            const p = activeDataUrl.split(',');
+            mime = p[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            base64Clean = p[1];
+          }
+
+          const isLab = analysisType === 'lab';
+          const genderLabel = patientGender === 'female' ? 'أنثى' : patientGender === 'male' ? 'ذكر' : 'غير محدد';
+          const ageLabel = patientAge ? `${patientAge} سنة` : 'غير محدد';
+
+          const clientPrompt = isLab
+            ? `أنت استشاري الطب المخبري والتحاليل السريرية وعلم الأمراض (Consultant Clinical Pathologist).
+قم بقراءة وتحليل صورة الفحص المخبري المرفقة (ورقة التحليل الطبي) واستخراج كافة النتائج بدقة متناهية.
+[بيانات المريض: الجنس: ${genderLabel} | العمر: ${ageLabel} - راعِ النطاقات المرجعية الخاصة بهذا الجنس والعمر بدقة]
+الملاحظات: ${customPrompt || textNotes || 'قراءة وتحليل صورة فحص مخبري'}.
+
+المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
+{
+  "isValidReport": true,
+  "testName": "اسم التقرير أو باقة الفحوصات بدقة",
+  "clinicalSummaryTitle": "الخلاصة الإكلينيكية والتشخيص المرجح بدقة",
+  "urgencyLevel": "normal أو medium أو high أو critical",
+  "items": [
+    {
+      "name": "اسم الفحص (عربي وإنجليزي)",
+      "value": "القيمة المقروءة مع الوحدة بدقة وفواصلها العشرية الكاملة",
+      "referenceRange": "المدى المرجعي السليم",
+      "status": "normal أو high أو low أو critical"
+    }
+  ],
+  "detailedExplanation": "تقرير سريري تفصيلي يشرح معنى النتائج، أسباب الارتفاع أو الانخفاض، والربط الفسيولوجي للمريض بلغة طبية واضحة ومطمئنة",
+  "recommendations": [
+    "توصيات طبية وعلاجية وغذائية دقيقة"
+  ]
+}`
+            : `أنت استشاري التشخيص الإشعاعي والتصوير الطبي (Consultant Diagnostic Radiologist).
+قم بقراءة وفحص صورة الفحص الشعاعي المرفقة (${imagingModality.toUpperCase()} لمنطقة ${anatomicalRegion}).
+الملاحظات: ${customPrompt || textNotes || 'فحص شعاعي تشخيصي'}.
+
+المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
+{
+  "isValidReport": true,
+  "testName": "اسم الفحص الإشعاعي والمنطقة بدقة",
+  "clinicalSummaryTitle": "الخلاصة الإشعاعية والتشخيص الدقيق",
+  "urgencyLevel": "normal أو medium أو high أو critical",
+  "items": [
+    {
+      "name": "العنصر التشريحي / البنية العظمية أو النسيجية",
+      "value": "الملاحظة السريرية المحددة بدقة",
+      "referenceRange": "المعيار التشريحي الطبيعي",
+      "status": "normal أو high أو low أو critical"
+    }
+  ],
+  "detailedExplanation": "تقرير إشعاعي سريري تفصيلي وشامل يوضح حالة العظام، المفاصل، الأنسجة الرخوة، أو الأعضاء المستهدفة بدقة",
+  "recommendations": [
+    "توصيات سريرية للمتابعة أو الفحوصات الإضافية والعلاج"
+  ]
+}`;
+
+          const visionModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+          for (const vModel of visionModels) {
+            try {
+              const geminiRes = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${vModel}:generateContent?key=${directKey}`,
+                {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    contents: [{
+                      parts: [
+                        { inlineData: { mimeType: mime, data: base64Clean } },
+                        { text: clientPrompt }
+                      ]
+                    }],
+                    generationConfig: {
+                      responseMimeType: 'application/json',
+                      temperature: 0.1
+                    }
+                  })
+                }
+              );
+
+              if (geminiRes.ok) {
+                const gData = await geminiRes.json();
+                const textResp = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (textResp) {
+                  const parsedG = JSON.parse(textResp);
+                  if (parsedG && Array.isArray(parsedG.items) && parsedG.items.length > 0) {
+                    setResult({ ...parsedG, isValidReport: true });
+                    setEditableItems(parsedG.items);
+                    analyzedSuccessfully = true;
+                    break;
+                  }
+                }
+              }
+            } catch (vErr) {
+              console.warn(`Direct client Gemini model ${vModel} error:`, vErr);
+            }
+          }
+        } catch (directErr) {
+          console.warn('Direct client Gemini vision attempt failed:', directErr);
+        } finally {
+          setOcrStatus(null);
+        }
       }
 
       // 2. Second attempt: Client-Side OCR with Tesseract.js (Extracts real text directly from the image)
@@ -1023,10 +1139,10 @@ ${recsText}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800 flex-wrap">
             <button
               onClick={() => { setAnalysisType('lab'); setResult(null); }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 analysisType === 'lab'
                   ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -1037,7 +1153,7 @@ ${recsText}
             </button>
             <button
               onClick={() => { setAnalysisType('imaging'); setResult(null); }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 analysisType === 'imaging'
                   ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
                   : 'text-slate-400 hover:text-white'
@@ -1045,6 +1161,15 @@ ${recsText}
             >
               <span>🩻</span>
               <span>الأشعة والتصوير</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowApiKeySetting(true)}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="ضبط مفتاح الذكاء الاصطناعي الطبي Gemini Vision"
+            >
+              <Key className="w-3.5 h-3.5 text-amber-400" />
+              <span>{userGeminiApiKey ? 'مفتاح AI مفعل ✓' : 'مفتاح الذكاء الاصطناعي'}</span>
             </button>
           </div>
         </div>
@@ -2452,6 +2577,121 @@ ${recsText}
           )}
         </div>
       </div>
+
+      {/* API Key Modal for Gemini Vision */}
+      {showApiKeySetting && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-right relative">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <Key className="w-5 h-5" />
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-white">إعداد مفتاح الذكاء الاصطناعي (Gemini Vision)</h3>
+                  <p className="text-xs text-slate-400">للقراءة البصرية فائقة الدقة لصور التحاليل والأشعة الطبية</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApiKeySetting(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
+              <p>
+                يتيح لك هذا الخيار ربط مفتاح <strong className="text-amber-300 font-semibold">Google Gemini API</strong> مباشرة بالمتصفح ليقوم بالتشخيص الإشعاعي والمخبري البصري الحي بنسبة دقة 100% دون الاعتماد على أي خوادم وسيطة.
+              </p>
+              
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-200">
+                  أدخل مفتاح Gemini API الخاص بك:
+                </label>
+                <input
+                  type="text"
+                  value={tempApiKey}
+                  onChange={(e) => setTempApiKey(e.target.value)}
+                  placeholder="AIzaSy..."
+                  dir="ltr"
+                  className="w-full bg-slate-950 border border-slate-750 focus:border-amber-400 rounded-xl px-3 py-2.5 text-xs text-white font-mono outline-none transition-colors"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5 text-[11px] text-slate-400">
+                <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Info className="w-3.5 h-3.5" />
+                  <span>كيف تحصل على مفتاح مجاني؟</span>
+                </div>
+                <p>
+                  يمكنك الحصول على مفتاح رسمي مجاني خلال دقيقة واحدة من منصة Google AI Studio:
+                </p>
+                <a
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 underline font-mono text-xs"
+                >
+                  <span>https://aistudio.google.com/apikey</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const cleaned = tempApiKey.trim();
+                  setUserGeminiApiKey(cleaned);
+                  try {
+                    if (cleaned) {
+                      localStorage.setItem('user_gemini_api_key', cleaned);
+                      localStorage.setItem('gemini_api_key', cleaned);
+                    } else {
+                      localStorage.removeItem('user_gemini_api_key');
+                      localStorage.removeItem('gemini_api_key');
+                    }
+                  } catch (e) {
+                    console.warn(e);
+                  }
+                  setShowApiKeySetting(false);
+                }}
+                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-teal-500 hover:from-amber-400 hover:to-teal-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all text-center cursor-pointer"
+              >
+                حفظ وتفعيل المفتاح
+              </button>
+
+              {userGeminiApiKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTempApiKey('');
+                    setUserGeminiApiKey('');
+                    try {
+                      localStorage.removeItem('user_gemini_api_key');
+                      localStorage.removeItem('gemini_api_key');
+                    } catch (e) {}
+                  }}
+                  className="py-2.5 px-3 bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+                >
+                  مسح المفتاح
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowApiKeySetting(false)}
+                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
