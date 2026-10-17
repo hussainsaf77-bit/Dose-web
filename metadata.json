@@ -1,0 +1,6 @@
+{
+  "name": "Telegram Bot & Web Sync Platform",
+  "description": "منصة جرعة (Dose) الطبية المتكاملة مع بوت تليجرام وحاسبة الجرعات وفحص التفاعلات ونظام الاشتراكات الموحد",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

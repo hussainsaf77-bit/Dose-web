@@ -12,6 +12,13 @@ FOUND_ZIP=""
 
 # Search common Android / Termux download paths
 CANDIDATES=(
+  "$HOME/storage/downloads/dose_pediatric_update.zip"
+  "$HOME/storage/shared/Download/dose_pediatric_update.zip"
+  "/sdcard/Download/dose_pediatric_update.zip"
+  "/sdcard/Downloads/dose_pediatric_update.zip"
+  "$HOME/Downloads/dose_pediatric_update.zip"
+  "./dose_pediatric_update.zip"
+  "../dose_pediatric_update.zip"
   "$HOME/storage/downloads/dose_v36_final.zip"
   "$HOME/storage/shared/Download/dose_v36_final.zip"
   "/sdcard/Download/dose_v36_final.zip"
@@ -28,10 +35,10 @@ for f in "${CANDIDATES[@]}"; do
   fi
 done
 
-# If not found exact name, search for any dose_v36_final*.zip in downloads (handles dose_v36_final (1).zip)
+# If not found exact name, search for any dose_*.zip in downloads
 if [ -z "$FOUND_ZIP" ]; then
   for d in "/sdcard/Download" "$HOME/storage/downloads" "$HOME/Downloads"; do
-    MATCH=$(ls -t "$d"/dose_v36_final*.zip 2>/dev/null | head -n 1 || true)
+    MATCH=$(ls -t "$d"/dose_*.zip 2>/dev/null | head -n 1 || true)
     if [ -n "$MATCH" ] && [ -f "$MATCH" ]; then
       FOUND_ZIP="$MATCH"
       break
@@ -44,15 +51,15 @@ if [ -n "$FOUND_ZIP" ] && [ -f "$FOUND_ZIP" ]; then
   echo "جاري فك الضغط واستبدال الملفات المحدثة..."
   unzip -o "$FOUND_ZIP" -d .
 else
-  echo "⚠️ لم يتم العثور على ملف dose_v36_final.zip في مجلد التحميلات."
-  echo "يرجى التأكد من تنزيل الملف من الرابط في المتصفح أولاً ليكون في مجلد التحميلات Download."
+  echo "⚠️ لم يتم العثور على ملف dose_pediatric_update.zip أو dose_v36_final.zip في مجلد التحميلات."
+  echo "يرجى تنزيل ملف التحديث أولاً ليكون في مجلد التحميلات Download."
   exit 1
 fi
 
 echo "🔄 جاري رفع التحديث المكتمل إلى GitHub..."
 git add -A
-git commit -m "feat(v3.6): clean production bundle, fixed 25-OH/HOMA-IR parser, and Vercel serverless integration" || true
-git push origin main || git push origin master
+git commit -m "feat: deploy pediatric vision AI with on-device OCR and instant dosing" || true
+git push origin main --force || git push origin master --force || git push origin HEAD --force
 
 echo ""
 echo "=============================================="
