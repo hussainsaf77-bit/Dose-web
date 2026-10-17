@@ -567,7 +567,9 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
       reader.onloadend = async () => {
         const dataUrl = reader.result as string;
         try {
-          const optimized = await enhanceImageForMedicalOcr(dataUrl);
+          // IMPORTANT: Only enhance contrast for paper lab reports.
+          // NEVER binarize imaging/radiology (X-Ray, CT, MRI, Ultrasound), as it destroys subtle grayscale bone, lung, and soft-tissue details!
+          const optimized = analysisType === 'lab' ? await enhanceImageForMedicalOcr(dataUrl) : dataUrl;
           setPreviewUrl(optimized);
         } catch {
           setPreviewUrl(dataUrl);
@@ -834,8 +836,15 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
   ]
 }`
             : `أنت استشاري التشخيص الإشعاعي والتصوير الطبي (Consultant Diagnostic Radiologist).
-قم بقراءة وفحص صورة الفحص الشعاعي المرفقة (${imagingModality.toUpperCase()} لمنطقة ${anatomicalRegion}).
-الملاحظات: ${customPrompt || textNotes || 'فحص شعاعي تشخيصي'}.
+قم بقراءة وفحص صورة الفحص الشعاعي المرفقة (${imagingModality.toUpperCase()} لمنطقة ${anatomicalRegion}) بدقة تشخيصية سريرية متقدمة.
+الملاحظات السريرية: ${customPrompt || textNotes || 'فحص شعاعي تشخيصي'}.
+
+معايير التقييم الشعاعي المنهجي:
+1. فحص الصدر (CXR): تقييم ABCDEF (المجرى الهوائي والبلعوم، العظام والقفص الصدري والترقوة، ظل القلب ومؤشر CTR، الحجاب الحاجز والزوايا الضلعية الحجابية Costophrenic Angles، الأنسجة الرخوة، حقول الرئة: الارتشاح Consolidation، الانصباب Effusion، استرواح الصدر Pneumothorax، والعقد الرئوية).
+2. فحص العظام والمفاصل (MSK): تقييم ABCs (المحاذاة والخلع Alignment، سلامة القشرة العظمية ونفي الشروخ والكسور الشعرية Cortical continuity، المفاصل والغضاريف Cartilage، وتورم الأنسجة الرخوة Soft tissues).
+3. فحص العمود الفقري: استقامة الفقرات، الفراغات بين الفقرات، وأي انزلاق أو كسر انضغاطي.
+4. فحص البطن والحوض: توزيع الغازات، أي هواء حر تحت الحجاب الحاجز (Pneumoperitoneum)، أو ظلال تكلسية وحصوات.
+5. راعِ احتمالية وجود انعكاسات ضوئية إذا كانت الصورة ملتقطة لشاشة أو فيلم، وركز على التراكيب التشريحية الحقيقية بدقة.
 
 المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
 {
@@ -857,7 +866,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
   ]
 }`;
 
-          const visionModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+          const visionModels = ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
           for (const vModel of visionModels) {
             try {
               const geminiRes = await fetch(

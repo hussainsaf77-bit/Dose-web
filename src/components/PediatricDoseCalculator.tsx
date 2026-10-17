@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { 
   Baby, AlertCircle, CheckCircle, Droplets, Clock, Calculator, ShieldAlert, 
   Sparkles, Camera, Upload, Loader2, RefreshCw, Search, Syringe, Wind, 
-  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, Key
+  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, Key, ArrowRight
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { parsePediatricMedicineFromText } from '../utils/pediatricMedicineParser';
@@ -603,7 +603,7 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   };
 
   // Sync / Calculate with Dedicated Clinical API Endpoint
-  const handleClinicalApiSync = async () => {
+  const handleClinicalApiSync = async (overrideDrugName?: string) => {
     const wt = parseFloat(weightKg);
     if (isNaN(wt) || wt <= 0) {
       setApiError(isAr ? 'يرجى إدخال وزن صحيح للطفل أولاً' : 'Please provide a valid child weight');
@@ -613,9 +613,9 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     setIsCallingApi(true);
     setApiError(null);
 
-    const drugNameToUse = isCustomDrugMode 
-      ? customDrugName 
-      : (isAr ? currentDrug.name_ar : currentDrug.name_en);
+    const drugNameToUse = overrideDrugName 
+      ? overrideDrugName 
+      : (isCustomDrugMode ? customDrugName : (isAr ? currentDrug.name_ar : currentDrug.name_en));
 
     try {
       const res = await fetch(getApiUrl('/api/medical/pediatric-dose'), {
@@ -636,6 +636,12 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
       if (res.ok) {
         const data: PediatricApiDoseResult = await res.json();
         setApiResult(data);
+        if (data.minMpk) {
+          setCustomMpk(String(data.minMpk));
+        }
+        if (data.dosesPerDay) {
+          setCustomDosesPerDay(data.dosesPerDay);
+        }
       } else {
         const errData = await res.json().catch(() => ({}));
         setApiError(errData.error || (isAr ? 'حدث خطأ أثناء الاتصال بالـ API السريري' : 'Clinical API error'));
@@ -646,6 +652,13 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     } finally {
       setIsCallingApi(false);
     }
+  };
+
+  const handleAiDrugQuickSelect = (queryName: string) => {
+    setIsCustomDrugMode(true);
+    setCustomDrugName(queryName);
+    setSearchQuery('');
+    handleClinicalApiSync(queryName);
   };
 
   // Local Rule-Based Dose Calculation Logic
@@ -1397,7 +1410,31 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                       ))
                     ) : (
                       <div className="p-3 text-center text-xs text-slate-400">
-                        {isAr ? 'لم يتم العثور على دواء مطابق تماماً، يمكنك استخدام زر «+ دواء مخصص» أعلاه.' : 'No matching medication found.'}
+                        {isAr ? 'لم يتم العثور على دواء مطابق في القائمة السريعة.' : 'No matching medication in quick list.'}
+                      </div>
+                    )}
+
+                    {/* Instant AI Clinical Lookup for ANY typed drug */}
+                    {searchQuery.trim().length > 1 && (
+                      <div className="pt-2 mt-2 border-t border-slate-800">
+                        <button
+                          type="button"
+                          onClick={() => handleAiDrugQuickSelect(searchQuery.trim())}
+                          className="w-full text-right p-2.5 rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/80 to-purple-950/80 hover:from-indigo-900 hover:to-purple-900 text-indigo-200 transition-all flex items-center justify-between gap-2 text-xs font-bold shadow-md group cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-indigo-400 group-hover:rotate-12 transition-transform shrink-0" />
+                            <div>
+                              <span className="block font-bold text-white">
+                                {isAr ? `جلب جرعة «${searchQuery.trim()}» بالذكاء السريري الشامل` : `Fetch "${searchQuery.trim()}" dose via Clinical AI`}
+                              </span>
+                              <span className="block text-[10px] text-indigo-300 font-normal">
+                                {isAr ? 'حساب فوري معتمد من مراجع BNFC & Harriet Lane لأي دواء عالمي أو تجاري' : 'Instant clinical calculation for any international/commercial medication'}
+                              </span>
+                            </div>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-indigo-400 shrink-0 rotate-180" />
+                        </button>
                       </div>
                     )}
                   </div>

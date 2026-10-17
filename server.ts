@@ -3237,8 +3237,10 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     }
     parts.push({ text: prompt });
 
-    // Multi-model resilience fallback
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
+    // Multi-model resilience fallback - for imaging, prioritize high-detail vision models (gemini-3.8-flash, gemini-4-argon)
+    const candidateModels = isImaging
+      ? ["gemini-3.8-flash", "gemini-4-argon", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+      : ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
     let modelReportRejection: any = null;
 
     for (const modelName of candidateModels) {
@@ -3904,25 +3906,28 @@ app.post("/api/medical/prescription-ocr", async (req, res) => {
 
   let extractedInfo: any = null;
   if (ai) {
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
-    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, and injections).
-Analyze this medical image (doctor prescription, medicine box, bottle, vial, or tube).
+    const candidateModels = ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, suppositories, and injections).
+Analyze this medical image (doctor prescription, medicine box, bottle, vial, suppository pack, or tube).
 
 CRITICAL INSTRUCTIONS:
 1. Examine the image carefully. Identify the EXACT drug name written on the box, label, or prescription.
-   - Look for Antibiotics: Amoxicillin, Amoxil, Augmentin, Curam, Klavox, Megamox, Hibiotic, Cefixime, Suprax, Azithromycin, Zithromax, Ceftriaxone, Rocephin, Cefuroxime, Zinnat, etc.
-   - Look for Antipyretics/NSAIDs: Paracetamol, Panadol, Adol, Tempra, Cetal, Fevadol, Ibuprofen, Brufen, Advil.
-   - Look for Respiratory: Salbutamol, Ventolin, Budesonide, Pulmicort.
-   - Look for Antihistamines: Cetirizine, Zyrtec, Levocetirizine, Desloratadine.
+   - Look for Antibiotics: Amoxicillin, Amoxil, Augmentin, Curam, Klavox, Megamox, Hibiotic, Cefixime, Suprax, Azithromycin, Zithromax, Ceftriaxone, Rocephin, Cefuroxime, Zinnat, Cefaclor, Ceclor, Clarithromycin, Klacid, Metronidazole, Flagyl, Cefotaxime, Claforan, etc.
+   - Look for Antipyretics/NSAIDs: Paracetamol, Panadol, Adol, Tempra, Cetal, Fevadol, Ibuprofen, Brufen, Advil, Profinal.
+   - Look for Respiratory & Cough: Salbutamol, Ventolin, Budesonide, Pulmicort, Prospan, Mucosolvan, Ambroxol, Dexamethasone, Decadron.
+   - Look for Antihistamines & Allergy: Cetirizine, Zyrtec, Dimetindene, Fenistil, Loratadine, Claritin.
+   - Look for GI & Colic: Ondansetron, Zofran, Domperidone, Motilium, Simethicone, Dentinox, Infacol, ORS, Pedialyte.
    - Look for Topicals/Drops: Mupirocin, Bactroban, Hydrocortisone, Fucidin, Tobramycin, Tobrex, Ciprofloxacin.
 2. Formulation type:
-   - "syrup": oral suspension, dry powder for syrup, drops with spoon/syringe, elixir, solution.
+   - "syrup": oral suspension, dry powder for syrup, elixir, solution.
    - "ointment": cream, ointment, topical gel.
-   - "drops": eye drops, ear drops, nasal drops, infant oral drops (e.g. 100mg/ml).
+   - "drops": infant oral drops (e.g. 100mg/ml, Fenistil, Dentinox), eye drops, ear drops.
+   - "suppository": rectal suppositories (e.g. Adol 125/250, Brufen 60/125).
    - "spray": inhaler (MDI), nasal spray, nebulizer suspension.
    - "injection": vial, ampoule, IV/IM powder.
+   - "sachet": oral rehydration salts / soluble powder.
 3. Concentration / Strength:
-   - Extract numeric strength for syrups in mg per 5ml (e.g. 125, 250, 400, 457, 600, 120, 200, 100).
+   - Extract numeric strength for syrups in mg per 5ml (e.g. 125, 156, 200, 228, 250, 312, 400, 457, 600, 120, 100).
    - If written as "250mg/5ml", extract concentrationMgPer5ml: 250.
    - If written as "457mg/5ml", extract concentrationMgPer5ml: 457.
    - If drops (e.g. 100mg/ml), extract concentrationText: "100mg/ml".
@@ -3941,8 +3946,8 @@ OUTPUT JSON SCHEMA ONLY:
   "drugNameEn": "Exact Generic or Trade Name in English",
   "tradeName": "Brand name if visible (e.g. Augmentin, Amoxil, Suprax, Brufen, Panadol)",
   "genericName": "Active scientific ingredient (e.g. Amoxicillin, Paracetamol, Ibuprofen)",
-  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "tobramycin" | "other",
-  "formulation": "syrup" | "ointment" | "drops" | "spray" | "injection",
+  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "cefalexin" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "dexamethasone" | "dimetindene" | "prospan" | "mucosolvan" | "simethicone" | "cefotaxime" | "ors" | "tobramycin" | "other",
+  "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
