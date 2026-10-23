@@ -1,28 +1,40 @@
 // Multi-Drug Clinical Pharmacology Analysis Engine for Vercel Serverless Functions
 // Supports any pair or multi-drug combination in Arabic or English
 
+export function cleanDrugToken(t) {
+  return (t || '')
+    .toLowerCase()
+    .replace(/[ًٌٍَُِّْـ]/g, '')
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/ئ|ؤ/g, 'ء')
+    .trim();
+}
+
 export function identifyDrugClasses(token) {
-  const t = (token || '').toLowerCase().trim();
+  const raw = (token || '').toLowerCase().trim();
+  const t = cleanDrugToken(token);
   const classes = [];
   let name = (token || '').trim();
 
   // 1. Anticoagulants
   if (
-    t.includes('warfarin') || t.includes('وارفارين') || t.includes('coumadin') || t.includes('كومادين') ||
+    t.includes('warfarin') || t.includes('وارفار') || t.includes('وارفر') || t.includes('coumadin') || t.includes('كومادين') ||
     t.includes('marivan') || t.includes('ماريفان') || t.includes('sintrom') || t.includes('سينتروم')
   ) {
     classes.push('anticoagulant_vka', 'anticoagulant', 'bleeding_risk');
     name = 'وارفارين (Warfarin)';
   } else if (
-    t.includes('apixaban') || t.includes('أبيكسابان') || t.includes('eliquis') || t.includes('إليكويس') ||
+    t.includes('apixaban') || t.includes('ابيكسابان') || t.includes('eliquis') || t.includes('اليكويس') ||
     t.includes('rivaroxaban') || t.includes('ريفاروكسابان') || t.includes('xarelto') || t.includes('زاريلتو') ||
     t.includes('dabigatran') || t.includes('دابيجاتران') || t.includes('pradaxa') || t.includes('براداكسا') ||
     t.includes('edoxaban') || t.includes('lixiana')
   ) {
     classes.push('anticoagulant_doac', 'anticoagulant', 'bleeding_risk');
   } else if (
-    t.includes('clexane') || t.includes('كليكسان') || t.includes('enoxaparin') || t.includes('إينوكسابارين') ||
-    t.includes('heparin') || t.includes('هيبارين') || t.includes('fondaparinux') || t.includes('أريكسترا')
+    t.includes('clexane') || t.includes('كليكسان') || t.includes('enoxaparin') || t.includes('اينوكسابارين') ||
+    t.includes('heparin') || t.includes('هيبارين') || t.includes('fondaparinux') || t.includes('اريكسترا')
   ) {
     classes.push('anticoagulant_heparin', 'anticoagulant', 'bleeding_risk');
   }
@@ -121,19 +133,22 @@ export function identifyDrugClasses(token) {
 
   // 8. Macrolides
   if (
-    t.includes('clarithromycin') || t.includes('كلاريثروميسين') || t.includes('كلاريثرومايسين') || t.includes('klacid') ||
+    t.includes('clarithro') || t.includes('كلاريثرو') || t.includes('كلارثرو') || t.includes('كلاريثروم') || t.includes('klacid') ||
     t.includes('كلاسيد') || t.includes('claritop')
   ) {
-    classes.push('macrolide', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
+    classes.push('macrolide', 'macrolide_potent', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
+    name = 'كلاريثروميسين (Klacid / Clarithromycin)';
   } else if (
-    t.includes('erythromycin') || t.includes('إريثرومايسين') || t.includes('ارثرومايسين')
+    t.includes('erythro') || t.includes('اريثرو') || t.includes('ارثرو')
   ) {
-    classes.push('macrolide', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
+    classes.push('macrolide', 'macrolide_potent', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
+    name = 'إريثروميسين (Erythromycin)';
   } else if (
-    t.includes('azithromycin') || t.includes('أزيثرومايسين') || t.includes('ازيثرومايسين') || t.includes('zithromax') ||
-    t.includes('زيثروماكس') || t.includes('azitro')
+    t.includes('azithro') || t.includes('azitro') || t.includes('ازيثر') || t.includes('ازتر') ||
+    t.includes('zithro') || t.includes('زيثر') || t.includes('زيزرو')
   ) {
-    classes.push('macrolide', 'qt_prolonging');
+    classes.push('macrolide', 'azithromycin', 'qt_prolonging');
+    name = 'أزيثرومايسين (Azithromycin / Zithromax)';
   }
 
   // 9. Quinolones
@@ -356,6 +371,90 @@ export function evaluatePair(drugA, drugB) {
       severityLabel: '🔴 تعارض حرج (خطر نزيف هضمي ودماغي مهدد للحياة)',
       mechanism: 'مضاد التخثر يعطل عوامل التجلط بينما مضاد الالتهاب أو الصفائح يعطل وظيفة الصفيحات الدموية ويسبب تآكلاً موضعياً لمخاطية المعدة، مما يضاعف خطر النزيف النزفي الحاد بمقدار 3 إلى 5 أضعاف.',
       recommendation: 'تجنب الجمع التام واستبدال المسكن بالباراسيتامول كبديل مسكن آمن. إذا كان الجمع بين الأسبرين ومضاد التخثر موصوفاً من طبيب القلب لدعامات الشرايين، يجب حماية المعدة بحامي PPI ومراقبة علامات النزيف.'
+    };
+  }
+
+  // 2.1. Anticoagulant (Warfarin/VKA/DOAC) + Macrolides (Azithromycin, Clarithromycin, Erythromycin) -> CRITICAL BLEEDING & HIGH INR
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && (has('macrolide') || has('azithromycin'))) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج (ارتفاع حاد في نسبة السيولة INR وخطر نزيف مهدد للحياة)',
+      mechanism: 'المضادات الحيوية الماكروليدية (خاصة الأزيثرومايسين والكلاريثرومايسين) تقضي على البكتيريا المعوية المصنعة لفيتامين K، وتثبط استقلاب الوارفارين أو تطرحه، مما يؤدي إلى قفزة مفاجئة وحادة في معدل السيولة (INR) مسببة نزيفاً باطنياً أو دماغياً مهدداً للحياة.',
+      recommendation: 'تجنب الجمع قدر الإمكان واختيار مضاد حيوي بديل، أو إجراء فحص سيولة الدم (INR) بعد 3 إلى 5 أيام من بدء المضاد مع تخفيض جرعة الوارفارين بنسبة 25% إلى 50% ومراقبة علامات النزف فوراً.'
+    };
+  }
+
+  // 2.2. Anticoagulant + Fluoroquinolones (Ciprofloxacin, Levofloxacin) -> CRITICAL BLEEDING
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('quinolone')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج (ارتفاع حاد ومفاجئ في سيولة الدم INR)',
+      mechanism: 'الفلوروكينولونات تثبط الاستقلاب الكبدي للوارفارين وتستنزف البكتيريا المعوية المنتجة لفيتامين K، مما يرفع زمن البروثرومبين وخطر النزيف الحاد بمقدار 3 أضعاف.',
+      recommendation: 'مراقبة لصيقة لمعدل INR وتخفيض جرعة الوارفارين أو استخدام مضاد حيوي بديل لا يتداخل كبدياً.'
+    };
+  }
+
+  // 2.3. Anticoagulant + Metronidazole (Flagyl) -> CRITICAL BLEEDING (CYP2C9 INHIBITION)
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('metronidazole')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج جداً (تثبيط عنيف لـ CYP2C9 ونزيف تلقائي مميت)',
+      mechanism: 'الميترونيدازول يثبط بشدة إنزيم CYP2C9 المسؤول عن التخلص من المتماكب الفعال للوارفارين (S-warfarin)، مما يرفع تركيزه لأكثر من 3 أضعاف ويسبب قفزة كارثية في INR (>10).',
+      recommendation: 'يحظر الجمع دون تخفيض جرعة الوارفارين فوراً بمقدار النصف (50%) وإجراء فحص INR كل 48 ساعة.'
+    };
+  }
+
+  // 2.4. Anticoagulant + Azole Antifungals (Fluconazole, Ketoconazole) -> CRITICAL BLEEDING
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('azole_antifungal')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج جداً (تثبيط كبدي لـ CYP2C9 ونزيف حاد)',
+      mechanism: 'الفلوكونازول يثبط بشدة استقلاب الوارفارين الكبدي، مما يؤدي إلى تراكم دوائي خطير وارتفاع حرج للـ INR مع خطر نزيف هضمي أو مخي.',
+      recommendation: 'خفض جرعة الوارفارين بنسبة 50% وفحص الـ INR بعد 48 ساعة من بدء مضاد الفطريات.'
+    };
+  }
+
+  // 2.5. Anticoagulant + Cotrimoxazole (Bactrim / Septra) -> CRITICAL BLEEDING
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('cotrimoxazole')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج جداً (ازدواجية تثبيط استقلاب الوارفارين واستنزاف فيتامين K)',
+      mechanism: 'السلفاميثوكسازول يثبط إنزيم CYP2C9 بينما يثبط التريميثوبريم المسار الإنزيمي، مما يسبب قفزة خطيرة ومفاجئة في الـ INR.',
+      recommendation: 'تجنب الجمع تماماً واستخدام مضاد بديل، أو خفض جرعة الوارفارين بنسبة 50% مع فحص دوري يومي للـ INR.'
+    };
+  }
+
+  // 2.6. Anticoagulant + SSRIs (Zoloft, Cipralex, Prozac) -> CRITICAL BLEEDING
+  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('serotonergic_antidepressant')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض حرج (مضاعفة خطر النزيف الهضمي عبر شلل الصفائح)',
+      mechanism: 'مضادات الاكتئاب SSRI تمنع إعادة امتصاص السيروتونين داخل الصفائح الدموية مما يشل وظيفتها التراكمية، وعند اجتماعها مع مميع الدم يتضاعف خطر النزف الهضمي 4 أضعاف.',
+      recommendation: 'إعطاء دواء واقٍ للمعدة (PPI) ومراقبة علامات النزيف الخفي والبراز الأسود.'
+    };
+  }
+
+  // 2.7. Anticoagulant + Statins -> MODERATE INTERACTION
+  if (has('anticoagulant_vka') && has('statin')) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'warning',
+      severityLabel: '🟠 تعارض استقلابي متوسط (زيادة طفيفة في زمن التخثر INR)',
+      mechanism: 'الستاتينات تنافس الوارفارين جزئياً على إنزيمات السيتوكروم الكبدية والارتباط بالبروتين، مما قد يرفع الـ INR بنسبة 15-20%.',
+      recommendation: 'فحص الـ INR بعد أسبوع من بدء الستاتين أو تعديل جرعته.'
     };
   }
 

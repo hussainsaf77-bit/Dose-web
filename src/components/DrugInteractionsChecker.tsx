@@ -20,7 +20,7 @@ import {
   Search
 } from 'lucide-react';
 import { INTERACTIONS_DB } from '../data/medicalData';
-import { analyzeAllMedications, PairwiseInteraction } from '../data/clinicalInteractionEngine';
+import { analyzeAllMedications, PairwiseInteraction, cleanDrugToken } from '../data/clinicalInteractionEngine';
 import { COMPREHENSIVE_CATALOG } from '../data/masterClinicalDrugs';
 import { getApiUrl } from '../utils/apiConfig';
 
@@ -70,7 +70,10 @@ const EXTENSIVE_AUTOCOMPLETE_DRUGS: AutoDrug[] = [
   { name: 'إيزوميبرازول', nameEn: 'Esomeprazole', trade: 'نيكسيوم (Nexium)', category: 'مثبط مضخة البروتون (PPI)' },
   { name: 'سيبروفلوكساسين', nameEn: 'Ciprofloxacin', trade: 'سيبرو (Cipro) / سبروباي', category: 'مضاد حيوي فلوروكينولون' },
   { name: 'كلاريثروميسين', nameEn: 'Clarithromycin', trade: 'كلاسيد (Klacid) / كلاريتوب', category: 'مضاد حيوي ماكروليد' },
-  { name: 'أزيثروميسين', nameEn: 'Azithromycin', trade: 'زيثروماكس (Zithromax)', category: 'مضاد حيوي ماكروليد' },
+  { name: 'أزيثروميسين', nameEn: 'Azithromycin', trade: 'أزيثرومايسين / زيثروماكس (Zithromax) / زيثرو', category: 'مضاد حيوي ماكروليد' },
+  { name: 'أزيثرومايسين', nameEn: 'Azithromycin', trade: 'أزيثروميسين / زيثروماكس (Zithromax)', category: 'مضاد حيوي ماكروليد' },
+  { name: 'باكتريم', nameEn: 'Bactrim / Cotrimoxazole', trade: 'سبترا (Septra) / كوتريموكسازول', category: 'مضاد حيوي سلفا' },
+  { name: 'فلوكونازول', nameEn: 'Fluconazole', trade: 'ديفلوكان (Diflucan)', category: 'مضاد فطريات آزولي' },
   { name: 'أوجمنتين', nameEn: 'Augmentin', trade: 'أموكسيسيلين + كلافولانات', category: 'مضاد حيوي واسع المجال' },
   { name: 'أميودارون', nameEn: 'Amiodarone', trade: 'كوردارون (Cordarone)', category: 'منظم ضربات القلب' },
   { name: 'ديجوكسين', nameEn: 'Digoxin', trade: 'لانوكسين (Lanoxin)', category: 'جليكوسيد قلبي' },
@@ -113,9 +116,9 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const [recentHistory, setRecentHistory] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('dose_interaction_history');
-      return saved ? JSON.parse(saved) : ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'كلوبيدوجريل'];
+      return saved ? JSON.parse(saved) : ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'أزيثرومايسين'];
     } catch {
-      return ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'كلوبيدوجريل'];
+      return ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'أزيثرومايسين'];
     }
   });
 
@@ -145,13 +148,14 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Compute live matching suggestions from first 2-3 characters
-  const trimmed = inputVal.trim().toLowerCase();
-  const filteredSuggestions: AutoDrug[] = trimmed.length >= 2 
+  // Compute live matching suggestions from first 2-3 characters using normalized comparison
+  const cleanInput = cleanDrugToken(inputVal);
+  const filteredSuggestions: AutoDrug[] = cleanInput.length >= 2 
     ? EXTENSIVE_AUTOCOMPLETE_DRUGS.filter(d => 
-        d.name.toLowerCase().includes(trimmed) ||
-        d.nameEn.toLowerCase().includes(trimmed) ||
-        d.trade.toLowerCase().includes(trimmed)
+        cleanDrugToken(d.name).includes(cleanInput) ||
+        cleanDrugToken(d.nameEn).includes(cleanInput) ||
+        cleanDrugToken(d.trade).includes(cleanInput) ||
+        cleanDrugToken(d.category).includes(cleanInput)
       ).slice(0, 8)
     : [];
 
@@ -159,6 +163,7 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const popularSuggestions = [
     { label: 'وارفارين (Warfarin)', key: 'وارفارين' },
     { label: 'أسبرين (Aspirin)', key: 'أسبرين' },
+    { label: 'أزيثرومايسين (Zithromax)', key: 'أزيثرومايسين' },
     { label: 'سيلدينافيل (فياغرا)', key: 'سيلدينافيل' },
     { label: 'نيتروجلسرين (نترات)', key: 'نيتروجلسرين' },
     { label: 'إيبوبروفين (بروفين)', key: 'إيبوبروفين' },
@@ -169,6 +174,8 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
     { label: 'أوميبرازول (Losec)', key: 'أوميبرازول' },
     { label: 'سيبروفلوكساسين (سيبرو)', key: 'سيبروفلوكساسين' },
     { label: 'كلاريثروميسين (كلاسيد)', key: 'كلاريثروميسين' },
+    { label: 'باكتريم (Bactrim)', key: 'باكتريم' },
+    { label: 'فلوكونازول (Diflucan)', key: 'فلوكونازول' },
     { label: 'ديجوكسين (Lanoxin)', key: 'ديجوكسين' },
     { label: 'أميودارون (Cordarone)', key: 'أميودارون' },
     { label: 'ترامادول (Tramal)', key: 'ترامادول' },
@@ -181,9 +188,11 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
   // High-yield quick-test pairs
   const quickTestPairs = [
+    { label: '🔴 وارفارين + أزيثرومايسين (نزيف وارتفاع INR)', drugs: ['وارفارين', 'أزيثرومايسين'] },
     { label: '🔴 سيلدينافيل + نيترات (هبوط مميت)', drugs: ['سيلدينافيل', 'نيتروجلسرين'] },
     { label: '🔴 وارفارين + أسبرين (نزيف حاد)', drugs: ['وارفارين', 'أسبرين'] },
     { label: '🔴 سيمفاستاتين + كلاريثرومايسين (تسمم عضلات)', drugs: ['سيمفاستاتين', 'كلاريثروميسين'] },
+    { label: '🔴 وارفارين + باكتريم (نزيف كارثي)', drugs: ['وارفارين', 'باكتريم'] },
     { label: '🔴 فلاجيل + كحول (تفاعل ديسولفيرام)', drugs: ['ميترونيدازول', 'كحول'] },
     { label: '🔴 ديجوكسين + أميودارون (تسمم قلب)', drugs: ['ديجوكسين', 'أميودارون'] },
     { label: '🔴 ترامادول + سيبرالكس (متلازمة سيروتونين)', drugs: ['ترامادول', 'إسيتالوبرام'] },
