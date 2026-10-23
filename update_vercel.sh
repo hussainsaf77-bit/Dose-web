@@ -8,43 +8,16 @@ echo "=============================================="
 # Go to repo directory
 cd "$(dirname "$0")"
 
-FOUND_ZIP=""
-
-# Search common Android / Termux download paths
-CANDIDATES=(
-  "$HOME/storage/downloads/dose_pediatric_update.zip"
-  "$HOME/storage/shared/Download/dose_pediatric_update.zip"
-  "/sdcard/Download/dose_pediatric_update.zip"
-  "/sdcard/Downloads/dose_pediatric_update.zip"
-  "$HOME/Downloads/dose_pediatric_update.zip"
-  "./dose_pediatric_update.zip"
-  "../dose_pediatric_update.zip"
-  "$HOME/storage/downloads/dose_v36_final.zip"
-  "$HOME/storage/shared/Download/dose_v36_final.zip"
-  "/sdcard/Download/dose_v36_final.zip"
-  "/sdcard/Downloads/dose_v36_final.zip"
-  "$HOME/Downloads/dose_v36_final.zip"
-  "./dose_v36_final.zip"
-  "../dose_v36_final.zip"
-)
-
-for f in "${CANDIDATES[@]}"; do
-  if [ -f "$f" ]; then
-    FOUND_ZIP="$f"
-    break
-  fi
-done
-
-# If not found exact name, search for any dose_*.zip in downloads
-if [ -z "$FOUND_ZIP" ]; then
-  for d in "/sdcard/Download" "$HOME/storage/downloads" "$HOME/Downloads"; do
-    MATCH=$(ls -t "$d"/dose_*.zip 2>/dev/null | head -n 1 || true)
-    if [ -n "$MATCH" ] && [ -f "$MATCH" ]; then
-      FOUND_ZIP="$MATCH"
-      break
-    fi
-  done
-fi
+FOUND_ZIP=$(ls -t \
+  /sdcard/Download/dose_update_new*.zip \
+  ./dose_update_new*.zip \
+  /sdcard/Download/dose_pediatric_update*.zip \
+  /sdcard/Download/dose_v36_final*.zip \
+  /sdcard/Download/update*.zip \
+  "$HOME/storage/downloads"/dose_update_new*.zip \
+  "$HOME/storage/shared/Download"/dose_update_new*.zip \
+  ./update.zip \
+  2>/dev/null | head -n 1 || true)
 
 if [ -n "$FOUND_ZIP" ] && [ -f "$FOUND_ZIP" ]; then
   echo "📦 تم العثور على ملف التحديث: $FOUND_ZIP"
@@ -58,12 +31,13 @@ fi
 
 echo "🔄 جاري رفع التحديث المكتمل إلى GitHub..."
 git add -A
-git commit -m "feat(v3.6): clean production bundle, fixed 25-OH/HOMA-IR parser, and Vercel serverless integration" || true
-git push origin main || git push origin master
+git commit -m "feat: fix vercel public output and sync all branches" || true
+git push origin main --force || true
+git push origin main:gh-pages --force || true
+git push origin HEAD --force || true
 
 echo ""
 echo "=============================================="
-echo "✅ تم التحديث والدفع إلى GitHub بنجاح تام!"
-echo "🎯 يقوم Vercel الآن بنشر التحديث تلقائياً خلال 30 ثانية."
-echo "افتح موقعك: https://web-dose.vercel.app"
+echo "✅ تم التحديث والدفع إلى GitHub لكافة الفروع (main و gh-pages) بنجاح!"
+echo "🎯 يقوم Vercel الآن بنشر التحديث تلقائياً وبناء مجلدي dist و public معاً."
 echo "=============================================="

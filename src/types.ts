@@ -169,20 +169,59 @@ export interface PatientReading {
   note?: string;
 }
 
+export interface PatientPrescription {
+  id: string;
+  drugName: string;
+  dosage: string;
+  frequency: string;
+  duration?: string;
+  startDate?: string;
+  status: 'active' | 'completed' | 'stopped';
+}
+
+export interface PatientVitalEntry {
+  id: string;
+  date: string;
+  bp?: string;
+  sugar?: string;
+  hr?: string;
+  temp?: string;
+  spo2?: string;
+  weight?: string;
+  note?: string;
+}
+
+export interface PatientClinicalNote {
+  id: string;
+  date: string;
+  author: string;
+  diagnosis?: string;
+  note: string;
+}
+
 export interface PatientProfile {
+  id?: string;
   fullName: string;
+  mrn?: string;
   age: number | string;
   weight: number | string;
+  height?: number | string;
   gender: 'male' | 'female';
   bloodType: string;
+  phone?: string;
+  emergencyContact?: string;
+  isChild?: boolean;
   allergies: string;
   chronicDiseases: string;
   currentMedications: string;
+  prescriptions?: PatientPrescription[];
+  vitalSignsHistory?: PatientVitalEntry[];
+  clinicalNotes?: PatientClinicalNote[];
   notes: string;
 }
 
 // ── Pediatric Dosing Types ──
-export type PediatricFormulationType = 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection';
+export type PediatricFormulationType = 'syrup' | 'drops' | 'suppository' | 'ointment' | 'spray' | 'injection' | 'sachet';
 
 export type PediatricInfectionSite = 'general' | 'ear' | 'lung' | 'pharynx' | 'urinary' | 'skin';
 

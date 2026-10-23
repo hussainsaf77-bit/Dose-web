@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldAlert, 
   ShieldCheck, 
@@ -13,9 +13,15 @@ import {
   Share2, 
   Pill, 
   CheckCircle2,
-  Stethoscope
+  Stethoscope,
+  ExternalLink,
+  History,
+  Trash2,
+  Search
 } from 'lucide-react';
 import { INTERACTIONS_DB } from '../data/medicalData';
+import { analyzeAllMedications, PairwiseInteraction } from '../data/clinicalInteractionEngine';
+import { COMPREHENSIVE_CATALOG } from '../data/masterClinicalDrugs';
 import { getApiUrl } from '../utils/apiConfig';
 
 interface DrugInteractionsCheckerProps {
@@ -31,7 +37,64 @@ interface InteractionResult {
   recommendation: string;
   clinicalDetails?: string;
   analyzedDrugs: string[];
+  detectedInteractions?: PairwiseInteraction[];
+  cumulativeRisks?: string[];
 }
+interface AutoDrug {
+  name: string;
+  nameEn: string;
+  trade: string;
+  category: string;
+}
+
+const EXTENSIVE_AUTOCOMPLETE_DRUGS: AutoDrug[] = [
+  { name: 'سيلدينافيل', nameEn: 'Sildenafil', trade: 'فياغرا (Viagra) / ريفاتيو', category: 'مثبط PDE-5 / موسع وعائي' },
+  { name: 'تادالافيل', nameEn: 'Tadalafil', trade: 'سياليس (Cialis) / سنافي (Snafi)', category: 'مثبط PDE-5' },
+  { name: 'فاردينافيل', nameEn: 'Vardenafil', trade: 'ليفيترا (Levitra)', category: 'مثبط PDE-5' },
+  { name: 'نيتروجلسرين', nameEn: 'Nitroglycerin', trade: 'نيتروديرم / نترونال / أنجيسيد', category: 'نترات موسعة للشرايين التاجية' },
+  { name: 'إيزوسوربيد', nameEn: 'Isosorbide Dinitrate', trade: 'إمدور (Imdur) / إيزورديل (Isordil)', category: 'نترات عضوية' },
+  { name: 'وارفارين', nameEn: 'Warfarin', trade: 'كومادين (Coumadin) / ماريفان', category: 'مضاد تخثر / مثبط فيتامين K' },
+  { name: 'أسبرين', nameEn: 'Aspirin', trade: 'جوسبرين / أسبوسيد / Protect', category: 'مضاد صفيحات ومسكن NSAID' },
+  { name: 'كلوبيدوجريل', nameEn: 'Clopidogrel', trade: 'بلافيكس (Plavix)', category: 'مضاد صفيحات P2Y12' },
+  { name: 'إيبوبروفين', nameEn: 'Ibuprofen', trade: 'بروفين (Brufen) / أدفيل (Advil)', category: 'مسكن ومضاد التهاب NSAID' },
+  { name: 'باراسيتامول', nameEn: 'Paracetamol', trade: 'بانادول (Panadol) / أدول (Adol)', category: 'مسكن للألم وخافض حرارة' },
+  { name: 'ديكلوفيناك', nameEn: 'Diclofenac', trade: 'فولتارين (Voltaren) / كاتافلام', category: 'مضاد التهاب ومسكن NSAID' },
+  { name: 'بيسوبرولول', nameEn: 'Bisoprolol', trade: 'كونكور (Concor)', category: 'حاصر مستقبلات بيتا القلبي' },
+  { name: 'أملوديبين', nameEn: 'Amlodipine', trade: 'نورفاسك (Norvasc)', category: 'حاصر قنوات الكالسيوم (CCB)' },
+  { name: 'أتورفاستاتين', nameEn: 'Atorvastatin', trade: 'ليبيتور (Lipitor) / أتور', category: 'ستاتين خافض للكوليسترول' },
+  { name: 'سيمفاستاتين', nameEn: 'Simvastatin', trade: 'زوكور (Zocor)', category: 'ستاتين خافض للكوليسترول' },
+  { name: 'روزوفاستاتين', nameEn: 'Rosuvastatin', trade: 'كريستور (Crestor)', category: 'ستاتين قوي' },
+  { name: 'ميتفورمين', nameEn: 'Metformin', trade: 'غلوكوفاج (Glucophage)', category: 'منظم سكر / بيغوانيد' },
+  { name: 'أوميبرازول', nameEn: 'Omeprazole', trade: 'لوسيك (Losec) / أوميز', category: 'مثبط مضخة البروتون (PPI)' },
+  { name: 'بانتوبرازول', nameEn: 'Pantoprazole', trade: 'كونترولوك (Controloc)', category: 'مثبط مضخة البروتون (PPI)' },
+  { name: 'إيزوميبرازول', nameEn: 'Esomeprazole', trade: 'نيكسيوم (Nexium)', category: 'مثبط مضخة البروتون (PPI)' },
+  { name: 'سيبروفلوكساسين', nameEn: 'Ciprofloxacin', trade: 'سيبرو (Cipro) / سبروباي', category: 'مضاد حيوي فلوروكينولون' },
+  { name: 'كلاريثروميسين', nameEn: 'Clarithromycin', trade: 'كلاسيد (Klacid) / كلاريتوب', category: 'مضاد حيوي ماكروليد' },
+  { name: 'أزيثروميسين', nameEn: 'Azithromycin', trade: 'زيثروماكس (Zithromax)', category: 'مضاد حيوي ماكروليد' },
+  { name: 'أوجمنتين', nameEn: 'Augmentin', trade: 'أموكسيسيلين + كلافولانات', category: 'مضاد حيوي واسع المجال' },
+  { name: 'أميودارون', nameEn: 'Amiodarone', trade: 'كوردارون (Cordarone)', category: 'منظم ضربات القلب' },
+  { name: 'ديجوكسين', nameEn: 'Digoxin', trade: 'لانوكسين (Lanoxin)', category: 'جليكوسيد قلبي' },
+  { name: 'ترامادول', nameEn: 'Tramadol', trade: 'ترامال (Tramal) / كونترامال', category: 'مسكن أفيوني وسيروتونيني' },
+  { name: 'إسيتالوبرام', nameEn: 'Escitalopram', trade: 'سبرالكس (Cipralex)', category: 'مضاد اكتئاب SSRI' },
+  { name: 'سيرترالين', nameEn: 'Sertraline', trade: 'زولوفت (Zoloft) / لوسترال', category: 'مضاد اكتئاب SSRI' },
+  { name: 'فلوكسيتين', nameEn: 'Fluoxetine', trade: 'بروزاك (Prozac)', category: 'مضاد اكتئاب SSRI' },
+  { name: 'لوسارتان', nameEn: 'Losartan', trade: 'كوزار (Cozaar)', category: 'حاصر مستقبلات أنجيوتنسين (ARB)' },
+  { name: 'فالسارتان', nameEn: 'Valsartan', trade: 'ديوفان (Diovan) / تارج', category: 'حاصر مستقبلات أنجيوتنسين' },
+  { name: 'كانديسارتان', nameEn: 'Candesartan', trade: 'أتاكاند (Atacand)', category: 'حاصر مستقبلات أنجيوتنسين' },
+  { name: 'كابتوبريل', nameEn: 'Captopril', trade: 'كابوتن (Capoten)', category: 'مثبط ACE' },
+  { name: 'إنالابريل', nameEn: 'Enalapril', trade: 'رينيتك (Renitec)', category: 'مثبط ACE' },
+  { name: 'سبيرونولاكتون', nameEn: 'Spironolactone', trade: 'ألداكتون (Aldactone)', category: 'مدر بول حافظ للبوتاسيوم' },
+  { name: 'فوروسيميد', nameEn: 'Furosemide', trade: 'لازيكس (Lasix)', category: 'مدر بول عروي قوي' },
+  { name: 'ليثيوم', nameEn: 'Lithium', trade: 'بريادل (Prianil)', category: 'مثبت مزاج' },
+  { name: 'ميثوتريكسات', nameEn: 'Methotrexate', trade: 'ميثوتريكسات (MTX)', category: 'مضاد مناعة وأورام' },
+  { name: 'ليفوثيروكسين', nameEn: 'Levothyroxine', trade: 'إلتروكسين / يثيروكس (Euthyrox)', category: 'هرمون الغدة الدرقية' },
+  { name: 'ميترونيدازول', nameEn: 'Metronidazole', trade: 'فلاجيل (Flagyl)', category: 'مضاد طفيليات وجراثيم لاهوائية' },
+  { name: 'سيماجلوتايد', nameEn: 'Semaglutide', trade: 'أوزمبيك (Ozempic) / ويغوفي', category: 'منبه مستقبلات GLP-1' },
+  { name: 'إمباغليفلوزين', nameEn: 'Empagliflozin', trade: 'جارديانس (Jardiance)', category: 'مثبط SGLT2' },
+  { name: 'داباجليفلوزين', nameEn: 'Dapagliflozin', trade: 'فورسيجا (Forxiga)', category: 'مثبط SGLT2' },
+  { name: 'تيزانيدين', nameEn: 'Tizanidine', trade: 'سيردالود (Sirdalud)', category: 'مرخي عضلات مركزي' },
+  { name: 'كالسيوم', nameEn: 'Calcium', trade: 'كالسيتريول / أوستوكير', category: 'مكمل معدني' }
+];
 
 export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = ({
   initialDrugs = ['وارفارين', 'أسبرين'],
@@ -43,25 +106,101 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const [analysisResult, setAnalysisResult] = useState<InteractionResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Persistent Medication History Memory
+  const [recentHistory, setRecentHistory] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('dose_interaction_history');
+      return saved ? JSON.parse(saved) : ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'كلوبيدوجريل'];
+    } catch {
+      return ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'كلوبيدوجريل'];
+    }
+  });
+
+  const saveToHistory = (drugName: string) => {
+    const clean = drugName.trim();
+    if (!clean || clean.length < 2) return;
+    setRecentHistory((prev) => {
+      const updated = [clean, ...prev.filter(d => d.toLowerCase() !== clean.toLowerCase())].slice(0, 16);
+      try { localStorage.setItem('dose_interaction_history', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+  };
+
+  const clearHistory = () => {
+    setRecentHistory([]);
+    try { localStorage.removeItem('dose_interaction_history'); } catch {}
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (inputContainerRef.current && !inputContainerRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Compute live matching suggestions from first 2-3 characters
+  const trimmed = inputVal.trim().toLowerCase();
+  const filteredSuggestions: AutoDrug[] = trimmed.length >= 2 
+    ? EXTENSIVE_AUTOCOMPLETE_DRUGS.filter(d => 
+        d.name.toLowerCase().includes(trimmed) ||
+        d.nameEn.toLowerCase().includes(trimmed) ||
+        d.trade.toLowerCase().includes(trimmed)
+      ).slice(0, 8)
+    : [];
 
   // Popular clinical suggestions
   const popularSuggestions = [
     { label: 'وارفارين (Warfarin)', key: 'وارفارين' },
     { label: 'أسبرين (Aspirin)', key: 'أسبرين' },
-    { label: 'إيبوبروفين (Ibuprofen / بروفين)', key: 'إيبوبروفين' },
-    { label: 'باراسيتامول (Paracetamol / بنادول)', key: 'باراسيتامول' },
+    { label: 'سيلدينافيل (فياغرا)', key: 'سيلدينافيل' },
+    { label: 'نيتروجلسرين (نترات)', key: 'نيتروجلسرين' },
+    { label: 'إيبوبروفين (بروفين)', key: 'إيبوبروفين' },
+    { label: 'باراسيتامول (بانادول)', key: 'باراسيتامول' },
+    { label: 'بيسوبرولول (كونكور)', key: 'بيسوبرولول' },
+    { label: 'أتورفاستاتين (ليبيتور)', key: 'أتورفاستاتين' },
+    { label: 'كلوبيدوجريل (بلافيكس)', key: 'كلوبيدوجريل' },
+    { label: 'أوميبرازول (Losec)', key: 'أوميبرازول' },
+    { label: 'سيبروفلوكساسين (سيبرو)', key: 'سيبروفلوكساسين' },
+    { label: 'كلاريثروميسين (كلاسيد)', key: 'كلاريثروميسين' },
+    { label: 'ديجوكسين (Lanoxin)', key: 'ديجوكسين' },
+    { label: 'أميودارون (Cordarone)', key: 'أميودارون' },
+    { label: 'ترامادول (Tramal)', key: 'ترامادول' },
+    { label: 'إسيتالوبرام (سبرالكس)', key: 'إسيتالوبرام' },
+    { label: 'لوسارتان (Cozaar)', key: 'لوسارتان' },
+    { label: 'سبيرونولاكتون (Aldactone)', key: 'سبيرونولاكتون' },
     { label: 'ميترونيدازول (فلاجيل)', key: 'ميترونيدازول' },
-    { label: 'كحول (Alcohol)', key: 'كحول' },
-    { label: 'أومبيرازول (Omeprazole)', key: 'أومبيرازول' },
-    { label: 'كلوبيدوجريل (Plavix)', key: 'كلوبيدوجريل' },
-    { label: 'ميتفورمين (Glucophage)', key: 'ميتفورمين' },
-    { label: 'كلاريثروميسين (Klacid)', key: 'كلاريثروميسين' },
-    { label: 'سيمفاستاتين (Zocor)', key: 'سيمفاستاتين' },
-    { label: 'سيبروفلوكساسين (Ciprofloxacin)', key: 'سيبروفلوكساسين' },
-    { label: 'مضاد حموضة (Antacid)', key: 'مضاد حموضة' },
-    { label: 'سيلدينافيل (Viagra)', key: 'سيلدينافيل' },
-    { label: 'نيتروجلسرين (Nitrates)', key: 'نيتروجلسرين' },
+    { label: 'ليفوثيروكسين (Euthyrox)', key: 'ليفوثيروكسين' },
   ];
+
+  // High-yield quick-test pairs
+  const quickTestPairs = [
+    { label: '🔴 سيلدينافيل + نيترات (هبوط مميت)', drugs: ['سيلدينافيل', 'نيتروجلسرين'] },
+    { label: '🔴 وارفارين + أسبرين (نزيف حاد)', drugs: ['وارفارين', 'أسبرين'] },
+    { label: '🔴 سيمفاستاتين + كلاريثرومايسين (تسمم عضلات)', drugs: ['سيمفاستاتين', 'كلاريثروميسين'] },
+    { label: '🔴 فلاجيل + كحول (تفاعل ديسولفيرام)', drugs: ['ميترونيدازول', 'كحول'] },
+    { label: '🔴 ديجوكسين + أميودارون (تسمم قلب)', drugs: ['ديجوكسين', 'أميودارون'] },
+    { label: '🔴 ترامادول + سيبرالكس (متلازمة سيروتونين)', drugs: ['ترامادول', 'إسيتالوبرام'] },
+    { label: '🔴 ميثوتريكسات + بروفين (تسمم نخاعي)', drugs: ['ميثوتريكسات', 'إيبوبروفين'] },
+    { label: '⚠️ لوسارتان + سبيرونولاكتون (فرط بوتاسيوم)', drugs: ['لوسارتان', 'سبيرونولاكتون'] },
+    { label: '⚠️ بلافيكس + أوميبرازول (تثبيط مفعول)', drugs: ['كلوبيدوجريل', 'أوميبرازول'] },
+    { label: '⚠️ ليفوثيروكسين + كالسيوم (تثبيط امتصاص)', drugs: ['ليفوثيروكسين', 'كالسيوم'] },
+    { label: '🟢 باراسيتامول + أوجمنتين (آمن)', drugs: ['باراسيتامول', 'أوجمنتين'] },
+    { label: '🟢 ميتفورمين + أملوديبين (آمن)', drugs: ['ميتفورمين', 'أملوديبين'] },
+  ];
+
+  const loadPair = (drugs: string[]) => {
+    setSelectedTokens(drugs);
+    drugs.forEach(saveToHistory);
+    setAnalysisResult(null);
+    setErrorMessage('');
+  };
 
   const addDrug = (token: string) => {
     const clean = token.trim();
@@ -75,7 +214,9 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
         if (parts.length >= 2) {
           const newSet = Array.from(new Set([...selectedTokens, ...parts]));
           setSelectedTokens(newSet);
+          parts.forEach(saveToHistory);
           setInputVal('');
+          setShowDropdown(false);
           setAnalysisResult(null);
           return;
         }
@@ -84,9 +225,11 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
     if (!selectedTokens.includes(clean)) {
       setSelectedTokens([...selectedTokens, clean]);
+      saveToHistory(clean);
       setAnalysisResult(null);
     }
     setInputVal('');
+    setShowDropdown(false);
   };
 
   const removeDrug = (token: string) => {
@@ -137,10 +280,12 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
         recommendation: data.recommendation,
         clinicalDetails: data.clinicalDetails,
         analyzedDrugs: data.analyzedDrugs || selectedTokens,
+        detectedInteractions: data.detectedInteractions || [],
+        cumulativeRisks: data.cumulativeRisks || [],
       });
     } catch (err: any) {
       console.warn('API check failed, falling back to local clinical DB:', err);
-      // Fallback to local DB
+      // Fallback to extensive local DB
       fallbackLocalCheck();
     } finally {
       setIsLoading(false);
@@ -148,39 +293,18 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   };
 
   const fallbackLocalCheck = () => {
-    const listStr = selectedTokens.join(' ').toLowerCase();
-    const isWarfarin = listStr.includes('وارفارين') || listStr.includes('warfarin') || listStr.includes('كومادين');
-    const isAspirin = listStr.includes('اسبرين') || listStr.includes('أسبرين') || listStr.includes('aspirin') || listStr.includes('جوسبرين');
-    const isIbuprofen = listStr.includes('بروفين') || listStr.includes('ايبوبروفين') || listStr.includes('إيبوبروفين') || listStr.includes('ibuprofen');
-
-    if (isWarfarin && isAspirin) {
-      setAnalysisResult({
-        severity: 'critical',
-        severityLabel: '🔴 خطير جداً (يحظر الجمع في معظم الحالات)',
-        isSafe: false,
-        mechanism: 'تثبيط مزدوج لمسارات التخثر والصفائح الدموية مما يرفع احتمالية النزيف الحاد بمقدار 2-3 أضعاف.',
-        recommendation: 'تجنب الجمع التام إلا تحت إشراف طبيب القلب مع المراقبة الدورية للـ INR.',
-        analyzedDrugs: selectedTokens,
-      });
-    } else if (isWarfarin && isIbuprofen) {
-      setAnalysisResult({
-        severity: 'critical',
-        severityLabel: '🔴 خطير جداً (يحظر الجمع)',
-        isSafe: false,
-        mechanism: 'مضادات الالتهاب غير الستيرويدية تزيد خطر القرحة الهضمية والنزيف الحاد.',
-        recommendation: 'استخدم الباراسيتامول كبديل مسكن آمن مع الوارفارين.',
-        analyzedDrugs: selectedTokens,
-      });
-    } else {
-      setAnalysisResult({
-        severity: 'safe',
-        severityLabel: '🟢 آمن نسبياً (لا يوجد تعارض حرج معروف)',
-        isSafe: true,
-        mechanism: 'لم يتم رصد تعارض استقلابي أو سمي مباشر بين هذه الأدوية المحددة.',
-        recommendation: 'يُفضل دائماً الفصل بساعة إلى ساعتين بين الأدوية المختلفة لضمان الامتصاص الأمثل.',
-        analyzedDrugs: selectedTokens,
-      });
-    }
+    const res = analyzeAllMedications(selectedTokens, language as 'ar' | 'en');
+    setAnalysisResult({
+      severity: res.severity,
+      severityLabel: res.severityLabel,
+      isSafe: res.isSafe,
+      mechanism: res.mechanism,
+      recommendation: res.recommendation,
+      clinicalDetails: res.clinicalDetails,
+      analyzedDrugs: res.analyzedDrugs,
+      detectedInteractions: res.detectedInteractions,
+      cumulativeRisks: res.cumulativeRisks,
+    });
   };
 
   const handleCopyReport = () => {
@@ -238,35 +362,113 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
             )}
           </div>
 
-          {/* Quick Input Bar */}
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-slate-300">
-              اكتب اسم الدواء (أو دوائين معاً مثل: وارفارين + أسبرين):
-            </label>
-            <div className="flex gap-2">
-              <input
-                id="interaction-drug-input"
-                type="text"
-                value={inputVal}
-                onChange={(e) => setInputVal(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    addDrug(inputVal);
-                  }
-                }}
-                placeholder="مثال: أسبرين، بروفين، وارفارين..."
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
-              />
+          {/* Quick Input Bar with Auto-suggest & Autocomplete Dropdown */}
+          <div className="space-y-2 relative" ref={inputContainerRef}>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-300">
+                اكتب اسم الدواء (أو دوائين معاً مثل: وارفارين + أسبرين):
+              </label>
+              <span className="text-[11px] text-teal-400 font-medium flex items-center gap-1">
+                <Search className="w-3 h-3" />
+                <span>تعرف فوري من أول حرفين (عربي/إنجليزي)</span>
+              </span>
+            </div>
+
+            <div className="flex gap-2 relative">
+              <div className="relative flex-1">
+                <input
+                  id="interaction-drug-input"
+                  type="text"
+                  value={inputVal}
+                  onFocus={() => setShowDropdown(true)}
+                  onChange={(e) => {
+                    setInputVal(e.target.value);
+                    setShowDropdown(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (filteredSuggestions.length > 0 && showDropdown) {
+                        addDrug(filteredSuggestions[0].name);
+                      } else {
+                        addDrug(inputVal);
+                      }
+                    }
+                  }}
+                  placeholder="اكتب أول حرفين مثل: سيل، نيت، بان، كون، وارفارين..."
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
+                />
+
+                {/* Floating Autocomplete Dropdown */}
+                {showDropdown && filteredSuggestions.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-slate-950/95 backdrop-blur-md border border-rose-500/50 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto divide-y divide-slate-800 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1.5 bg-rose-950/40 text-[11px] text-rose-300 font-bold flex items-center justify-between">
+                      <span>الأدوية المطابقة ({filteredSuggestions.length}):</span>
+                      <span className="text-[10px] text-slate-400">اضغط للاختيار الفوري</span>
+                    </div>
+                    {filteredSuggestions.map((sug, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => addDrug(sug.name)}
+                        className="w-full text-right px-3.5 py-2 hover:bg-rose-900/30 flex items-center justify-between text-xs transition-colors group cursor-pointer"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-white font-bold group-hover:text-rose-300 transition-colors">
+                            {sug.name} <span className="text-slate-400 font-normal">({sug.nameEn})</span>
+                          </span>
+                          <span className="text-[11px] text-amber-300/90">{sug.trade}</span>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 shrink-0">
+                          {sug.category}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button
                 type="button"
                 onClick={() => addDrug(inputVal)}
-                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/30 flex items-center gap-1 shrink-0"
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/30 flex items-center gap-1 shrink-0 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>إضافة</span>
               </button>
             </div>
+
+            {/* Persistent Medication Memory (سجل الأدوية السابقة) */}
+            {recentHistory.length > 0 && (
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
+                    <History className="w-3 h-3 text-teal-400" />
+                    <span>ذاكرة الأدوية الأخيرة (Recent Memory):</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearHistory}
+                    className="text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-0.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-2.5 h-2.5" />
+                    <span>مسح الذاكرة</span>
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {recentHistory.slice(0, 8).map((d, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => addDrug(d)}
+                      className="px-2 py-0.5 rounded-md text-[11px] bg-slate-950/80 hover:bg-slate-800 text-teal-300 border border-slate-800/90 hover:border-teal-500/50 transition-all font-mono"
+                    >
+                      + {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Selected Medicine Chips */}
@@ -360,6 +562,26 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
               })}
             </div>
           </div>
+
+          {/* Quick Test Interaction Pairs */}
+          <div className="pt-2 border-t border-slate-800/80">
+            <span className="text-xs font-semibold text-rose-400 block mb-2 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>أزواج سريرية نموذجية للاختبار السريع بنقرة واحدة:</span>
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+              {quickTestPairs.map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => loadPair(p.drugs)}
+                  className="text-right px-2.5 py-1.5 rounded-lg text-xs bg-slate-950/70 hover:bg-slate-800/90 text-slate-300 border border-slate-800/80 hover:border-slate-700 transition-all font-medium truncate"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Right Column: Clinical Report & Guidance */}
@@ -372,6 +594,14 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
             {analysisResult && (
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1 border border-slate-700 transition-colors"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>طباعة / تصدير</span>
+                </button>
                 <button
                   type="button"
                   onClick={handleCopyReport}
@@ -439,6 +669,54 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
                 </div>
               </div>
 
+              {/* Cumulative Risks Badges */}
+              {analysisResult.cumulativeRisks && analysisResult.cumulativeRisks.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-900/50 space-y-2">
+                  <span className="text-xs font-bold text-rose-300 block flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    المخاطر التراكمية المشتركة لهذا البرنامج العلاجي:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {analysisResult.cumulativeRisks.map((risk, idx) => (
+                      <span key={idx} className="text-xs px-2.5 py-1 rounded-lg bg-rose-900/40 border border-rose-700/50 text-rose-200 font-medium">
+                        ⚠️ {risk}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Detected Pairwise Interaction Cards */}
+              {analysisResult.detectedInteractions && analysisResult.detectedInteractions.length > 0 && (
+                <div className="space-y-2.5">
+                  <span className="text-xs font-bold text-slate-300 block flex items-center gap-1.5">
+                    <Pill className="w-4 h-4 text-teal-400" />
+                    تفصيل التعارضات بين أزواج الأدوية ({analysisResult.detectedInteractions.length} تعارض محدد):
+                  </span>
+                  <div className="space-y-2">
+                    {analysisResult.detectedInteractions.map((pair, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                          pair.severity === 'critical'
+                            ? 'bg-rose-950/30 border-rose-800/60 text-rose-200'
+                            : 'bg-amber-950/30 border-amber-800/60 text-amber-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold">
+                          <span>{pair.drugA} ⟷ {pair.drugB}</span>
+                          <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[11px]">
+                            {pair.severityLabel}
+                          </span>
+                        </div>
+                        <p className="text-slate-300 leading-relaxed">{pair.mechanism}</p>
+                        <p className="text-emerald-300 font-medium">💡 التوجيه: {pair.recommendation}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Mechanism of Action */}
               <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
                 <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
@@ -468,6 +746,42 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
                   {analysisResult.clinicalDetails}
                 </div>
               )}
+
+              {/* Online Global References Verification Card (Drugs.com & Medscape) */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/40 border border-indigo-800/40 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                    <ExternalLink className="w-4 h-4 text-indigo-400" />
+                    <span>التحقق المباشر من المراجع الدوائية العالمية (Global Grounded Checkers):</span>
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/50">
+                    Live Web References
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  يمكنك مضاهاة هذا التقرير مع قواعد البيانات الصيدلانية السريرية المعتمدة عالمياً (Lexicomp, Drugs.com, Medscape) بضغطة زر:
+                </p>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <a
+                    href={`https://www.drugs.com/interactions-check.php?drug_list=${encodeURIComponent(analysisResult.analyzedDrugs.join(','))}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-semibold transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    <span>فتح فاحص Drugs.com العالمي</span>
+                  </a>
+                  <a
+                    href="https://reference.medscape.com/drug-interactionchecker"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                    <span>فاحص Medscape السريري</span>
+                  </a>
+                </div>
+              </div>
 
               {/* Mandatory Medical Disclaimer */}
               <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-[11px] text-slate-500 space-y-0.5">

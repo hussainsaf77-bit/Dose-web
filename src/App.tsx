@@ -21,6 +21,7 @@ import { TherapeuticDietSection } from './components/TherapeuticDietSection';
 import { ClinicalSymptomChecker } from './components/ClinicalSymptomChecker';
 import { MedicalUserGuideSection } from './components/MedicalUserGuideSection';
 import { Language, TRANSLATIONS } from './utils/translations';
+import { downloadZipFile } from './utils/downloadHelper';
 
 import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope, Download } from 'lucide-react';
 
@@ -39,6 +40,7 @@ const resolveTab = (h: string): ActiveTabType => {
   if (clean === 'reminders') return 'reminders';
   if (clean === 'ai_chat' || clean === 'pharmacist') return 'ai_chat';
   if (clean === 'drugs') return 'drugs';
+  if (clean === 'patient' || clean === 'profile') return 'patient';
   return 'symptoms';
 };
 
@@ -329,16 +331,18 @@ export default function App() {
                 <span>{language === 'ar' ? 'شاشة الترحيب والتسجيل' : 'Welcome & Register'}</span>
               </button>
 
-              <a
+              <button
+                type="button"
                 id="hero-download-vercel-update"
-                href="/dose_v36_final.zip"
-                download="dose_v36_final.zip"
+                onClick={async () => {
+                  await downloadZipFile('dose_update_new.zip');
+                }}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-amber-400"
                 title="تنزيل ملف تحديث Vercel لنقله إلى المستودع"
               >
                 <Download className="w-4 h-4 text-amber-400" />
                 <span>{language === 'ar' ? 'تحميل حزمة تحديث Vercel (ZIP)' : 'Download Vercel ZIP'}</span>
-              </a>
+              </button>
             </div>
 
           </div>

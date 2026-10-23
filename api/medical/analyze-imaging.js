@@ -59,29 +59,36 @@ export default async function handler(req, res) {
       }
       contents.push({ text: prompt });
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: contents }],
-            generationConfig: {
-              responseMimeType: 'application/json',
-              temperature: 0.2
+      const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+      for (const model of candidateModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: contents }],
+                generationConfig: {
+                  responseMimeType: 'application/json',
+                  temperature: 0.1
+                }
+              })
             }
-          })
-        }
-      );
+          );
 
-      if (response.ok) {
-        const data = await response.json();
-        const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (candidateText) {
-          const parsed = JSON.parse(candidateText);
-          if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
-            return res.status(200).json(parsed);
+          if (response.ok) {
+            const data = await response.json();
+            const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (candidateText) {
+              const parsed = JSON.parse(candidateText);
+              if (parsed && Array.isArray(parsed.items) && parsed.items.length > 0) {
+                return res.status(200).json(parsed);
+              }
+            }
           }
+        } catch (mErr) {
+          console.warn(`Imaging model ${model} failed, trying next:`, mErr?.message);
         }
       }
     } catch (err) {

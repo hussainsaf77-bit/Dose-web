@@ -73,14 +73,14 @@ export const PEDIATRIC_FORMULATION_CONFIGS = [
     descriptionEn: 'Number of drops per ear/eye or orally per dose'
   },
   {
-    id: 'spray' as PediatricFormulationType,
-    labelAr: 'بخاخ ورذاذ نيبولايزر',
-    labelEn: 'Inhaler / Nebulizer Spray',
-    icon: '💨',
-    unitAr: 'بخة / مل',
-    unitEn: 'Puffs / ml',
-    descriptionAr: 'بخات مع أنبوب التباعد (Spacer) أو محاليل جلسات الرذاذ',
-    descriptionEn: 'MDI puffs with spacer chamber or nebulizer volume'
+    id: 'suppository' as PediatricFormulationType,
+    labelAr: 'تحاميل ولبوس شرجي',
+    labelEn: 'Suppositories (Rectal)',
+    icon: '💊',
+    unitAr: 'تحميلة (Supp)',
+    unitEn: 'Suppository',
+    descriptionAr: 'قوة التحميلة بالمليجرام حسب وزن وعمر الطفل',
+    descriptionEn: 'Strength per suppository based on child weight & age'
   },
   {
     id: 'ointment' as PediatricFormulationType,
@@ -93,6 +93,16 @@ export const PEDIATRIC_FORMULATION_CONFIGS = [
     descriptionEn: 'Finger-Tip Unit dosing (1 FTU = ~0.5g) for target body area'
   },
   {
+    id: 'spray' as PediatricFormulationType,
+    labelAr: 'بخاخ ورذاذ نيبولايزر',
+    labelEn: 'Inhaler / Nebulizer Spray',
+    icon: '💨',
+    unitAr: 'بخة / مل',
+    unitEn: 'Puffs / ml',
+    descriptionAr: 'بخات مع أنبوب التباعد (Spacer) أو محاليل جلسات الرذاذ',
+    descriptionEn: 'MDI puffs with spacer chamber or nebulizer volume'
+  },
+  {
     id: 'injection' as PediatricFormulationType,
     labelAr: 'حقنة (وريد / عضل)',
     labelEn: 'Injection (IV / IM)',
@@ -101,6 +111,16 @@ export const PEDIATRIC_FORMULATION_CONFIGS = [
     unitEn: 'mg & Reconstitution ml',
     descriptionAr: 'حساب الجرعة بالـ mg وحجم السائل المذاب ومعدل التسريب الوريدي',
     descriptionEn: 'Dose in mg, reconstitution liquid volume, and infusion duration'
+  },
+  {
+    id: 'sachet' as PediatricFormulationType,
+    labelAr: 'أكياس فوارة وأقراص مضغ',
+    labelEn: 'Sachets / Tablets',
+    icon: '📦',
+    unitAr: 'كيس / قرص',
+    unitEn: 'Sachet / Tablet',
+    descriptionAr: 'عدد الأكياس المذابة في الماء أو الأقراص المخصصة للأطفال',
+    descriptionEn: 'Number of dissolved sachets or pediatric chewable tablets'
   }
 ];
 
@@ -166,7 +186,7 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
     class_ar: 'خافض حرارة ومسكن مركزي للآلام',
     class_en: 'Central Analgesic & Antipyretic',
     is_antibiotic: false,
-    supported_formulations: ['syrup', 'drops', 'injection'],
+    supported_formulations: ['syrup', 'drops', 'suppository', 'injection'],
     default_formulation: 'syrup',
     mpk_min: 10,
     mpk_max: 15,
@@ -177,6 +197,8 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '120 مجم / 5 مل (شراب معتاد)', labelEn: '120 mg / 5ml (Standard)', value: 120, unit: 'mg/5ml', tradeExampleAr: 'Adol, Panadol Baby', formulation: 'syrup' },
       { labelAr: '250 مجم / 5 مل (شراب مركز للأطفال الأكبر)', labelEn: '250 mg / 5ml (High strength)', value: 250, unit: 'mg/5ml', tradeExampleAr: 'Panadol Child, Calpol 6+', formulation: 'syrup' },
       { labelAr: '100 مجم / 1 مل (قطارة فموية للرضع)', labelEn: '100 mg / 1ml (Infant Oral Drops)', value: 500, unit: 'mg/ml', tradeExampleAr: 'Tempra Drops, Cetal Drops', formulation: 'drops' },
+      { labelAr: '125 مجم (تحميلة أدول/سيتال للرضع)', labelEn: '125 mg Suppository (Infants)', value: 125, unit: 'mg', tradeExampleAr: 'Adol 125 Supp', formulation: 'suppository' },
+      { labelAr: '250 مجم (تحميلة للأطفال 2-6 سنوات)', labelEn: '250 mg Suppository (Children)', value: 250, unit: 'mg', tradeExampleAr: 'Adol 250 Supp', formulation: 'suppository' },
       { labelAr: '10 مجم / 1 مل (محلول وريدي Perfalgan)', labelEn: '10 mg / 1ml (IV Infusion)', value: 50, unit: 'mg/ml', tradeExampleAr: 'Perfalgan IV', formulation: 'injection' }
     ],
     formulation_guidelines: {
@@ -826,6 +848,1213 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
     contraindications_en: 'Status asthmaticus without bronchodilator; untreated oral candidiasis.',
     clinical_pearls_ar: 'علاج وقائي ممتاز لحساسية الصدر ونوبات الخانوق الحنجري (Croup). في الخانوق: يعطى 2 مجم كجرعة مفردة بالنيبولايزر لتقليل وذمة الحنجرة.',
     clinical_pearls_en: 'Preferred for persistent asthma maintenance and acute viral croup (2mg single dose neb).'
+  },
+
+  // 20. Co-Trimoxazole (Bactrim / Septra)
+  {
+    id: 'co_trimoxazole',
+    name_ar: 'كو-تريموكسازول (باكتريم / سبترين)',
+    name_en: 'Co-Trimoxazole / TMP-SMX (Bactrim / Septra)',
+    trade_names: ['باكتريم (Bactrim)', 'سبترين (Septra)', 'سوتريم (Sutrim)', 'سلفاتريم (Sulfatrim)'],
+    aliases: ['bactrim', 'septra', 'co-trimoxazole', 'tmp-smx', 'باكتريم', 'سبترين', 'مضاد مسالك'],
+    class_ar: 'مضاد حيوي تركيبي (Sulfonamide + Trimethoprim)',
+    class_en: 'Sulfonamide Antibacterial Combination',
+    is_antibiotic: true,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 6, // TMP component: 6-12 mg/kg/day
+    mpk_max: 10,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 240, // 200mg SMX + 40mg TMP = 240mg total per 5ml (or standard 40mg TMP per 5ml)
+    available_concentrations: [
+      { labelAr: '240 مجم / 5 مل (معلق أطفال: 40 تريميثوبريم + 200 سلفاميثوكسازول)', labelEn: '240 mg / 5ml (40 TMP + 200 SMX)', value: 240, unit: 'mg/5ml', tradeExampleAr: 'Bactrim 240mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 2,
+    max_daily_adult_mg: 960,
+    contraindications_ar: 'الرضع دون عمر شهرين (خطر اليرقان النووي Kernicterus)، نقص إنزيم G6PD (أنيميا الفول)، فرط حساسية السلفا.',
+    contraindications_en: 'Infants < 2 months, G6PD deficiency, severe sulfonamide allergy.',
+    clinical_pearls_ar: 'خط علاجي ممتاز لالتهابات المسالك البولية عند الأطفال (UTI) والنزلات المعوية البكتيرية. يحسب عادة على أساس مكون التريميثوبريم (8 مجم/كجم/يوم مقسمة على جرعتين).',
+    clinical_pearls_en: 'Calculated as 8 mg/kg/day of TMP component divided q12h. Excellent for pediatric UTI.'
+  },
+
+  // 21. Loratadine (Claritin)
+  {
+    id: 'loratadine',
+    name_ar: 'لوراتادين (كلاريتين)',
+    name_en: 'Loratadine (Claritin)',
+    trade_names: ['كلاريتين (Claritin)', 'لورين (Lorin)', 'لوراتيد (Loratid)', 'كلاراليرج (Clarallerg)'],
+    aliases: ['claritin', 'loratadine', 'كلاريتين', 'لورين', 'حساسية', 'مضاد حساسية'],
+    class_ar: 'مضاد هيستامين من الجيل الثاني (غير مهدئ)',
+    class_en: 'Second-Generation Non-Sedating Antihistamine',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0.2,
+    mpk_max: 0.3,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 5,
+    available_concentrations: [
+      { labelAr: '5 مجم / 5 مل (شراب أطفال)', labelEn: '5 mg / 5ml Syrup', value: 5, unit: 'mg/5ml', tradeExampleAr: 'Claritin Syrup 5mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 24,
+    max_daily_adult_mg: 10,
+    contraindications_ar: 'الأطفال أقل من سنتين دون إشراف أخصائي أطفال.',
+    contraindications_en: 'Children under 2 years without specialist supervision.',
+    clinical_pearls_ar: 'الجرعة القياسية حسب الوزن: الأطفال من 10 إلى 30 كجم: 5 مجم (5 مل) مرة واحدة يومياً. أكثر من 30 كجم: 10 مجم (10 مل) مرة واحدة يومياً.',
+    clinical_pearls_en: 'Weight-band dosing: 10-30 kg = 5 mg (5 ml) once daily; > 30 kg = 10 mg (10 ml) once daily.'
+  },
+
+  // 22. Fusidic Acid (Fucidin) - Topical
+  {
+    id: 'fusidic_acid',
+    name_ar: 'حمض الفوسيديك (فيوسيدين مرهم وكريم)',
+    name_en: 'Fusidic Acid / Sodium Fusidate (Fucidin)',
+    trade_names: ['فيوسيدين (Fucidin)', 'فوسيكورت (Fucicort)', 'فوسيزون (Fucizone)', 'ديرموفوسين (Dermofucin)'],
+    aliases: ['fucidin', 'fusidic', 'فيوسيدين', 'مرهم احمر', 'كريم اسد', 'التهاب جلد'],
+    class_ar: 'مضاد حيوي موضعي نوعي للمكورات العنقودية',
+    class_en: 'Topical Antistaphylococcal Antibiotic',
+    is_antibiotic: true,
+    supported_formulations: ['ointment'],
+    default_formulation: 'ointment',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 20, // 2% = 20mg/g
+    available_concentrations: [
+      { labelAr: '2% مرهم أو كريم (20 مجم/جم)', labelEn: '2% Ointment / Cream (20mg/g)', value: 20, unit: 'mg/g', tradeExampleAr: 'Fucidin 2%', formulation: 'ointment' }
+    ],
+    formulation_guidelines: {
+      ointment_ftu_advice_ar: 'يدهن طبقة رقيقة على الآفة الجلدية (القوباء Impetigo أو الحصف أو الجروح الملتهبة) بمقدار وحدة طرف الإصبع FTU مرتين إلى 3 مرات يومياً لمدة 7 إلى 10 أيام.',
+      ointment_ftu_advice_en: 'Apply thin film to affected skin lesions 2-3 times daily for 7-10 days.'
+    },
+    min_age_months: 1,
+    max_daily_adult_mg: 0,
+    contraindications_ar: 'فرط الحساسية لحمض الفوسيديك.',
+    contraindications_en: 'Hypersensitivity to fusidate.',
+    clinical_pearls_ar: 'العلاج الموضعي المفضل للحصف والتهابات الجلد السطحية الناتجة عن بكتيريا Staph aureus عند الرضع والأطفال.',
+    clinical_pearls_en: 'First-line topical treatment for pediatric impetigo and minor superficial skin infections.'
+  },
+
+  // Cefalexin / Cephalexin (Cefalin 250mg/5ml - as seen on packaging)
+  {
+    id: 'cefalexin',
+    name_ar: 'سيفاليكسين (سيفالين / كفليكس)',
+    name_en: 'Cefalexin / Cephalexin (Cefalin / Keflex)',
+    trade_names: ['سيفالين (Cefalin)', 'كفليكس (Keflex)', 'أوسبيكسين (Ospexin)', 'سيفاليكس (Cefalex)', 'يونيلاب سيفالين (Unilab Cefalin)'],
+    aliases: ['cefalexin', 'cephalexin', 'cefalin', 'keflex', 'ospexin', 'سيفالين', 'سيفاليكسين', 'كفليكس', 'مضاد حيوي أطفال', 'التهاب حلق', 'التهاب جلد', 'بولية'],
+    class_ar: 'مضاد حيوي سيفالوسبورين جيل أول واسع الطيف للأطفال',
+    class_en: 'First-Generation Cephalosporin Antibiotic',
+    is_antibiotic: true,
+    supported_formulations: ['syrup', 'drops'],
+    default_formulation: 'syrup',
+    mpk_min: 25,
+    mpk_max: 50,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 250,
+    available_concentrations: [
+      { labelAr: '250 مجم / 5 مل (معلق سيفالين Cefalin الأكثر شيوعاً)', labelEn: '250 mg / 5ml (Cefalin Suspension)', value: 250, unit: 'mg/5ml', tradeExampleAr: 'Cefalin 250mg/5ml 60ml', formulation: 'syrup' },
+      { labelAr: '125 مجم / 5 مل (معلق كفليكس / سيفاليكسين للأطفال)', labelEn: '125 mg / 5ml (Keflex Suspension)', value: 125, unit: 'mg/5ml', tradeExampleAr: 'Keflex 125mg/5ml', formulation: 'syrup' },
+      { labelAr: '100 مجم / 1 مل (نقط فموية Cefalin Drops للرضع)', labelEn: '100 mg / 1ml Drops', value: 100, unit: 'mg/ml', tradeExampleAr: 'Cefalexin Infant Drops', formulation: 'drops' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 4000,
+    contraindications_ar: 'فرط الحساسية للسيفالوسبورينات أو الحساسية الشديدة الفورية للبنسلين.',
+    contraindications_en: 'Hypersensitivity to cephalosporins or severe anaphylaxis to penicillins.',
+    clinical_pearls_ar: 'الجرعة المعتادة للأطفال: 25 إلى 50 مجم/كجم/يوم مقسمة كل 8 أو 12 ساعة. في الالتهابات الشديدة يمكن زيادتها إلى 75-100 مجم/كجم/يوم. مثالي لالتهابات الحلق البكتيرية والتهاب المسالك البولية والتهابات الجلد والأنسجة الرخوة.',
+    clinical_pearls_en: 'Dose: 25-50 mg/kg/day divided q8-12h (up to 100 mg/kg/day in severe infections). Excellent for streptococcal pharyngitis, skin/soft tissue, and UTIs.'
+  },
+
+  // 23. Dexamethasone (Decadron)
+  {
+    id: 'dexamethasone',
+    name_ar: 'ديكساميثازون (ديكادرون / فورتيكورتين)',
+    name_en: 'Dexamethasone (Decadron / Fortecortin)',
+    trade_names: ['ديكادرون (Decadron)', 'فورتيكورتين (Fortecortin)', 'ابيديكس (Apidex)', 'ديكساميثازون أمبول'],
+    aliases: ['decadron', 'dexamethasone', 'ديكادرون', 'كورتيزون', 'خناق', 'كحة نباحية', 'حنجرة', 'ربو', 'croup'],
+    class_ar: 'كورتيكوستيرويد قوي مضاد للالتهاب والتورم الحنجري',
+    class_en: 'Potent Glucocorticoid Anti-Inflammatory',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'drops', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 0.15,
+    mpk_max: 0.6,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 0.5,
+    available_concentrations: [
+      { labelAr: '0.5 مجم / 5 مل (شراب ديكادرون)', labelEn: '0.5 mg / 5ml Syrup', value: 0.5, unit: 'mg/5ml', tradeExampleAr: 'Decadron Syrup 0.5mg/5ml', formulation: 'syrup' },
+      { labelAr: '4 مجم / 1 مل (حقن أمبول Decadron IV/IM)', labelEn: '4 mg / 1ml Ampoule', value: 4, unit: 'mg/ml', tradeExampleAr: 'Decadron 4mg/ml', formulation: 'injection' },
+      { labelAr: '8 مجم / 2 مل (أمبول فورتيكورتين)', labelEn: '8 mg / 2ml Ampoule', value: 4, unit: 'mg/ml', tradeExampleAr: 'Fortecortin 8mg/2ml', formulation: 'injection' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 16,
+    contraindications_ar: 'العدوى الفطرية الجهازية، الدرن النشط، تلقي لقاحات حية حديثاً.',
+    contraindications_en: 'Systemic fungal infection, live viral vaccines.',
+    clinical_pearls_ar: 'الدواء المعياري الذهبي لعلاج الخناق الحنجري عند الأطفال (Croup / Laryngotracheitis): جرعة واحدة فموية أو عضلية 0.15 إلى 0.6 مجم/كجم (بحد أقصى 10-16 مجم) تخفف بحة الصوت وضيق التنفس خلال ساعات.',
+    clinical_pearls_en: 'Gold standard for pediatric croup: Single dose 0.15-0.6 mg/kg (max 10-16 mg) PO/IM.'
+  },
+
+  // 24. Dimetindene (Fenistil Drops)
+  {
+    id: 'dimetindene',
+    name_ar: 'ديميتيندين (فينستيل نقط فموية)',
+    name_en: 'Dimetindene maleate (Fenistil Drops)',
+    trade_names: ['فينستيل (Fenistil)', 'فينستيل نقط', 'أبوليرج (Apolerg)'],
+    aliases: ['fenistil', 'dimetindene', 'فينستيل', 'فينيستيل', 'حساسية رضع', 'حكة', 'ارتكاريا', 'اكزيما'],
+    class_ar: 'مضاد هيستامين من الجيل الأول مناسب للرضع',
+    class_en: 'First-Generation Antihistamine for Infants',
+    is_antibiotic: false,
+    supported_formulations: ['drops'],
+    default_formulation: 'drops',
+    mpk_min: 0.1,
+    mpk_max: 0.1,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 1,
+    available_concentrations: [
+      { labelAr: '1 مجم / 1 مل (فينستيل نقط فموية للرضع)', labelEn: '1 mg / 1ml Drops (20 drops = 1ml)', value: 1, unit: 'mg/ml', tradeExampleAr: 'Fenistil Drops 1mg/ml', formulation: 'drops' }
+    ],
+    formulation_guidelines: {
+      drops_count_advice_ar: 'الجرعة البسيطة الدقيقة: نقطتان (2 Drops) لكل 1 كجم من وزن الطفل في اليوم، مقسمة على 3 جرعات (مثال: طفل وزنه 6 كجم يأخذ 4 نقط كل 8 ساعات).',
+      drops_count_advice_en: '2 drops per kg per day, divided into 3 doses (e.g. 6kg infant = 4 drops TID).'
+    },
+    min_age_months: 1,
+    max_daily_adult_mg: 6,
+    contraindications_ar: 'الخدج دون عمر شهر، الأطفال المصابين بنوبات ربو حادة.',
+    contraindications_en: 'Neonates < 1 month, acute severe asthma.',
+    clinical_pearls_ar: 'الخيار الصيدلاني الأكثر أماناً وشهرة لتخفيف الحكة والطفح الجلدي وحساسية البعوض عند الرضع والأطفال الصغار.',
+    clinical_pearls_en: 'Classic pediatric antihistamine for infantile pruritus, eczema itch, and urticaria.'
+  },
+
+  // 25. Ivy Leaf Extract (Prospan)
+  {
+    id: 'prospan',
+    name_ar: 'خلاصة أوراق اللبلاب (بروسبان شراب كحة)',
+    name_en: 'Ivy Leaf Extract (Prospan)',
+    trade_names: ['بروسبان (Prospan)', 'روابكس (Rowapex)', 'كيفبان (Kifpan)', 'أيفي كف (Ivy Cough)'],
+    aliases: ['prospan', 'ivy', 'بروسبان', 'لبلاب', 'كحة', 'سعال', 'كحة اطفال', 'بلغم'],
+    class_ar: 'شراب أعشاب طبيعي موسع للشعب ومذيب للمخاط',
+    class_en: 'Herbal Bronchospasmolytic & Mucolytic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 7, // 7mg dried ivy leaf per 1ml = 35mg/5ml
+    available_concentrations: [
+      { labelAr: '35 مجم / 5 مل (شراب بروسبان المعتمد)', labelEn: '35 mg / 5ml Ivy Leaf Syrup', value: 35, unit: 'mg/5ml', tradeExampleAr: 'Prospan Syrup', formulation: 'syrup' }
+    ],
+    min_age_months: 12,
+    max_daily_adult_mg: 105,
+    contraindications_ar: 'الحساسية لأوراق اللبلاب، الرضع دون عمر سنة دون استشارة طبيب.',
+    contraindications_en: 'Hypersensitivity to ivy leaf, infants < 1 year without MD.',
+    clinical_pearls_ar: 'جرعات الفئات العمرية: الأطفال من 1 إلى 5 سنوات: 2.5 مل مرتين إلى 3 مرات يومياً. الأطفال من 6 إلى 12 سنة: 5 مل 3 مرات يومياً.',
+    clinical_pearls_en: '1-5 years: 2.5 ml TID; 6-12 years: 5 ml TID.'
+  },
+
+  // 26. Ambroxol (Mucosolvan)
+  {
+    id: 'mucosolvan',
+    name_ar: 'أمبروكسول (موكوسولفان مذيب البلغم)',
+    name_en: 'Ambroxol HCl (Mucosolvan)',
+    trade_names: ['موكوسولفان (Mucosolvan)', 'أمبروكسول (Ambroxol)', 'برونكوبرو (Bronchopro)'],
+    aliases: ['mucosolvan', 'ambroxol', 'موكوسولفان', 'امبروكسول', 'بلغم', 'كحة ببلغم', 'مذيب بلغم'],
+    class_ar: 'مذيب ومعدل لإفرازات البلغم ومحفز للسطح الرئوي',
+    class_en: 'Secretolytic & Surfactant Stimulating Mucolytic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'drops'],
+    default_formulation: 'syrup',
+    mpk_min: 1.2,
+    mpk_max: 1.6,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 15,
+    available_concentrations: [
+      { labelAr: '15 مجم / 5 مل (شراب أطفال موكوسولفان)', labelEn: '15 mg / 5ml Syrup', value: 15, unit: 'mg/5ml', tradeExampleAr: 'Mucosolvan Pediatric 15mg/5ml', formulation: 'syrup' },
+      { labelAr: '30 مجم / 5 مل (شراب فورت للأطفال الأكبر)', labelEn: '30 mg / 5ml Forte Syrup', value: 30, unit: 'mg/5ml', tradeExampleAr: 'Mucosolvan Forte 30mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 24,
+    max_daily_adult_mg: 120,
+    contraindications_ar: 'الأطفال دون عمر سنتين دون استشارة طبية مباشرة، القرحة الهضمية النشطة.',
+    contraindications_en: 'Children < 2 years without prescription, active peptic ulcer.',
+    clinical_pearls_ar: 'الجرعة بالمل: من 2 إلى 5 سنوات: 2.5 مل (نصف ملعقة صغيرة) 3 مرات يومياً. من 6 إلى 12 سنة: 5 مل (ملعقة صغيرة) مرتين إلى 3 مرات يومياً.',
+    clinical_pearls_en: '2-5 years: 2.5 ml TID (7.5 mg); 6-12 years: 5 ml BID/TID (15 mg).'
+  },
+
+  // 27. Simethicone (Dentinox / Infacol)
+  {
+    id: 'simethicone',
+    name_ar: 'سيميثيكون (دينتينوكس / إنفاكول لمغص الرضع)',
+    name_en: 'Simethicone (Dentinox / Infacol / Disflatyl)',
+    trade_names: ['دينتينوكس نقط (Dentinox)', 'إنفاكول (Infacol)', 'ديسفلاتيل (Disflatyl)', 'بيديكير (Pedicare)'],
+    aliases: ['dentinox', 'infacol', 'simethicone', 'disflatyl', 'دينتينوكس', 'انفاكول', 'مغص', 'غازات', 'انتفاخ رضع'],
+    class_ar: 'مضاد للغازات والمغص وفقاعات الجهاز الهضمي',
+    class_en: 'Antiflatulent / Defoaming Agent',
+    is_antibiotic: false,
+    supported_formulations: ['drops'],
+    default_formulation: 'drops',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 40,
+    available_concentrations: [
+      { labelAr: '40 مجم / 1 مل (دينتينوكس / إنفاكول نقط قطارة كاملة)', labelEn: '40 mg / 1ml Infant Colic Drops', value: 40, unit: 'mg/ml', tradeExampleAr: 'Dentinox Colic Drops', formulation: 'drops' }
+    ],
+    formulation_guidelines: {
+      drops_count_advice_ar: 'تُعطى قطارة واحدة ممتلئة (حوالي 0.5 مل إلى 1 مل = 20-40 مجم) مع أو بعد كل رضعة مباشرة أو تخلط مع الحليب، حتى 4 إلى 6 مرات باليوم.',
+      drops_count_advice_en: '0.5 to 1 dropperful (20-40 mg) with or after each feed up to 6 times daily.'
+    },
+    min_age_months: 0,
+    max_daily_adult_mg: 500,
+    contraindications_ar: 'الانسداد المعوي الحاد، فرط الحساسية للمادة.',
+    contraindications_en: 'Known hypersensitivity, suspected intestinal obstruction.',
+    clinical_pearls_ar: 'يعمل ميكانيكياً بتفتيت فقاعات الغازات داخل أمعاء الرضيع دون أي امتصاص في مجرى الدم، مما يجعله آمناً تماماً من الأيام الأولى للولادة.',
+    clinical_pearls_en: 'Acts physically by reducing surface tension of gas bubbles; completely non-absorbed systemically.'
+  },
+
+  // 28. Cefotaxime (Claforan)
+  {
+    id: 'cefotaxime',
+    name_ar: 'سيفوتاكسيم (كلافوران حقن)',
+    name_en: 'Cefotaxime (Claforan IV/IM)',
+    trade_names: ['كلافوران (Claforan)', 'سيفوتاكس (Cefotax)', 'تاكسيم (Taxim)'],
+    aliases: ['claforan', 'cefotaxime', 'كلافوران', 'سيفوتاكسيم', 'حقنة التهاب', 'تسمم دم', 'سحايا'],
+    class_ar: 'سيفالوسبورين الجيل الثالث واسع المدى بالحقن',
+    class_en: 'Third-Generation Cephalosporin IV/IM',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 100,
+    mpk_max: 150,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 500,
+    available_concentrations: [
+      { labelAr: '500 مجم فيال (حل في 2 مل ماء حقن)', labelEn: '500 mg Vial (Reconstitute with 2ml)', value: 250, unit: 'mg/ml', tradeExampleAr: 'Claforan 500mg Vial', formulation: 'injection' },
+      { labelAr: '1000 مجم (1 جم) فيال (حل في 4 مل ماء حقن)', labelEn: '1000 mg Vial (Reconstitute with 4ml)', value: 250, unit: 'mg/ml', tradeExampleAr: 'Claforan 1g Vial', formulation: 'injection' }
+    ],
+    formulation_guidelines: {
+      injection_reconstitution_ar: 'يُحل الفيال في ماء للحقن بتركيز 100 إلى 250 مجم/مل، ويُحقن وريدياً ببطء على مدار 3 إلى 5 دقائق، أو تسريباً متقطعاً على 20 دقيقة.',
+      injection_reconstitution_en: 'Reconstitute to 100-250 mg/ml; inject slowly IV over 3-5 minutes or infuse over 20-30 min.'
+    },
+    min_age_months: 0,
+    max_daily_adult_mg: 8000,
+    contraindications_ar: 'صدمة الحساسية السابقة للبنسلينات أو السيفالوسبورينات.',
+    contraindications_en: 'Severe immediate anaphylaxis to beta-lactams.',
+    clinical_pearls_ar: 'السيفالوسبورين الأكثر أماناً للمواليد والخدج (على عكس سيفترياكسون الذي يُمنع مع محاليل الكالسيوم أو اليرقان الشديد)، الجرعة في الحمى الشوكية والسحايا تصل إلى 200 مجم/كجم/يوم مقسمة كل 6 ساعات.',
+    clinical_pearls_en: 'Preferred 3rd-gen cephalosporin in neonates because it does not displace bilirubin nor precipitate with calcium.'
+  },
+
+  // 29. Oral Rehydration Salts (ORS / Pedialyte)
+  {
+    id: 'ors',
+    name_ar: 'محلول معالجة الجفاف (أو آر إس / هيدروسيف / بيديالايت)',
+    name_en: 'Oral Rehydration Salts (ORS / Pedialyte)',
+    trade_names: ['بيديالايت (Pedialyte)', 'هيدروسيف (HydroSafe)', 'لو-أورالايت (Low-Osmolarity ORS)', 'ريهايدران (Rehydran)'],
+    aliases: ['ors', 'pedialyte', 'محلول جفاف', 'هيدروسيف', 'اسهال', 'ترجيع', 'نوازل معوية', 'املاح'],
+    class_ar: 'محاليل متوازنة الشوارد لإنقاذ الجفاف ومنع التدهور',
+    class_en: 'WHO Low-Osmolarity Oral Electrolyte Solution',
+    is_antibiotic: false,
+    supported_formulations: ['sachet', 'syrup'],
+    default_formulation: 'sachet',
+    mpk_min: 50,
+    mpk_max: 100,
+    doses_per_day: 1,
+    interval_hours: 4,
+    default_conc: 1,
+    available_concentrations: [
+      { labelAr: 'كيس فوار قياسي (يُذاب في 200 مل ماء نقي)', labelEn: '1 Sachet dissolved in 200ml clean water', value: 1, unit: 'sachet', tradeExampleAr: 'WHO Low Osmolarity Sachet', formulation: 'sachet' },
+      { labelAr: 'محلول بيديالايت سائل جاهز للشرب 500 مل', labelEn: 'Pedialyte Ready-to-drink solution 500ml', value: 1, unit: 'ml', tradeExampleAr: 'Pedialyte 500ml', formulation: 'syrup' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 5000,
+    contraindications_ar: 'الانسداد المعوي الميكانيكي، الصدمة الشديدة غير المستقرة (تتطلب محاليل وريدية فوراً)، القيء المستعصي المستمر.',
+    contraindications_en: 'Severe hypovolemic shock (requires IV resuscitation), intestinal obstruction.',
+    clinical_pearls_ar: 'حساب الحجم السريري لمنظمة الصحة العالمية (WHO): الجفاف الخفيف إلى المتوسط يُعطى 50 إلى 100 مل/كجم على مدار 4 ساعات بواسطة ملعقة صغيرة كل 1-2 دقيقة لتقليل القيء، ثم 10 مل/كجم إضافية بعد كل تبرز إسهالي مائي.',
+    clinical_pearls_en: 'WHO Protocol: 50-100 ml/kg over 4 hours administered slowly by spoon, plus 10 ml/kg for each watery stool.'
+  },
+
+  // 30. Montelukast (Singulair)
+  {
+    id: 'montelukast',
+    name_ar: 'مونتيلوكاست (سنجولير / سينجولير)',
+    name_en: 'Montelukast (Singulair)',
+    trade_names: ['سنجولير (Singulair)', 'مونتيلوكاست (Montelukast)', 'إيرفاست (Airfast)', 'كلير-إير (ClearAir)'],
+    aliases: ['montelukast', 'singulair', 'سنجولير', 'سينجولير', 'حساسية صدر', 'ربو وقائي', 'لحمية'],
+    class_ar: 'مضاد مستقبلات الليكوترين الوقائي للربو والحساسية',
+    class_en: 'Leukotriene Receptor Antagonist (LTRA)',
+    is_antibiotic: false,
+    supported_formulations: ['sachet', 'syrup'],
+    default_formulation: 'sachet',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 4,
+    available_concentrations: [
+      { labelAr: 'حبيبات فموية 4 مجم ساشيت (من عمر 6 شهور حتى 5 سنوات)', labelEn: '4 mg Granules Sachet (6 mo - 5 yrs)', value: 4, unit: 'mg/sachet', tradeExampleAr: 'Singulair 4mg Granules', formulation: 'sachet' },
+      { labelAr: 'أقراص للمضغ 5 مجم (من 6 سنوات حتى 14 سنة)', labelEn: '5 mg Chewable Tablet (6 - 14 yrs)', value: 5, unit: 'mg/tablet', tradeExampleAr: 'Singulair 5mg Chewable', formulation: 'sachet' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 10,
+    contraindications_ar: 'فرط الحساسية للدواء.',
+    contraindications_en: 'Hypersensitivity to montelukast.',
+    clinical_pearls_ar: 'يُعطى مرة واحدة يومياً مساءً قبل النوم. الحبيبات يمكن خلطها بملعقة زبادي أو تفاح مهروس بارد وتناولها فوراً خلال 15 دقيقة، لا تذاب في سوائل ساخنة. دواء وقائي طويل الأمد وليس موسعاً سريعاً للأزمات الحادة.',
+    clinical_pearls_en: 'Administer once daily in the evening. Granules can be mixed with cold soft food (applesauce/yogurt) within 15 min. Maintenance preventer, not a rescue bronchodilator.'
+  },
+
+  // 31. Ipratropium Bromide (Atrovent)
+  {
+    id: 'ipratropium',
+    name_ar: 'إبراتروبيوم بروميد (أتروفنت)',
+    name_en: 'Ipratropium Bromide (Atrovent)',
+    trade_names: ['أتروفنت (Atrovent)', 'إبراتروبيوم (Ipratropium)', 'كومبيفنت (Combivent)'],
+    aliases: ['ipratropium', 'atrovent', 'اتروفنت', 'اطروفنت', 'جلسات تنفس', 'كمامة'],
+    class_ar: 'موسع قصبات مضاد للكولين لجلسات الرذاذ والربو الحاد',
+    class_en: 'Inhaled Anticholinergic Bronchodilator',
+    is_antibiotic: false,
+    supported_formulations: ['drops', 'spray'],
+    default_formulation: 'drops',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 250,
+    available_concentrations: [
+      { labelAr: 'محلول استنشاق بالرذاذ 250 ميكروجرام / 1 مل (أمبولات)', labelEn: 'Nebulizer Solution 250 mcg / 1ml', value: 250, unit: 'mcg/ml', tradeExampleAr: 'Atrovent 250mcg Nebulizing Sol', formulation: 'drops' },
+      { labelAr: 'بخاخ فموي 20 ميكروجرام / بخة', labelEn: 'Oral Inhaler 20 mcg / puff', value: 20, unit: 'mcg/puff', tradeExampleAr: 'Atrovent Inhaler MDI', formulation: 'spray' }
+    ],
+    formulation_guidelines: {
+      drops_count_advice_ar: 'للأطفال أقل من 5 سنوات: 125 إلى 250 ميكروجرام (نصف إلى 1 مل) تخلط مع 2 مل محلول ملحي 0.9% في جهاز النيبولايزر كل 6-8 ساعات عند الأزمات الشديدة.',
+      drops_count_advice_en: 'Under 5 yrs: 125-250 mcg (0.5-1 ml) diluted with 2ml 0.9% saline q6-8h in acute moderate-to-severe bronchospasm.'
+    },
+    min_age_months: 1,
+    max_daily_adult_mg: 1000,
+    contraindications_ar: 'الحساسية لمشتقات الأتروبين أو الجلوكوما مغلقة الزاوية.',
+    contraindications_en: 'Hypersensitivity to atropine derivatives.',
+    clinical_pearls_ar: 'يضاف إلى السالبوتامول (الفنتولين) في الساعات الأولى من نوبة الربو الحادة الشديدة في الطوارئ لإحداث توسيع مضاعف للقصبات، يراعى حماية عيني الطفل من الرذاذ لتجنب اتساع حدقة العين.',
+    clinical_pearls_en: 'Synergistic with salbutamol in acute severe asthma exacerbations. Protect child eyes during nebulization to prevent mydriasis.'
+  },
+
+  // 32. Omeprazole (Losec)
+  {
+    id: 'omeprazole',
+    name_ar: 'أوميبرازول (لوسيك / جاستروزول)',
+    name_en: 'Omeprazole (Losec)',
+    trade_names: ['لوسيك (Losec)', 'جاستروزول (Gastrozole)', 'أومبراسيد (Omepracid)', 'رايسيك (Risek)'],
+    aliases: ['omeprazole', 'losec', 'اوميبرازول', 'لوسيك', 'حموضة', 'ارتجاع مريء', 'قرحة'],
+    class_ar: 'مثبط مضخة البروتون لعلاج ارتجاع المريء والتهاب المعدة',
+    class_en: 'Proton Pump Inhibitor (PPI)',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'sachet'],
+    default_formulation: 'syrup',
+    mpk_min: 0.7,
+    mpk_max: 1.5,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 20,
+    available_concentrations: [
+      { labelAr: 'محلول / معلق فموي مركب 20 مجم / 5 مل (4 مجم/مل)', labelEn: 'Oral Suspension 20 mg / 5ml (4 mg/ml)', value: 20, unit: 'mg/5ml', tradeExampleAr: 'Omeprazole 20mg/5ml Compounded', formulation: 'syrup' },
+      { labelAr: 'أكياس فوارة 10 مجم ساشيت', labelEn: '10 mg Sachet Powder', value: 10, unit: 'mg/sachet', tradeExampleAr: 'Losec MUPS / Sachet 10mg', formulation: 'sachet' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 40,
+    contraindications_ar: 'فرط الحساسية لمثبطات مضخة البروتون.',
+    contraindications_en: 'Hypersensitivity to PPIs.',
+    clinical_pearls_ar: 'الجرعة القياسية للأطفال: 1 مجم/كجم مرة واحدة يومياً صباحاً قبل الرضاعة أو الإفطار بـ 30 دقيقة. لعلاج ارتجاع المريء الموثق (GERD) أو قرحة المعدة. لا تمضغ الحبيبات المعوية.',
+    clinical_pearls_en: 'Dose: 0.7-1.5 mg/kg once daily in the morning 30 min before feed/meal. Do not crush enteric-coated microgranules.'
+  },
+
+  // 33. Famotidine (Antodine)
+  {
+    id: 'famotidine',
+    name_ar: 'فاموتيدين (أنتودين / جاسترودوم)',
+    name_en: 'Famotidine (Antodine)',
+    trade_names: ['أنتودين (Antodine)', 'جاسترودوم (Gastrodom)', 'فاموتاك (Famotack)'],
+    aliases: ['famotidine', 'antodine', 'فاموتيدين', 'انتودين', 'ارتجاع معدي مريئي', 'حموضة اطفال'],
+    class_ar: 'مضاد مستقبلات H2 لتقليل إفراز حمض المعدة',
+    class_en: 'H2 Receptor Antagonist',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0.5,
+    mpk_max: 1.0,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 40,
+    available_concentrations: [
+      { labelAr: 'معلق فموي 40 مجم / 5 مل (8 مجم/مل)', labelEn: 'Oral Suspension 40 mg / 5ml', value: 40, unit: 'mg/5ml', tradeExampleAr: 'Famotidine 40mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 40,
+    contraindications_ar: 'فرط الحساسية لمضادات الهيستامين H2.',
+    contraindications_en: 'Hypersensitivity to H2 blockers.',
+    clinical_pearls_ar: 'الجرعة: 0.5 إلى 1 مجم/كجم/يوم مقسمة كل 12 ساعة، أسرع في بدء المفعول من مثبطات مضخة البروتون PPI.',
+    clinical_pearls_en: 'Dosing: 0.5-1 mg/kg/day divided twice daily for pediatric GERD and peptic symptoms.'
+  },
+
+  // 34. Hydroxyzine (Atarax)
+  {
+    id: 'hydroxyzine',
+    name_ar: 'هيدروكسيزين (أتاراكس)',
+    name_en: 'Hydroxyzine (Atarax)',
+    trade_names: ['أتاراكس (Atarax)', 'هيدروكسيزين (Hydroxyzine)'],
+    aliases: ['hydroxyzine', 'atarax', 'اتاراكس', 'أتاراكس', 'حساسية شديدة', 'حكة', 'أرتيكاريا'],
+    class_ar: 'مضاد هيستامين H1 مهدئ ومضاد قوي للحكة والأرتيكاريا الحادة',
+    class_en: 'First-Generation Sedating Antihistamine & Antipruritic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 1.0,
+    mpk_max: 2.0,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 10,
+    available_concentrations: [
+      { labelAr: 'شراب 10 مجم / 5 مل (2 مجم/مل)', labelEn: 'Syrup 10 mg / 5ml (2 mg/ml)', value: 10, unit: 'mg/5ml', tradeExampleAr: 'Atarax Syrup 10mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 12,
+    max_daily_adult_mg: 100,
+    contraindications_ar: 'استطالة فترة QT القلبية، الرضع أقل من 12 شهراً.',
+    contraindications_en: 'Prolonged QT interval, infants under 12 months.',
+    clinical_pearls_ar: 'الجرعة: 1 إلى 2 مجم/كجم/يوم مقسمة على 3 إلى 4 جرعات. دواء فائق الفعالية لحكة الأكزيما الشديدة والأرتيكاريا المزعجة التي تمنع نوم الطفل ليلاً، يسبب نعاساً واضحاً.',
+    clinical_pearls_en: '1-2 mg/kg/day divided q6-8h. Highly effective for severe nighttime pruritus and atopic eczema flares.'
+  },
+
+  // 35. Desloratadine (Aerius)
+  {
+    id: 'desloratadine',
+    name_ar: 'ديسلوراتادين (إيريوس / ايريوس)',
+    name_en: 'Desloratadine (Aerius)',
+    trade_names: ['إيريوس (Aerius)', 'ديسلوراتادين (Desloratadine)', 'ديسلا (Desla)'],
+    aliases: ['desloratadine', 'aerius', 'ايريوس', 'إيريوس', 'حساسية انف', 'عطاس', 'حكة عيون'],
+    class_ar: 'مضاد هيستامين حديث غير مهدئ ممتد المفعول',
+    class_en: 'Second-Generation Non-Sedating Antihistamine',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 2.5,
+    available_concentrations: [
+      { labelAr: 'شراب 2.5 مجم / 5 مل (0.5 مجم/مل)', labelEn: 'Syrup 2.5 mg / 5ml (0.5 mg/ml)', value: 2.5, unit: 'mg/5ml', tradeExampleAr: 'Aerius Syrup 0.5mg/ml', formulation: 'syrup' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 5,
+    contraindications_ar: 'فرط الحساسية للديسلوراتادين أو اللوراتادين.',
+    contraindications_en: 'Hypersensitivity to desloratadine/loratadine.',
+    clinical_pearls_ar: 'الجرعات الثابتة حسب العمر: 6 شهور حتى 11 شهر: 1 مجم (2 مل) مرة واحدة يومياً؛ 1 إلى 5 سنوات: 1.25 مجم (2.5 مل) مرة واحدة يومياً؛ 6 إلى 11 سنة: 2.5 مجم (5 مل)؛ فوق 12 سنة: 5 مجم (10 مل). لا يسبب النعاس.',
+    clinical_pearls_en: 'Age-based dosing: 6-11 mo: 1 mg (2ml) OD; 1-5 yrs: 1.25 mg (2.5ml) OD; 6-11 yrs: 2.5 mg (5ml) OD; >=12 yrs: 5 mg OD.'
+  },
+
+  // 36. Clindamycin (Dalacin C)
+  {
+    id: 'clindamycin',
+    name_ar: 'كليندامايسين (دالاسين سي)',
+    name_en: 'Clindamycin (Dalacin C)',
+    trade_names: ['دالاسين سي (Dalacin C)', 'كليندامايسين (Clindamycin)', 'كلينداسين (Clindacin)'],
+    aliases: ['clindamycin', 'dalacin', 'دالاسين', 'كليندامايسين', 'خراج', 'التهاب عظم', 'مكورات عنقودية'],
+    class_ar: 'مضاد حيوي قوي للجلد والأنسجة الرخوة والتهاب العظم وخراجات MRSA',
+    class_en: 'Lincosamide Antibiotic',
+    is_antibiotic: true,
+    supported_formulations: ['syrup', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 20,
+    mpk_max: 40,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 75,
+    available_concentrations: [
+      { labelAr: 'معلق فموي 75 مجم / 5 مل', labelEn: 'Oral Suspension 75 mg / 5ml', value: 75, unit: 'mg/5ml', tradeExampleAr: 'Dalacin C Syrup 75mg/5ml', formulation: 'syrup' },
+      { labelAr: 'أمبولات حقن 300 مجم / 2 مل (150 مجم/مل)', labelEn: '300 mg / 2ml Ampoule', value: 150, unit: 'mg/ml', tradeExampleAr: 'Dalacin C 300mg Ampoule', formulation: 'injection' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 1800,
+    contraindications_ar: 'التاريخ السابق لالتهاب القولون الغشائي الكاذب المرتبط بالمضادات الحيوية (C. difficile colitis).',
+    contraindications_en: 'Previous history of pseudomembranous colitis.',
+    clinical_pearls_ar: 'الجرعة الفموية: 20 إلى 30 مجم/كجم/يوم مقسمة كل 8 ساعات، وفي العدوى العظمية أو MRSA الشديدة الوريدية تصل إلى 40 مجم/كجم/يوم مقسمة كل 6-8 ساعات. يوقف فوراً عند حدوث إسهال حاد مائي.',
+    clinical_pearls_en: '20-40 mg/kg/day divided q6-8h. Excellent penetration into bone and soft tissues. Discontinue if severe watery diarrhea occurs.'
+  },
+
+  // 37. Ampicillin
+  {
+    id: 'ampicillin',
+    name_ar: 'أمبيسيلين (أمبيسيلين حقن وريدي وعضلي)',
+    name_en: 'Ampicillin (IV/IM)',
+    trade_names: ['أمبيسيلين (Ampicillin)', 'أمبيبن (Ampipen)', 'أبيكوسيلين (Epicocillin)'],
+    aliases: ['ampicillin', 'امبيسيلين', 'أمبيسيلين', 'تسمم دم حديثي الولادة', 'ليستيريا'],
+    class_ar: 'أمينوبنسلين واسع الطيف لحديثي الولادة وتسمم الدم والسحايا',
+    class_en: 'Aminopenicillin Antibiotic IV/IM',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 100,
+    mpk_max: 200,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 250,
+    available_concentrations: [
+      { labelAr: 'فيال 500 مجم (يحل في 2 مل ماء حقن)', labelEn: '500 mg Vial (Reconstitute with 2ml)', value: 250, unit: 'mg/ml', tradeExampleAr: 'Ampicillin 500mg Vial', formulation: 'injection' },
+      { labelAr: 'فيال 1000 مجم (1 جم) (يحل في 4 مل ماء حقن)', labelEn: '1000 mg Vial (Reconstitute with 4ml)', value: 250, unit: 'mg/ml', tradeExampleAr: 'Ampicillin 1g Vial', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 12000,
+    contraindications_ar: 'حساسية البنسلين المؤكدة.',
+    contraindications_en: 'Severe hypersensitivity to penicillins.',
+    clinical_pearls_ar: 'الركن الأساسي مع الجنتامايسين في علاج تسمم الدم لحديثي الولادة (Neonatal Sepsis) لتغطية بكتيريا الليستيريا Listeria والعقدية Group B Streptococcus. الجرعة في السحايا ترتفع إلى 200-300 مجم/كجم/يوم.',
+    clinical_pearls_en: 'Standard neonatal sepsis first-line with gentamicin for Listeria & GBS coverage. Meningitic dose: 200-300 mg/kg/day q6h.'
+  },
+
+  // 38. Ampicillin-Sulbactam (Unasyn)
+  {
+    id: 'ampicillin_sulbactam',
+    name_ar: 'أمبيسيلين + سولباكتام (يوناسين)',
+    name_en: 'Ampicillin / Sulbactam (Unasyn)',
+    trade_names: ['يوناسين (Unasyn)', 'سلبين (Sulbin)', 'يونيكتام (Unictam)'],
+    aliases: ['unasyn', 'يوناسين', 'سولباكتام', 'التهاب رئوي معقد', 'خراج بطني'],
+    class_ar: 'بنسلين مدعم بمثبط بيتا لاكتاماز للعدوى الشديدة داخل البطن والحوض',
+    class_en: 'Aminopenicillin with Beta-Lactamase Inhibitor IV/IM',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 100,
+    mpk_max: 150,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 250,
+    available_concentrations: [
+      { labelAr: 'فيال 750 مجم (500 أمبيسيلين + 250 سولباكتام)', labelEn: '750 mg Vial (500mg Amp + 250mg Sulb)', value: 250, unit: 'mg/ml', tradeExampleAr: 'Unasyn 750mg Vial', formulation: 'injection' },
+      { labelAr: 'فيال 1500 مجم (1.5 جم) (1000 أمبيسيلين + 500 سولباكتام)', labelEn: '1500 mg Vial (1g Amp + 500mg Sulb)', value: 375, unit: 'mg/ml', tradeExampleAr: 'Unasyn 1.5g Vial', formulation: 'injection' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 8000,
+    contraindications_ar: 'حساسية البنسلين أو اليرقان الكبدي الركودي المرتبط بالدواء.',
+    contraindications_en: 'Penicillin allergy or previous hepatic dysfunction.',
+    clinical_pearls_ar: 'تحسب الجرعة على أساس مكون الأمبيسيلين (100 إلى 150 مجم/كجم/يوم) مقسمة كل 6 ساعات للعدوى داخل البطن، خراجات العنق، والالتهاب الرئوي التنخري.',
+    clinical_pearls_en: 'Dose calculated based on ampicillin component (100-150 mg/kg/day divided q6h).'
+  },
+
+  // 39. Erythromycin
+  {
+    id: 'erythromycin',
+    name_ar: 'إريثرومايسين (إريثروسين)',
+    name_en: 'Erythromycin',
+    trade_names: ['إريثروسين (Erythrocin)', 'إريثرومايسين (Erythromycin)'],
+    aliases: ['erythromycin', 'اريثرومايسين', 'إريثرومايسين', 'سعال ديكي', 'التهاب رئوي لانموذجي'],
+    class_ar: 'مضاد حيوي ماكروليد لعلاج السعال الديكي والميكوبلازما',
+    class_en: 'Macrolide Antibiotic',
+    is_antibiotic: true,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 30,
+    mpk_max: 50,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 200,
+    available_concentrations: [
+      { labelAr: 'شراب معلق 200 مجم / 5 مل', labelEn: 'Oral Suspension 200 mg / 5ml', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Erythrocin 200mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 2000,
+    contraindications_ar: 'الرضع أقل من أسبوعين (خطر تضيق بواب المعدة الضخامي IHPS).',
+    contraindications_en: 'Infants under 2 weeks (risk of infantile hypertrophic pyloric stenosis).',
+    clinical_pearls_ar: 'الجرعة: 30 إلى 50 مجم/كجم/يوم مقسمة كل 6 ساعات لمدة 14 يوماً في علاج ومخالطة السعال الديكي (Pertussis). يؤخذ قبل الوجبات لزيادة الامتصاص أو معها لتقليل الغثيان.',
+    clinical_pearls_en: '30-50 mg/kg/day divided q6h for pertussis eradication and prophylaxis.'
+  },
+
+  // 40. Fluconazole (Diflucan)
+  {
+    id: 'fluconazole',
+    name_ar: 'فلوكونازول (ديفلوكان)',
+    name_en: 'Fluconazole (Diflucan)',
+    trade_names: ['ديفلوكان (Diflucan)', 'فلوكونازول (Fluconazole)', 'فلوكاند (Flucand)'],
+    aliases: ['fluconazole', 'diflucan', 'ديفلوكان', 'فلوكونازول', 'فطريات فموية', 'كانديدا'],
+    class_ar: 'مضاد فطريات جهازي تريازول واسع الفعالية',
+    class_en: 'Systemic Triazole Antifungal',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 3,
+    mpk_max: 12,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 50,
+    available_concentrations: [
+      { labelAr: 'معلق فموي 50 مجم / 5 مل (10 مجم/مل)', labelEn: 'Oral Suspension 50 mg / 5ml', value: 50, unit: 'mg/5ml', tradeExampleAr: 'Diflucan 50mg/5ml Suspension', formulation: 'syrup' },
+      { labelAr: 'محلول تسريب وريدي 2 مجم / مل (فيال 100 مل = 200 مجم)', labelEn: 'IV Infusion 2 mg/ml (100ml = 200mg)', value: 2, unit: 'mg/ml', tradeExampleAr: 'Diflucan IV 2mg/ml', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 400,
+    contraindications_ar: 'التناول المتزامن مع أدوية تستطيل فترة QT.',
+    contraindications_en: 'Co-administration with QT-prolonging drugs.',
+    clinical_pearls_ar: 'كانديدا الفم والمريء: جرعة تحميل 6 مجم/كجم في اليوم الأول ثم 3 مجم/كجم مرة واحدة يومياً لمدة 7-14 يوماً. في العدوى الفطرية الجهازية ترتفع إلى 6-12 مجم/كجم/يوم.',
+    clinical_pearls_en: 'Oral/esophageal candidiasis: Loading dose 6 mg/kg Day 1, then 3 mg/kg once daily for 7-14 days. Systemic candidiasis: 6-12 mg/kg OD.'
+  },
+
+  // 41. Nystatin (Mycostatin)
+  {
+    id: 'nystatin',
+    name_ar: 'نيستاتين (ميكوستاتين نقط فموية)',
+    name_en: 'Nystatin Oral Drops',
+    trade_names: ['ميكوستاتين (Mycostatin)', 'نيستاتين (Nystatin)', 'فنجيستاتين (Fungistatin)'],
+    aliases: ['nystatin', 'mycostatin', 'ميكوستاتين', 'نيستاتين', 'فطريات لسان الرضيع', 'بقع بيضاء باللسان'],
+    class_ar: 'مضاد فطريات موضعي فموي لعلاج فطريات اللسان والفم عند الرضع',
+    class_en: 'Topical Polyene Antifungal Oral Suspension',
+    is_antibiotic: false,
+    supported_formulations: ['drops'],
+    default_formulation: 'drops',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 100000,
+    available_concentrations: [
+      { labelAr: 'نقط فموية 100,000 وحدة دولية / مل', labelEn: 'Oral Drops 100,000 IU / ml', value: 100000, unit: 'IU/ml', tradeExampleAr: 'Mycostatin Oral Drops 100k IU/ml', formulation: 'drops' }
+    ],
+    formulation_guidelines: {
+      drops_count_advice_ar: 'للرضع: 1 مل (100,000 وحدة) تقطر في تجويف الفم وتوزع على جانبي اللسان بعد الرضاعة 4 مرات يومياً، ويستمر العلاج لمدة 48 ساعة بعد اختفاء البقع البيضاء تماماً.',
+      drops_count_advice_en: '1 ml (100,000 IU) dropped into oral cavity after feeds QID. Continue for 48h after lesions clear.'
+    },
+    min_age_months: 0,
+    max_daily_adult_mg: 2000000,
+    contraindications_ar: 'فرط الحساسية للنيستاتين.',
+    contraindications_en: 'Hypersensitivity to nystatin.',
+    clinical_pearls_ar: 'لا يمتص من الأمعاء ويعمل موضعياً تماماً. يجب التأكد من تعقيم حلمات زجاجات الرضاعة أو علاج حلمة ثدي الأم المرضعة لمنع تكرار العدوى.',
+    clinical_pearls_en: 'Non-absorbable topical action. Clean bottle teats and treat mother nipples if breastfeeding to avoid reinfection.'
+  },
+
+  // 42. Acyclovir (Zovirax)
+  {
+    id: 'acyclovir',
+    name_ar: 'أسيكلوفير (زوفيراكس)',
+    name_en: 'Acyclovir (Zovirax)',
+    trade_names: ['زوفيراكس (Zovirax)', 'أسيكلوفير (Acyclovir)', 'أفيروسن (Avirax)'],
+    aliases: ['acyclovir', 'zovirax', 'زوفيراكس', 'اسيكلوفير', 'جديري مائي', 'هربس فموي', 'عنقز'],
+    class_ar: 'مضاد فيروسات لعلاج الجديري المائي الشديد والهربس البسيط',
+    class_en: 'Antiviral Guanosine Analogue',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 40,
+    mpk_max: 80,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 200,
+    available_concentrations: [
+      { labelAr: 'معلق فموي 200 مجم / 5 مل (40 مجم/مل)', labelEn: 'Oral Suspension 200 mg / 5ml', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Zovirax Suspension 200mg/5ml', formulation: 'syrup' },
+      { labelAr: 'فيال تسريب وريدي 250 مجم', labelEn: '250 mg IV Infusion Vial', value: 25, unit: 'mg/ml', tradeExampleAr: 'Zovirax 250mg IV Vial', formulation: 'injection' }
+    ],
+    min_age_months: 3,
+    max_daily_adult_mg: 4000,
+    contraindications_ar: 'فرط الحساسية للأسيكلوفير أو الفالاسيكلوفير.',
+    contraindications_en: 'Hypersensitivity to acyclovir or valacyclovir.',
+    clinical_pearls_ar: 'جرعة الجديري المائي الفموية للأطفال فوق سنتين: 20 مجم/كجم/جرعة (بحد أقصى 800 مجم) 4 مرات يومياً لمدة 5 أيام، ويفضل البدء بها في أول 24-48 ساعة من ظهور الطفح.',
+    clinical_pearls_en: 'Varicella dose: 20 mg/kg/dose (max 800mg) QID for 5 days. Must start within 24-48h of rash onset for optimal clinical benefit.'
+  },
+
+  // 43. Diazepam Rectal (Stesolid)
+  {
+    id: 'diazepam_rectal',
+    name_ar: 'ديازيبام حقن شرجية (ستيسولد / ديستاتين)',
+    name_en: 'Diazepam Rectal Tube (Stesolid)',
+    trade_names: ['ستيسولد (Stesolid)', 'ديستاتين (Diastat)', 'ديازيبام (Diazepam Rectal)'],
+    aliases: ['diazepam', 'stesolid', 'ستيسولد', 'تشنج حراري', 'صرع طوارئ', 'تشنجات اطفال'],
+    class_ar: 'بنزوديازيبين إسعافي لإنهاء نوبات التشنج الحراري المستمر',
+    class_en: 'Emergency Anticonvulsant Benzodiazepine Rectal Tube',
+    is_antibiotic: false,
+    supported_formulations: ['suppository'],
+    default_formulation: 'suppository',
+    mpk_min: 0.3,
+    mpk_max: 0.5,
+    doses_per_day: 1,
+    interval_hours: 12,
+    default_conc: 5,
+    available_concentrations: [
+      { labelAr: 'أنبوبة شرجية جاهزة 5 مجم في 2.5 مل (للوزن < 15 كجم)', labelEn: '5 mg / 2.5ml Rectal Tube (Weight < 15kg)', value: 5, unit: 'mg/tube', tradeExampleAr: 'Stesolid 5mg Rectal Tube', formulation: 'suppository' },
+      { labelAr: 'أنبوبة شرجية جاهزة 10 مجم في 2.5 مل (للوزن > 15 كجم)', labelEn: '10 mg / 2.5ml Rectal Tube (Weight > 15kg)', value: 10, unit: 'mg/tube', tradeExampleAr: 'Stesolid 10mg Rectal Tube', formulation: 'suppository' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 20,
+    contraindications_ar: 'تثبيط التنفس الشديد، الوهن العضلي الوبيل.',
+    contraindications_en: 'Severe respiratory depression, myasthenia gravis.',
+    clinical_pearls_ar: 'دواء إنقاذ فوري لنوبة التشنج التي تستمر أكثر من 5 دقائق. يدخل طرف الأنبوبة في الشرج ويفرغ المحتوى بالكامل مع الضغط على الإليتين لمدة دقيقة لمنع التسرب. مراقبة التنفس ضرورية.',
+    clinical_pearls_en: 'Emergency rescue for seizure lasting > 5 min. 0.5 mg/kg rectally (5mg for <15kg, 10mg for >15kg). Monitor airway and breathing.'
+  },
+
+  // 44. Levetiracetam (Keppra)
+  {
+    id: 'levetiracetam',
+    name_ar: 'ليفيتيراسيتام (كيبرا)',
+    name_en: 'Levetiracetam (Keppra)',
+    trade_names: ['كيبرا (Keppra)', 'ليفيتيراسيتام (Levetiracetam)', 'إبيكسيلين (Epixeline)'],
+    aliases: ['keppra', 'levetiracetam', 'كيبرا', 'صرع', 'شحنات كهربائية', 'تشنجات'],
+    class_ar: 'مضاد صرع وتشنجات حديث واسع الطيف عالي الأمان',
+    class_en: 'Broad-Spectrum Antiepileptic Drug',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 20,
+    mpk_max: 60,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 500,
+    available_concentrations: [
+      { labelAr: 'محلول فموي 500 مجم / 5 مل (100 مجم/مل)', labelEn: 'Oral Solution 100 mg/ml (500mg/5ml)', value: 500, unit: 'mg/5ml', tradeExampleAr: 'Keppra 100mg/ml Solution', formulation: 'syrup' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 3000,
+    contraindications_ar: 'فرط الحساسية للدواء أو مشتقات البيروليدون.',
+    contraindications_en: 'Hypersensitivity to levetiracetam.',
+    clinical_pearls_ar: 'البدء بجرعة 20 مجم/كجم/يوم مقسمة كل 12 ساعة، ثم التدرج كل أسبوعين بمقدار 20 مجم/كجم/يوم حتى الوصول للجرعة العلاجية (40-60 مجم/كجم/يوم). قليل التداخلات الدوائية.',
+    clinical_pearls_en: 'Start 20 mg/kg/day divided twice daily, titrate by 20 mg/kg/day every 2 weeks to target maintenance 40-60 mg/kg/day.'
+  },
+
+  // 45. Sodium Valproate (Depakine)
+  {
+    id: 'valproate',
+    name_ar: 'فالبروات الصوديوم (ديباكين)',
+    name_en: 'Sodium Valproate (Depakine)',
+    trade_names: ['ديباكين (Depakine)', 'فالبريكس (Valprex)', 'كونفولكس (Convulex)'],
+    aliases: ['depakine', 'valproate', 'ديباكين', 'فالبروات', 'صرع عام', 'غياب الوعي'],
+    class_ar: 'مضاد صرع شامل لنوبات الصرع الجزئية والمعممة',
+    class_en: 'Broad-Spectrum Anticonvulsant',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'drops'],
+    default_formulation: 'syrup',
+    mpk_min: 15,
+    mpk_max: 30,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 200,
+    available_concentrations: [
+      { labelAr: 'شراب 200 مجم / 5 مل (معيار ديباكين)', labelEn: 'Syrup 200 mg / 5ml (40 mg/ml)', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Depakine Syrup 200mg/5ml', formulation: 'syrup' },
+      { labelAr: 'نقط فموية 200 مجم / مل (1 مل = 40 نقطة)', labelEn: 'Oral Drops 200 mg / ml', value: 200, unit: 'mg/ml', tradeExampleAr: 'Depakine Oral Drops 200mg/ml', formulation: 'drops' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 2500,
+    contraindications_ar: 'أمراض الكبد الحادة، اضطرابات دورة اليوريا أو اعتلالات الميتوكوندريا.',
+    contraindications_en: 'Active liver disease, urea cycle disorders, mitochondrial disease.',
+    clinical_pearls_ar: 'الجرعة الابتدائية: 15 مجم/كجم/يوم مقسمة على جرعتين مع الطعام، ترفع تدريجياً إلى 25-30 مجم/كجم/يوم. مراقبة وظائف الكبد وصورة الدم ضرورية في الأشهر الأولى.',
+    clinical_pearls_en: 'Initial 15 mg/kg/day divided BID with meals, titrate to 25-30 mg/kg/day. Monitor LFTs and CBC.'
+  },
+
+  // 46. Furosemide (Lasix)
+  {
+    id: 'furosemide',
+    name_ar: 'فوروسيميد (لازيكس)',
+    name_en: 'Furosemide (Lasix)',
+    trade_names: ['لازيكس (Lasix)', 'فوروسيميد (Furosemide)', 'ديوريكس (Diurex)'],
+    aliases: ['furosemide', 'lasix', 'لازيكس', 'مدر بول', 'فشل قلب', 'استسقاء', 'قصور كلوي'],
+    class_ar: 'مدر بول عروي سريع المفعول لعلاج الوذمات وهبوط القلب',
+    class_en: 'Loop Diuretic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 1.0,
+    mpk_max: 2.0,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 10,
+    available_concentrations: [
+      { labelAr: 'محلول فموي 10 مجم / مل', labelEn: 'Oral Solution 10 mg / ml', value: 10, unit: 'mg/ml', tradeExampleAr: 'Lasix Oral Liquid 10mg/ml', formulation: 'syrup' },
+      { labelAr: 'أمبولات حقن 20 مجم / 2 مل (10 مجم/مل)', labelEn: '20 mg / 2ml Ampoule', value: 10, unit: 'mg/ml', tradeExampleAr: 'Lasix 20mg Ampoule', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 80,
+    contraindications_ar: 'الجفاف الحاد ونقص حجم الدم، انقطاع البول التام الناتج عن فشل كلوي غير مستجيب.',
+    contraindications_en: 'Hypovolemia, dehydration, severe anuria.',
+    clinical_pearls_ar: 'الجرعة الفموية: 1 إلى 2 مجم/كجم مرة إلى مرتين يومياً. الجرعة الوريدية: 0.5 إلى 1 مجم/كجم بطيئاً. يجب مراقبة شوارد الدم (البوتاسيوم والصوديوم) لتجنب نقص البوتاسيوم.',
+    clinical_pearls_en: 'Oral: 1-2 mg/kg/day; IV: 0.5-1 mg/kg. Monitor serum electrolytes (especially K+) to prevent hypokalemia.'
+  },
+
+  // 47. Spironolactone (Aldactone)
+  {
+    id: 'spironolactone',
+    name_ar: 'سبيرونولاكتون (ألداكتون)',
+    name_en: 'Spironolactone (Aldactone)',
+    trade_names: ['ألداكتون (Aldactone)', 'سبيرونولاكتون (Spironolactone)'],
+    aliases: ['spironolactone', 'aldactone', 'الداكتون', 'مدر حافظ للبوتاسيوم', 'هبوط قلب احتقاني'],
+    class_ar: 'مدر بول حافظ للبوتاسيوم ومضاد للألدوستيرون',
+    class_en: 'Potassium-Sparing Aldosterone Antagonist Diuretic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 1.0,
+    mpk_max: 3.0,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 25,
+    available_concentrations: [
+      { labelAr: 'معلق فموي مركب 25 مجم / 5 مل (5 مجم/مل)', labelEn: 'Compounded Suspension 25 mg / 5ml', value: 25, unit: 'mg/5ml', tradeExampleAr: 'Spironolactone 5mg/ml Suspension', formulation: 'syrup' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 100,
+    contraindications_ar: 'ارتفاع بوتاسيوم الدم، القصور الكلوي الحاد مع انخفاض الترشيح الكبيبي.',
+    contraindications_en: 'Hyperkalemia, severe acute renal failure.',
+    clinical_pearls_ar: 'الجرعة: 1 إلى 3 مجم/كجم/يوم مقسمة كل 12 أو 24 ساعة. غالباً ما يشارك مع مدرات العروة مثل اللازيكس لحماية البوتاسيوم في هبوط القلب الاحتقاني أو المتلازمة الكلوية.',
+    clinical_pearls_en: '1-3 mg/kg/day divided daily or BID. Often paired with furosemide to prevent potassium wasting in pediatric HF/nephrotic syndrome.'
+  },
+
+  // 48. Hydrocortisone (Solu-Cortef)
+  {
+    id: 'hydrocortisone_inj',
+    name_ar: 'هيدروكورتيزون حقن (سوليو كورتيف)',
+    name_en: 'Hydrocortisone Injection (Solu-Cortef)',
+    trade_names: ['سوليو كورتيف (Solu-Cortef)', 'هيدروكورتيزون (Hydrocortisone)'],
+    aliases: ['hydrocortisone', 'solu-cortef', 'سوليوكورتيف', 'هيدروكورتيزون', 'حساسية مفرطة', 'صدمة تحسسية', 'أزمة ربو'],
+    class_ar: 'كورتيكوستيرويد جهازي إسعافي فوري المفعول للطوارئ والحساسية المفرطة',
+    class_en: 'Immediate-Action Systemic Glucocorticoid IV/IM',
+    is_antibiotic: false,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 2,
+    mpk_max: 4,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 50,
+    available_concentrations: [
+      { labelAr: 'فيال 100 مجم بودرة للحل في 2 مل ماء حقن (50 مجم/مل)', labelEn: '100 mg Vial (Reconstitute with 2ml)', value: 50, unit: 'mg/ml', tradeExampleAr: 'Solu-Cortef 100mg Vial', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 500,
+    contraindications_ar: 'العدوى الفطرية الجهازية غير المعالجة (باستثناء حالات الطوارئ المنقذة للحياة).',
+    contraindications_en: 'Untreated systemic fungal infections (except emergency rescue).',
+    clinical_pearls_ar: 'جرعة الطوارئ والإنعاش التحسسي الحاد: 4 مجم/كجم وريدياً ببطء في البداية، ثم 2 إلى 4 مجم/كجم كل 6 ساعات حتى استقرار العلامات الحيوية. لا يغني عن الأدرينالين في الصدمة التحسسية.',
+    clinical_pearls_en: 'Emergency bolus: 4 mg/kg slow IV, then 2-4 mg/kg q6h. Adjunctive to epinephrine in anaphylaxis, never replaces epinephrine.'
+  },
+
+  // 49. Epinephrine / Adrenaline
+  {
+    id: 'epinephrine',
+    name_ar: 'أدرينالين / إبينفرين (أمبولات إنعاش وطوارئ)',
+    name_en: 'Epinephrine / Adrenaline Injection',
+    trade_names: ['أدرينالين (Adrenaline 1:1000)', 'إبينفرين (EpiPen / Epinephrine)'],
+    aliases: ['epinephrine', 'adrenaline', 'ادرينالين', 'ابينفرين', 'انافيلاكسيس', 'صدمة تحسسية', 'خانوق حاد'],
+    class_ar: 'محفز أدرينالي منقذ للحياة في صدمة الحساسية المفرطة وتوقف القلب والخانوق',
+    class_en: 'Emergency Alpha/Beta Adrenergic Agonist',
+    is_antibiotic: false,
+    supported_formulations: ['injection', 'drops'],
+    default_formulation: 'injection',
+    mpk_min: 0.01,
+    mpk_max: 0.01,
+    doses_per_day: 1,
+    interval_hours: 1,
+    default_conc: 1,
+    available_concentrations: [
+      { labelAr: 'أمبولة أدرينالين 1 مجم / 1 مل (تركيز 1:1000 للحقن العضلي في الفخذ)', labelEn: '1 mg / 1ml Ampoule (1:1000 for IM Vastus Lateralis)', value: 1, unit: 'mg/ml', tradeExampleAr: 'Adrenaline 1:1000 Ampoule', formulation: 'injection' }
+    ],
+    formulation_guidelines: {
+      injection_reconstitution_ar: 'جرعة الحساسية المفرطة (Anaphylaxis): 0.01 مل/كجم من تركيز 1:1000 تُحقن عضلياً فوراً في الجزء الخارجي من الفخذ (Vastus Lateralis)، بحد أقصى 0.3 مل (0.3 مجم) للأطفال قبل البلوغ، و0.5 مل للمراهقين. يمكن تكرارها بعد 5-15 دقيقة إذا لم تستقر الحالة.',
+      injection_reconstitution_en: 'Anaphylaxis IM dose: 0.01 ml/kg of 1:1000 into mid-anterolateral thigh. Max single dose 0.3ml in prepubertal children, 0.5ml in adolescents.'
+    },
+    min_age_months: 0,
+    max_daily_adult_mg: 1.5,
+    contraindications_ar: 'لا توجد موانع مطلقة في الطوارئ التحسسية والإنعاش القلبي الرئوي.',
+    contraindications_en: 'No absolute contraindications in life-threatening anaphylaxis.',
+    clinical_pearls_ar: 'العلاج الأول والأهم لإنقاذ حياة الطفل في صدمة الحساسية Anaphylaxis ويجب إعطاؤه فوراً دون تأخير في عضلة الفخذ الخارجية، وليس تحت الجلد.',
+    clinical_pearls_en: 'First-line life-saving therapy in anaphylaxis. Must be administered IM in anterolateral thigh without delay.'
+  },
+
+  // 50. Metoclopramide (Primperan)
+  {
+    id: 'metoclopramide',
+    name_ar: 'ميتوكلوبراميد (بريمبران / بلاسيل)',
+    name_en: 'Metoclopramide (Primperan)',
+    trade_names: ['بريمبران (Primperan)', 'بلاسيل (Plasil)', 'ميتوكلوبراميد (Metoclopramide)'],
+    aliases: ['metoclopramide', 'primperan', 'بريمبران', 'بلاسيل', 'ميتوكلوبراميد', 'استفراغ', 'قيء'],
+    class_ar: 'مضاد قيء ومنشط للحركة المعدية (يستخدم بحذر شديد مع تجنب الرضع)',
+    class_en: 'Dopamine Antagonist Prokinetic & Antiemetic',
+    is_antibiotic: false,
+    supported_formulations: ['syrup', 'drops', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 0.1,
+    mpk_max: 0.15,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 5,
+    available_concentrations: [
+      { labelAr: 'شراب 5 مجم / 5 مل (1 مجم/مل)', labelEn: 'Syrup 5 mg / 5ml (1 mg/ml)', value: 5, unit: 'mg/5ml', tradeExampleAr: 'Primperan Syrup 5mg/5ml', formulation: 'syrup' },
+      { labelAr: 'أمبولات حقن 10 مجم / 2 مل (5 مجم/مل)', labelEn: '10 mg / 2ml Ampoule', value: 5, unit: 'mg/ml', tradeExampleAr: 'Primperan 10mg Ampoule', formulation: 'injection' }
+    ],
+    min_age_months: 12,
+    max_daily_adult_mg: 30,
+    contraindications_ar: 'الأطفال أقل من سنة (ممنوع تماماً لخطر النوبات الهرمية الحادة)، انسداد أو انثقاب الأمعاء.',
+    contraindications_en: 'Children under 1 year (contraindicated due to severe extrapyramidal symptoms), GI obstruction/perforation.',
+    clinical_pearls_ar: 'الجرعة: 0.1 إلى 0.15 مجم/كجم/جرعة حتى 3 مرات يومياً كحد أقصى. يفضل استخدام أوندانسيترون (زوفران) كبديل أكثر أماناً للأطفال لتجنب التشنجات العضلية التصلبية الحادة.',
+    clinical_pearls_en: '0.1-0.15 mg/kg/dose. Ondansetron is strongly preferred in children due to extrapyramidal dystonia risks.'
+  },
+
+  // 51. Lactulose (Duphalac)
+  {
+    id: 'lactulose',
+    name_ar: 'لاكتولوز (دوفلاك / إيزيلاكس)',
+    name_en: 'Lactulose (Duphalac)',
+    trade_names: ['دوفلاك (Duphalac)', 'إيزيلاكس (Ezilax)', 'لاكتولوز (Lactulose)', 'راملاك (Ramlac)'],
+    aliases: ['lactulose', 'duphalac', 'دوفلاك', 'لاكتولوز', 'امساك اطفال', 'تليين بطن', 'صعوبة تبرز'],
+    class_ar: 'ملين أوزموزي آمن غير ممتص لعلاج الإمساك الحاد والمزمن عند الأطفال',
+    class_en: 'Non-Absorbable Osmotic Laxative Syrup',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 1.0,
+    mpk_max: 2.0,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 3.35,
+    available_concentrations: [
+      { labelAr: 'شراب 3.35 جم / 5 مل (67% محلول مركز)', labelEn: 'Syrup 3.35 g / 5ml (67% solution)', value: 3.35, unit: 'g/5ml', tradeExampleAr: 'Duphalac Syrup 67%', formulation: 'syrup' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 30000,
+    contraindications_ar: 'الجلاكتوسيميا (Galactosemia)، انسداد الأمعاء الميكانيكي الحاد.',
+    contraindications_en: 'Galactosemia, acute intestinal obstruction.',
+    clinical_pearls_ar: 'الجرعة العملية: 1 إلى 2 مل/كجم/يوم مرة واحدة يومياً أو مقسمة على جرعتين مع كوب ماء أو عصير. يحتاج من 24 إلى 48 ساعة لبدء مفعوله التلييني اللطيف دون التسبب في كسل الأمعاء.',
+    clinical_pearls_en: '1-2 ml/kg/day orally in 1-2 divided doses. Takes 24-48 hours to produce gentle osmotic stool softening.'
+  },
+
+  // 52. Glycerin Suppositories
+  {
+    id: 'glycerin_supp',
+    name_ar: 'جلسرين تحاميل (جلسرين أطفال ورضع)',
+    name_en: 'Glycerin Pediatric Suppositories',
+    trade_names: ['جلسرين أطفال (Glycerin Infantile)', 'جلسرين رضع (Glycerin Pediatric)'],
+    aliases: ['glycerin', 'جلسرين', 'تحاميل امساك', 'لبوس جلسرين', 'تفريغ بطن فوري'],
+    class_ar: 'ملين موضعي شرجي إسموزي ومنبه للإفراغ الفوري',
+    class_en: 'Rectal Osmotic & Lubricant Laxative Suppository',
+    is_antibiotic: false,
+    supported_formulations: ['suppository'],
+    default_formulation: 'suppository',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 1,
+    available_concentrations: [
+      { labelAr: 'تحميلة رضع (Infant size ~ 1g) للأعمار أقل من سنة', labelEn: 'Infant Suppository (~1g) for < 1 year', value: 1, unit: 'supp', tradeExampleAr: 'Glycerin Infant Suppository', formulation: 'suppository' },
+      { labelAr: 'تحميلة أطفال (Children size ~ 2g) للأعمار من 1-6 سنوات', labelEn: 'Children Suppository (~2g) for 1-6 years', value: 2, unit: 'supp', tradeExampleAr: 'Glycerin Pediatric Suppository', formulation: 'suppository' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 4000,
+    contraindications_ar: 'الاشتباه بالتهاب الزائدة الدودية، النزيف الشرجي مجهول السبب.',
+    contraindications_en: 'Suspected appendicitis, unexplained rectal bleeding.',
+    clinical_pearls_ar: 'تحميلة واحدة عند الحاجة لفك الانحشار البرازي الحاد، تعمل خلال 15 إلى 30 دقيقة. ترطب بقطرة ماء دافئ قبل الإدخال. لا تستخدم بصفة يومية مستمرة.',
+    clinical_pearls_en: 'One suppository PR PRN for acute fecal impaction. Works within 15-30 minutes.'
+  },
+
+  // 53. Diclofenac (Cataflam)
+  {
+    id: 'diclofenac',
+    name_ar: 'ديكلوفيناك (كتافلام / فولتارين)',
+    name_en: 'Diclofenac (Cataflam / Voltaren)',
+    trade_names: ['كتافلام (Cataflam)', 'فولتارين (Voltaren)', 'ديكلوفيناك (Diclofenac)'],
+    aliases: ['diclofenac', 'cataflam', 'voltaren', 'كتافلام', 'فولتارين', 'مسكن قوي', 'التهاب مفاصل', 'ألم أسنان'],
+    class_ar: 'مضاد التهاب غير ستيرويدي مسكن وخافض للحرارة للأطفال فوق سنة',
+    class_en: 'Non-Steroidal Anti-Inflammatory Drug (NSAID)',
+    is_antibiotic: false,
+    supported_formulations: ['drops', 'suppository'],
+    default_formulation: 'drops',
+    mpk_min: 0.5,
+    mpk_max: 2.0,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 15,
+    available_concentrations: [
+      { labelAr: 'نقط فموية كتافلام 15 مجم / 1 مل (1 مل = 30 نقطة)', labelEn: 'Cataflam Oral Drops 15 mg/ml (1 drop = 0.5mg)', value: 15, unit: 'mg/ml', tradeExampleAr: 'Cataflam Oral Drops 15mg/ml', formulation: 'drops' },
+      { labelAr: 'تحاميل فولتارين أطفال 12.5 مجم', labelEn: 'Voltaren Suppository 12.5 mg', value: 12.5, unit: 'mg/supp', tradeExampleAr: 'Voltaren 12.5mg Suppository', formulation: 'suppository' },
+      { labelAr: 'تحاميل فولتارين أطفال 25 مجم', labelEn: 'Voltaren Suppository 25 mg', value: 25, unit: 'mg/supp', tradeExampleAr: 'Voltaren 25mg Suppository', formulation: 'suppository' }
+    ],
+    formulation_guidelines: {
+      drops_count_advice_ar: 'نقط كتافلام: كل نقطة تحتوي على 0.5 مجم. الجرعة للأطفال فوق سنة: 1 إلى 2 نقطة لكل كجم من وزن الطفل مقسمة على جرعتين أو ثلاث يومياً بعد الطعام.',
+      drops_count_advice_en: 'Cataflam drops: 1 drop = 0.5mg. 1-2 drops per kg body weight divided BID-TID with meals.'
+    },
+    min_age_months: 12,
+    max_daily_adult_mg: 150,
+    contraindications_ar: 'الرضع أقل من 12 شهراً، القرحة الهضمية النشطة، الربو الحساس للأسبرين، الجفاف الحاد.',
+    contraindications_en: 'Infants < 12 months, active peptic ulcer, severe dehydration.',
+    clinical_pearls_ar: 'الجرعة: 0.5 إلى 2 مجم/كجم/يوم مقسمة كل 8-12 ساعة. مسكن فعال جداً بعد جراحات الأنف والأذن والحنجرة أو آلام الأسنان والمفاصل الحادة. يجب تناوله بعد الطعام.',
+    clinical_pearls_en: '0.5-2 mg/kg/day divided BID-TID after food. Highly effective for post-ENT surgical pain and juvenile arthritis.'
+  },
+
+  // 54. Ciprofloxacin
+  {
+    id: 'ciprofloxacin',
+    name_ar: 'سيبروفلوكساسين (سيبرو)',
+    name_en: 'Ciprofloxacin (Cipro)',
+    trade_names: ['سيبرو (Cipro)', 'سيبروباي (Ciprobay)', 'سيبروفلوكساسين (Ciprofloxacin)'],
+    aliases: ['ciprofloxacin', 'cipro', 'سيبرو', 'سيبروفلوكساسين', 'التهاب مسالك بكتيري معقد', 'سالمونيلا', 'شيجيللا'],
+    class_ar: 'فلوروكينولون واسع الطيف للعدوى البكتيرية المعقدة وحالات السالمونيلا والزوائف',
+    class_en: 'Fluoroquinolone Antibiotic',
+    is_antibiotic: true,
+    supported_formulations: ['syrup', 'injection'],
+    default_formulation: 'syrup',
+    mpk_min: 20,
+    mpk_max: 30,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 250,
+    available_concentrations: [
+      { labelAr: 'معلق فموي 250 مجم / 5 مل (50 مجم/مل)', labelEn: 'Oral Suspension 250 mg / 5ml', value: 250, unit: 'mg/5ml', tradeExampleAr: 'Cipro 250mg/5ml Suspension', formulation: 'syrup' },
+      { labelAr: 'محلول تسريب وريدي 200 مجم / 100 مل (2 مجم/مل)', labelEn: '200 mg / 100ml IV Infusion', value: 2, unit: 'mg/ml', tradeExampleAr: 'Ciprofloxacin 2mg/ml IV', formulation: 'injection' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 1500,
+    contraindications_ar: 'فرط الحساسية للفلوروكينولونات، الوهن العضلي الوبيل.',
+    contraindications_en: 'Hypersensitivity to fluoroquinolones, myasthenia gravis.',
+    clinical_pearls_ar: 'الجرعة الفموية: 20 إلى 30 مجم/كجم/يوم مقسمة كل 12 ساعة (حد أقصى 500-750 مجم للجرعة). الجرعة الوريدية: 20 مجم/كجم/يوم مقسمة كل 12 ساعة. مخصص لالتهاب المسالك المعقد، التليف الكيسي (Pseudomonas)، أو النزلات المعوية الغازية الموثقة.',
+    clinical_pearls_en: 'Oral: 20-30 mg/kg/day divided q12h; IV: 20 mg/kg/day divided q12h. Reserved for complicated UTI, cystic fibrosis pseudomonas, and severe invasive gastroenteritis.'
+  },
+
+  // 55. Amikacin
+  {
+    id: 'amikacin',
+    name_ar: 'أميكاسين (أميكين / بيكاسين)',
+    name_en: 'Amikacin (IV/IM)',
+    trade_names: ['أميكين (Amikin)', 'بيكاسين (Biklin)', 'أميكاسين (Amikacin)'],
+    aliases: ['amikacin', 'amikin', 'اميكاسين', 'أميكاسين', 'عدوى سالبة الجرام معقدة', 'تسمم دم حاد'],
+    class_ar: 'أمينوجليكوزيد قوي للبكتيريا سالبة الجرام المقاومة وتسمم الدم الوليدي',
+    class_en: 'Aminoglycoside Antibiotic IV/IM',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 15,
+    mpk_max: 20,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 100,
+    available_concentrations: [
+      { labelAr: 'فيال 100 مجم / 2 مل (50 مجم/مل)', labelEn: '100 mg / 2ml Vial', value: 50, unit: 'mg/ml', tradeExampleAr: 'Amikacin 100mg Vial', formulation: 'injection' },
+      { labelAr: 'فيال 250 مجم / 2 مل (125 مجم/مل)', labelEn: '250 mg / 2ml Vial', value: 125, unit: 'mg/ml', tradeExampleAr: 'Amikacin 250mg Vial', formulation: 'injection' },
+      { labelAr: 'فيال 500 مجم / 2 مل (250 مجم/مل)', labelEn: '500 mg / 2ml Vial', value: 250, unit: 'mg/ml', tradeExampleAr: 'Amikacin 500mg Vial', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 1500,
+    contraindications_ar: 'الوهن العضلي الوبيل، القصور الكلوي الحاد ما لم يتم تعديل الجرعة بدقة.',
+    contraindications_en: 'Myasthenia gravis, unmonitored severe renal impairment.',
+    clinical_pearls_ar: 'الجرعة: 15 إلى 20 مجم/كجم مرة واحدة يومياً تسريباً وريدياً على مدار 30 دقيقة. يحفظ قوة تأثيره ضد السلالات المقاومة للجنتامايسين. يتطلب مراقبة وظائف الكلى والسمع في العلاج الطويل.',
+    clinical_pearls_en: '15-20 mg/kg once daily IV infused over 30 min. Effective against gentamicin-resistant Gram-negative isolates. Monitor renal function.'
+  },
+
+  // 56. Gentamicin
+  {
+    id: 'gentamicin',
+    name_ar: 'جنتامايسين (جارامايسين حقن)',
+    name_en: 'Gentamicin (Garamycin)',
+    trade_names: ['جارامايسين (Garamycin)', 'جنتامايسين (Gentamicin)', 'سيدومايسين (Cidomycin)'],
+    aliases: ['gentamicin', 'garamycin', 'جنتامايسين', 'جارامايسين', 'تسمم دم وليدي', 'عدوى مسالك بولية حادة'],
+    class_ar: 'أمينوجليكوزيد كلاسيكي بالحقن لحديثي الولادة والعدوى الحادة',
+    class_en: 'Aminoglycoside Antibiotic IV/IM',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 5.0,
+    mpk_max: 7.5,
+    doses_per_day: 1,
+    interval_hours: 24,
+    default_conc: 40,
+    available_concentrations: [
+      { labelAr: 'أمبولة 20 مجم / 2 مل (10 مجم/مل للأطفال والرضع)', labelEn: '20 mg / 2ml Pediatric Ampoule (10 mg/ml)', value: 10, unit: 'mg/ml', tradeExampleAr: 'Gentamicin Paediatric 20mg', formulation: 'injection' },
+      { labelAr: 'أمبولة 80 مجم / 2 مل (40 مجم/مل)', labelEn: '80 mg / 2ml Ampoule', value: 40, unit: 'mg/ml', tradeExampleAr: 'Garamycin 80mg Ampoule', formulation: 'injection' }
+    ],
+    min_age_months: 0,
+    max_daily_adult_mg: 360,
+    contraindications_ar: 'فرط الحساسية للأمينوجليكوزيدات، الوهن العضلي.',
+    contraindications_en: 'Hypersensitivity to aminoglycosides.',
+    clinical_pearls_ar: 'نظام الجرعة الواحدة اليومية (Once-daily dosing): 5 إلى 7.5 مجم/كجم مرة واحدة يومياً وريدياً على 30 دقيقة. أكثر أماناً وأعلى كفاءة في القضاء على البكتيريا من التقسيم على 3 جرعات.',
+    clinical_pearls_en: 'Once-daily dosing regimen: 5-7.5 mg/kg once daily IV over 30 min. Maximizes bactericidal efficacy and minimizes nephrotoxicity.'
+  },
+
+  // 57. Vancomycin
+  {
+    id: 'vancomycin',
+    name_ar: 'فانكومايسين (فانكوسين حقن)',
+    name_en: 'Vancomycin (Vancocin)',
+    trade_names: ['فانكوسين (Vancocin)', 'فانكومايسين (Vancomycin)'],
+    aliases: ['vancomycin', 'vancocin', 'فانكومايسين', 'عدوى مكورات عنقودية مقاومة', 'MRSA', 'سحايا بكتيرية'],
+    class_ar: 'مضاد حيوي جليكوببتيد خط أول لعدوى MRSA وتسمم الدم المقاوم والسحايا',
+    class_en: 'Glycopeptide Antibiotic IV Infusion',
+    is_antibiotic: true,
+    supported_formulations: ['injection'],
+    default_formulation: 'injection',
+    mpk_min: 40,
+    mpk_max: 60,
+    doses_per_day: 4,
+    interval_hours: 6,
+    default_conc: 50,
+    available_concentrations: [
+      { labelAr: 'فيال 500 مجم بودرة (يحل في 100 مل محلول ملحي)', labelEn: '500 mg Infusion Vial (Dilute in 100ml)', value: 5, unit: 'mg/ml', tradeExampleAr: 'Vancomycin 500mg Vial', formulation: 'injection' },
+      { labelAr: 'فيال 1000 مجم (1 جم) (يحل في 200 مل محلول ملحي)', labelEn: '1000 mg (1g) Infusion Vial (Dilute in 200ml)', value: 5, unit: 'mg/ml', tradeExampleAr: 'Vancomycin 1g Vial', formulation: 'injection' }
+    ],
+    min_age_months: 1,
+    max_daily_adult_mg: 3000,
+    contraindications_ar: 'فرط الحساسية للفانكومايسين.',
+    contraindications_en: 'Hypersensitivity to vancomycin.',
+    clinical_pearls_ar: 'الجرعة القياسية: 45 إلى 60 مجم/كجم/يوم مقسمة كل 6 إلى 8 ساعات. يجب تسريبه وريدياً ببطء على مدار 60 دقيقة على الأقل لتجنب متلازمة الرجل الأحمر (Red Man Syndrome). يتطلب مراقبة مستوى القاع في الدم (Trough level 10-15 mcg/ml أو 15-20 في السحايا).',
+    clinical_pearls_en: '45-60 mg/kg/day divided q6-8h. Infuse slowly over at least 60 min to prevent Red Man Syndrome. Target trough 10-15 mcg/ml (15-20 for CNS/bacteremia).'
+  },
+
+  // 58. Chlorpheniramine (Histop)
+  {
+    id: 'chlorpheniramine',
+    name_ar: 'كلورفينيرامين (هيستوب / أليرفين)',
+    name_en: 'Chlorpheniramine (Histop)',
+    trade_names: ['هيستوب (Histop)', 'أليرفين (Allergyl)', 'أناليرج (Anallerge)'],
+    aliases: ['chlorpheniramine', 'histop', 'هيستوب', 'حساسية ورشح', 'حكة مهدئة'],
+    class_ar: 'مضاد هيستامين تقليدي لعلاج أعراض الحساسية والرشح والحكة',
+    class_en: 'First-Generation Sedating Antihistamine',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0.35,
+    mpk_max: 0.35,
+    doses_per_day: 3,
+    interval_hours: 8,
+    default_conc: 2,
+    available_concentrations: [
+      { labelAr: 'شراب 2 مجم / 5 مل (0.4 مجم/مل)', labelEn: 'Syrup 2 mg / 5ml (0.4 mg/ml)', value: 2, unit: 'mg/5ml', tradeExampleAr: 'Histop Syrup 2mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 12,
+    max_daily_adult_mg: 12,
+    contraindications_ar: 'الأطفال دون عمر السنة.',
+    contraindications_en: 'Infants under 1 year.',
+    clinical_pearls_ar: 'الجرعة حسب العمر: من 1 إلى 2 سنة: 1 مجم (2.5 مل) مرتين يومياً؛ من 2 إلى 5 سنوات: 1 مجم (2.5 مل) كل 4-6 ساعات (حد أقصى 6 مجم/يوم)؛ من 6 إلى 12 سنة: 2 مجم (5 مل) كل 4-6 ساعات (حد أقصى 12 مجم/يوم).',
+    clinical_pearls_en: 'Age-based dosing: 1-2 yrs: 1 mg BID; 2-5 yrs: 1 mg q4-6h (max 6mg/day); 6-12 yrs: 2 mg q4-6h (max 12mg/day).'
+  },
+
+  // 59. Fexofenadine (Telfast)
+  {
+    id: 'fexofenadine',
+    name_ar: 'فيكسوفينادين (تيلفاست شراب أطفال)',
+    name_en: 'Fexofenadine (Telfast Paediatric)',
+    trade_names: ['تيلفاست (Telfast)', 'فيكسوفينادين (Fexofenadine)', 'أليجرا (Allegra)'],
+    aliases: ['fexofenadine', 'telfast', 'تيلفاست', 'حساسية انف', 'ارتيكاريا مزمنة'],
+    class_ar: 'مضاد هيستامين غير مهدئ آمن تماماً لا يسبب النعاس',
+    class_en: 'Second-Generation Purely Non-Sedating Antihistamine',
+    is_antibiotic: false,
+    supported_formulations: ['syrup'],
+    default_formulation: 'syrup',
+    mpk_min: 0,
+    mpk_max: 0,
+    doses_per_day: 2,
+    interval_hours: 12,
+    default_conc: 30,
+    available_concentrations: [
+      { labelAr: 'معلق فموي للأطفال 30 مجم / 5 مل (6 مجم/مل)', labelEn: 'Paediatric Oral Suspension 30 mg / 5ml', value: 30, unit: 'mg/5ml', tradeExampleAr: 'Telfast Paediatric Suspension 30mg/5ml', formulation: 'syrup' }
+    ],
+    min_age_months: 6,
+    max_daily_adult_mg: 180,
+    contraindications_ar: 'فرط الحساسية للفيكسوفينادين.',
+    contraindications_en: 'Hypersensitivity to fexofenadine.',
+    clinical_pearls_ar: 'الجرعة: 6 أشهر حتى 2 سنة: 15 مجم (2.5 مل) مرتين يومياً للأرتيكاريا؛ من 2 إلى 11 سنة: 30 مجم (5 مل) مرتين يومياً؛ فوق 12 سنة: 60 مجم مرتين يومياً أو 180 مجم مرة واحدة. لا يعبر الحاجز الدموي الدماغي إطلاقاً.',
+    clinical_pearls_en: '2-11 yrs: 30 mg (5ml) BID; >= 12 yrs: 60 mg BID or 180 mg OD. Zero sedation, does not cross blood-brain barrier.'
   }
 ];
 

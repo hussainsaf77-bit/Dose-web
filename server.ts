@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { analyzeAllMedications } from "./src/data/clinicalInteractionEngine";
+import { synthesizeDrugMonograph } from "./src/data/universalDrugDirectory";
 
 interface StoredUser {
   id: string;
@@ -63,9 +65,18 @@ app.get("/api/download-index", (req, res) => {
   res.download(filePath, "index.html");
 });
 
-app.get(["/api/download-zip", "/download-zip", "/dose_v36_final.zip"], (req, res) => {
-  const filePath = path.join(process.cwd(), "public", "dose_v36_final.zip");
-  res.download(filePath, "dose_v36_final.zip");
+app.get([
+  "/api/download-zip",
+  "/download-zip",
+  "/dose_update_new.zip",
+  "/dose_v36_final.zip",
+  "/update.zip",
+  "/dose_pediatric_update.zip"
+], (req, res) => {
+  const zipPath = path.join(process.cwd(), "public", "dose_update_new.zip");
+  const fallbackPath = path.join(process.cwd(), "public", "dose_v36_final.zip");
+  const finalPath = fs.existsSync(zipPath) ? zipPath : fallbackPath;
+  res.download(finalPath, "dose_update_new.zip");
 });
 
 // Lazy-loaded Gemini AI client
@@ -2526,6 +2537,39 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     safeReply(); return;
   }
 
+  // 10b. Clinical Drug Interaction Handler in Telegram Bot
+  if (text && (text.startsWith('/interaction') || text.startsWith('/interactions') || text.includes('تعارض') || text.includes('تداخل') || (text.includes('مع') && (text.includes('دواء') || text.includes('حبوب') || text.includes('علاج'))))) {
+    let queryDrugs = text.replace(/^\/interactions?\s*/i, '').replace(/هل\s+يتعارض/gi, '').replace(/تعارض/gi, '').replace(/تداخل/gi, '').trim();
+    const delimiters = [' + ', '+', ' and ', ' AND ', ' مع ', ' و ', '\n', ';', ', ', ','];
+    let tokens = [queryDrugs];
+    for (const d of delimiters) {
+      tokens = tokens.flatMap(t => t.split(d));
+    }
+    const cleanTokens = tokens.map(t => t.trim()).filter(Boolean);
+    if (cleanTokens.length >= 2) {
+      const interactionResult = analyzeAllMedications(cleanTokens, 'ar');
+      let reportMsg = `🛡️ **تقرير فحص التداخلات الدوائية السريري:**\n` +
+        `💊 **الأدوية المفحوصة:** ${interactionResult.analyzedDrugs.join(' + ')}\n` +
+        `⚠️ **مستوى الخطورة:** ${interactionResult.severityLabel}\n\n` +
+        `🔬 **آلية التأثير السريري:**\n${interactionResult.mechanism}\n\n` +
+        `💡 **التوصية والبدائل الآمنة:**\n${interactionResult.recommendation}\n`;
+
+      if (interactionResult.cumulativeRisks && interactionResult.cumulativeRisks.length > 0) {
+        reportMsg += `\n🚨 **المخاطر التراكمية:**\n` + interactionResult.cumulativeRisks.map(r => `• ${r}`).join('\n') + `\n`;
+      }
+
+      reportMsg += `\n⚠️ *تنويه: الفحص استرشادي صيدلاني ولا يغني عن مراجعة الطبيب المعالج.*`;
+
+      await sendTelegramMessage(chatId, reportMsg, {
+        inline_keyboard: [
+          [{ text: "🖥️ فحص التداخلات الموسع على الموقع", url: `${DEFAULT_APP_URL}/#interactions` }],
+          [{ text: "💊 استعراض دليل الأدوية", callback_data: "browse_drugs" }]
+        ]
+      });
+      safeReply(); return;
+    }
+  }
+
   // 11. Standard text question -> AI Medical Chat Assistant
   if (text && !text.startsWith("/")) {
     // Check quota
@@ -2908,6 +2952,23 @@ app.get("/bot/verify/:telegram_id", (req, res) => {
   });
 });
 
+// Direct Download endpoint for latest update zip
+app.get(["/dose_update_new.zip", "/api/download/dose-update.zip"], (req, res) => {
+  const zipPath = path.join(process.cwd(), "public", "dose_update_new.zip");
+  if (fs.existsSync(zipPath)) {
+    res.setHeader("Content-Disposition", 'attachment; filename="dose_update_new.zip"');
+    res.setHeader("Content-Type", "application/zip");
+    return res.sendFile(zipPath);
+  }
+  const rootZip = path.join(process.cwd(), "dose_update_new.zip");
+  if (fs.existsSync(rootZip)) {
+    res.setHeader("Content-Disposition", 'attachment; filename="dose_update_new.zip"');
+    res.setHeader("Content-Type", "application/zip");
+    return res.sendFile(rootZip);
+  }
+  return res.status(404).send("Update zip package not found");
+});
+
 app.post("/bot/track/:telegram_id", (req, res) => {
   const { telegram_id } = req.params;
   const user = usersDB.get(String(telegram_id));
@@ -3237,8 +3298,10 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     }
     parts.push({ text: prompt });
 
-    // Multi-model resilience fallback
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
+    // Multi-model resilience fallback - for imaging, prioritize high-detail vision models (gemini-3.8-flash, gemini-4-argon)
+    const candidateModels = isImaging
+      ? ["gemini-3.8-flash", "gemini-4-argon", "gemini-flash-latest", "gemini-3.1-flash-lite"]
+      : ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
     let modelReportRejection: any = null;
 
     for (const modelName of candidateModels) {
@@ -3631,15 +3694,17 @@ app.post("/api/interactions/check", async (req, res) => {
   let mechanism = "";
   let recommendation = "";
   let clinicalDetails = "";
+  let detectedInteractions: any[] = [];
+  let cumulativeRisks: string[] = [];
 
   if (ai) {
     try {
       const prompt = lang === "ar"
         ? `أنت صيدلاني سريري واستشاري في علم الأدوية السريري (Clinical Pharmacist).
-قم بفحص وتقييم التداخل والتعارض الدوائي بدقة بالغة بين هذه الأدوية:
+قم بفحص وتقييم التداخل والتعارض الدوائي بدقة بالغة بين كافة هذه الأدوية (${drugList.length} أدوية):
 ${drugsString}
 
-قم بتحليل المواد الفعالة سواء كانت الأسماء المدخلة تجارية أو علمية أو باللغة العربية أو الإنجليزية.
+قم بتحليل المواد الفعالة سواء كانت الأسماء المدخلة تجارية أو علمية أو باللغة العربية أو الإنجليزية وافحص كافة الأزواج المتقاطعة.
 
 المطلوب إخراج النتيجة بتنسيق JSON حصراً بهذا الشكل:
 {
@@ -3647,13 +3712,24 @@ ${drugsString}
   "severityLabel": "🔴 خطير جداً (يحظر الجمع) أو 🟠 متوسط الخطورة (يتطلب حذر ومراقبة) أو 🟡 طفيف أو 🟢 آمن (لا يوجد تعارض معروف)",
   "mechanism": "شرح علمي دقيق لآلية التأثير والمخاطر الفيزيولوجية الناتجة عن الجمع بينها",
   "recommendation": "توصية سريرية واضحة للطبيب والمريض (هل يوقف أحدهما، هل يباعد بساعتين، وما هو البديل الدوائي الآمن)",
-  "clinicalDetails": "ملخص نقاط سريرية هامة وتحذيرات إضافية"
+  "clinicalDetails": "ملخص نقاط سريرية هامة وتحذيرات إضافية ومؤشرات المتابعة",
+  "cumulativeRisks": ["خطر نزيف / إجهاد كلوي / هبوط ضغط"],
+  "detectedInteractions": [
+    {
+      "drugA": "اسم الدواء 1",
+      "drugB": "اسم الدواء 2",
+      "severity": "critical أو warning أو minor",
+      "severityLabel": "🔴 خطير جداً أو 🟠 متوسط",
+      "mechanism": "الآلية بين هذين الدوائين",
+      "recommendation": "التوجيه والبديل"
+    }
+  ]
 }`
         : `You are an expert Clinical Pharmacist and Clinical Pharmacologist.
-Analyze the drug-drug interaction between:
+Analyze the multi-drug interaction between:
 ${drugsString}
 
-Identify active ingredients, brand names, and physiological metabolic pathways (CYP450, renal clearance, QT prolongation, bleeding risks).
+Identify active ingredients, brand names, cross-pair combinations, and physiological metabolic pathways (CYP450, renal clearance, QT prolongation, bleeding risks).
 
 Output strictly valid JSON in this structure:
 {
@@ -3661,23 +3737,42 @@ Output strictly valid JSON in this structure:
   "severityLabel": "🔴 Severe / Contraindicated or 🟠 Moderate / Monitor Closely or 🟡 Minor or 🟢 Safe / No Known Interaction",
   "mechanism": "Detailed physiological mechanism and potential clinical hazards",
   "recommendation": "Actionable clinical guidance, administration timing separation, or safe alternative substitutions",
-  "clinicalDetails": "Key clinical takeaways and patient monitoring advice"
+  "clinicalDetails": "Key clinical takeaways and patient monitoring advice",
+  "cumulativeRisks": ["Cumulative risks list"],
+  "detectedInteractions": [
+    {
+      "drugA": "Drug 1",
+      "drugB": "Drug 2",
+      "severity": "critical or warning",
+      "severityLabel": "🔴 Severe or 🟠 Moderate",
+      "mechanism": "Mechanism of interaction",
+      "recommendation": "Actionable advice"
+    }
+  ]
 }`;
 
-      const candidateModels = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+      const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
       for (const modelName of candidateModels) {
         try {
-          const response = await ai.models.generateContent({
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 4000));
+          const generatePromise = ai.models.generateContent({
             model: modelName,
             contents: prompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+              responseMimeType: "application/json",
+              temperature: 0.1
+            }
           });
-          const parsed = JSON.parse(response.text || "{}");
+          const response: any = await Promise.race([generatePromise, timeoutPromise]);
+          const rawText = (response.text || "").replace(/```json\s*/gi, "").replace(/```\s*$/gi, "").trim();
+          const parsed = JSON.parse(rawText || "{}");
           if (parsed.severity) severity = parsed.severity;
           if (parsed.severityLabel) severityLabel = parsed.severityLabel;
           if (parsed.mechanism) mechanism = parsed.mechanism;
           if (parsed.recommendation) recommendation = parsed.recommendation;
           if (parsed.clinicalDetails) clinicalDetails = parsed.clinicalDetails;
+          if (Array.isArray(parsed.detectedInteractions)) detectedInteractions = parsed.detectedInteractions;
+          if (Array.isArray(parsed.cumulativeRisks)) cumulativeRisks = parsed.cumulativeRisks;
           if (mechanism) break;
         } catch (err: any) {
           console.warn(`Interactions model ${modelName} error:`, err?.message);
@@ -3688,48 +3783,16 @@ Output strictly valid JSON in this structure:
     }
   }
 
-  // Fallback clinical evaluation if AI didn't return complete data
+  // Comprehensive Clinical Pharmacology Fallback Rule Engine
   if (!mechanism) {
-    const textLower = drugsString.toLowerCase();
-    const isWarfarin = textLower.includes("warfarin") || textLower.includes("وارفارين") || textLower.includes("كومادين");
-    const isAspirin = textLower.includes("aspirin") || textLower.includes("أسبرين") || textLower.includes("اسبرين") || textLower.includes("جوسبرين");
-    const isIbuprofen = textLower.includes("ibuprofen") || textLower.includes("بروفين") || textLower.includes("إيبوبروفين");
-    const isMetronidazole = textLower.includes("metronidazole") || textLower.includes("فلاجيل") || textLower.includes("ميترونيدازول");
-    const isAlcohol = textLower.includes("alcohol") || textLower.includes("كحول");
-    const isSildenafil = textLower.includes("sildenafil") || textLower.includes("فياغرا") || textLower.includes("سيلدينافيل");
-    const isNitrate = textLower.includes("nitrate") || textLower.includes("نيترات") || textLower.includes("نيتروجلسرين");
-
-    if (isWarfarin && isAspirin) {
-      severity = "critical";
-      severityLabel = "🔴 خطير جداً (يحظر الجمع)";
-      mechanism = "تثبيط مزدوج لمسارات التخثر والصفائح الدموية مما يرفع احتمالية النزيف الحاد بمقدار 2-3 أضعاف، خصوصاً النزيف المعدي المعوي والدماغي.";
-      recommendation = "تجنب الجمع التام إلا تحت إشراف طبيب القلب مع المراقبة الدورية للـ INR، واستخدام حاميات المعدة (PPI).";
-    } else if (isWarfarin && isIbuprofen) {
-      severity = "critical";
-      severityLabel = "🔴 خطير جداً (يحظر الجمع)";
-      mechanism = "مضادات الالتهاب غير الستيرويدية تسبب تآكلاً في بطانة المعدة وتعيق الصفائح مع مضاد التجلط، مما يسبب نزيفاً هضمياً سريعاً.";
-      recommendation = "استبدال الإيبوبروفين بالباراسيتامول كمسكن آمن لألم والحرارة لدى مرضى الوارفارين.";
-    } else if (isMetronidazole && isAlcohol) {
-      severity = "critical";
-      severityLabel = "🔴 تفاعل شبيه بالديسولفيرام (Disulfiram Reaction)";
-      mechanism = "تراكم مادة الأسيتالدهيد السامة في الدم مسببة خفقاناً شديداً، هبوطاً في الضغط، احمراراً وغثياناً حاداً.";
-      recommendation = "الامتناع التام عن تناول أي مشروبات أو أدوية تحتوي على كحول أثناء العلاج ولمدة 48 ساعة بعد آخر جرعة.";
-    } else if (isSildenafil && isNitrate) {
-      severity = "critical";
-      severityLabel = "🔴 ممنوع الجمع قطعيّاً (Contraindicated)";
-      mechanism = "تراكم مركب cGMP الموسع للأوعية الدموية بشكل حاد مسبباً هبوطاً كارثياً في ضغط الدم واحتشاء عضلة القلب.";
-      recommendation = "يحظر استخدام سيلدينافيل مع مركبات النيترات مطلقاً.";
-    } else if (isAspirin && isIbuprofen) {
-      severity = "warning";
-      severityLabel = "🟠 متوسط الخطورة (تأثير متبادل)";
-      mechanism = "يرتبط الإيبوبروفين بمستقبلات الصفائح ويمنع الأسبرين من إحداث تأثيره الوقائي الدائم للقلب والأوعية الدموية.";
-      recommendation = "تناول جرعة الأسبرين الوقائية قبل الإيبوبروفين بساعتين على الأقل.";
-    } else {
-      severity = "safe";
-      severityLabel = "🟢 آمن نسبياً (لا يوجد تعارض حرج معروف)";
-      mechanism = "لم يُرصد تعارض استقلابي حاد أو خطورة تآزرية مباشرة بين هذه الأدوية وفق الأدلة السريرية المتوفرة.";
-      recommendation = "يُفضل الفصل بساعة إلى ساعتين بين تناول الأدوية الفموية لضمان الامتصاص الأمثل واستشارة الصيدلاني عند إضافة أي علاج جديد.";
-    }
+    const localResult = analyzeAllMedications(drugList, lang as 'ar' | 'en');
+    severity = localResult.severity;
+    severityLabel = localResult.severityLabel;
+    mechanism = localResult.mechanism;
+    recommendation = localResult.recommendation;
+    clinicalDetails = localResult.clinicalDetails;
+    detectedInteractions = localResult.detectedInteractions;
+    cumulativeRisks = localResult.cumulativeRisks;
   }
 
   // Log sync entry
@@ -3755,6 +3818,8 @@ Output strictly valid JSON in this structure:
     mechanism,
     recommendation,
     clinicalDetails,
+    detectedInteractions,
+    cumulativeRisks,
     disclaimerAr: "⚠️ إخلاء مسؤولية: هذا التقرير استرشادي للأغراض التثقيفية والصيدلانية، ولا يُغني عن استشارة الطبيب المعالج.",
     disclaimerEn: "⚠️ Disclaimer: This clinical report is for informational purposes and does not replace medical consultation."
   });
@@ -3836,10 +3901,11 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
   ]
 }`;
 
-    const candidateModels = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.7-flash", "gemini-3.1-flash-lite", "gemini-3.8-flash"];
+    const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
     for (const modelName of candidateModels) {
       try {
-        const response = await ai.models.generateContent({
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 4000));
+        const generatePromise = ai.models.generateContent({
           model: modelName,
           contents: [{ text: prompt }],
           config: {
@@ -3848,6 +3914,7 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
           }
         });
 
+        const response: any = await Promise.race([generatePromise, timeoutPromise]);
         const rawText = response.text || "{}";
         const parsed = JSON.parse(rawText);
         if (parsed.drugs && Array.isArray(parsed.drugs) && parsed.drugs.length > 0) {
@@ -3868,6 +3935,12 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
         console.warn(`[DrugSearch] Model ${modelName} failed, trying next:`, e);
       }
     }
+  }
+
+  if (aiDrugs.length === 0) {
+    const fallbackDrug = synthesizeDrugMonograph(cleanQuery);
+    aiDrugs = [fallbackDrug];
+    source = "Dose Clinical Compendium (Universal Drug Engine)";
   }
 
   // Record action in sync logs
@@ -3904,25 +3977,28 @@ app.post("/api/medical/prescription-ocr", async (req, res) => {
 
   let extractedInfo: any = null;
   if (ai) {
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
-    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, and injections).
-Analyze this medical image (doctor prescription, medicine box, bottle, vial, or tube).
+    const candidateModels = ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, suppositories, and injections).
+Analyze this medical image (doctor prescription, medicine box, bottle, vial, suppository pack, or tube).
 
 CRITICAL INSTRUCTIONS:
 1. Examine the image carefully. Identify the EXACT drug name written on the box, label, or prescription.
-   - Look for Antibiotics: Amoxicillin, Amoxil, Augmentin, Curam, Klavox, Megamox, Hibiotic, Cefixime, Suprax, Azithromycin, Zithromax, Ceftriaxone, Rocephin, Cefuroxime, Zinnat, etc.
-   - Look for Antipyretics/NSAIDs: Paracetamol, Panadol, Adol, Tempra, Cetal, Fevadol, Ibuprofen, Brufen, Advil.
-   - Look for Respiratory: Salbutamol, Ventolin, Budesonide, Pulmicort.
-   - Look for Antihistamines: Cetirizine, Zyrtec, Levocetirizine, Desloratadine.
+   - Look for Antibiotics: Amoxicillin, Amoxil, Augmentin, Curam, Klavox, Megamox, Hibiotic, Cefixime, Suprax, Azithromycin, Zithromax, Ceftriaxone, Rocephin, Cefuroxime, Zinnat, Cefaclor, Ceclor, Clarithromycin, Klacid, Metronidazole, Flagyl, Cefotaxime, Claforan, etc.
+   - Look for Antipyretics/NSAIDs: Paracetamol, Panadol, Adol, Tempra, Cetal, Fevadol, Ibuprofen, Brufen, Advil, Profinal.
+   - Look for Respiratory & Cough: Salbutamol, Ventolin, Budesonide, Pulmicort, Prospan, Mucosolvan, Ambroxol, Dexamethasone, Decadron.
+   - Look for Antihistamines & Allergy: Cetirizine, Zyrtec, Dimetindene, Fenistil, Loratadine, Claritin.
+   - Look for GI & Colic: Ondansetron, Zofran, Domperidone, Motilium, Simethicone, Dentinox, Infacol, ORS, Pedialyte.
    - Look for Topicals/Drops: Mupirocin, Bactroban, Hydrocortisone, Fucidin, Tobramycin, Tobrex, Ciprofloxacin.
 2. Formulation type:
-   - "syrup": oral suspension, dry powder for syrup, drops with spoon/syringe, elixir, solution.
+   - "syrup": oral suspension, dry powder for syrup, elixir, solution.
    - "ointment": cream, ointment, topical gel.
-   - "drops": eye drops, ear drops, nasal drops, infant oral drops (e.g. 100mg/ml).
+   - "drops": infant oral drops (e.g. 100mg/ml, Fenistil, Dentinox), eye drops, ear drops.
+   - "suppository": rectal suppositories (e.g. Adol 125/250, Brufen 60/125).
    - "spray": inhaler (MDI), nasal spray, nebulizer suspension.
    - "injection": vial, ampoule, IV/IM powder.
+   - "sachet": oral rehydration salts / soluble powder.
 3. Concentration / Strength:
-   - Extract numeric strength for syrups in mg per 5ml (e.g. 125, 250, 400, 457, 600, 120, 200, 100).
+   - Extract numeric strength for syrups in mg per 5ml (e.g. 125, 156, 200, 228, 250, 312, 400, 457, 600, 120, 100).
    - If written as "250mg/5ml", extract concentrationMgPer5ml: 250.
    - If written as "457mg/5ml", extract concentrationMgPer5ml: 457.
    - If drops (e.g. 100mg/ml), extract concentrationText: "100mg/ml".
@@ -3941,8 +4017,8 @@ OUTPUT JSON SCHEMA ONLY:
   "drugNameEn": "Exact Generic or Trade Name in English",
   "tradeName": "Brand name if visible (e.g. Augmentin, Amoxil, Suprax, Brufen, Panadol)",
   "genericName": "Active scientific ingredient (e.g. Amoxicillin, Paracetamol, Ibuprofen)",
-  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "tobramycin" | "other",
-  "formulation": "syrup" | "ointment" | "drops" | "spray" | "injection",
+  "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "cefalexin" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "dexamethasone" | "dimetindene" | "prospan" | "mucosolvan" | "simethicone" | "cefotaxime" | "ors" | "tobramycin" | "other",
+  "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
@@ -4213,6 +4289,199 @@ OUTPUT JSON SCHEMA ONLY:
     warningsEn: ["Consult physician if symptoms persist or signs of dehydration or allergic rash appear"],
     scientificReference: "BNF for Children (BNFC) / AAP Guidelines",
     source: "rule_based_clinical_engine"
+  });
+});
+
+// ========================
+// CLINICAL THERAPEUTIC NUTRITION & IBW ENGINE
+// ========================
+app.post("/api/medical/therapeutic-nutrition", async (req, res) => {
+  const {
+    condition = "diabetes",
+    age = 35,
+    weightKg = 75,
+    heightCm = 175,
+    gender = "male",
+    activityLevel = 1.375,
+    goal = "maintain",
+    patientName = "مريض",
+    lang = "ar"
+  } = req.body;
+
+  const wt = parseFloat(weightKg) || 70;
+  const ht = parseFloat(heightCm) || 170;
+  const ag = parseFloat(age) || 30;
+
+  // Gold Standard Clinical Formulas
+  const htInches = ht / 2.54;
+  const inchesOver5Ft = Math.max(0, htInches - 60);
+
+  // Devine Formula (1974)
+  const devineIBW = gender === "male"
+    ? 50.0 + (2.3 * inchesOver5Ft)
+    : 45.5 + (2.3 * inchesOver5Ft);
+
+  // Robinson Formula (1983)
+  const robinsonIBW = gender === "male"
+    ? 52.0 + (1.9 * inchesOver5Ft)
+    : 49.0 + (1.7 * inchesOver5Ft);
+
+  // Miller Formula (1983)
+  const millerIBW = gender === "male"
+    ? 56.2 + (1.41 * inchesOver5Ft)
+    : 53.1 + (1.36 * inchesOver5Ft);
+
+  // Hamwi Formula (1964)
+  const hamwiIBW = gender === "male"
+    ? 48.0 + (2.7 * inchesOver5Ft)
+    : 45.5 + (2.2 * inchesOver5Ft);
+
+  // Adjusted Body Weight (AdjBW) if obese (>120% of IBW)
+  const isObese = wt > (devineIBW * 1.2);
+  const adjustedBW = isObese ? (devineIBW + 0.4 * (wt - devineIBW)) : wt;
+
+  // Body Surface Area (BSA - Mosteller)
+  const bsa = Math.sqrt((ht * wt) / 3600);
+
+  // BMR (Mifflin-St Jeor)
+  let bmr = (10 * wt) + (6.25 * ht) - (5 * ag);
+  bmr += gender === "male" ? 5 : -161;
+
+  const tdee = Math.round(bmr * parseFloat(activityLevel));
+  let targetCalories = tdee;
+  if (goal === "lose") targetCalories = Math.max(1200, tdee - 500);
+  if (goal === "gain") targetCalories = tdee + 450;
+
+  const ai = getGenAI();
+  if (ai) {
+    const prompt = `You are a Senior Clinical Nutritionist & Dietitian (RD, CNSC) and Clinical Pharmacist.
+Generate an evidence-based clinical therapeutic nutrition protocol and tailored daily meal plan for:
+- Clinical Condition / Diagnosis: "${condition}"
+- Patient: ${gender === "male" ? "Male" : "Female"}, Age: ${ag} years, Weight: ${wt} kg, Height: ${ht} cm.
+- Ideal Body Weight (Devine): ${devineIBW.toFixed(1)} kg, AdjBW: ${adjustedBW.toFixed(1)} kg, BSA: ${bsa.toFixed(2)} m².
+- Target Calories: ${targetCalories} kcal/day (BMR: ${Math.round(bmr)}, TDEE: ${tdee}).
+- Goal: ${goal}.
+
+STRICTLY RETURN JSON conforming to this structure:
+{
+  "conditionTitleAr": "اسم الحالة السريرية والحمية بالعربية",
+  "conditionTitleEn": "Clinical Condition & Diet Name in English",
+  "clinicalRationale": "التفسير الطبي والفسيولوجي لأهداف الحمية بالعربية",
+  "dailyCaloriesTarget": ${targetCalories},
+  "proteinGrams": 85,
+  "proteinGramsPerKg": "1.1 g/kg (Based on clinical status)",
+  "carbsGrams": 220,
+  "fatGrams": 60,
+  "fluidRestrictionMl": "2500 mL/day",
+  "sodiumLimitMg": "أقل من 2000 ملغ صوديوم يومياً",
+  "potassiumRecommendation": "طبيعي أو محدد حسب وظائف الكلى",
+  "phosphorusRecommendation": "محدد أو غير مقيد",
+  "allowedFoods": ["غذاء 1 مسموح مع الفائدة", "غذاء 2", "غذاء 3", "غذاء 4", "غذاء 5"],
+  "forbiddenFoods": ["ممنوع 1 مع السبب السريري", "ممنوع 2", "ممنوع 3", "ممنوع 4"],
+  "mealPlan": {
+    "breakfast": "وجبة الإفطار السريرية المقترحة",
+    "snack1": "سناك صباحي صحي",
+    "lunch": "وجبة الغداء المتوازنة بالتفصيل",
+    "snack2": "سناك مسائي خفيف",
+    "dinner": "وجبة العشاء المتوافقة سريرياً"
+  },
+  "clinicalTips": ["نصيحة سريرية ذهبية 1", "نصيحة 2", "نصيحة 3"],
+  "drugFoodInteractions": ["تداخل دوائي غذائي هام لهذه الحالة أو أدويتها"],
+  "monitoringParameters": ["فحوصات المتابعة المخبرية: السكر التراكمي، الكرياتينين، الشوارد..."]
+}`;
+
+    const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    for (const model of candidateModels) {
+      try {
+        const resp = await ai.models.generateContent({
+          model,
+          contents: [{ text: prompt }],
+          config: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+          }
+        });
+        const parsed = JSON.parse(resp.text || "{}");
+        if (parsed.dailyCaloriesTarget) {
+          return res.json({
+            success: true,
+            ibw: {
+              devine: Number(devineIBW.toFixed(1)),
+              robinson: Number(robinsonIBW.toFixed(1)),
+              miller: Number(millerIBW.toFixed(1)),
+              hamwi: Number(hamwiIBW.toFixed(1)),
+              adjustedBW: Number(adjustedBW.toFixed(1)),
+              isObese,
+              bsa: Number(bsa.toFixed(2)),
+              bmr: Math.round(bmr),
+              tdee,
+              targetCalories
+            },
+            nutritionPlan: parsed,
+            source: `clinical_ai_${model}`
+          });
+        }
+      } catch (err: any) {
+        console.warn(`Therapeutic Nutrition AI on ${model} failed:`, err?.message);
+      }
+    }
+  }
+
+  // Fallback Rule-Based Clinical Nutrition
+  res.json({
+    success: true,
+    ibw: {
+      devine: Number(devineIBW.toFixed(1)),
+      robinson: Number(robinsonIBW.toFixed(1)),
+      miller: Number(millerIBW.toFixed(1)),
+      hamwi: Number(hamwiIBW.toFixed(1)),
+      adjustedBW: Number(adjustedBW.toFixed(1)),
+      isObese,
+      bsa: Number(bsa.toFixed(2)),
+      bmr: Math.round(bmr),
+      tdee,
+      targetCalories
+    },
+    nutritionPlan: {
+      conditionTitleAr: `الحمية العلاجية لحالة: ${condition}`,
+      conditionTitleEn: `Clinical Diet Protocol for: ${condition}`,
+      clinicalRationale: "نظام علاجي معتمد للتحكم في استقلاب المغذيات وتوازن السوائل والشوارد.",
+      dailyCaloriesTarget: targetCalories,
+      proteinGrams: Math.round(wt * 1.1),
+      proteinGramsPerKg: "1.1 g/kg",
+      carbsGrams: Math.round((targetCalories * 0.45) / 4),
+      fatGrams: Math.round((targetCalories * 0.25) / 9),
+      fluidRestrictionMl: `${Math.round(wt * 33)} mL/day`,
+      sodiumLimitMg: "أقل من 2000 ملغ صوديوم يومياً",
+      potassiumRecommendation: "ضمن المعدل الطبيعي (3.5 - 5.0 mEq/L)",
+      phosphorusRecommendation: "معتدل",
+      allowedFoods: [
+        "الخضراوات الورقية الطازجة الغنية بالألياف ومضادات الأكسدة",
+        "البروتينات الخالية من الدهون (صدور الدجاج والأسماك المشوية)",
+        "الحبوب الكاملة (الشوفان والأرز البني والخبز البلدي)",
+        "الدهون غير المشبعة (زيت الزيتون البكر والمكسرات النيئة)"
+      ],
+      forbiddenFoods: [
+        "السكريات المكررة والحلويات والمشروبات الغازية والعصائر المحلاة",
+        "الأطعمة فائقة المعالجة والدهون المتحولة والوجبات السريعة",
+        "المخللات والأغذية شديدة الملوحة والمعلبات"
+      ],
+      mealPlan: {
+        breakfast: "شوفان بالحليب قليل الدسم أو بيض مسلوق مع سلطة خضراء وشريحة خبز أسمر",
+        snack1: "تفاحة خضراء أو حفنة مكسرات نيئة",
+        lunch: "صدر دجاج أو سمك مشوي مع طبق سلطة كبير ونصف كوب أرز بني",
+        snack2: "كوب زبادي قليل الدسم مع بذور الكتان",
+        dinner: "حساء خضار صحي مع جبن قريش وزيت زيتون"
+      },
+      clinicalTips: [
+        "شرب كميات كافية من الماء موزعة على مدار ساعات اليوم",
+        "ممارسة النشاط البدني المعتدل (30 دقيقة مشي يومياً)",
+        "فحص المؤشرات الحيوية والتحاليل الدورية لمتابعة الاستجابة"
+      ],
+      drugFoodInteractions: ["تجنب تناول الجريب فروت مع أدوية الضغط والستاتينات"],
+      monitoringParameters: ["سكر الدم التراكمي، وظائف الكلى، ضغط الدم الشرياني"]
+    },
+    source: "clinical_rule_based"
   });
 });
 

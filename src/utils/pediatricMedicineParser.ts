@@ -2,6 +2,7 @@
 // Extracts brand names, active ingredients, formulations, concentrations, and dosing hints from raw OCR text (Tesseract or Vision)
 
 import { EXTENDED_PEDIATRIC_DRUGS, ExtendedPediatricDrug } from '../data/pediatricDrugData';
+import { PediatricFormulationType } from '../types';
 
 export interface DetectedMedicineResult {
   tradeName?: string;
@@ -9,7 +10,7 @@ export interface DetectedMedicineResult {
   drugNameAr?: string;
   drugNameEn?: string;
   matchedDrugId?: string;
-  formulation: 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection';
+  formulation: PediatricFormulationType;
   concentrationMgPer5ml?: number;
   concentrationText?: string;
   infectionSite?: 'general' | 'ear' | 'lung' | 'pharynx' | 'urinary' | 'skin';
@@ -29,7 +30,7 @@ interface BrandEntry {
   drugId: string;
   tradeNameEn: string;
   tradeNameAr: string;
-  defaultFormulation?: 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection';
+  defaultFormulation?: PediatricFormulationType;
   typicalConc?: number;
 }
 
@@ -200,6 +201,76 @@ const BRAND_DICTIONARY: BrandEntry[] = [
     tradeNameEn: 'Tobrex',
     tradeNameAr: 'توبريكس (توبراميسين قطرات)',
     defaultFormulation: 'drops'
+  },
+  // Cefalexin / Cefalin (from packaging photo)
+  {
+    patterns: [/cefalexin/i, /cephalexin/i, /cefalin/i, /keflex/i, /ospexin/i, /cefalex/i, /سيفالين/i, /سيفاليكسين/i, /كفليكس/i],
+    drugId: 'cefalexin',
+    tradeNameEn: 'Cefalin (Cefalexin)',
+    tradeNameAr: 'سيفالين (سيفاليكسين شراب 250)',
+    defaultFormulation: 'syrup',
+    typicalConc: 250
+  },
+  // Dexamethasone
+  {
+    patterns: [/decadron/i, /fortecortin/i, /dexamethasone/i, /apidex/i, /ديكادرون/i, /فورتيكورتين/i, /ديكساميثازون/i],
+    drugId: 'dexamethasone',
+    tradeNameEn: 'Decadron',
+    tradeNameAr: 'ديكادرون (ديكساميثازون)',
+    defaultFormulation: 'syrup',
+    typicalConc: 0.5
+  },
+  // Dimetindene (Fenistil)
+  {
+    patterns: [/fenistil/i, /dimetindene/i, /فينستيل/i, /فينيستيل/i],
+    drugId: 'dimetindene',
+    tradeNameEn: 'Fenistil',
+    tradeNameAr: 'فينستيل (ديميتيندين نقط)',
+    defaultFormulation: 'drops',
+    typicalConc: 1
+  },
+  // Prospan
+  {
+    patterns: [/prospan/i, /rowapex/i, /kifpan/i, /ivy/i, /بروسبان/i, /روابكس/i],
+    drugId: 'prospan',
+    tradeNameEn: 'Prospan',
+    tradeNameAr: 'بروسبان (خلاصة اللبلاب)',
+    defaultFormulation: 'syrup',
+    typicalConc: 35
+  },
+  // Mucosolvan
+  {
+    patterns: [/mucosolvan/i, /ambroxol/i, /bronchopro/i, /موكوسولفان/i, /امبروكسول/i],
+    drugId: 'mucosolvan',
+    tradeNameEn: 'Mucosolvan',
+    tradeNameAr: 'موكوسولفان (أمبروكسول)',
+    defaultFormulation: 'syrup',
+    typicalConc: 15
+  },
+  // Simethicone
+  {
+    patterns: [/dentinox/i, /infacol/i, /disflatyl/i, /simethicone/i, /دينتينوكس/i, /انفاكول/i, /ديسفلاتيل/i],
+    drugId: 'simethicone',
+    tradeNameEn: 'Dentinox / Infacol',
+    tradeNameAr: 'دينتينوكس / إنفاكول (سيميثيكون)',
+    defaultFormulation: 'drops',
+    typicalConc: 40
+  },
+  // Cefotaxime
+  {
+    patterns: [/claforan/i, /cefotax/i, /taxim/i, /cefotaxime/i, /كلافوران/i, /سيفوتاكس/i, /سيفوتاكسيم/i],
+    drugId: 'cefotaxime',
+    tradeNameEn: 'Claforan',
+    tradeNameAr: 'كلافوران (سيفوتاكسيم حقن)',
+    defaultFormulation: 'injection'
+  },
+  // ORS
+  {
+    patterns: [/pedialyte/i, /hydrosafe/i, /rehydran/i, /\bors\b/i, /بيديالايت/i, /هيدروسيف/i, /محلول جفاف/i],
+    drugId: 'ors',
+    tradeNameEn: 'Pedialyte / ORS',
+    tradeNameAr: 'بيديالايت / محلول جفاف',
+    defaultFormulation: 'syrup'
   }
 ];
 
@@ -214,8 +285,12 @@ export function parsePediatricMedicineFromText(rawText: string): DetectedMedicin
     .replace(/\s+/g, ' ');
 
   // 1. Detect Formulation
-  let formulation: 'syrup' | 'ointment' | 'drops' | 'spray' | 'injection' = 'syrup';
-  if (/drop|point|نقط|قطر|عين|اذن/i.test(normalized)) {
+  let formulation: PediatricFormulationType = 'syrup';
+  if (/suppositor|تحميل|لبوس|تحاميل/i.test(normalized)) {
+    formulation = 'suppository';
+  } else if (/sachet|فوار|كيس|حبيبات/i.test(normalized)) {
+    formulation = 'sachet';
+  } else if (/drop|point|نقط|قطر|عين|اذن/i.test(normalized)) {
     formulation = 'drops';
   } else if (/ointment|cream|gel|مرهم|كريم|جل|دهان/i.test(normalized)) {
     formulation = 'ointment';
