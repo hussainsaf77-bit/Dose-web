@@ -17,7 +17,8 @@ import {
   ExternalLink,
   History,
   Trash2,
-  Search
+  Search,
+  Settings
 } from 'lucide-react';
 import { INTERACTIONS_DB } from '../data/medicalData';
 import { analyzeAllMedications, PairwiseInteraction, cleanDrugToken } from '../data/clinicalInteractionEngine';
@@ -96,6 +97,8 @@ const EXTENSIVE_AUTOCOMPLETE_DRUGS: AutoDrug[] = [
   { name: 'إمباغليفلوزين', nameEn: 'Empagliflozin', trade: 'جارديانس (Jardiance)', category: 'مثبط SGLT2' },
   { name: 'داباجليفلوزين', nameEn: 'Dapagliflozin', trade: 'فورسيجا (Forxiga)', category: 'مثبط SGLT2' },
   { name: 'تيزانيدين', nameEn: 'Tizanidine', trade: 'سيردالود (Sirdalud)', category: 'مرخي عضلات مركزي' },
+  { name: 'ثيوفلين', nameEn: 'Theophylline', trade: 'ثيودور (Theo-Dur) / يونيفيل', category: 'موسع قصبات زانثيني (CYP1A2)' },
+  { name: 'أمينوفيلين', nameEn: 'Aminophylline', trade: 'أمينوفيلين حقن', category: 'موسع قصبات زانثيني' },
   { name: 'كالسيوم', nameEn: 'Calcium', trade: 'كالسيتريول / أوستوكير', category: 'مكمل معدني' }
 ];
 
@@ -110,6 +113,11 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    try { return localStorage.getItem('dose_gemini_api_key') || ''; } catch { return ''; }
+  });
+  const [showApiConfig, setShowApiConfig] = useState(false);
+  const [engineSource, setEngineSource] = useState<'clinical_class' | 'gemini_ai'>('clinical_class');
   const inputContainerRef = useRef<HTMLDivElement>(null);
 
   // Persistent Medication History Memory
@@ -188,6 +196,8 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
   // High-yield quick-test pairs
   const quickTestPairs = [
+    { label: '🔴 ثيوفلين + سيبروفلوكساسين (تسمم صرعي حاد)', drugs: ['ثيوفلين', 'سيبروفلوكساسين'] },
+    { label: '🔴 سيبروفلوكساسين + سيردالود (هبوط كارثي وغيبوبة)', drugs: ['سيبروفلوكساسين', 'سيردالود'] },
     { label: '🔴 وارفارين + أزيثرومايسين (نزيف وارتفاع INR)', drugs: ['وارفارين', 'أزيثرومايسين'] },
     { label: '🔴 سيلدينافيل + نيترات (هبوط مميت)', drugs: ['سيلدينافيل', 'نيتروجلسرين'] },
     { label: '🔴 وارفارين + أسبرين (نزيف حاد)', drugs: ['وارفارين', 'أسبرين'] },
@@ -267,12 +277,14 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
     setErrorMessage('');
 
     try {
+      const savedApiKey = customApiKey || localStorage.getItem('dose_gemini_api_key') || '';
       const res = await fetch(getApiUrl('/api/interactions/check'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           drugs: selectedTokens,
           lang: language,
+          customApiKey: savedApiKey.trim() || undefined,
         }),
       });
 
@@ -292,6 +304,7 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
         detectedInteractions: data.detectedInteractions || [],
         cumulativeRisks: data.cumulativeRisks || [],
       });
+      setEngineSource(data.engine === 'gemini_clinical_ai' ? 'gemini_ai' : 'clinical_class');
     } catch (err: any) {
       console.warn('API check failed, falling back to local clinical DB:', err);
       // Fallback to extensive local DB
@@ -314,6 +327,7 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
       detectedInteractions: res.detectedInteractions,
       cumulativeRisks: res.cumulativeRisks,
     });
+    setEngineSource('clinical_class');
   };
 
   const handleCopyReport = () => {
@@ -344,12 +358,63 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowApiConfig(!showApiConfig)}
+              className="bg-slate-800/90 hover:bg-slate-800 px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="إعدادات محرك التحليل والذكاء الاصطناعي"
+            >
+              <Settings className="w-3.5 h-3.5 text-rose-400" />
+              <span>محرك الفحص</span>
+            </button>
             <div className="bg-slate-800/90 px-4 py-2.5 rounded-xl border border-slate-700/80 text-center sm:text-right">
               <span className="text-[11px] text-slate-400 block font-medium">الأدوية المحددة:</span>
               <span className="text-sm sm:text-base font-black text-rose-400">{selectedTokens.length} مستحضرات</span>
             </div>
           </div>
         </div>
+
+        {/* Engine Settings Drawer */}
+        {showApiConfig && (
+          <div className="mt-4 pt-4 border-t border-slate-800 bg-slate-950/70 p-4 rounded-xl border border-slate-700/60 space-y-3 relative z-10 animate-in fade-in duration-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>محرك الصيدلة السريرية الشامل (INN Stem & Class Engine) نشط ويعمل ذاتياً لجميع الأدوية</span>
+              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 self-start sm:self-auto">
+                جاهز بدون مفاتيح
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              يقوم المحرك بتصنيف أي دواء في العالم تلقائياً عبر الجذر العلمي والمسارات الإنزيمية الكبدية (CYP450). كما يمكنك إدخال مفتاح Gemini API اختياري لإجراء تحليل ذكاء اصطناعي توليدي مخصص:
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={customApiKey}
+                onChange={(e) => {
+                  setCustomApiKey(e.target.value);
+                  try { localStorage.setItem('dose_gemini_api_key', e.target.value); } catch {}
+                }}
+                placeholder="أدخل مفتاح Gemini API (اختياري)..."
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              />
+              {customApiKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomApiKey('');
+                    try { localStorage.removeItem('dose_gemini_api_key'); } catch {}
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-rose-400 border border-slate-700 transition-colors"
+                >
+                  مسح
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -664,9 +729,14 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
                   <span className="text-base sm:text-lg font-black tracking-wide">
                     {analysisResult.severityLabel}
                   </span>
-                  <span className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-950/70 border border-slate-700/60 text-slate-300">
-                    {analysisResult.analyzedDrugs.join(' + ')}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-900/80 border border-slate-700/80 text-rose-300">
+                      {engineSource === 'gemini_ai' ? '🤖 ذكاء اصطناعي (Gemini)' : '⚡ محرك الصيدلة السريرية الشامل (INN Engine)'}
+                    </span>
+                    <span className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-950/70 border border-slate-700/60 text-slate-300">
+                      {analysisResult.analyzedDrugs.join(' + ')}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="text-xs text-slate-300 leading-relaxed font-medium mt-2">

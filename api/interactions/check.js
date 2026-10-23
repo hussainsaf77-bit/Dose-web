@@ -122,8 +122,9 @@ Output strictly valid JSON with this structure:
 }`;
 
     for (const model of candidateModels) {
+      try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 4000);
+        const timeoutId = setTimeout(() => controller.abort(), 7000);
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
@@ -158,7 +159,7 @@ Output strictly valid JSON with this structure:
           }
         }
       } catch (e) {
-        console.warn(`[Vercel Interactions] Model ${model} failed, trying next:`, e);
+        console.warn(`[Vercel Interactions] Model ${model} failed, trying next:`, e?.message || e);
       }
     }
   }

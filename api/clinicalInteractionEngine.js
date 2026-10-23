@@ -331,11 +331,125 @@ export function identifyDrugClasses(token) {
     classes.push('alcohol', 'cns_depressant');
   }
 
-  // 28. Tizanidine / Theophylline
+  // 28. Tizanidine & Theophylline / Xanthines
   if (
     t.includes('tizanidine') || t.includes('تيزانيدين') || t.includes('sirdalud') || t.includes('سيردالود')
   ) {
     classes.push('tizanidine', 'cyp1a2_substrate', 'hypotensive_risk');
+    name = 'تيزانيدين (Tizanidine / Sirdalud)';
+  } else if (
+    t.includes('theophyll') || t.includes('ثيوفل') || t.includes('ثيوفيل') ||
+    t.includes('aminophyll') || t.includes('امينوفل') || t.includes('أمينوفل') ||
+    t.includes('quibron') || t.includes('uniphyl') || t.includes('theolin') || t.includes('ثيودور') ||
+    t.includes('xanthine') || t.includes('زانثين')
+  ) {
+    classes.push('theophylline', 'cyp1a2_substrate', 'narrow_therapeutic_index', 'xanthine', 'arrhythmia_risk');
+    name = 'ثيوفيلين (Theophylline)';
+  }
+
+  // 29. UNIVERSAL PHARMACOLOGICAL STEM / SUFFIX RECOGNITION (INN / USAN)
+  // Automatically classifies any medication by chemical/pharmacological stem
+
+  // Fluoroquinolones (-floxacin / فلوكساسين / فلوكس)
+  if (t.includes('floxacin') || t.includes('فلوكساسين') || t.includes('فلوكس')) {
+    if (!classes.includes('quinolone')) classes.push('quinolone', 'qt_prolonging', 'chelation_risk');
+    if ((t.includes('cipro') || t.includes('سيبرو') || t.includes('norflo') || t.includes('نورفلو')) && !classes.includes('cyp1a2_inhibitor')) {
+      classes.push('cyp1a2_inhibitor');
+    }
+  }
+
+  // Statins (-statin / ستاتين)
+  if (t.includes('statin') || t.includes('ستاتين')) {
+    if (!classes.includes('statin')) classes.push('statin', 'myopathy_risk');
+    if ((t.includes('simva') || t.includes('سيمفا') || t.includes('atorva') || t.includes('اتورفا') || t.includes('أتورفا')) && !classes.includes('statin_cyp3a4')) {
+      classes.push('statin_cyp3a4');
+    }
+  }
+
+  // Beta-Blockers (-olol / ولول)
+  if (t.endsWith('olol') || t.includes('olol') || t.endsWith('ولول') || t.includes('ولول')) {
+    if (!classes.includes('beta_blocker')) classes.push('beta_blocker', 'bradycardia_risk', 'hypoglycemia_mask');
+  }
+
+  // ACE Inhibitors (-pril / بريل)
+  if (t.endsWith('pril') || t.includes('pril') || t.endsWith('بريل') || t.includes('بريل')) {
+    if (!classes.includes('raas_inhibitor')) classes.push('raas_inhibitor', 'hyperkalemia_risk', 'nephrotoxic_triple_whammy');
+  }
+
+  // ARBs (-sartan / سارتان)
+  if (t.endsWith('sartan') || t.includes('sartan') || t.endsWith('سارتان') || t.includes('سارتان')) {
+    if (!classes.includes('raas_inhibitor')) classes.push('raas_inhibitor', 'hyperkalemia_risk', 'nephrotoxic_triple_whammy');
+  }
+
+  // DHP Calcium Channel Blockers (-dipine / ديبين)
+  if (t.endsWith('dipine') || t.includes('dipine') || t.endsWith('ديبين') || t.includes('ديبين')) {
+    if (!classes.includes('ccb_dhp')) classes.push('ccb_dhp', 'antihypertensive');
+  }
+
+  // Proton Pump Inhibitors (-prazole / برازول)
+  if (t.endsWith('prazole') || t.includes('prazole') || t.endsWith('برازول') || t.includes('برازول')) {
+    if (!classes.includes('ppi')) classes.push('ppi');
+    if ((t.includes('omeprazole') || t.includes('اوميبرازول') || t.includes('esomeprazole') || t.includes('ايزوميبرازول')) && !classes.includes('cyp2c19_inhibitor')) {
+      classes.push('cyp2c19_inhibitor', 'ppi_omeprazole');
+    }
+  }
+
+  // PDE-5 Inhibitors (-afil / افيل)
+  if (t.endsWith('afil') || t.includes('afil') || t.endsWith('افيل') || t.includes('افيل') || t.includes('نافيل')) {
+    if (!classes.includes('pde5_inhibitor')) classes.push('pde5_inhibitor', 'vasodilator');
+  }
+
+  // Azole Antifungals (-conazole / -azole / كونازول)
+  if (t.includes('conazol') || t.includes('كونازول') || t.includes('فلوكونازول') || t.includes('ايتراكونازول') || t.includes('كيتوكونازول')) {
+    if (!classes.includes('azole_antifungal')) {
+      classes.push('azole_antifungal', 'cyp3a4_strong_inhibitor', 'cyp2c9_inhibitor', 'qt_prolonging');
+    }
+  }
+
+  // DOACs (-xaban / كسابان / جاتران)
+  if (t.endsWith('xaban') || t.includes('xaban') || t.endsWith('كسابان') || t.includes('كسابان') || t.includes('gatran') || t.includes('جاتران')) {
+    if (!classes.includes('anticoagulant')) classes.push('anticoagulant_doac', 'anticoagulant', 'bleeding_risk');
+  }
+
+  // Heparins / LMWH (-parin / بارين)
+  if (t.includes('parin') || t.includes('بارين')) {
+    if (!classes.includes('anticoagulant')) classes.push('anticoagulant_heparin', 'anticoagulant', 'bleeding_risk');
+  }
+
+  // SGLT2 Inhibitors (-gliflozin / جليفلوزين)
+  if (t.includes('gliflozin') || t.includes('جليفلوزين') || t.includes('جليفلوتسين')) {
+    if (!classes.includes('sglt2_inhibitor')) classes.push('sglt2_inhibitor', 'antidiabetic', 'dehydration_risk');
+  }
+
+  // DPP-4 Inhibitors (-gliptin / جليبتين)
+  if (t.includes('gliptin') || t.includes('جليبتين')) {
+    if (!classes.includes('antidiabetic')) classes.push('antidiabetic');
+  }
+
+  // GLP-1 Agonists (-glutide / -tide / جلوتايد / تايد)
+  if (t.includes('glutide') || t.includes('جلوتايد') || t.includes('جلوتيد')) {
+    if (!classes.includes('glp1_agonist')) classes.push('glp1_agonist', 'antidiabetic', 'delayed_gastric_emptying');
+  }
+
+  // Benzodiazepines (-azepam / -azolam / ازيبام / ازولام)
+  if (t.includes('azepam') || t.includes('azolam') || t.includes('ازيبام') || t.includes('ازولام')) {
+    if (!classes.includes('sedative_benzodiazepine')) classes.push('sedative_benzodiazepine', 'cns_respiratory_depressant');
+  }
+
+  // Tetracyclines (-cycline / سايكلين / سيكلين)
+  if (t.includes('cycline') || t.includes('سايكلين') || t.includes('سيكلين')) {
+    if (!classes.includes('chelation_risk')) classes.push('chelation_risk', 'tetracycline', 'antimicrobial');
+  }
+
+  // Macrolides (-thromycin / ثرومايسين / ثروميسين)
+  if (t.includes('thromycin') || t.includes('ثرومايسين') || t.includes('ثروميسين') || t.includes('ثرومايسن')) {
+    if (!classes.includes('macrolide')) classes.push('macrolide', 'qt_prolonging');
+    if ((t.includes('clarithro') || t.includes('كلاريثرو') || t.includes('erythro') || t.includes('اريثرو')) && !classes.includes('cyp3a4_strong_inhibitor')) {
+      classes.push('macrolide_potent', 'cyp3a4_strong_inhibitor');
+    }
+    if ((t.includes('azithro') || t.includes('ازيثر') || t.includes('أزيثر') || t.includes('زيزرو')) && !classes.includes('azithromycin')) {
+      classes.push('azithromycin');
+    }
   }
 
   return { name, classes };
@@ -566,15 +680,27 @@ export function evaluatePair(drugA, drugB) {
     };
   }
 
-  // 12. Ciprofloxacin + Tizanidine
-  if (has('cyp1a2_inhibitor') && has('cyp1a2_substrate')) {
+  // 12. Ciprofloxacin (or CYP1A2 inhibitor) + Theophylline -> CRITICAL TOXICITY & FATAL CONVULSIONS
+  if ((has('theophylline') || (has('xanthine') && has('narrow_therapeutic_index'))) && (has('cyp1a2_inhibitor') || has('quinolone'))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
       severity: 'critical',
-      severityLabel: '🔴 تعارض خطير محظور (هبوط ضغط حاد واختلاجات)',
-      mechanism: 'السيبروفلوكساسين مثبط قوي لإنزيم CYP1A2، مما يرفع مستويات التيزانيدين لأكثر من 10 أضعاف مسبباً هبوط ضغط شديداً ونعاساً حاداً أو نوبات صرع.',
-      recommendation: 'يحظر استخدام السيبروفلوكساسين مع التيزانيدين (سيردالود). يجب استبدال المضاد الحيوي ببديل لا يثبط CYP1A2.'
+      severityLabel: '🔴 تعارض حرج جداً (تسمم ثيوفيلين حاد ونوبات صرع مميتة)',
+      mechanism: 'السيبروفلوكساسين يثبط بشدة إنزيم CYP1A2 الكبدي المسؤول عن تكسير الثيوفيلين، مما يؤدي إلى تراكم دوائي هائل وارتفاع تركيز الثيوفيلين في الدم بنسبة 200% إلى 300%، مسبباً سمية قلبية وعصبية قاتلة تشمل تسرع القلب البطيني، نوبات صرع واختلاجات مستمرة غير مستجيبة للعلاج، وتوقف القلب.',
+      recommendation: 'يحظر الجمع بين السيبروفلوكساسين والثيوفيلين تماماً وفق تحذيرات FDA. يجب استبدال السيبروفلوكساسين بمضاد حيوي بديل لا يثبط CYP1A2 (مثل السيفالوسبورينات أو البنسلينات)، أو تخفيض جرعة الثيوفيلين بنسبة 60% مع المراقبة اليومية الدقيقة لتركيزه في المصل.'
+    };
+  }
+
+  // 12.1. Ciprofloxacin + Tizanidine -> CONTRAINDICATED (HYPOTENSIVE SHOCK)
+  if (has('tizanidine') && (has('cyp1a2_inhibitor') || has('quinolone'))) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: 'critical',
+      severityLabel: '🔴 تعارض خطير محظور قطعياً (هبوط ضغط كارثي وغيبوبة)',
+      mechanism: 'السيبروفلوكساسين يرفع تركيز التيزانيدين (سيردالود) في الدم لأكثر من 10 أضعاف ويزيد مساحة تحت المنحنى (AUC) بمقدار 7 أضعاف عبر تثبيط CYP1A2، مسبباً هبوطاً حاداً ومميتاً في ضغط الدم، بطء نبض القلب، وتثبيطاً عصبياً شديداً.',
+      recommendation: 'يحظر استخدامهما معاً وفق تعليمات هيئة الغذاء والدواء الصارمة (Contraindicated). يجب استبدال المضاد الحيوي ببديل آمن أو إيقاف التيزانيدين واستخدام باسط عضلات آخر.'
     };
   }
 
