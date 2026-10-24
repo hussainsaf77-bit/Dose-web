@@ -10,6 +10,47 @@ export interface PairwiseInteraction {
   recommendation: string;
 }
 
+export interface DrugFoodInteraction {
+  id: string;
+  foodCategory: string;
+  foodCategoryEn: string;
+  foodIcon: string;
+  affectedDrug: string;
+  severity: 'critical' | 'warning' | 'minor';
+  severityLabel: string;
+  mechanism: string;
+  recommendation: string;
+  clinicalNote: string;
+  dietaryAdvice: string;
+}
+
+export interface FoodFoodInteraction {
+  id: string;
+  foodA: string;
+  foodB: string;
+  foodIconA: string;
+  foodIconB: string;
+  foodAIcon?: string;
+  foodBIcon?: string;
+  type: 'synergy' | 'antagonism' | 'risk';
+  effectType?: 'synergy' | 'antagonism' | 'risk';
+  typeLabel: string;
+  severityLabel?: string;
+  severity: 'beneficial' | 'warning' | 'critical';
+  mechanism: string;
+  recommendation: string;
+  clinicalNote: string;
+  culinaryTip?: string;
+}
+
+export interface MealInstruction {
+  drug: string;
+  timing: 'empty_stomach' | 'with_food' | 'after_food' | 'flexible';
+  timingLabel: string;
+  instructions: string;
+  rationale: string;
+}
+
 export interface ClinicalAnalysisResult {
   severity: 'critical' | 'warning' | 'minor' | 'safe';
   severityLabel: string;
@@ -20,6 +61,9 @@ export interface ClinicalAnalysisResult {
   detectedInteractions: PairwiseInteraction[];
   cumulativeRisks: string[];
   analyzedDrugs: string[];
+  foodInteractions?: DrugFoodInteraction[];
+  foodFoodInteractions?: FoodFoodInteraction[];
+  mealInstructions?: MealInstruction[];
 }
 
 export interface DrugClassMatch {
@@ -1143,6 +1187,780 @@ export function analyzeAllMedications(tokens: string[], lang: 'ar' | 'en' = 'ar'
     clinicalDetails,
     detectedInteractions,
     cumulativeRisks,
-    analyzedDrugs: cleanTokens
+    analyzedDrugs: cleanTokens,
+    foodInteractions: evaluateFoodInteractions(cleanTokens, lang),
+    foodFoodInteractions: evaluateFoodFoodInteractions(cleanTokens, lang),
+    mealInstructions: getMealInstructions(cleanTokens, lang)
   };
+}
+
+export function evaluateFoodInteractions(tokens: string[], lang: 'ar' | 'en' = 'ar'): DrugFoodInteraction[] {
+  const isAr = lang === 'ar';
+  const foodInteractions: DrugFoodInteraction[] = [];
+  const processedKeys = new Set<string>();
+
+  for (const token of tokens) {
+    const match = identifyDrugClasses(token);
+    const classes = match.classes;
+    const name = match.name;
+
+    // 1. Grapefruit & Citrus (CYP3A4 inhibition)
+    if (classes.includes('statin_cyp3a4')) {
+      const key = `grapefruit-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'عصير الجريب فروت والبوملي والحمضيات المرّة',
+          foodCategoryEn: 'Grapefruit & Citrus Juice',
+          foodIcon: '🍇',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: انحلال العضلات المخططة وتسمم كبدي' : '🔴 Critical: Rhabdomyolysis & Liver Injury',
+          mechanism: isAr
+            ? 'يحتوي الجريب فروت على مركبات الفورانوكومارين التي تثبط إنزيم CYP3A4 المعوي والكبدي بشكل لا رجعة فيه، مما يرفع تركيز الستاتين في الدم بنسبة تصل إلى 15 ضعفاً، مسبباً ألماً عضلياً شديداً وانحلال الربيدات (Rhabdomyolysis) وفشلاً كلوياً حاداً.'
+            : 'Grapefruit furanocoumarins irreversibly inhibit intestinal CYP3A4, dramatically elevating statin bioavailability up to 15-fold and risking severe rhabdomyolysis and acute renal failure.',
+          recommendation: isAr
+            ? 'تجنب تناول الجريب فروت أو عصيره نهائياً طوال فترة العلاج بالستاتين (تأثير التثبيط يستمر حتى 72 ساعة بعد شرب العصير). كبديل آمن، يمكن استشارة الطبيب للتحويل إلى روزوفاستاتين أو برافاستاتين اللذين لا يتأثران بالجريب فروت.'
+            : 'Completely avoid grapefruit and Seville oranges. Consult physician for non-CYP3A4 alternatives like Rosuvastatin or Pravastatin.',
+          clinicalNote: isAr ? 'يشمل التحذير: سيمفاستاتين، أتورفاستاتين، لوفاستاتين.' : 'Applies to: Simvastatin, Atorvastatin, Lovastatin.',
+          dietaryAdvice: isAr ? 'البدائل الآمنة من الفواكه: البرتقال العادي، التفاح، الموز، الفراولة.' : 'Safe fruit alternatives: Sweet oranges, apples, bananas, berries.'
+        });
+      }
+    }
+
+    if (classes.includes('ccb')) {
+      const key = `grapefruit-ccb-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'عصير الجريب فروت',
+          foodCategoryEn: 'Grapefruit Juice',
+          foodIcon: '🍇',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: هبوط ضغط حاد ودوار شديد' : '🔴 Critical: Severe Hypotension & Tachycardia',
+          mechanism: isAr
+            ? 'تثبيط CYP3A4 يزيد التوافر الحيوي لحاصرات قنوات الكالسيوم (أملوديبين، فيلوديبين، نيفيديبين)، مما يؤدي إلى توسع وعائي مفاجئ، هبوط حاد في ضغط الدم الشرياني، خفقان ارتدادي، ووذمات شديدة في الكاحلين.'
+            : 'Inhibition of CYP3A4 increases calcium channel blocker systemic exposure, precipitating profound hypotension, dizziness, and reflex tachycardia.',
+          recommendation: isAr
+            ? 'الامتناع التام عن الجريب فروت. راقب ضغط الدم بانتظام واشرب عصائر بديلة كالبرتقال أو التفاح.'
+            : 'Avoid grapefruit products. Monitor blood pressure routinely.',
+          clinicalNote: isAr ? 'تأثير الجريب فروت يستمر حتى 3 أيام بعد تناوله.' : 'Grapefruit effect lasts up to 72 hours.',
+          dietaryAdvice: isAr ? 'مسموح: عصير الليمون، عصير البرتقال العادي.' : 'Allowed: Regular orange and lemon juice.'
+        });
+      }
+    }
+
+    if (classes.includes('pde5_inhibitor')) {
+      const key = `grapefruit-pde5-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الجريب فروت والبوملي',
+          foodCategoryEn: 'Grapefruit & Pomelo',
+          foodIcon: '🍇',
+          affectedDrug: name,
+          severity: 'warning',
+          severityLabel: isAr ? '🟠 تعارض متوسط: هبوط ضغط وصداع وخفقان' : '🟠 Moderate: Hypotension & Flushing',
+          mechanism: isAr
+            ? 'زيادة مستويات مثبطات الفوسفو داي إستراز (فياجرا، سياليس) في مصل الدم مما يضاعف الآثار الجانبية كالصداع واحمرار الوجه وهبوط الضغط الانتصابي.'
+            : 'Elevated PDE-5 inhibitor plasma concentrations leading to severe headache, dizziness, and postural hypotension.',
+          recommendation: isAr ? 'تجنب شرب عصير الجريب فروت قبل أو أثناء استخدام العلاج.' : 'Avoid grapefruit products around dosing.',
+          clinicalNote: isAr ? 'يشمل: سيلدينافيل وتادالافيل.' : 'Applies to: Sildenafil, Tadalafil.',
+          dietaryAdvice: isAr ? 'شرب الماء بكثرة عند تناول العلاج.' : 'Ensure adequate hydration.'
+        });
+      }
+    }
+
+    // 2. Dairy, Milk & Calcium (Chelation)
+    if (classes.includes('quinolone')) {
+      const key = `dairy-quinolone-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الحليب ومشتقات الألبان والأجبان ومكملات الكالسيوم',
+          foodCategoryEn: 'Dairy Products & Calcium',
+          foodIcon: '🥛',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: فشل العلاج المضاد للبكتيريا وتكون معقدات غير ممتصة' : '🔴 Critical: Chelation & Antibiotic Treatment Failure',
+          mechanism: isAr
+            ? 'ترتبط شوارد الكالسيوم والمغنيسيوم في الحليب والألبان بجزيئات المضاد الحيوي (الفلوروكينولون) لتكوّن معقداً غير قابل للذوبان أو الامتصاص (Chelation)، مما ينقص امتصاص الدواء بنسبة تصل إلى 70% ويؤدي لفشل علاج العدوى وتطور مقاومة بكتيرية.'
+            : 'Polyvalent cations in milk and dairy chelate fluoroquinolones, decreasing systemic absorption by up to 70%, resulting in clinical failure and resistance.',
+          recommendation: isAr
+            ? 'تناول المضاد الحيوي قبل الحليب أو الزبادي أو مكملات الكالسيوم بساعتين على الأقل، أو بعدها بـ 4 ساعات. يجب بلع الحبة مع كأس كامل من الماء العادي حصراً.'
+            : 'Administer antibiotic at least 2 hours before or 4 hours after dairy products or calcium supplements.',
+          clinicalNote: isAr ? 'ينطبق على سيبروفلوكساسين، ليفوفلوكساسين، موكسيفلوكساسين.' : 'Applies to: Ciprofloxacin, Levofloxacin, Moxifloxacin.',
+          dietaryAdvice: isAr ? 'يمكن تناول وجبات خالية من الألبان (أرز، دجاج، خضار مطبوخة) مع الدواء دون تعارض.' : 'Dairy-free meals do not impair absorption.'
+        });
+      }
+    }
+
+    if (classes.includes('tetracycline')) {
+      const key = `dairy-tetra-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الحليب والألبان ومكملات الكالسيوم',
+          foodCategoryEn: 'Milk & Dairy Products',
+          foodIcon: '🥛',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: انعدام امتصاص التتراسيكلين' : '🔴 Critical: Impaired Tetracycline Absorption',
+          mechanism: isAr
+            ? 'الكالسيوم في الحليب والجبن يشكل معقداً خالياً من الفعالية الحيوية مع التتراسيكلين والدوكسيسيكلين في تجويف الأمعاء، مانعاً امتصاصه بالكامل.'
+            : 'Calcium binds tetracycline molecules into insoluble chelates, negating antibacterial efficacy.',
+          recommendation: isAr
+            ? 'افصل بين الدوكسيسيكلين أو التتراسيكلين وأي منتجات ألبان بساعتين إلى 3 ساعات، وتناوله مع كأس ماء كامل في وضعية الوقوف لتجنب تقرح المريء.'
+            : 'Separate by at least 2 to 3 hours from dairy products; swallow with plenty of water.',
+          clinicalNote: isAr ? 'يشمل: دوكسيسيكلين (فيبرامايسين)، تتراسيكلين.' : 'Applies to: Doxycycline, Tetracycline.',
+          dietaryAdvice: isAr ? 'لا تشرب الحليب لبلع حبة التتراسيكلين مطلقاً.' : 'Never take tetracyclines with a glass of milk.'
+        });
+      }
+    }
+
+    if (classes.includes('levothyroxine')) {
+      const key = `dairy-thyro-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الحليب والألبان والقهوة والكالسيوم والحديد',
+          foodCategoryEn: 'Dairy, Coffee & Calcium Supplements',
+          foodIcon: '🥛',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: هبوط امتصاص هرمون الغدة الدرقية وقصور درقي' : '🔴 Critical: Blocked Thyroid Hormone Absorption',
+          mechanism: isAr
+            ? 'الكالسيوم وفول الصويا والقهوة الصباحية والألياف ترتبط بقوة بهرمون الليفوثيروكسين وتمنع امتصاصه في الصائم والأمعاء الدقيقة، مما يعيد المريض لحالة قصور الدرق وارتفاع هرمون TSH.'
+            : 'Calcium, dairy, morning coffee, and dietary fiber severely impede levothyroxine absorption, causing clinical hypothyroidism.',
+          recommendation: isAr
+            ? 'القاعدة الذهبية للغدة: تناول حبة الثيروكسين فور الاستيقاظ على الريق مع نصف كوب ماء نقي، وانتظر 30 إلى 60 دقيقة قبل تناول الإفطار أو القهوة، وافصل مكملات الكالسيوم أو الحليب بـ 4 ساعات كاملة.'
+            : 'Take on an empty stomach with plain water at least 30-60 minutes before breakfast and coffee. Separate calcium/iron by 4 hours.',
+          clinicalNote: isAr ? 'يشمل: إيوثيروكس (Euthyrox)، ثيروكسين.' : 'Applies to: Euthyrox, Levothyroxine.',
+          dietaryAdvice: isAr ? 'تجنب منتجات الصويا ومكملات الألياف في وجبة الإفطار.' : 'Avoid soy and fiber supplements during breakfast.'
+        });
+      }
+    }
+
+    if (classes.includes('iron_supplement')) {
+      const key = `iron-food-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الشاي، القهوة، الحليب، والبيض',
+          foodCategoryEn: 'Tea, Coffee, Dairy & Eggs',
+          foodIcon: '☕',
+          affectedDrug: name,
+          severity: 'warning',
+          severityLabel: isAr ? '🟠 تعارض متوسط: نقص امتصاص الحديد بنسبة 60-80%' : '🟠 Moderate: Markedly Reduced Iron Absorption',
+          mechanism: isAr
+            ? 'التانينات في الشاي والبوليفينول في القهوة والكالسيوم في الحليب والفوسفوفيتين في صفار البيض ترتبط بالحديد وتشكل أملاحاً غير قابلة للامتصاص، مما يحرم الجسم من علاج فقر الدم.'
+            : 'Tannins in tea, coffee polyphenols, and dairy calcium bind iron into non-absorbable complexes, decreasing uptake by 60-80%.',
+          recommendation: isAr
+            ? 'افصل بين حبوب الحديد والشاي أو القهوة أو الحليب بساعتين على الأقل. نصيحة ذهبية: تناول حبة الحديد مع كوب من عصير البرتقال (فيتامين C) حيث يضاعف امتصاص الحديد بنسبة 300%!'
+            : 'Separate iron intake from tea/coffee/milk by at least 2 hours. Take with Vitamin C or orange juice to maximize absorption.',
+          clinicalNote: isAr ? 'يشمل: كبريتات الحديد، فيروز، فيروجلوبين.' : 'Applies to: Ferrous sulfate, iron supplements.',
+          dietaryAdvice: isAr ? 'فيتامين C الطبيعي (برتقال، كيوي، فلفل رومي) هو الصديق الأفضل لحبوب الحديد.' : 'Vitamin C boosts iron absorption significantly.'
+        });
+      }
+    }
+
+    // 3. Vitamin K & Green Leafy Vegetables (Warfarin Antagonism)
+    if (classes.includes('anticoagulant_vka')) {
+      const key = `vitk-warfarin-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الخضروات الورقية الغنية بفيتامين K (السبانخ، الكرنب، الملوخية، البروكلي، البقدونس، الخس)',
+          foodCategoryEn: 'Vitamin K Rich Leafy Greens (Spinach, Broccoli, Kale)',
+          foodIcon: '🥬',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: هبوط حاد في تميع الدم (INR) وخطر الجلطات والسكتة' : '🔴 Critical: Antagonism of Warfarin, Decreased INR & Thrombosis Risk',
+          mechanism: isAr
+            ? 'فيتامين K الغذائي هو الركيزة الأساسية لتصنيع عوامل التخثر (II, VII, IX, X). تناول كميات متقلبة أو مفرطة يعاكس عمل الوارفارين ويسقط قيمة تميع الدم (INR) لأدنى من المستوى العلاجي، مما يعرض المريض لجلطات رئوية وسكتات دماغية مميتة.'
+            : 'Dietary Vitamin K directly antagonizes Warfarin inhibition of VKORC1, precipitating acute drops in INR and putting the patient at risk of stroke and thromboembolism.',
+          recommendation: isAr
+            ? 'القاعدة الطبية الذهبية لمرضى الوارفارين هي "الثبات في كمية الخضار وليس الامتناع" (Consistency). لا تفرط فجأة في تناول أطباق السبانخ أو الملوخية، ولا تقطعها فجأة. قم بإجراء فحص INR بانتظام عند أي تعديل في نظامك الغذائي.'
+            : 'Maintain a consistent, steady daily intake of Vitamin K greens rather than fluctuating drastically. Test INR if dietary habits shift.',
+          clinicalNote: isAr ? 'يشمل: وارفارين، كومادين، ماريفان.' : 'Applies to: Warfarin, Coumadin, Marevan.',
+          dietaryAdvice: isAr ? 'الخضروات الآمنة منخفضة فيتامين K: الخيار المقشر، الطماطم، الجزر، الكوسا، الذرة، البطاطس.' : 'Low Vitamin K veggies: Peeled cucumbers, tomatoes, carrots, potatoes.'
+        });
+      }
+    }
+
+    // 4. Caffeine, Coffee & Energy Drinks
+    if (classes.includes('xanthine')) {
+      const key = `caffeine-theophylline-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'القهوة، الشاي، الكولا، ومشروبات الطاقة (الكافيين)',
+          foodCategoryEn: 'Coffee, Tea, Cola & Energy Drinks (Caffeine)',
+          foodIcon: '☕',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: سمية ميثيل زانثين، خفقان قلبي حاد وتشنجات' : '🔴 Critical: Methylxanthine Toxicity, Arrhythmia & Seizures',
+          mechanism: isAr
+            ? 'الكافيين والثيوفلين ينتميان لنفس العائلة الدوائية (الميثيل زانثين) ويتنافسان على إنزيم CYP1A2. الكافيين يرفع تركيز الثيوفلين في الدم ويحدث تأثيراً تحفيزياً مضاعفاً على القلب والجهاز العصبي، مسبباً تسارع نبض حاد، خفقان، رجفان، غثيان وتشنجات.'
+            : 'Caffeine and theophylline share identical methylxanthine mechanisms and compete for CYP1A2 metabolism, triggering severe cardiotoxicity, tremors, and arrhythmias.',
+          recommendation: isAr
+            ? 'تجنب تماماً تناول مشروبات الطاقة والقهوة والشاي المركز والشوكولاتة الداكنة أثناء العلاج بالثيوفلين. استشر الصيدلاني عند الشعور بأي رجفان باليدين أو خفقان في الصدر.'
+            : 'Strictly avoid high-caffeine beverages and energy drinks. Monitor serum theophylline levels.',
+          clinicalNote: isAr ? 'يشمل: ثيوفلين، أمينوفيلين، ثيودور، كويبرون.' : 'Applies to: Theophylline, Aminophylline.',
+          dietaryAdvice: isAr ? 'المشروبات البديلة: النعناع، الكاموميل، الماء، العصائر الطبيعية.' : 'Safe beverages: Herbal teas (chamomile, peppermint), water, fresh juices.'
+        });
+      }
+    }
+
+    if (classes.includes('quinolone') && (cleanDrugToken(token).includes('cipro') || cleanDrugToken(token).includes('سيبرو'))) {
+      const key = `caffeine-cipro-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'القهوة والمنبهات (الكافيين)',
+          foodCategoryEn: 'Coffee & Caffeinated Drinks',
+          foodIcon: '☕',
+          affectedDrug: name,
+          severity: 'warning',
+          severityLabel: isAr ? '🟠 تعارض متوسط: مضاعفة مفعول الكافيين وأرق ورجفان حاد' : '🟠 Moderate: Cipro Prolongs Caffeine Half-Life 3x',
+          mechanism: isAr
+            ? 'السيبروفلوكساسين مثبط قوي لإنزيم CYP1A2 المسؤول عن تكسير الكافيين، مما يقلل تصفية الكافيين بنسبة 70% ويطيل بقاءه في الجسم حتى 15 ساعة؛ كوب قهوة واحد قد يسبب لك رجفاناً وتوتراً وأرقاً شديداً.'
+            : 'Ciprofloxacin potently inhibits CYP1A2, reducing caffeine clearance by up to 70% and triggering agitation, palpitations, and sleep disturbances.',
+          recommendation: isAr
+            ? 'قلل استهلاك القهوة والشاي والمشروبات الغازية إلى أدنى حد أثناء كورس السيبروفلوكساسين.'
+            : 'Reduce or eliminate caffeine consumption while taking ciprofloxacin.',
+          clinicalNote: isAr ? 'التأثير خاص بالسيبروفلوكساسين بدرجة أكبر من باقي الكينولونات.' : 'Specifically pronounced with ciprofloxacin.',
+          dietaryAdvice: isAr ? 'شرب الماء بكثرة يساعد على سرعة تصفية الدواء وحماية الكلى.' : 'Drink copious amounts of plain water.'
+        });
+      }
+    }
+
+    // 5. Licorice / Glycyrrhizin (عرق السوس)
+    if (classes.includes('cardiac_glycoside')) {
+      const key = `licorice-digoxin-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'عرق السوس الطبيعي ومشروب السوس الرمضاني',
+          foodCategoryEn: 'Natural Black Licorice & Glycyrrhizin',
+          foodIcon: '🌿',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: هبوط البوتاسيوم وتسمم ديجيتالي قاتل' : '🔴 Critical: Hypokalemia & Lethal Digoxin Toxicity',
+          mechanism: isAr
+            ? 'مادة الجليسيريزين في عرق السوس تثبط إنزيم 11β-HSD2 في الكلى، مما يسبب طرحاً مفرطاً للبوتاسيوم في البول (Hypokalemia). هبوط بوتاسيوم الدم يحرّض فوراً سمية الديجوكسين القاتلة واضطراب نظم البطينين.'
+            : 'Glycyrrhizin inhibits renal 11beta-HSD2, inducing severe hypokalemia which dramatically potentiates digoxin cardiac toxicity and ventricular fibrillation.',
+          recommendation: isAr
+            ? 'يُمنع منعاً باتاً لمرضى الديجوكسين تناول عرق السوس الطبيعي أو شرب منقوع السوس بأي كمية.'
+            : 'Strict contraindication: Patients on digoxin must completely avoid real licorice and licorice beverages.',
+          clinicalNote: isAr ? 'يشمل: ديجوكسين ولانوكسين.' : 'Applies to: Digoxin, Lanoxin.',
+          dietaryAdvice: isAr ? 'تجنب الحلويات والمشروبات العشبية التي يدخل فيها مستخلص عرق السوس.' : 'Carefully inspect traditional herbal syrups for licorice extract.'
+        });
+      }
+    }
+
+    if (classes.includes('ace_inhibitor') || classes.includes('arb') || classes.includes('beta_blocker') || classes.includes('diuretic_loop') || classes.includes('diuretic_thiazide')) {
+      const key = `licorice-bp-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'عرق السوس الطبيعي (Licorice)',
+          foodCategoryEn: 'Natural Licorice',
+          foodIcon: '🌿',
+          affectedDrug: name,
+          severity: 'warning',
+          severityLabel: isAr ? '🟠 تعارض مهم: إبطال مفعول خافضات الضغط وارتفاع الصوديوم' : '🟠 Warning: Antagonizes Antihypertensives & Spikes Blood Pressure',
+          mechanism: isAr
+            ? 'عرق السوس يمتلك فعالية ألدوستيرونية كاذبة تحبس الصوديوم والماء في الجسم وتطرح البوتاسيوم، مما يعاكس مباشرة عمل أدوية الضغط ومدرات البول ويرفع قراءات الضغط بشكل مباغت.'
+            : 'Licorice triggers pseudoaldosteronism, retaining sodium and water while depleting potassium, directly neutralizing antihypertensive therapy.',
+          recommendation: isAr
+            ? 'الامتناع عن شرب عرق السوس لمرضى ضغط الدم المعالجين.'
+            : 'Avoid licorice products if being treated for hypertension.',
+          clinicalNote: isAr ? 'يشمل أدوية الضغط كافة ومدرات البول.' : 'Applies to all antihypertensives and diuretics.',
+          dietaryAdvice: isAr ? 'البدائل العشبية الآمنة لضغط الدم: الكركديه البارد، اليانسون، البابونج.' : 'Safe herbal alternatives: Hibiscus, anise, chamomile.'
+        });
+      }
+    }
+
+    // 6. High Potassium Foods & Salt Substitutes
+    if (classes.includes('potassium_sparing') || classes.includes('ace_inhibitor') || classes.includes('arb')) {
+      const key = `potassium-food-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الأطعمة الغنية بالبوتاسيوم وبدائل الملح (الموز، التمر، الأفوكادو، ملح الحمية Diet Salt)',
+          foodCategoryEn: 'High Potassium Foods & Potassium Salt Substitutes',
+          foodIcon: '🍌',
+          affectedDrug: name,
+          severity: classes.includes('potassium_sparing') ? 'critical' : 'warning',
+          severityLabel: classes.includes('potassium_sparing')
+            ? (isAr ? '🔴 تعارض حرج: فرط بوتاسيوم الدم وتوقف عضلة القلب' : '🔴 Critical: Hyperkalemia & Cardiac Arrest')
+            : (isAr ? '🟠 تعارض مهم: ارتفاع البوتاسيوم في الدم' : '🟠 Warning: Risk of Hyperkalemia'),
+          mechanism: isAr
+            ? 'هذه الأدوية تقلل من إفراز الألدوستيرون أو تغلق قنوات الصوديوم الكلوية، مما يقلل طرح البوتاسيوم. تناول أملاح الحمية (المكونة من كلوريد البوتاسيوم KCl) أو الإفراط في التمر والموز يرفع بوتاسيوم المصل لمستويات سامة تؤثر على كهرباء القلب.'
+            : 'Inhibition of aldosterone or epithelial sodium channels reduces renal potassium excretion. Potassium-based salt substitutes can cause fatal hyperkalemia.',
+          recommendation: isAr
+            ? 'تجنب تماماً استخدام بدائل الملح الخالية من الصوديوم (Diet Salt / No-Salt) دون استشارة الطبيب، واعتدل في تناول الموز والتمر والفواكه المجففة مع الفحص المخبري الدوري للشوارد.'
+            : 'Avoid potassium chloride salt substitutes; consume high-potassium fruits in moderation.',
+          clinicalNote: isAr ? 'يشمل: سبيرونولاكتون (ألداكتون)، راميبريل، كابتوبريل، لوسارتان، فالسارتان.' : 'Applies to: Spironolactone, ACEIs, ARBs.',
+          dietaryAdvice: isAr ? 'استخدم البهارات الطبيعية والأعشاب وعصير الليمون كبديل لنكهة الملح بدلاً من أملاح البوتاسيوم.' : 'Use natural herbs, spices, and lemon juice for seasoning.'
+        });
+      }
+    }
+
+    // 7. Tyramine-Rich Foods (Linezolid / MAOIs)
+    if (classes.includes('maoi') || cleanDrugToken(token).includes('linezolid') || cleanDrugToken(token).includes('لينيزوليد') || cleanDrugToken(token).includes('zyvox')) {
+      const key = `tyramine-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'الأغذية الغنية بالتيرامين (الأجبان المعتقة، اللحوم المصنعة والمقددة، المخللات، صلصة الصويا)',
+          foodCategoryEn: 'Tyramine-Rich Foods (Aged Cheese, Cured Meats, Soy Sauce)',
+          foodIcon: '🧀',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: أزمة فرط ضغط الدم القاتلة (Cheese Reaction)' : '🔴 Critical: Hypertensive Crisis (Cheese Effect)',
+          mechanism: isAr
+            ? 'اللينيزوليد يثبط إنزيم مونوأمين أوكسيديز (MAO) في الأمعاء. تناول الأطعمة الغنية بالتيرامين يسمح بدخول التيرامين للدم مسبباً إفرازاً هائلاً للنورأدرينالين وانقباضاً وعائياً حاداً وارتفاعاً انفجارياً في ضغط الدم مع خطر النزف الدماغي.'
+            : 'Linezolid reversibly inhibits MAO; ingestion of dietary tyramine causes massive norepinephrine release and life-threatening hypertensive emergency.',
+          recommendation: isAr
+            ? 'حمية صارمة خالية من الأجبان القديمة (شيدر، بارميزان، جبن أزرق)، اللحوم المدخنة، المخللات وصلصة الصويا أثناء العلاج باللينيزوليد ولمدة أسبوعين بعد انتهائه.'
+            : 'Strictly avoid aged cheeses, cured meats, and fermented foods during and for 2 weeks after therapy.',
+          clinicalNote: isAr ? 'يشمل: لينيزوليد (زيفوكس)، مثبطات MAO.' : 'Applies to: Linezolid (Zyvox), MAOIs.',
+          dietaryAdvice: isAr ? 'المسموح: الأجبان الطازجة (جبن القريش، الريكوتا، جبن المثلثات الحديث) واللحوم الطازجة المطهوة تواً.' : 'Allowed: Fresh cottage cheese, ricotta, freshly cooked meats.'
+        });
+      }
+    }
+
+    // 8. Alcohol (الكحول)
+    if (classes.includes('metronidazole') || cleanDrugToken(token).includes('flagyl') || cleanDrugToken(token).includes('فلاجيل')) {
+      const key = `alcohol-metro-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'المشروبات الكحولية والأدوية الحاوية على الكحول',
+          foodCategoryEn: 'Alcohol & Ethanol Products',
+          foodIcon: '🍷',
+          affectedDrug: name,
+          severity: 'critical',
+          severityLabel: isAr ? '🔴 تعارض حرج: تفاعل شبيه بالديسولفيرام (قيء مقذوف وهبوط دوراني)' : '🔴 Critical: Disulfiram-Like Reaction',
+          mechanism: isAr
+            ? 'الميترونيدازول يثبط إنزيم ألدهيد ديهيدروجينيز (ALDH)، مما يؤدي لتراكم مادة الأسيتالدهيد السامة في الدم بسرعة فائقة مسببة احمراراً وجهياً عنيفاً، صداعاً نابضاً، غثياناً وقيئاً شديداً، خفقاناً وهبوط ضغط.'
+            : 'Metronidazole inhibits aldehyde dehydrogenase, precipitating toxic acetaldehyde accumulation with violent vomiting, flushing, and hypotension.',
+          recommendation: isAr
+            ? 'الامتناع التام عن أي منتجات كحولية طوال فترة أخذ الفلاجيل ولمدة 48 إلى 72 ساعة بعد آخر جرعة.'
+            : 'Avoid all alcohol during treatment and for at least 72 hours post-completion.',
+          clinicalNote: isAr ? 'انتبه أيضاً لشرابات السعال وغسول الفم المحتوي على كحول إيثيلي.' : 'Check mouthwashes and cough syrups for hidden alcohol.',
+          dietaryAdvice: isAr ? 'شرب كميات وفيرة من الماء وعصائر الفاكهة الطبيعية.' : 'Drink plenty of water and fresh fruit juices.'
+        });
+      }
+    }
+
+    if (classes.includes('paracetamol')) {
+      const key = `alcohol-para-${name}`;
+      if (!processedKeys.has(key)) {
+        processedKeys.add(key);
+        foodInteractions.push({
+          id: key,
+          foodCategory: 'المشروبات الكحولية',
+          foodCategoryEn: 'Alcoholic Beverages',
+          foodIcon: '🍷',
+          affectedDrug: name,
+          severity: 'warning',
+          severityLabel: isAr ? '🟠 تعارض مهم: تحفيز تلف الكبد الحاد حتى بالجرعات الاعتيادية' : '🟠 Warning: Synergistic Hepatotoxicity Risk',
+          mechanism: isAr
+            ? 'تناول الكحول يحفز إنزيم CYP2E1 الكبدي، مما يحول نسبة أكبر من الباراسيتامول إلى المركب السام (NAPQI) مع استنفاد مخزون الجلوتاثيون الواقي للكبد، مما يرفع خطر النخر الكبدي.'
+            : 'Chronic alcohol use induces CYP2E1, shifting acetaminophen toward toxic NAPQI metabolite and depleting glutathione.',
+          recommendation: isAr
+            ? 'لا تتجاوز جرعة 2 غرام (4 أقراص عيار 500 ملغ) يومياً عند وجود تاريخ لتناول الكحول أو اعتلال كبدي.'
+            : 'Limit acetaminophen dose to under 2g/day in individuals who consume alcohol.',
+          clinicalNote: isAr ? 'يشمل: بانادول، أدول، باراسيتامول.' : 'Applies to: Paracetamol, Panadol, Tylenol.',
+          dietaryAdvice: isAr ? 'تناول الباراسيتامول مع الماء العادي بعد وجبة خفيفة.' : 'Take with water after a light meal.'
+        });
+      }
+    }
+  }
+
+  return foodInteractions;
+}
+
+export function getMealInstructions(tokens: string[], lang: 'ar' | 'en' = 'ar'): MealInstruction[] {
+  const isAr = lang === 'ar';
+  const instructions: MealInstruction[] = [];
+  const processed = new Set<string>();
+
+  for (const token of tokens) {
+    const match = identifyDrugClasses(token);
+    const classes = match.classes;
+    const name = match.name;
+    const t = cleanDrugToken(token);
+
+    if (processed.has(name)) continue;
+    processed.add(name);
+
+    if (classes.includes('ppi')) {
+      instructions.push({
+        drug: name,
+        timing: 'empty_stomach',
+        timingLabel: isAr ? 'على معدة فارغة قبل الأكل بـ 30-60 دقيقة' : 'Empty stomach, 30-60 min before breakfast',
+        instructions: isAr
+          ? 'تناول الحبة صباحاً فور الاستيقاظ وقبل وجبة الإفطار بنصف ساعة إلى ساعة مع كأس ماء، دون مضغ أو كسر الحبة.'
+          : 'Take 30-60 minutes before first meal with a full glass of water. Swallow whole.',
+        rationale: isAr
+          ? 'مضخات البروتون في المعدة تنشط بكثافة عند تناول أول وجبة؛ وجود الدواء في الدم قبيل الوجبة يحقق أعلى نسبة تثبيط لإفراز الحمض المعدي.'
+          : 'Proton pumps are most active post-prandially; pre-meal administration ensures peak drug exposure when pumps fire.'
+      });
+    } else if (classes.includes('nsaid')) {
+      instructions.push({
+        drug: name,
+        timing: 'after_food',
+        timingLabel: isAr ? 'بعد وجبة طعام كاملة مع كأس ماء وفير' : 'After a full meal with a large glass of water',
+        instructions: isAr
+          ? 'تناول الجرعة بعد وجبة طعام رئيسية أو مع كأس حليب، ولا تستلقِ لمدة 15 دقيقة بعد البلع.'
+          : 'Take immediately after food with plenty of water. Do not lie down for 15 minutes.',
+        rationale: isAr
+          ? 'مضادات الالتهاب غير الستيرويدية تثبط البروستاجلاندين الواقي لبطانة المعدة؛ تناولها بعد الطعام يحمي الغشاء المخاطي من التخريش والتقرح.'
+          : 'Reduces direct gastric irritation and ulceration caused by mucosal prostaglandin inhibition.'
+      });
+    } else if (classes.includes('metformin') || t.includes('metformin') || t.includes('ميتفورمين') || t.includes('glucophage') || t.includes('جلوكوفاج')) {
+      instructions.push({
+        drug: name,
+        timing: 'with_food',
+        timingLabel: isAr ? 'مع الوجبة أو بعدها مباشرة' : 'With meals or immediately after',
+        instructions: isAr
+          ? 'تناول الحبة مع أول لقمة من وجبة الطعام أو فور الانتهاء منها.'
+          : 'Take with or right after your meals.',
+        rationale: isAr
+          ? 'يقلل بشكل فعال من الأعراض الجانبية الهضمية الشائعة مثل المغص، الانتفاخ، الغثيان، والإسهال.'
+          : 'Minimizes common gastrointestinal side effects including nausea, cramps, and diarrhea.'
+      });
+    } else if (classes.includes('levothyroxine')) {
+      instructions.push({
+        drug: name,
+        timing: 'empty_stomach',
+        timingLabel: isAr ? 'على الريق صباحاً قبل الفطور بـ 60 دقيقة' : 'Empty stomach, 60 min before breakfast',
+        instructions: isAr
+          ? 'يؤخذ فور الاستيقاظ مع ماء نقي فقط، مع الامتناع عن أي طعام أو قهوة أو شاي لمدة ساعة كاملة.'
+          : 'Take first thing in the morning with plain water only; wait 60 min before eating or drinking coffee.',
+        rationale: isAr
+          ? 'أبسط بقايا الطعام أو المنبهات أو المعادن تقلل امتصاص هرمون الثيروكسين بنسبة كبيرة مسببة فشل الضبط الهرموني.'
+          : 'Food, coffee, and minerals severely impair thyroxine bioavailability.'
+      });
+    } else if (t.includes('isotretinoin') || t.includes('روأكوتان') || t.includes('roaccutane') || t.includes('curacne')) {
+      instructions.push({
+        drug: name,
+        timing: 'with_food',
+        timingLabel: isAr ? 'مع وجبة رئيسية دسمة تحتوي على دهون صحية' : 'With a high-fat main meal',
+        instructions: isAr
+          ? 'يجب تناول الكبسولة في منتصف وجبة الغداء أو العشاء التي تحتوي على زيت زيتون، بيض، أو مكسرات.'
+          : 'Take capsule midway through a meal containing dietary fats.',
+        rationale: isAr
+          ? 'الروأكوتان دواء شديد الذوبان في الدهون؛ تناوله مع وجبة دسمة يضاعف امتصاصه مرتين مقارنة بالمعدة الفارغة.'
+          : 'Lipophilic medication whose bioavailability doubles when consumed with dietary lipids.'
+      });
+    } else if (classes.includes('quinolone')) {
+      instructions.push({
+        drug: name,
+        timing: 'flexible',
+        timingLabel: isAr ? 'مع أو بدون طعام (مع تجنب الألبان)' : 'With or without food (strictly avoid dairy)',
+        instructions: isAr
+          ? 'يمكن تناوله مع وجبة خفيفة خالية من الحليب والأجبان، مع شرب كأس ماء كبير.'
+          : 'Can be taken with non-dairy meals and a full glass of water.',
+        rationale: isAr
+          ? 'لحماية الكلى من ترسب بلورات الدواء وتجنب معقدات الكالسيوم غير الذوابة.'
+          : 'Ensures proper hydration and avoids insoluble chelate formation.'
+      });
+    }
+  }
+
+  return instructions;
+}
+
+export function evaluateFoodFoodInteractions(tokens: string[], lang: 'ar' | 'en' = 'ar'): FoodFoodInteraction[] {
+  const isAr = lang === 'ar';
+  const interactions: FoodFoodInteraction[] = [];
+
+  const hasIron = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('حديد') || c.includes('iron') || c.includes('ferrous') || c.includes('كبده') || c.includes('لحوم حمراء') || c.includes('عدس');
+  });
+
+  const hasTeaOrCoffee = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('شاي') || c.includes('قهوه') || c.includes('كافيين') || c.includes('tea') || c.includes('coffee') || c.includes('caffeine') || c.includes('نسكافيه');
+  });
+
+  const hasVitC = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('فيتامين س') || c.includes('فيتامين c') || c.includes('ليمون') || c.includes('برتقال') || c.includes('حمضيات') || c.includes('طماطم') || c.includes('vitamin c') || c.includes('اسكوربيك');
+  });
+
+  const hasCalciumOrDairy = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('حليب') || c.includes('لبن') || c.includes('زبادي') || c.includes('جبن') || c.includes('أجبان') || c.includes('كالسيوم') || c.includes('milk') || c.includes('dairy') || c.includes('calcium') || c.includes('yogurt') || c.includes('cheese');
+  });
+
+  const hasSpinachOrOxalate = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('سبانخ') || c.includes('سلق') || c.includes('شمندر') || c.includes('اوكسالات') || c.includes('spinach') || c.includes('oxalate');
+  });
+
+  const hasVitD = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('فيتامين د') || c.includes('فيتامين d') || c.includes('vitamin d');
+  });
+
+  const hasHealthyFats = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('زيت زيتون') || c.includes('افوكادو') || c.includes('مكسرات') || c.includes('دهون صحيه') || c.includes('olive oil');
+  });
+
+  const hasFatSolubleVitamins = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('جزر') || c.includes('بيتا كاروتين') || c.includes('فيتامين ا') || c.includes('فيتامين a') || c.includes('فيتامين ه') || c.includes('فيتامين e') || c.includes('فيتامين ك') || c.includes('فيتامين k');
+  });
+
+  const hasHighPotassiumFood = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('موز') || c.includes('تمر') || c.includes('افوكادو') || c.includes('banana') || c.includes('dates') || c.includes('potassium');
+  });
+
+  const hasSaltSubstitute = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('بديل ملح') || c.includes('بدائل الملح') || c.includes('ملح دايت') || c.includes('ملح بوتاسيوم') || c.includes('diet salt') || c.includes('salt substitute');
+  });
+
+  const hasRawEgg = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('بياض بيض') || c.includes('بيض ني') || c.includes('raw egg') || c.includes('افيدين');
+  });
+
+  const hasBiotin = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('بيوتين') || c.includes('biotin') || c.includes('فيتامين b7');
+  });
+
+  const hasHighFiber = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('رده') || c.includes('نخاله') || c.includes('شيا') || c.includes('الياف مركزه') || c.includes('wheat bran') || c.includes('fiber');
+  });
+
+  const hasMinerals = tokens.some(t => {
+    const c = cleanDrugToken(t);
+    return c.includes('زنك') || c.includes('مغنيسيوم') || c.includes('حديد') || c.includes('كالسيوم') || c.includes('zinc') || c.includes('magnesium');
+  });
+
+  // 1. Iron + Tea / Coffee (Antagonism)
+  if (hasIron && hasTeaOrCoffee) {
+    interactions.push({
+      id: 'iron-tea',
+      foodA: isAr ? 'أطعمة ومكملات الحديد' : 'Iron-rich foods / supplements',
+      foodB: isAr ? 'الشاي والقهوة (التانينات والبوليفينول)' : 'Tea & Coffee (Tannins & Polyphenols)',
+      foodIconA: '🥩',
+      foodIconB: '☕',
+      type: 'antagonism',
+      typeLabel: isAr ? 'تثبيط امتصاص بنسبة 60-80%' : 'Severe Absorption Inhibition',
+      severity: 'warning',
+      mechanism: isAr
+        ? 'مركبات التانين (Tannins) والبوليفينول في الشاي والقهوة ترتبط بشوارد الحديد غير الهيم في الأمعاء وتشكل أملاحاً معقدة غير قابلة للامتصاص، مما يحرم الجسم من الحديد ويؤدي لفقر الدم.'
+        : 'Polyphenols and tannins in tea and coffee bind non-heme iron into insoluble chelates, reducing bioavailability by 60-80%.',
+      recommendation: isAr
+        ? 'اشرب الشاي أو القهوة بعد وجبة اللحوم أو حبوب الحديد بساعة إلى ساعتين على الأقل.'
+        : 'Separate tea/coffee consumption by at least 1-2 hours from iron-rich meals or supplements.',
+      clinicalNote: isAr ? 'ينطبق على الشاي الأسود والأخضر والقهوة والنسكافيه.' : 'Applies to black tea, green tea, and coffee.'
+    });
+  }
+
+  // 2. Iron + Vitamin C (Synergy)
+  if (hasIron && hasVitC) {
+    interactions.push({
+      id: 'iron-vitc',
+      foodA: isAr ? 'أطعمة/مكملات الحديد (اللحوم، العدس، السبانخ)' : 'Iron-rich foods (meat, lentils, spinach)',
+      foodB: isAr ? 'فيتامين C (الحمضيات، الليمون، الطماطم)' : 'Vitamin C (Citrus, lemon, tomato)',
+      foodIconA: '🥩',
+      foodIconB: '🍋',
+      type: 'synergy',
+      typeLabel: isAr ? 'تآزر غذائي ممتاز (مضاعفة الامتصاص 300%)' : 'Nutrient Synergy (Triple Absorption)',
+      severity: 'beneficial',
+      mechanism: isAr
+        ? 'حمض الأسكوربيك (فيتامين C) يختزل الحديد الثلاثي (Fe3+) إلى الحديد الثنائي (Fe2+) الذائب والأسهل امتصاصاً في الاثني عشر، مما يرفع امتصاص الحديد بأكثر من 300%!'
+        : 'Ascorbic acid reduces ferric iron (Fe3+) to highly soluble ferrous iron (Fe2+), boosting gastrointestinal absorption more than 3-fold.',
+      recommendation: isAr
+        ? 'تركيبة مثالية: اعصر الليمون دائماً على العدس والسلطة والسبانخ، أو اشرب عصير برتقال طازج مع وجبة الحديد.'
+        : 'Ideal pairing: Squeeze lemon juice onto lentils/greens, or take iron with fresh orange juice.',
+      clinicalNote: isAr ? 'من أفضل الطرق الطبيعية المعتمدة لعلاج أنيميا نقص الحديد.' : 'One of the most effective dietary synergies for anemia.'
+    });
+  }
+
+  // 3. Iron + Calcium / Dairy (Antagonism)
+  if (hasIron && hasCalciumOrDairy) {
+    interactions.push({
+      id: 'iron-calcium',
+      foodA: isAr ? 'أطعمة ومصادر الحديد' : 'Iron-rich foods',
+      foodB: isAr ? 'الحليب ومشتقات الألبان (الكالسيوم)' : 'Milk & Dairy Products (Calcium)',
+      foodIconA: '🥩',
+      foodIconB: '🥛',
+      type: 'antagonism',
+      typeLabel: isAr ? 'تنافس شديد على الامتصاص' : 'Absorption Competition',
+      severity: 'warning',
+      mechanism: isAr
+        ? 'شوارد الكالسيوم تتنافس مع شوارد الحديد على نفس الناقل الخلوي في الأمعاء (DMT-1). وجود كمية كبيرة من الكالسيوم (كوب حليب أو قطعة جبن) يزيح الحديد ويقلل امتصاصه بنسبة تفوق 50%.'
+        : 'Calcium directly competes with iron for divalent metal transporter 1 (DMT-1), significantly depressing iron bioavailability.',
+      recommendation: isAr
+        ? 'تجنب شرب الحليب أو تناول اللبن والزبادي مع وجبة اللحوم أو العدس، وافصل بينهما بساعتين على الأقل.'
+        : 'Avoid dairy during high-iron meals; separate by 2 hours for optimal hematologic benefit.',
+      clinicalNote: isAr ? 'خطأ شائع: شرب اللبن أو الحليب مع اللحوم الحمراء أو الكبدة.' : 'Common dietary mistake: consuming dairy alongside red meats.'
+    });
+  }
+
+  // 4. Spinach / Oxalates + Calcium / Dairy (Stone Risk & Blocked Calcium)
+  if (hasSpinachOrOxalate && hasCalciumOrDairy) {
+    interactions.push({
+      id: 'spinach-calcium',
+      foodA: isAr ? 'السبانخ والسلق والشمندر (حمض الأوكساليك)' : 'Spinach & Swiss Chard (Oxalic Acid)',
+      foodB: isAr ? 'الحليب والأجبان (الكالسيوم)' : 'Dairy Products (Calcium)',
+      foodIconA: '🥬',
+      foodIconB: '🧀',
+      type: 'risk',
+      typeLabel: isAr ? 'تكون بلورات أوكسالات الكالسيوم وحصى الكلى' : 'Calcium Oxalate Precipitation',
+      severity: 'warning',
+      mechanism: isAr
+        ? 'حمض الأوكساليك الموجود بكثافة في السبانخ يرتبط بشوارد الكالسيوم ويشكل بلورات أوكسالات الكالسيوم غير القابلة للذوبان؛ هذا يقلل امتصاص الكالسيوم ويزيد من خطر ترسب الحصيات الكلوية لدى المعرضين.'
+        : 'Oxalic acid binds dietary calcium into insoluble calcium oxalate crystals, lowering calcium absorption and increasing nephrolithiasis risk in stone-formers.',
+      recommendation: isAr
+        ? 'سلق السبانخ أو طهيها بالبخار والتخلص من ماء السلق يتخلص من 80% من الأوكسالات. احرص على شرب 2-3 لتر ماء يومياً.'
+        : 'Blanching or boiling spinach significantly reduces soluble oxalate content. Ensure high daily water hydration.',
+      clinicalNote: isAr ? 'الأشخاص الذين لديهم تاريخ لحصوات الكلى يجب أن ينتبهوا لهذه التركيبة.' : 'Important for patients with a personal history of kidney stones.'
+    });
+  }
+
+  // 5. Calcium + Vitamin D (Synergy)
+  if (hasCalciumOrDairy && hasVitD) {
+    interactions.push({
+      id: 'calcium-vitd',
+      foodA: isAr ? 'الحليب ومنتجات الكالسيوم' : 'Calcium-rich dairy products',
+      foodB: isAr ? 'فيتامين D (البيض، الأسماك، الشمس)' : 'Vitamin D (Eggs, fatty fish, sunlight)',
+      foodIconA: '🥛',
+      foodIconB: '☀️',
+      type: 'synergy',
+      typeLabel: isAr ? 'تآزر ممتاز لبناء كثافة العظام' : 'Vital Bone Synergy',
+      severity: 'beneficial',
+      mechanism: isAr
+        ? 'فيتامين د هو الهرمون المنشط لقنوات امتصاص الكالسيوم المعوية وتصنيع بروتين Calbindin، وبدونه لا يستطيع الجسم امتصاص أكثر من 10-15% من كالسيوم الطعام.'
+        : 'Vitamin D stimulates active transcellular calcium transport and calbindin protein synthesis in enterocytes.',
+      recommendation: isAr
+        ? 'تناول الحليب المدعم بفيتامين د أو تناول الأجبان مع البيض والأسماك الدهنية للحفاظ على كثافة العظام والوقاية من الهشاشة.'
+        : 'Combine calcium sources with vitamin D for peak skeletal density and osteoporosis prevention.',
+      clinicalNote: isAr ? 'ثنائي سريري ذهبي لصحة العظام والأسنان.' : 'The gold-standard combination for skeletal integrity.'
+    });
+  }
+
+  // 6. Healthy Fats + Fat Soluble Vitamins (Synergy)
+  if (hasHealthyFats && hasFatSolubleVitamins) {
+    interactions.push({
+      id: 'fats-vitamins',
+      foodA: isAr ? 'الدهون الصحية (زيت الزيتون، الأفوكادو)' : 'Healthy Fats (Olive oil, avocado)',
+      foodB: isAr ? 'الخضروات الملونة (فيتامينات A, D, E, K والبيتاكاروتين)' : 'Fat-Soluble Vitamins (A, D, E, K & Carotenoids)',
+      foodIconA: '🫒',
+      foodIconB: '🥕',
+      type: 'synergy',
+      typeLabel: isAr ? 'تعزيز امتصاص مضادات الأكسدة والفيتامينات' : 'Antioxidant & Carotenoid Boost',
+      severity: 'beneficial',
+      mechanism: isAr
+        ? 'الفيتامينات (A, D, E, K) والبيتاكاروتين والليكوبين في الجزر والطماطم لا تذوب في الماء؛ تحتاج إلى دهون لتكوين المذيلات الدهنية (Micelles) الممتصة في الأمعاء. تناول سلطة خالية من الزيت يحرمك من 90% من قيمتها الغذائية!'
+        : 'Lipophilic carotenoids and vitamins A, D, E, and K require lipid micelles for intestinal absorption.',
+      recommendation: isAr
+        ? 'أضف دائماً ملعقة من زيت الزيتون البكر أو قطع الأفوكادو إلى أطباق السلطة والجزر والطماطم.'
+        : 'Always dress salads and cooked vegetables with virgin olive oil or avocado slices.',
+      clinicalNote: isAr ? 'السلطات خالية الدسم غير صحية لامتصاص الفيتامينات الحيوية.' : 'Fat-free dressings fail to unlock fat-soluble micronutrients.'
+    });
+  }
+
+  // 7. Potassium Foods + Salt Substitutes (Critical Risk)
+  if (hasHighPotassiumFood && hasSaltSubstitute) {
+    interactions.push({
+      id: 'potassium-salt',
+      foodA: isAr ? 'الأغذية عالية البوتاسيوم (الموز، التمر)' : 'High potassium foods (Bananas, dates)',
+      foodB: isAr ? 'بدائل الملح الخالية من الصوديوم (كلوريد البوتاسيوم KCl)' : 'Potassium Salt Substitutes (No-Salt / Diet Salt)',
+      foodIconA: '🍌',
+      foodIconB: '🧂',
+      type: 'risk',
+      typeLabel: isAr ? 'خطر فرط البوتاسيوم وتوقف عضلة القلب' : 'Severe Hyperkalemia Risk',
+      severity: 'critical',
+      mechanism: isAr
+        ? 'بدائل الملح المخصصة لمرضى الضغط تتكون من كلوريد البوتاسيوم النقي (KCl)؛ الجمع بينها وبين وجبات غنية بالبوتاسيوم (موز، تمر، أفوكادو) قد يحدث قفزة حادة ومفاجئة في بوتاسيوم الدم مهددة لنظم القلب.'
+        : 'Dietary potassium load combined with KCl-based salt substitutes can trigger dangerous hyperkalemia.',
+      recommendation: isAr
+        ? 'تجنب استخدام بدائل الملح البوتاسية عند تناول كميات وافرة من الفواكه الغنية بالبوتاسيوم.'
+        : 'Exercise extreme caution when using potassium-based salts alongside high-potassium foods.',
+      clinicalNote: isAr ? 'تحذير مضاعف لمرضى الكلى ومستخدمي أدوية الضغط.' : 'Double caution for renal patients.'
+    });
+  }
+
+  // 8. Raw Egg White + Biotin (Antagonism)
+  if (hasRawEgg && hasBiotin) {
+    interactions.push({
+      id: 'rawegg-biotin',
+      foodA: isAr ? 'بياض البيض النيء' : 'Raw egg whites',
+      foodB: isAr ? 'البيوتين (فيتامين B7 - صفار البيض، الكبدة، المكسرات)' : 'Biotin (Vitamin B7)',
+      foodIconA: '🥚',
+      foodIconB: '🥜',
+      type: 'antagonism',
+      typeLabel: isAr ? 'نقص البيوتين وتساقط الشعر' : 'Biotin Deficiency & Hair Loss',
+      severity: 'warning',
+      mechanism: isAr
+        ? 'بياض البيض النيء يحتوي على بروتين الأفيدين (Avidin) الذي يرتبط بجزيء البيوتين برباط كيميائي فائق القوة لا يمكن للأمعاء تفكيكه، مسبباً نقص البيوتين وتساقط الشعر والتهاب الجلد.'
+        : 'Avidin in raw egg whites binds biotin with near-covalent affinity, preventing absorption.',
+      recommendation: isAr
+        ? 'طهي البيض بالحرارة (سلق أو قلي) يفكك بروتين الأفيدين تماماً ويجعله آمناً ومغذياً.'
+        : 'Cook egg whites thoroughly; heat denatures avidin completely.',
+      clinicalNote: isAr ? 'لا تشرب البيض النيء مطلقاً في مشروبات كمال الأجسام.' : 'Never ingest raw egg whites in bodybuilding smoothies.'
+    });
+  }
+
+  // 9. High Fiber / Bran + Minerals (Antagonism)
+  if (hasHighFiber && hasMinerals) {
+    interactions.push({
+      id: 'fiber-minerals',
+      foodA: isAr ? 'النخالة والألياف المركزة (ردة القمح، بذور الشيا)' : 'Concentrated wheat bran & dietary fiber',
+      foodB: isAr ? 'المعادن الأساسية (الحديد، الزنك، الكالسيوم)' : 'Essential minerals (Iron, Zinc, Calcium)',
+      foodIconA: '🌾',
+      foodIconB: '💊',
+      type: 'antagonism',
+      typeLabel: isAr ? 'ارتباط بحمض الفايتيك ونقص امتصاص المعادن' : 'Phytate Chelation of Minerals',
+      severity: 'warning',
+      mechanism: isAr
+        ? 'حبوب النخالة غير المعالجة غنية بحمض الفايتيك (Phytic Acid) الذي يرتبط بالزنك والحديد والكالسيوم ويشكل معقدات غير ممتصة تخرج مع الفضلات.'
+        : 'Phytic acid in raw wheat bran chelates divalent minerals, depressing bioavailability.',
+      recommendation: isAr
+        ? 'افصل بين تناول مكملات المعادن أو وجبات اللحوم ونخالة القمح بساعتين، وتناول الخبز المخمر حيث تحطم الخميرة حمض الفايتيك.'
+        : 'Separate mineral supplements from raw bran by 2 hours. Yeast fermentation breaks down phytates.',
+      clinicalNote: isAr ? 'التخمير الطبيعي للخبز يكسر الفايتات ويحرر المعادن.' : 'Sourdough fermentation liberates bound minerals.'
+    });
+  }
+
+  return interactions.map(item => ({
+    ...item,
+    foodAIcon: item.foodIconA,
+    foodBIcon: item.foodIconB,
+    effectType: item.type,
+    severityLabel: item.typeLabel,
+    culinaryTip: item.clinicalNote,
+  }));
 }

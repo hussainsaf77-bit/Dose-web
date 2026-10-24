@@ -1,4 +1,9 @@
-import { analyzeAllMedications } from '../clinicalInteractionEngine.js';
+import { 
+  analyzeAllMedications, 
+  evaluateFoodInteractions, 
+  evaluateFoodFoodInteractions, 
+  getMealInstructions 
+} from '../clinicalInteractionEngine.js';
 
 export default async function handler(req, res) {
   // CORS Headers
@@ -189,6 +194,9 @@ Output strictly valid JSON with this structure:
     clinicalDetails,
     detectedInteractions,
     cumulativeRisks,
+    foodInteractions: evaluateFoodInteractions(drugList, lang),
+    foodFoodInteractions: evaluateFoodFoodInteractions(drugList, lang),
+    mealInstructions: getMealInstructions(drugList, lang),
     disclaimerAr: '⚠️ إخلاء مسؤولية: هذا الفحص استرشادي صيدلاني للأغراض التثقيفية والسريرية، ولا يغني عن تقييم الطبيب المعالج.',
     disclaimerEn: '⚠️ Disclaimer: Clinical decision support tool for educational purposes only; does not replace medical consultation.'
   });
