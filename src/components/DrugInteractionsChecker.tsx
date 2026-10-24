@@ -1004,9 +1004,11 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
                 <div className="text-xs text-slate-300 leading-relaxed font-medium mt-2">
                   {analysisResult.severity === 'critical'
-                    ? '⚠️ تحذير حرج: هذا التداخل قد يسبب مضاعفات خطيرة ومهددة للحياة. يجب إبلاغ الطبيب المعالج فوراً.'
+                    ? '⚠️ تحذير حرج: هذا التداخل قد يسبب مضاعفات خطيرة ومهددة للحياة. يجب إبلاغ الطبيب المعالج فوراً والامتناع عن الجمع.'
                     : analysisResult.severity === 'warning'
-                    ? '⚠️ تنبيه سريري: يلزم تعديل الجرعات أو المباعدة الزمنية أو مراقبة استجابة المريض.'
+                    ? '⚠️ تنبيه سريري أو غذائي: يلزم المباعدة الزمنية بالساعات أو تعديل الجرعات وطريقة التحضير.'
+                    : (analysisResult.foodFoodInteractions && analysisResult.foodFoodInteractions.some(f => f.type === 'synergy' || (f as any).effectType === 'synergy'))
+                    ? '✨ تركيبة تآزرية ممتازة: تعزز الامتصاص وتضاعف الفائدة الحيوية الصحية والعلاجية للمريض.'
                     : '✅ مطمئن: لا يوجد تعارض رئيسي مسجل بين هذه المواد في الجرعات العلاجية الاعتيادية.'}
                 </div>
               </div>

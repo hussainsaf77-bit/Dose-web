@@ -1,782 +1,600 @@
-// Multi-Drug Clinical Pharmacology Analysis Engine for Vercel Serverless Functions
-// Supports any pair or multi-drug combination in Arabic or English
-
-export function cleanDrugToken(t) {
-  return (t || '')
-    .toLowerCase()
-    .replace(/[ًٌٍَُِّْـ]/g, '')
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/ى/g, 'ي')
-    .replace(/ئ|ؤ/g, 'ء')
-    .trim();
+function cleanDrugToken(t) {
+  return (t || "").toLowerCase().replace(/[ًٌٍَُِّْـ]/g, "").replace(/[أإآ]/g, "\u0627").replace(/ة/g, "\u0647").replace(/ى/g, "\u064A").replace(/ئ|ؤ/g, "\u0621").trim();
 }
-
-export function identifyDrugClasses(token) {
-  const raw = (token || '').toLowerCase().trim();
+function identifyDrugClasses(token) {
+  const raw = (token || "").toLowerCase().trim();
   const t = cleanDrugToken(token);
   const classes = [];
-  let name = (token || '').trim();
-
-  // 1. Anticoagulants
-  if (
-    t.includes('warfarin') || t.includes('وارفار') || t.includes('وارفر') || t.includes('coumadin') || t.includes('كومادين') ||
-    t.includes('marivan') || t.includes('ماريفان') || t.includes('sintrom') || t.includes('سينتروم')
-  ) {
-    classes.push('anticoagulant_vka', 'anticoagulant', 'bleeding_risk');
-    name = 'وارفارين (Warfarin)';
-  } else if (
-    t.includes('apixaban') || t.includes('ابيكسابان') || t.includes('eliquis') || t.includes('اليكويس') ||
-    t.includes('rivaroxaban') || t.includes('ريفاروكسابان') || t.includes('xarelto') || t.includes('زاريلتو') ||
-    t.includes('dabigatran') || t.includes('دابيجاتران') || t.includes('pradaxa') || t.includes('براداكسا') ||
-    t.includes('edoxaban') || t.includes('lixiana')
-  ) {
-    classes.push('anticoagulant_doac', 'anticoagulant', 'bleeding_risk');
-  } else if (
-    t.includes('clexane') || t.includes('كليكسان') || t.includes('enoxaparin') || t.includes('اينوكسابارين') ||
-    t.includes('heparin') || t.includes('هيبارين') || t.includes('fondaparinux') || t.includes('اريكسترا')
-  ) {
-    classes.push('anticoagulant_heparin', 'anticoagulant', 'bleeding_risk');
+  let name = token.trim();
+  if (t.includes("warfarin") || t.includes("\u0648\u0627\u0631\u0641\u0627\u0631") || t.includes("\u0648\u0627\u0631\u0641\u0631") || t.includes("coumadin") || t.includes("\u0643\u0648\u0645\u0627\u062F\u064A\u0646") || t.includes("marivan") || t.includes("\u0645\u0627\u0631\u064A\u0641\u0627\u0646") || t.includes("sintrom") || t.includes("\u0633\u064A\u0646\u062A\u0631\u0648\u0645")) {
+    classes.push("anticoagulant_vka", "anticoagulant", "bleeding_risk");
+    name = "\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 (Warfarin)";
+  } else if (t.includes("apixaban") || t.includes("\u0627\u0628\u064A\u0643\u0633\u0627\u0628\u0627\u0646") || t.includes("eliquis") || t.includes("\u0627\u0644\u064A\u0643\u0648\u064A\u0633") || t.includes("rivaroxaban") || t.includes("\u0631\u064A\u0641\u0627\u0631\u0648\u0643\u0633\u0627\u0628\u0627\u0646") || t.includes("xarelto") || t.includes("\u0632\u0627\u0631\u064A\u0644\u062A\u0648") || t.includes("dabigatran") || t.includes("\u062F\u0627\u0628\u064A\u062C\u0627\u062A\u0631\u0627\u0646") || t.includes("pradaxa") || t.includes("\u0628\u0631\u0627\u062F\u0627\u0643\u0633\u0627") || t.includes("edoxaban") || t.includes("lixiana")) {
+    classes.push("anticoagulant_doac", "anticoagulant", "bleeding_risk");
+  } else if (t.includes("clexane") || t.includes("\u0643\u0644\u064A\u0643\u0633\u0627\u0646") || t.includes("enoxaparin") || t.includes("\u0627\u064A\u0646\u0648\u0643\u0633\u0627\u0628\u0627\u0631\u064A\u0646") || t.includes("heparin") || t.includes("\u0647\u064A\u0628\u0627\u0631\u064A\u0646") || t.includes("fondaparinux") || t.includes("\u0627\u0631\u064A\u0643\u0633\u062A\u0631\u0627")) {
+    classes.push("anticoagulant_heparin", "anticoagulant", "bleeding_risk");
   }
-
-  // 2. Antiplatelets
-  if (
-    t.includes('aspirin') || t.includes('أسبرين') || t.includes('اسبرين') || t.includes('aspocid') ||
-    t.includes('أسبوسيد') || t.includes('jusprin') || t.includes('جوسبرين') || t.includes('ezacard') ||
-    t.includes('acetylsalicylic')
-  ) {
-    classes.push('antiplatelet_aspirin', 'antiplatelet', 'nsaid_salicylate', 'bleeding_risk', 'gastric_irritant');
-    name = 'أسبرين (Aspirin)';
-  } else if (
-    t.includes('clopidogrel') || t.includes('كلوبيدوجريل') || t.includes('كلوبيدوغريل') || t.includes('plavix') ||
-    t.includes('بلافيكس') || t.includes('ticagrelor') || t.includes('تيكاجريلور') || t.includes('brilinta') ||
-    t.includes('بريلينتا') || t.includes('prasugrel') || t.includes('إيفينت')
-  ) {
-    classes.push('antiplatelet_p2y12', 'antiplatelet', 'bleeding_risk');
+  if (t.includes("aspirin") || t.includes("\u0627\u0633\u0628\u0631\u064A\u0646") || t.includes("aspocid") || t.includes("\u0627\u0633\u0628\u0648\u0633\u064A\u062F") || t.includes("jusprin") || t.includes("\u062C\u0648\u0633\u0628\u0631\u064A\u0646") || t.includes("ezacard") || t.includes("acetylsalicylic")) {
+    classes.push("antiplatelet_aspirin", "antiplatelet", "nsaid_salicylate", "bleeding_risk", "gastric_irritant");
+    name = "\u0623\u0633\u0628\u0631\u064A\u0646 (Aspirin)";
+  } else if (t.includes("clopidogrel") || t.includes("\u0643\u0644\u0648\u0628\u064A\u062F\u0648\u062C\u0631\u064A\u0644") || t.includes("\u0643\u0644\u0648\u0628\u064A\u062F\u0648\u063A\u0631\u064A\u0644") || t.includes("plavix") || t.includes("\u0628\u0644\u0627\u0641\u064A\u0643\u0633") || t.includes("ticagrelor") || t.includes("\u062A\u064A\u0643\u0627\u062C\u0631\u064A\u0644\u0648\u0631") || t.includes("brilinta") || t.includes("\u0628\u0631\u064A\u0644\u064A\u0646\u062A\u0627") || t.includes("prasugrel") || t.includes("\u0627\u064A\u0641\u064A\u0646\u062A")) {
+    classes.push("antiplatelet_p2y12", "antiplatelet", "bleeding_risk");
+    name = "\u0643\u0644\u0648\u0628\u064A\u062F\u0648\u062C\u0631\u064A\u0644 (Plavix)";
   }
-
-  // 3. NSAIDs
-  if (
-    t.includes('ibuprofen') || t.includes('بروفين') || t.includes('إيبوبروفين') || t.includes('ايبوبروفين') ||
-    t.includes('brufen') || t.includes('advil') || t.includes('أدفيل') || t.includes('motrin')
-  ) {
-    classes.push('nsaid', 'bleeding_risk', 'nephrotoxic', 'gastric_irritant');
-    name = 'إيبوبروفين (Ibuprofen)';
-  } else if (
-    t.includes('diclofenac') || t.includes('ديكلوفيناك') || t.includes('voltaren') || t.includes('فولتارين') ||
-    t.includes('cataflam') || t.includes('كاتافلام') || t.includes('declophen') || t.includes('رومافين') ||
-    t.includes('olfen')
-  ) {
-    classes.push('nsaid', 'bleeding_risk', 'nephrotoxic', 'gastric_irritant', 'cv_risk');
-    name = 'ديكلوفيناك (Voltaren)';
-  } else if (
-    t.includes('naproxen') || t.includes('نابروكسين') || t.includes('aleve') || t.includes('proxen') ||
-    t.includes('meloxicam') || t.includes('ميلوكسيكام') || t.includes('mobic') || t.includes('موبيك') ||
-    t.includes('ketoprofen') || t.includes('كيتوبروفين') || t.includes('ketofan') || t.includes('كيتوفان') ||
-    t.includes('indomethacin') || t.includes('إندوميثاسين') || t.includes('celecoxib') || t.includes('سيليكوكسيب') ||
-    t.includes('celebrex') || t.includes('سيليبريكس') || t.includes('etoricoxib') || t.includes('أركوكسيا')
-  ) {
-    classes.push('nsaid', 'bleeding_risk', 'nephrotoxic', 'gastric_irritant');
+  if (t.includes("ibuprofen") || t.includes("\u0628\u0631\u0648\u0641\u064A\u0646") || t.includes("\u0625\u064A\u0628\u0648\u0628\u0631\u0648\u0641\u064A\u0646") || t.includes("\u0627\u064A\u0628\u0648\u0628\u0631\u0648\u0641\u064A\u0646") || t.includes("brufen") || t.includes("advil") || t.includes("\u0623\u062F\u0641\u064A\u0644") || t.includes("motrin")) {
+    classes.push("nsaid", "bleeding_risk", "nephrotoxic", "gastric_irritant");
+    name = "\u0625\u064A\u0628\u0648\u0628\u0631\u0648\u0641\u064A\u0646 (Ibuprofen)";
+  } else if (t.includes("diclofenac") || t.includes("\u062F\u064A\u0643\u0644\u0648\u0641\u064A\u0646\u0627\u0643") || t.includes("voltaren") || t.includes("\u0641\u0648\u0644\u062A\u0627\u0631\u064A\u0646") || t.includes("cataflam") || t.includes("\u0643\u0627\u062A\u0627\u0641\u0644\u0627\u0645") || t.includes("declophen") || t.includes("\u0631\u0648\u0645\u0627\u0641\u064A\u0646") || t.includes("olfen")) {
+    classes.push("nsaid", "bleeding_risk", "nephrotoxic", "gastric_irritant", "cv_risk");
+    name = "\u062F\u064A\u0643\u0644\u0648\u0641\u064A\u0646\u0627\u0643 (Voltaren)";
+  } else if (t.includes("naproxen") || t.includes("\u0646\u0627\u0628\u0631\u0648\u0643\u0633\u064A\u0646") || t.includes("aleve") || t.includes("proxen") || t.includes("meloxicam") || t.includes("\u0645\u064A\u0644\u0648\u0643\u0633\u064A\u0643\u0627\u0645") || t.includes("mobic") || t.includes("\u0645\u0648\u0628\u064A\u0643") || t.includes("ketoprofen") || t.includes("\u0643\u064A\u062A\u0648\u0628\u0631\u0648\u0641\u064A\u0646") || t.includes("ketofan") || t.includes("\u0643\u064A\u062A\u0648\u0641\u0627\u0646") || t.includes("indomethacin") || t.includes("\u0625\u0646\u062F\u0648\u0645\u064A\u062B\u0627\u0633\u064A\u0646") || t.includes("celecoxib") || t.includes("\u0633\u064A\u0644\u064A\u0643\u0648\u0643\u0633\u064A\u0628") || t.includes("celebrex") || t.includes("\u0633\u064A\u0644\u064A\u0628\u0631\u064A\u0643\u0633") || t.includes("etoricoxib") || t.includes("\u0623\u0631\u0643\u0648\u0643\u0633\u064A\u0627")) {
+    classes.push("nsaid", "bleeding_risk", "nephrotoxic", "gastric_irritant");
   }
-
-  // 4. Paracetamol
-  if (
-    t.includes('paracetamol') || t.includes('باراسيتامول') || t.includes('acetaminophen') || t.includes('أسيتامينوفين') ||
-    t.includes('panadol') || t.includes('بانادول') || t.includes('adol') || t.includes('أدول') ||
-    t.includes('feverdol') || t.includes('tylenol') || t.includes('تايلينول') || t.includes('cefal')
-  ) {
-    classes.push('paracetamol', 'analgesic_safe');
-    name = 'باراسيتامول (Panadol / Paracetamol)';
+  if (t.includes("paracetamol") || t.includes("\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644") || t.includes("acetaminophen") || t.includes("\u0623\u0633\u064A\u062A\u0627\u0645\u064A\u0646\u0648\u0641\u064A\u0646") || t.includes("panadol") || t.includes("\u0628\u0627\u0646\u0627\u062F\u0648\u0644") || t.includes("adol") || t.includes("\u0623\u062F\u0648\u0644") || t.includes("feverdol") || t.includes("tylenol") || t.includes("\u062A\u0627\u064A\u0644\u064A\u0646\u0648\u0644") || t.includes("cefal")) {
+    classes.push("paracetamol", "analgesic_safe");
+    name = "\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 (Panadol / Paracetamol)";
   }
-
-  // 5. PDE-5 Inhibitors
-  if (
-    t.includes('sildenafil') || t.includes('سيلدينافيل') || t.includes('سيلدنافيل') || t.includes('سيلين') ||
-    t.includes('viagra') || t.includes('فياغرا') || t.includes('فياجرا') || t.includes('revatio') ||
-    t.includes('tadalafil') || t.includes('تادالافيل') || t.includes('cialis') || t.includes('سياليس') ||
-    t.includes('snafi') || t.includes('سنافي') || t.includes('vardenafil') || t.includes('ليفيترا') ||
-    t.includes('levitra') || t.includes('avanafil') || t.includes('أفانافيل')
-  ) {
-    classes.push('pde5_inhibitor', 'vasodilator');
-    name = 'سيلدينافيل (Sildenafil / Viagra)';
+  if (t.includes("sildenafil") || t.includes("\u0633\u064A\u0644\u062F\u064A\u0646\u0627\u0641\u064A\u0644") || t.includes("\u0633\u064A\u0644\u062F\u0646\u0627\u0641\u064A\u0644") || t.includes("\u0633\u064A\u0644\u064A\u0646") || t.includes("viagra") || t.includes("\u0641\u064A\u0627\u063A\u0631\u0627") || t.includes("\u0641\u064A\u0627\u062C\u0631\u0627") || t.includes("revatio") || t.includes("tadalafil") || t.includes("\u062A\u0627\u062F\u0627\u0644\u0627\u0641\u064A\u0644") || t.includes("cialis") || t.includes("\u0633\u064A\u0627\u0644\u064A\u0633") || t.includes("snafi") || t.includes("\u0633\u0646\u0627\u0641\u064A") || t.includes("vardenafil") || t.includes("\u0644\u064A\u0641\u064A\u062A\u0631\u0627") || t.includes("levitra") || t.includes("avanafil") || t.includes("\u0623\u0641\u0627\u0646\u0627\u0641\u064A\u0644")) {
+    classes.push("pde5_inhibitor", "vasodilator");
+    name = "\u0633\u064A\u0644\u062F\u064A\u0646\u0627\u0641\u064A\u0644 (Sildenafil / Viagra)";
   }
-
-  // 6. Nitrates
-  if (
-    t.includes('nitroglycerin') || t.includes('نيتروجلسرين') || t.includes('نتروجلسرين') ||
-    t.includes('nitro') || t.includes('نيترو') || t.includes('نترو') || t.includes('nitronal') ||
-    t.includes('isosorbide') || t.includes('إيزوسوربيد') || t.includes('ايزوسوربيد') ||
-    t.includes('isordil') || t.includes('إيزورديل') || t.includes('monomak') || t.includes('مونوماك') ||
-    t.includes('imdur') || t.includes('إمدور') || t.includes('نيترات') || t.includes('نترات') ||
-    t.includes('nitrate') || t.includes('angised') || t.includes('أنجيسيد')
-  ) {
-    classes.push('nitrate', 'vasodilator');
-    name = 'نيتروجلسرين (Nitroglycerin / Nitrates)';
+  if (t.includes("nitroglycerin") || t.includes("\u0646\u064A\u062A\u0631\u0648\u062C\u0644\u0633\u0631\u064A\u0646") || t.includes("\u0646\u062A\u0631\u0648\u062C\u0644\u0633\u0631\u064A\u0646") || t.includes("nitro") || t.includes("\u0646\u064A\u062A\u0631\u0648") || t.includes("\u0646\u062A\u0631\u0648") || t.includes("nitronal") || t.includes("isosorbide") || t.includes("\u0625\u064A\u0632\u0648\u0633\u0648\u0631\u0628\u064A\u062F") || t.includes("\u0627\u064A\u0632\u0648\u0633\u0648\u0631\u0628\u064A\u062F") || t.includes("isordil") || t.includes("\u0625\u064A\u0632\u0648\u0631\u062F\u064A\u0644") || t.includes("monomak") || t.includes("\u0645\u0648\u0646\u0648\u0645\u0627\u0643") || t.includes("imdur") || t.includes("\u0625\u0645\u062F\u0648\u0631") || t.includes("\u0646\u064A\u062A\u0631\u0627\u062A") || t.includes("\u0646\u062A\u0631\u0627\u062A") || t.includes("nitrate") || t.includes("angised") || t.includes("\u0623\u0646\u062C\u064A\u0633\u064A\u062F")) {
+    classes.push("nitrate", "vasodilator");
+    name = "\u0646\u064A\u062A\u0631\u0648\u062C\u0644\u0633\u0631\u064A\u0646 (Nitroglycerin / Nitrates)";
   }
-
-  // 7. Statins
-  if (
-    t.includes('simvastatin') || t.includes('سيمفاستاتين') || t.includes('zocor') || t.includes('زوكور')
-  ) {
-    classes.push('statin', 'statin_cyp3a4', 'myopathy_risk');
-  } else if (
-    t.includes('atorvastatin') || t.includes('أتورفاستاتين') || t.includes('اتورفاستاتين') || t.includes('lipitor') ||
-    t.includes('ليبيتور') || t.includes('ator') || t.includes('تورفاكول')
-  ) {
-    classes.push('statin', 'statin_cyp3a4', 'myopathy_risk');
-  } else if (
-    t.includes('rosuvastatin') || t.includes('روزوڤاستاتين') || t.includes('روزوفاستاتين') || t.includes('crestor') ||
-    t.includes('كريستور') || t.includes('pravastatin') || t.includes('برافاستاتين')
-  ) {
-    classes.push('statin', 'myopathy_risk');
+  if (t.includes("simvastatin") || t.includes("\u0633\u064A\u0645\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646") || t.includes("zocor") || t.includes("\u0632\u0648\u0643\u0648\u0631")) {
+    classes.push("statin", "statin_cyp3a4", "myopathy_risk");
+  } else if (t.includes("atorvastatin") || t.includes("\u0623\u062A\u0648\u0631\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646") || t.includes("\u0627\u062A\u0648\u0631\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646") || t.includes("lipitor") || t.includes("\u0644\u064A\u0628\u064A\u062A\u0648\u0631") || t.includes("ator") || t.includes("\u062A\u0648\u0631\u0641\u0627\u0643\u0648\u0644")) {
+    classes.push("statin", "statin_cyp3a4", "myopathy_risk");
+  } else if (t.includes("rosuvastatin") || t.includes("\u0631\u0648\u0632\u0648\u06A4\u0627\u0633\u062A\u0627\u062A\u064A\u0646") || t.includes("\u0631\u0648\u0632\u0648\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646") || t.includes("crestor") || t.includes("\u0643\u0631\u064A\u0633\u062A\u0648\u0631") || t.includes("pravastatin") || t.includes("\u0628\u0631\u0627\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646")) {
+    classes.push("statin", "myopathy_risk");
   }
-
-  // 8. Macrolides
-  if (
-    t.includes('clarithro') || t.includes('كلاريثرو') || t.includes('كلارثرو') || t.includes('كلاريثروم') || t.includes('klacid') ||
-    t.includes('كلاسيد') || t.includes('claritop')
-  ) {
-    classes.push('macrolide', 'macrolide_potent', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
-    name = 'كلاريثروميسين (Klacid / Clarithromycin)';
-  } else if (
-    t.includes('erythro') || t.includes('اريثرو') || t.includes('ارثرو')
-  ) {
-    classes.push('macrolide', 'macrolide_potent', 'cyp3a4_strong_inhibitor', 'qt_prolonging');
-    name = 'إريثروميسين (Erythromycin)';
-  } else if (
-    t.includes('azithro') || t.includes('azitro') || t.includes('ازيثر') || t.includes('ازتر') ||
-    t.includes('zithro') || t.includes('زيثر') || t.includes('زيزرو')
-  ) {
-    classes.push('macrolide', 'azithromycin', 'qt_prolonging');
-    name = 'أزيثرومايسين (Azithromycin / Zithromax)';
+  if (t.includes("clarithro") || t.includes("\u0643\u0644\u0627\u0631\u064A\u062B\u0631\u0648") || t.includes("\u0643\u0644\u0627\u0631\u062B\u0631\u0648") || t.includes("\u0643\u0644\u0627\u0631\u064A\u062B\u0631\u0648\u0645") || t.includes("klacid") || t.includes("\u0643\u0644\u0627\u0633\u064A\u062F") || t.includes("claritop")) {
+    classes.push("macrolide", "macrolide_potent", "cyp3a4_strong_inhibitor", "qt_prolonging");
+    name = "\u0643\u0644\u0627\u0631\u064A\u062B\u0631\u0648\u0645\u064A\u0633\u064A\u0646 (Klacid / Clarithromycin)";
+  } else if (t.includes("erythro") || t.includes("\u0627\u0631\u064A\u062B\u0631\u0648") || t.includes("\u0627\u0631\u062B\u0631\u0648")) {
+    classes.push("macrolide", "macrolide_potent", "cyp3a4_strong_inhibitor", "qt_prolonging");
+    name = "\u0625\u0631\u064A\u062B\u0631\u0648\u0645\u064A\u0633\u064A\u0646 (Erythromycin)";
+  } else if (t.includes("azithro") || t.includes("azitro") || t.includes("\u0627\u0632\u064A\u062B\u0631") || t.includes("\u0627\u0632\u062A\u0631") || t.includes("zithro") || t.includes("\u0632\u064A\u062B\u0631") || t.includes("\u0632\u064A\u0632\u0631\u0648")) {
+    classes.push("macrolide", "azithromycin", "qt_prolonging");
+    name = "\u0623\u0632\u064A\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u064A\u0646 (Azithromycin / Zithromax)";
   }
-
-  // 9. Quinolones
-  if (
-    t.includes('ciprofloxacin') || t.includes('سيبروفلوكساسين') || t.includes('سيبرو') || t.includes('cipro') ||
-    t.includes('ciprobay') || t.includes('سيبروباي')
-  ) {
-    classes.push('quinolone', 'cyp1a2_inhibitor', 'qt_prolonging', 'chelation_risk');
-  } else if (
-    t.includes('levofloxacin') || t.includes('ليفوفلوكساسين') || t.includes('tavanic') || t.includes('تافانيك') ||
-    t.includes('moxifloxacin') || t.includes('موكسيفلوكساسين') || t.includes('avelox') || t.includes('أفيلوكس')
-  ) {
-    classes.push('quinolone', 'qt_prolonging', 'chelation_risk');
+  if (t.includes("ciprofloxacin") || t.includes("\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646") || t.includes("\u0633\u064A\u0628\u0631\u0648") || t.includes("cipro") || t.includes("ciprobay") || t.includes("\u0633\u064A\u0628\u0631\u0648\u0628\u0627\u064A")) {
+    classes.push("quinolone", "cyp1a2_inhibitor", "qt_prolonging", "chelation_risk");
+  } else if (t.includes("levofloxacin") || t.includes("\u0644\u064A\u0641\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646") || t.includes("tavanic") || t.includes("\u062A\u0627\u0641\u0627\u0646\u064A\u0643") || t.includes("moxifloxacin") || t.includes("\u0645\u0648\u0643\u0633\u064A\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646") || t.includes("avelox") || t.includes("\u0623\u0641\u064A\u0644\u0648\u0643\u0633") || t.includes("ofloxacin") || t.includes("\u0623\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646")) {
+    classes.push("quinolone", "qt_prolonging", "chelation_risk");
   }
-
-  // 10. Beta Blockers
-  if (
-    t.includes('bisoprolol') || t.includes('بيسوبرولول') || t.includes('concor') || t.includes('كونكور') ||
-    t.includes('metoprolol') || t.includes('ميتوبرولول') || t.includes('betaloc') || t.includes('atenolol') ||
-    t.includes('carvedilol') || t.includes('كارفيديلول') || t.includes('propranolol') || t.includes('بروبرانولول') ||
-    t.includes('inderal') || t.includes('إندرال') || t.includes('nebivolol') || t.includes('نيبيفولول')
-  ) {
-    classes.push('beta_blocker', 'bradycardia_risk', 'hypoglycemia_mask');
+  if (t.includes("bisoprolol") || t.includes("\u0628\u064A\u0633\u0648\u0628\u0631\u0648\u0644\u0648\u0644") || t.includes("concor") || t.includes("\u0643\u0648\u0646\u0643\u0648\u0631") || t.includes("metoprolol") || t.includes("\u0645\u064A\u062A\u0648\u0628\u0631\u0648\u0644\u0648\u0644") || t.includes("betaloc") || t.includes("\u0628\u064A\u062A\u0627\u0644\u0648\u0643") || t.includes("atenolol") || t.includes("\u0623\u062A\u064A\u0646\u0648\u0644\u0648\u0644") || t.includes("tenormin") || t.includes("\u062A\u064A\u0646\u0648\u0631\u0645\u064A\u0646") || t.includes("carvedilol") || t.includes("\u0643\u0627\u0631\u0641\u064A\u062F\u064A\u0644\u0648\u0644") || t.includes("dilatrend") || t.includes("\u062F\u064A\u0644\u0627\u062A\u0632\u0646\u062F") || t.includes("propranolol") || t.includes("\u0628\u0631\u0648\u0628\u0631\u0627\u0646\u0648\u0644\u0648\u0644") || t.includes("inderal") || t.includes("\u0625\u0646\u062F\u0631\u0627\u0644") || t.includes("nebivolol") || t.includes("\u0646\u064A\u0628\u064A\u0641\u0648\u0644\u0648\u0644") || t.includes("nebilet") || t.includes("\u0646\u064A\u0628\u064A\u0644\u064A\u062A")) {
+    classes.push("beta_blocker", "bradycardia_risk", "hypoglycemia_mask");
   }
-
-  // 11. Calcium Channel Blockers
-  if (
-    t.includes('amlodipine') || t.includes('أملوديبين') || t.includes('نورفاسك') || t.includes('norvasc') ||
-    t.includes('nifedipine') || t.includes('نيفيديبين') || t.includes('adalat')
-  ) {
-    classes.push('ccb_dhp', 'antihypertensive');
-  } else if (
-    t.includes('verapamil') || t.includes('فيراباميل') || t.includes('isoptin') || t.includes('diltiazem')
-  ) {
-    classes.push('ccb_non_dhp', 'bradycardia_risk', 'cyp3a4_inhibitor', 'pgp_inhibitor');
+  if (t.includes("amlodipine") || t.includes("\u0623\u0645\u0644\u0648\u062F\u064A\u0628\u064A\u0646") || t.includes("\u0646\u0648\u0631\u0641\u0627\u0633\u0643") || t.includes("norvasc") || t.includes("nifedipine") || t.includes("\u0646\u064A\u0641\u064A\u062F\u064A\u0628\u064A\u0646") || t.includes("adalat") || t.includes("\u0623\u062F\u0627\u0644\u0627\u062A")) {
+    classes.push("ccb_dhp", "antihypertensive");
+  } else if (t.includes("verapamil") || t.includes("\u0641\u064A\u0631\u0627\u0628\u0627\u0645\u064A\u0644") || t.includes("isoptin") || t.includes("\u0625\u064A\u0632\u0648\u0628\u062A\u064A\u0646") || t.includes("diltiazem") || t.includes("\u062F\u064A\u0644\u062A\u064A\u0627\u0632\u064A\u0645")) {
+    classes.push("ccb_non_dhp", "bradycardia_risk", "cyp3a4_inhibitor", "pgp_inhibitor");
   }
-
-  // 12. ACEi / ARBs
-  if (
-    t.includes('ramipril') || t.includes('راميبريل') || t.includes('tritace') || t.includes('enalapril') ||
-    t.includes('lisinopril') || t.includes('captopril') || t.includes('كابتوبريل') ||
-    t.includes('losartan') || t.includes('لوسارتان') || t.includes('cozaar') ||
-    t.includes('valsartan') || t.includes('فالسارتان') || t.includes('candesartan') || t.includes('telmisartan')
-  ) {
-    classes.push('raas_inhibitor', 'hyperkalemia_risk', 'nephrotoxic_triple_whammy');
+  if (t.includes("ramipril") || t.includes("\u0631\u0627\u0645\u064A\u0628\u0631\u064A\u0644") || t.includes("tritace") || t.includes("\u062A\u0631\u064A\u062A\u0627\u0633") || t.includes("enalapril") || t.includes("\u0625\u0646\u0627\u0644\u0627\u0628\u0631\u064A\u0644") || t.includes("renitec") || t.includes("lisinopril") || t.includes("\u0644\u064A\u0633\u064A\u0646\u0648\u0628\u0631\u064A\u0644") || t.includes("zestril") || t.includes("\u0632\u064A\u0633\u062A\u0631\u064A\u0644") || t.includes("captopril") || t.includes("\u0643\u0627\u0628\u062A\u0648\u0628\u0631\u064A\u0644") || t.includes("capoten") || t.includes("\u0643\u0627\u0628\u0648\u062A\u064A\u0646") || t.includes("losartan") || t.includes("\u0644\u0648\u0633\u0627\u0631\u062A\u0627\u0646") || t.includes("cozaar") || t.includes("\u0643\u0648\u0632\u0627\u0631") || t.includes("valsartan") || t.includes("\u0641\u0627\u0644\u0633\u0627\u0631\u062A\u0627\u0646") || t.includes("diovan") || t.includes("\u062F\u064A\u0648\u0641\u0627\u0646") || t.includes("candesartan") || t.includes("\u0643\u0627\u0646\u062F\u064A\u0633\u0627\u0631\u062A\u0627\u0646") || t.includes("atacand") || t.includes("\u0623\u062A\u0627\u0643\u0627\u0646\u062F") || t.includes("telmisartan") || t.includes("\u062A\u064A\u0644\u0645\u064A\u0633\u0627\u0631\u062A\u0627\u0646") || t.includes("micardis") || t.includes("\u0645\u064A\u0643\u0627\u0631\u062F\u064A\u0633")) {
+    classes.push("raas_inhibitor", "hyperkalemia_risk", "nephrotoxic_triple_whammy");
   }
-
-  // 13. Potassium-sparing diuretics & K supplements
-  if (
-    t.includes('spironolactone') || t.includes('سبيرونولاكتون') || t.includes('aldactone') || t.includes('ألداكتون') ||
-    t.includes('eplerenone') || t.includes('potassium') || t.includes('بوتاسيوم')
-  ) {
-    classes.push('k_sparing_agent', 'hyperkalemia_risk');
+  if (t.includes("spironolactone") || t.includes("\u0633\u0628\u064A\u0631\u0648\u0646\u0648\u0644\u0627\u0643\u062A\u0648\u0646") || t.includes("aldactone") || t.includes("\u0623\u0644\u062F\u0627\u0643\u062A\u0648\u0646") || t.includes("eplerenone") || t.includes("\u0625\u064A\u0628\u0644\u064A\u0631\u064A\u0646\u0648\u0646") || t.includes("inspra") || t.includes("potassium") || t.includes("\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645") || t.includes("k-dur") || t.includes("slow-k")) {
+    classes.push("k_sparing_agent", "hyperkalemia_risk");
   }
-
-  // 14. Loop & Thiazide Diuretics
-  if (
-    t.includes('furosemide') || t.includes('فوروسيميد') || t.includes('lasix') || t.includes('لازيكس') ||
-    t.includes('torsemide')
-  ) {
-    classes.push('loop_diuretic', 'ototoxic', 'hypokalemia_risk', 'nephrotoxic_triple_whammy');
-  } else if (
-    t.includes('hydrochlorothiazide') || t.includes('هيدروكلوروثيازيد') || t.includes('indapamide') || t.includes('ناتريليكس')
-  ) {
-    classes.push('thiazide_diuretic', 'hypokalemia_risk', 'lithium_clearance_reducer');
+  if (t.includes("furosemide") || t.includes("\u0641\u0648\u0631\u0648\u0633\u064A\u0645\u064A\u062F") || t.includes("lasix") || t.includes("\u0644\u0627\u0632\u064A\u0643\u0633") || t.includes("torsemide") || t.includes("\u062A\u0648\u0631\u0633\u064A\u0645\u064A\u062F") || t.includes("torem")) {
+    classes.push("loop_diuretic", "ototoxic", "hypokalemia_risk", "nephrotoxic_triple_whammy");
+  } else if (t.includes("hydrochlorothiazide") || t.includes("\u0647\u064A\u062F\u0631\u0648\u0643\u0644\u0648\u0631\u0648\u062B\u064A\u0627\u0632\u064A\u062F") || t.includes("hctz") || t.includes("indapamide") || t.includes("\u0625\u0646\u062F\u0627\u0628\u0627\u0645\u064A\u062F") || t.includes("natrilix") || t.includes("\u0646\u0627\u062A\u0631\u064A\u0644\u064A\u0643\u0633")) {
+    classes.push("thiazide_diuretic", "hypokalemia_risk", "lithium_clearance_reducer");
   }
-
-  // 15. Digoxin
-  if (
-    t.includes('digoxin') || t.includes('ديجوكسين') || t.includes('lanoxin') || t.includes('لانوكسين')
-  ) {
-    classes.push('digoxin', 'narrow_therapeutic_index', 'arrhythmia_risk');
+  if (t.includes("digoxin") || t.includes("\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646") || t.includes("lanoxin") || t.includes("\u0644\u0627\u0646\u0648\u0643\u0633\u064A\u0646")) {
+    classes.push("digoxin", "cardiac_glycoside", "narrow_therapeutic_index", "arrhythmia_risk");
   }
-
-  // 16. Amiodarone
-  if (
-    t.includes('amiodarone') || t.includes('أميودارون') || t.includes('cordarone') || t.includes('كوردارون')
-  ) {
-    classes.push('amiodarone', 'cyp_strong_inhibitor', 'pgp_inhibitor', 'qt_prolonging', 'bradycardia_risk');
+  if (t.includes("amiodarone") || t.includes("\u0627\u0645\u064A\u0648\u062F\u0627\u0631\u0648\u0646") || t.includes("\u0623\u0645\u064A\u0648\u062F\u0627\u0631\u0648\u0646") || t.includes("cordarone") || t.includes("\u0643\u0648\u0631\u062F\u0627\u0631\u0648\u0646")) {
+    classes.push("amiodarone", "cyp_strong_inhibitor", "pgp_inhibitor", "qt_prolonging", "bradycardia_risk");
   }
-
-  // 17. SSRIs & SNRIs
-  if (
-    t.includes('escitalopram') || t.includes('إسيتالوبرام') || t.includes('cipralex') || t.includes('سيبرالكس') ||
-    t.includes('sertraline') || t.includes('سيرترالين') || t.includes('zoloft') || t.includes('زولوفت') ||
-    t.includes('fluoxetine') || t.includes('فلوكسيتين') || t.includes('prozac') || t.includes('بروزاك') ||
-    t.includes('paroxetine') || t.includes('venlafaxine') || t.includes('duloxetine') || t.includes('cymbalta')
-  ) {
-    classes.push('serotonergic_antidepressant', 'serotonin_syndrome_risk', 'bleeding_risk', 'qt_prolonging');
+  if (t.includes("escitalopram") || t.includes("\u0625\u0633\u064A\u062A\u0627\u0644\u0648\u0628\u0631\u0627\u0645") || t.includes("cipralex") || t.includes("\u0633\u064A\u0628\u0631\u0627\u0644\u0643\u0633") || t.includes("lexapro") || t.includes("\u0644\u064A\u0643\u0633\u0627\u0628\u0631\u0648") || t.includes("citalopram") || t.includes("\u0633\u064A\u062A\u0627\u0644\u0648\u0628\u0631\u0627\u0645") || t.includes("cipramil") || t.includes("sertraline") || t.includes("\u0633\u064A\u0631\u062A\u0631\u0627\u0644\u064A\u0646") || t.includes("zoloft") || t.includes("\u0632\u0648\u0644\u0648\u0641\u062A") || t.includes("lustral") || t.includes("\u0644\u0648\u0633\u062A\u0631\u0627\u0644") || t.includes("fluoxetine") || t.includes("\u0641\u0644\u0648\u0643\u0633\u064A\u062A\u064A\u0646") || t.includes("prozac") || t.includes("\u0628\u0631\u0648\u0632\u0627\u0643") || t.includes("paroxetine") || t.includes("\u0628\u0627\u0631\u0648\u0643\u0633\u064A\u062A\u064A\u0646") || t.includes("seroxat") || t.includes("\u0633\u064A\u0631\u0648\u0643\u0633\u0627\u062A") || t.includes("venlafaxine") || t.includes("\u0641\u064A\u0646\u0644\u0627\u0641\u0627\u0643\u0633\u064A\u0646") || t.includes("efexor") || t.includes("\u0625\u0641\u0643\u0633\u0648\u0631") || t.includes("duloxetine") || t.includes("\u062F\u0648\u0644\u0648\u0643\u0633\u062A\u064A\u0646") || t.includes("cymbalta") || t.includes("\u0633\u064A\u0645\u0628\u0627\u0644\u062A\u0627")) {
+    classes.push("serotonergic_antidepressant", "serotonin_syndrome_risk", "bleeding_risk", "qt_prolonging");
   }
-
-  // 18. Opioids
-  if (
-    t.includes('tramadol') || t.includes('ترامادول') || t.includes('tramal') || t.includes('ترامال')
-  ) {
-    classes.push('opioid', 'serotonergic_opioid', 'seizure_risk', 'cns_respiratory_depressant');
-  } else if (
-    t.includes('morphine') || t.includes('مورفين') || t.includes('fentanyl') || t.includes('فينتانيل') ||
-    t.includes('codeine') || t.includes('methadone')
-  ) {
-    classes.push('opioid', 'cns_respiratory_depressant');
+  if (t.includes("tramadol") || t.includes("\u062A\u0631\u0627\u0645\u0627\u062F\u0648\u0644") || t.includes("tramal") || t.includes("\u062A\u0631\u0627\u0645\u0627\u0644") || t.includes("ultram") || t.includes("\u0623\u0648\u0644\u062A\u0632\u0627\u0645")) {
+    classes.push("opioid", "serotonergic_opioid", "seizure_risk", "cns_respiratory_depressant");
+  } else if (t.includes("morphine") || t.includes("\u0645\u0648\u0631\u0641\u064A\u0646") || t.includes("fentanyl") || t.includes("\u0641\u064A\u0646\u062A\u0627\u0646\u064A\u0644") || t.includes("oxycodone") || t.includes("\u0623\u0648\u0643\u0633\u064A\u0643\u0648\u062F\u0648\u0646") || t.includes("codeine") || t.includes("\u0643\u0648\u062F\u0627\u064A\u064A\u0646") || t.includes("methadone") || t.includes("\u0645\u064A\u062B\u0627\u062F\u0648\u0646")) {
+    classes.push("opioid", "cns_respiratory_depressant");
   }
-
-  // 19. Benzodiazepines
-  if (
-    t.includes('diazepam') || t.includes('ديازيبام') || t.includes('valium') || t.includes('فاليوم') ||
-    t.includes('alprazolam') || t.includes('ألبرازولام') || t.includes('xanax') || t.includes('زاناكس') ||
-    t.includes('clonazepam') || t.includes('lorazepam') || t.includes('zolpidem')
-  ) {
-    classes.push('sedative_benzodiazepine', 'cns_respiratory_depressant');
+  if (t.includes("diazepam") || t.includes("\u062F\u064A\u0627\u0632\u064A\u0628\u0627\u0645") || t.includes("valium") || t.includes("\u0641\u0627\u0644\u064A\u0648\u0645") || t.includes("alprazolam") || t.includes("\u0623\u0644\u0628\u0631\u0627\u0632\u0648\u0644\u0627\u0645") || t.includes("xanax") || t.includes("\u0632\u0627\u0646\u0627\u0643\u0633") || t.includes("clonazepam") || t.includes("\u0643\u0644\u0648\u0646\u0627\u0632\u064A\u0628\u0627\u0645") || t.includes("rivotril") || t.includes("\u0631\u064A\u0641\u0648\u062A\u0631\u064A\u0644") || t.includes("lorazepam") || t.includes("\u0644\u0648\u0631\u0627\u0632\u064A\u0628\u0627\u0645") || t.includes("ativan") || t.includes("\u0623\u062A\u064A\u0641\u0627\u0646") || t.includes("bromazepam") || t.includes("lexotanil") || t.includes("\u0644\u064A\u0643\u0633\u0648\u062A\u0627\u0646\u064A\u0644") || t.includes("zolpidem") || t.includes("\u0632\u0648\u0644\u0628\u064A\u062F\u064A\u0645") || t.includes("stilnox")) {
+    classes.push("sedative_benzodiazepine", "cns_respiratory_depressant");
   }
-
-  // 20. Lithium
-  if (
-    t.includes('lithium') || t.includes('ليثيوم') || t.includes('priadel') || t.includes('بريانيل')
-  ) {
-    classes.push('lithium', 'narrow_therapeutic_index', 'neurotoxic_risk');
+  if (t.includes("lithium") || t.includes("\u0644\u064A\u062B\u064A\u0648\u0645") || t.includes("priadel") || t.includes("\u0628\u0631\u064A\u0627\u0646\u064A\u0644")) {
+    classes.push("lithium", "narrow_therapeutic_index", "neurotoxic_risk");
   }
-
-  // 21. Methotrexate
-  if (
-    t.includes('methotrexate') || t.includes('ميثوتريكسات') || t.includes('mtx')
-  ) {
-    classes.push('methotrexate', 'narrow_therapeutic_index', 'bone_marrow_suppressant');
+  if (t.includes("methotrexate") || t.includes("\u0645\u064A\u062B\u0648\u062A\u0631\u064A\u0643\u0633\u0627\u062A") || t.includes("mtx") || t.includes("\u062A\u0631\u064A\u0643\u0633\u0627\u0646")) {
+    classes.push("methotrexate", "narrow_therapeutic_index", "bone_marrow_suppressant");
   }
-
-  // 22. Antidiabetics
-  if (
-    t.includes('metformin') || t.includes('ميتفورمين') || t.includes('glucophage') || t.includes('جلوكوفاج')
-  ) {
-    classes.push('metformin', 'antidiabetic', 'lactic_acidosis_risk');
-  } else if (
-    t.includes('glimepiride') || t.includes('جليمبريد') || t.includes('amaryl') || t.includes('أماريل') ||
-    t.includes('gliclazide') || t.includes('جليكلازيد') || t.includes('diamicron') || t.includes('دياميكرون')
-  ) {
-    classes.push('sulfonylurea', 'antidiabetic', 'hypoglycemia_high_risk');
-  } else if (
-    t.includes('insulin') || t.includes('إنسولين') || t.includes('انسولين') || t.includes('lantus') || t.includes('novorapid')
-  ) {
-    classes.push('insulin', 'antidiabetic', 'hypoglycemia_high_risk');
+  if (t.includes("metformin") || t.includes("\u0645\u064A\u062A\u0641\u0648\u0631\u0645\u064A\u0646") || t.includes("glucophage") || t.includes("\u062C\u0644\u0648\u0643\u0648\u0641\u0627\u062C") || t.includes("cidophage") || t.includes("\u0633\u064A\u062F\u0648\u0641\u0627\u062C")) {
+    classes.push("metformin", "antidiabetic", "lactic_acidosis_risk");
+  } else if (t.includes("glimepiride") || t.includes("\u062C\u0644\u064A\u0645\u0628\u0631\u064A\u062F") || t.includes("amaryl") || t.includes("\u0623\u0645\u0627\u0631\u064A\u0644") || t.includes("gliclazide") || t.includes("\u062C\u0644\u064A\u0643\u0644\u0627\u0632\u064A\u062F") || t.includes("diamicron") || t.includes("\u062F\u064A\u0627\u0645\u064A\u0643\u0631\u0648\u0646") || t.includes("glibenclamide") || t.includes("\u062F\u0627\u0648\u0646\u064A\u0644") || t.includes("daonil")) {
+    classes.push("sulfonylurea", "antidiabetic", "hypoglycemia_high_risk");
+  } else if (t.includes("dapagliflozin") || t.includes("\u0641\u0648\u0631\u0633\u064A\u062C\u0627") || t.includes("forxiga") || t.includes("empagliflozin") || t.includes("\u062C\u0627\u0631\u062F\u064A\u0646\u0633") || t.includes("jardiance")) {
+    classes.push("sglt2_inhibitor", "antidiabetic", "dehydration_risk");
+  } else if (t.includes("semaglutide") || t.includes("\u0623\u0648\u0632\u0645\u0628\u064A\u0643") || t.includes("ozempic") || t.includes("wegovy") || t.includes("\u0648\u064A\u062C\u0648\u0641\u064A") || t.includes("liraglutide") || t.includes("\u0641\u064A\u0643\u062A\u0648\u0632\u0627") || t.includes("victoza") || t.includes("saxenda") || t.includes("tirzepatide") || t.includes("\u0645\u0648\u0646\u062C\u0627\u0631\u0648") || t.includes("mounjaro")) {
+    classes.push("glp1_agonist", "antidiabetic", "delayed_gastric_emptying");
+  } else if (t.includes("insulin") || t.includes("\u0625\u0646\u0633\u0648\u0644\u064A\u0646") || t.includes("\u0627\u0646\u0633\u0648\u0644\u064A\u0646") || t.includes("lantus") || t.includes("\u0644\u0627\u0646\u062A\u0648\u0633") || t.includes("novorapid") || t.includes("\u0646\u0648\u0641\u0648\u0631\u0627\u0628\u064A\u062F") || t.includes("actrapid") || t.includes("humalog") || t.includes("\u0647\u0648\u0645\u0627\u0644\u0648\u062C") || t.includes("tresiba") || t.includes("\u062A\u0631\u064A\u0633\u064A\u0628\u0627")) {
+    classes.push("insulin", "antidiabetic", "hypoglycemia_high_risk");
   }
-
-  // 23. PPIs
-  if (
-    t.includes('omeprazole') || t.includes('أوميبرازول') || t.includes('losec')
-  ) {
-    classes.push('ppi_omeprazole', 'ppi', 'cyp2c19_inhibitor');
-  } else if (
-    t.includes('pantoprazole') || t.includes('بانتوبرازول') || t.includes('controloc')
-  ) {
-    classes.push('ppi_safe_p2y12', 'ppi');
+  if (t.includes("omeprazole") || t.includes("\u0623\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("\u0627\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("losec") || t.includes("\u0644\u0648\u0633\u0643") || t.includes("gasec") || t.includes("\u063A\u0627\u0632\u064A\u0643")) {
+    classes.push("ppi_omeprazole", "ppi", "cyp2c19_inhibitor");
+  } else if (t.includes("esomeprazole") || t.includes("\u0625\u064A\u0632\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("nexium") || t.includes("\u0646\u064A\u0643\u0633\u064A\u0648\u0645")) {
+    classes.push("ppi_esomeprazole", "ppi", "cyp2c19_inhibitor");
+  } else if (t.includes("pantoprazole") || t.includes("\u0628\u0627\u0646\u062A\u0648\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("controloc") || t.includes("\u0643\u0648\u0646\u062A\u0631\u0648\u0644\u0648\u0643") || t.includes("pantozol") || t.includes("\u0628\u0627\u0646\u062A\u0648\u0632\u0648\u0644") || t.includes("lansoprazole") || t.includes("\u0644\u0627\u0646\u0632\u0648\u0628\u0631\u0627\u0632\u0648\u0644")) {
+    classes.push("ppi_safe_p2y12", "ppi");
   }
-
-  // 24. Thyroid
-  if (
-    t.includes('levothyroxine') || t.includes('ليفوثيروكسين') || t.includes('euthyrox') || t.includes('إيوثيروكس') || t.includes('الغدة')
-  ) {
-    classes.push('levothyroxine', 'chelation_sensitive');
+  if (t.includes("levothyroxine") || t.includes("\u0644\u064A\u0641\u0648\u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646") || t.includes("euthyrox") || t.includes("\u0625\u064A\u0648\u062B\u064A\u0631\u0648\u0643\u0633") || t.includes("eltroxin") || t.includes("\u0625\u0644\u062A\u0631\u0648\u0643\u0633\u064A\u0646") || t.includes("thyroxine") || t.includes("\u0627\u0644\u063A\u062F\u0629")) {
+    classes.push("levothyroxine", "chelation_sensitive");
   }
-
-  // 25. Cations
-  if (
-    t.includes('calcium') || t.includes('كالسيوم') || t.includes('iron') || t.includes('حديد') ||
-    t.includes('magnesium') || t.includes('مغنيسيوم') || t.includes('antacid') || t.includes('حموضة')
-  ) {
-    classes.push('multivalent_cation', 'chelator');
+  if (t.includes("calcium") || t.includes("\u0643\u0627\u0644\u0633\u064A\u0648\u0645") || t.includes("caltrate") || t.includes("iron") || t.includes("\u062D\u062F\u064A\u062F") || t.includes("ferrous") || t.includes("ferose") || t.includes("\u0641\u064A\u0631\u0648\u0632") || t.includes("magnesium") || t.includes("\u0645\u063A\u0646\u064A\u0633\u064A\u0648\u0645") || t.includes("maalox") || t.includes("\u0645\u0627\u0644\u0648\u0643\u0633") || t.includes("antacid") || t.includes("\u062D\u0645\u0648\u0636\u0629") || t.includes("gaviscon") || t.includes("\u062C\u0627\u0641\u064A\u0633\u0643\u0648\u0646")) {
+    classes.push("multivalent_cation", "chelator");
   }
-
-  // 26. Metronidazole
-  if (
-    t.includes('metronidazole') || t.includes('ميترونيدازول') || t.includes('flagyl') || t.includes('فلاجيل')
-  ) {
-    classes.push('metronidazole', 'disulfiram_reactive', 'cyp2c9_inhibitor');
+  if (t.includes("fluconazol") || t.includes("\u0641\u0644\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("diflucan") || t.includes("\u062F\u064A\u0641\u0644\u0648\u0643\u0627\u0646") || t.includes("itraconazol") || t.includes("\u0627\u064A\u062A\u0631\u0627\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("sporanox") || t.includes("ketoconazol") || t.includes("\u0643\u064A\u062A\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("voriconazol") || t.includes("\u0641\u0648\u0631\u064A\u0643\u0648\u0646\u0627\u0632\u0648\u0644")) {
+    classes.push("azole_antifungal", "cyp3a4_strong_inhibitor", "cyp2c9_inhibitor", "qt_prolonging");
+    name = "\u0641\u0644\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644 (Fluconazole / Diflucan)";
   }
-
-  // 27. Alcohol
-  if (
-    t.includes('alcohol') || t.includes('كحول') || t.includes('خمر')
-  ) {
-    classes.push('alcohol', 'cns_depressant');
+  if (t.includes("metronidazol") || t.includes("\u0645\u064A\u062A\u0631\u0648\u0646\u064A\u062F\u0627\u0632\u0648\u0644") || t.includes("flagyl") || t.includes("\u0641\u0644\u0627\u062C\u064A\u0644") || t.includes("tinidazol") || t.includes("\u062A\u064A\u0646\u064A\u062F\u0627\u0632\u0648\u0644") || t.includes("fasigyn")) {
+    classes.push("metronidazole", "disulfiram_reactive", "cyp2c9_inhibitor");
+    name = "\u0645\u064A\u062A\u0631\u0648\u0646\u064A\u062F\u0627\u0632\u0648\u0644 (Flagyl / Metronidazole)";
   }
-
-  // 28. Tizanidine & Theophylline / Xanthines
-  if (
-    t.includes('tizanidine') || t.includes('تيزانيدين') || t.includes('sirdalud') || t.includes('سيردالود')
-  ) {
-    classes.push('tizanidine', 'cyp1a2_substrate', 'hypotensive_risk');
-    name = 'تيزانيدين (Tizanidine / Sirdalud)';
-  } else if (
-    t.includes('theophyll') || t.includes('ثيوفل') || t.includes('ثيوفيل') ||
-    t.includes('aminophyll') || t.includes('امينوفل') || t.includes('أمينوفل') ||
-    t.includes('quibron') || t.includes('uniphyl') || t.includes('theolin') || t.includes('ثيودور') ||
-    t.includes('xanthine') || t.includes('زانثين')
-  ) {
-    classes.push('theophylline', 'cyp1a2_substrate', 'narrow_therapeutic_index', 'xanthine', 'arrhythmia_risk');
-    name = 'ثيوفيلين (Theophylline)';
+  if (t.includes("bactrim") || t.includes("\u0628\u0627\u0643\u062A\u0631\u064A\u0645") || t.includes("septra") || t.includes("\u0633\u0628\u062A\u0631\u0627") || t.includes("cotrimoxazol") || t.includes("\u0643\u0648\u062A\u0631\u064A\u0645\u0648\u0643\u0633\u0627\u0632\u0648\u0644") || t.includes("trimethoprim") || t.includes("\u062A\u0631\u064A\u0645\u064A\u062B\u0648\u0628\u0631\u064A\u0645") || t.includes("sulfamethoxazol") || t.includes("\u0633\u0644\u0641\u0627\u0645\u064A\u062B\u0648\u0643\u0633\u0627\u0632\u0648\u0644") || t.includes("septazole") || t.includes("\u0633\u064A\u0628\u062A\u0627\u0632\u0648\u0644") || t.includes("septrin") || t.includes("\u0633\u064A\u0628\u062A\u0631\u064A\u0646") || t.includes("chemotrim") || t.includes("\u0643\u064A\u0645\u0648\u062A\u0631\u064A\u0645")) {
+    classes.push("cotrimoxazole", "cyp2c9_inhibitor", "hyperkalemia_risk", "potassium_sparing", "sulfonamide");
+    name = "\u0628\u0627\u0643\u062A\u0631\u064A\u0645 (Bactrim / Cotrimoxazole)";
   }
-
-  // 29. UNIVERSAL PHARMACOLOGICAL STEM / SUFFIX RECOGNITION (INN / USAN)
-  // Automatically classifies any medication by chemical/pharmacological stem
-
-  // Fluoroquinolones (-floxacin / فلوكساسين / فلوكس)
-  if (t.includes('floxacin') || t.includes('فلوكساسين') || t.includes('فلوكس')) {
-    if (!classes.includes('quinolone')) classes.push('quinolone', 'qt_prolonging', 'chelation_risk');
-    if ((t.includes('cipro') || t.includes('سيبرو') || t.includes('norflo') || t.includes('نورفلو')) && !classes.includes('cyp1a2_inhibitor')) {
-      classes.push('cyp1a2_inhibitor');
+  if (t.includes("alcohol") || t.includes("\u0643\u062D\u0648\u0644") || t.includes("\u062E\u0645\u0631") || t.includes("ethanol")) {
+    classes.push("alcohol", "cns_depressant");
+  }
+  if (t.includes("tizanidine") || t.includes("\u062A\u064A\u0632\u0627\u0646\u064A\u062F\u064A\u0646") || t.includes("sirdalud") || t.includes("\u0633\u064A\u0631\u062F\u0627\u0644\u0648\u062F")) {
+    classes.push("tizanidine", "cyp1a2_substrate", "hypotensive_risk");
+    name = "\u062A\u064A\u0632\u0627\u0646\u064A\u062F\u064A\u0646 (Tizanidine / Sirdalud)";
+  } else if (t.includes("theophyll") || t.includes("\u062B\u064A\u0648\u0641\u0644") || t.includes("\u062B\u064A\u0648\u0641\u064A\u0644") || t.includes("aminophyll") || t.includes("\u0627\u0645\u064A\u0646\u0648\u0641\u0644") || t.includes("\u0623\u0645\u064A\u0646\u0648\u0641\u0644") || t.includes("quibron") || t.includes("uniphyl") || t.includes("theolin") || t.includes("\u062B\u064A\u0648\u062F\u0648\u0631") || t.includes("xanthine") || t.includes("\u0632\u0627\u0646\u062B\u064A\u0646")) {
+    classes.push("theophylline", "cyp1a2_substrate", "narrow_therapeutic_index", "xanthine", "arrhythmia_risk");
+    name = "\u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646 (Theophylline)";
+  }
+  if (t.includes("allopurinol") || t.includes("\u0623\u0644\u0648\u0628\u064A\u0648\u0631\u064A\u0646\u0648\u0644") || t.includes("zyloric") || t.includes("\u0632\u064A\u0644\u0648\u0631\u064A\u0643") || t.includes("febuxostat") || t.includes("\u0641\u064A\u0628\u0648\u0643\u0633\u0648\u0633\u062A\u0627\u062A") || t.includes("adenuric")) {
+    classes.push("xanthine_oxidase_inhibitor");
+  } else if (t.includes("colchicine") || t.includes("\u0643\u0648\u0644\u0634\u064A\u0633\u064A\u0646")) {
+    classes.push("colchicine", "cyp3a4_substrate", "pgp_substrate");
+  }
+  if (t.includes("carbamazepine") || t.includes("\u0643\u0627\u0631\u0628\u0627\u0645\u0627\u0632\u064A\u0628\u064A\u0646") || t.includes("tegretol") || t.includes("\u062A\u062C\u0631\u064A\u062A\u0648\u0644") || t.includes("phenytoin") || t.includes("\u0641\u0646\u064A\u062A\u0648\u064A\u0646") || t.includes("epanutin")) {
+    classes.push("strong_cyp_inducer", "cns_depressant", "narrow_therapeutic_index");
+  } else if (t.includes("valproat") || t.includes("\u0641\u0627\u0644\u0628\u0631\u0648\u0627\u062A") || t.includes("depakine") || t.includes("\u062F\u064A\u0628\u0627\u0643\u064A\u0646")) {
+    classes.push("valproate", "cyp_inhibitor", "hepatotoxic");
+  } else if (t.includes("lamotrigine") || t.includes("\u0644\u0627\u0645\u0648\u062A\u0631\u064A\u062C\u064A\u0646") || t.includes("lamictal") || t.includes("\u0644\u0627\u0645\u064A\u0643\u062A\u0627\u0644")) {
+    classes.push("lamotrigine", "steve_johnson_risk");
+  } else if (t.includes("gabapentin") || t.includes("\u062C\u0627\u0628\u0627\u0628\u0646\u062A\u064A\u0646") || t.includes("neurontin") || t.includes("\u0646\u064A\u0648\u0631\u0648\u0646\u062A\u064A\u0646") || t.includes("pregabalin") || t.includes("\u0628\u0631\u064A\u062C\u0627\u0628\u0627\u0644\u064A\u0646") || t.includes("lyrica") || t.includes("\u0644\u064A\u0631\u064A\u0643\u0627")) {
+    classes.push("gabapentinoid", "cns_depressant");
+  }
+  if (t.includes("gentamicin") || t.includes("\u062C\u0646\u062A\u0627\u0645\u0627\u064A\u0633\u064A\u0646") || t.includes("amikacin") || t.includes("\u0623\u0645\u064A\u0643\u0627\u0633\u064A\u0646") || t.includes("amikin") || t.includes("tobramycin") || t.includes("\u062A\u0648\u0628\u0631\u0627\u0645\u0627\u064A\u0633\u064A\u0646")) {
+    classes.push("aminoglycoside", "nephrotoxic", "ototoxic");
+  } else if (t.includes("vancomycin") || t.includes("\u0641\u0627\u0646\u0643\u0648\u0645\u0627\u064A\u0633\u064A\u0646") || t.includes("vancocin")) {
+    classes.push("vancomycin", "nephrotoxic", "ototoxic");
+  }
+  if (t.includes("amoxicillin") || t.includes("\u0623\u0645\u0648\u0643\u0633\u064A\u0633\u064A\u0644\u064A\u0646") || t.includes("augmentin") || t.includes("\u0623\u0648\u062C\u0645\u0646\u062A\u064A\u0646") || t.includes("curam") || t.includes("\u0643\u0644\u0627\u0645\u0648\u0643\u0633\u064A\u0644") || t.includes("ampicillin") || t.includes("\u0623\u0645\u0628\u064A\u0633\u064A\u0644\u064A\u0646")) {
+    classes.push("penicillin_antibiotic", "antimicrobial");
+  } else if (t.includes("ceftriaxone") || t.includes("\u0633\u064A\u0641\u062A\u0631\u064A\u0627\u0643\u0633\u0648\u0646") || t.includes("rocephin") || t.includes("\u0631\u0648\u0633\u064A\u0641\u064A\u0646") || t.includes("cefixime") || t.includes("\u0633\u064A\u0641\u064A\u0643\u0633\u064A\u0645") || t.includes("suprax") || t.includes("\u0633\u0648\u0628\u0631\u0627\u0643\u0633") || t.includes("cefuroxime") || t.includes("\u0633\u064A\u0641\u0648\u0631\u0648\u0643\u0633\u064A\u0645") || t.includes("zinnat") || t.includes("\u0632\u064A\u0646\u0627\u062A")) {
+    classes.push("cephalosporin_antibiotic", "antimicrobial");
+  }
+  if (t.includes("prednisolone") || t.includes("\u0628\u0631\u064A\u062F\u0646\u064A\u0632\u0648\u0644\u0648\u0646") || t.includes("prednisone") || t.includes("dexamethasone") || t.includes("\u062F\u064A\u0643\u0633\u0627\u0645\u064A\u062B\u0627\u0632\u0648\u0646") || t.includes("decadron") || t.includes("hydrocortisone") || t.includes("\u0643\u0648\u0631\u062A\u064A\u0632\u0648\u0646")) {
+    classes.push("corticosteroid", "hyperglycemia_risk", "gastric_irritant", "immunosuppressant");
+  }
+  if (t.includes("floxacin") || t.includes("\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646") || t.includes("\u0641\u0644\u0648\u0643\u0633")) {
+    if (!classes.includes("quinolone")) classes.push("quinolone", "qt_prolonging", "chelation_risk");
+    if ((t.includes("cipro") || t.includes("\u0633\u064A\u0628\u0631\u0648") || t.includes("norflo") || t.includes("\u0646\u0648\u0631\u0641\u0644\u0648")) && !classes.includes("cyp1a2_inhibitor")) {
+      classes.push("cyp1a2_inhibitor");
     }
   }
-
-  // Statins (-statin / ستاتين)
-  if (t.includes('statin') || t.includes('ستاتين')) {
-    if (!classes.includes('statin')) classes.push('statin', 'myopathy_risk');
-    if ((t.includes('simva') || t.includes('سيمفا') || t.includes('atorva') || t.includes('اتورفا') || t.includes('أتورفا')) && !classes.includes('statin_cyp3a4')) {
-      classes.push('statin_cyp3a4');
+  if (t.includes("statin") || t.includes("\u0633\u062A\u0627\u062A\u064A\u0646")) {
+    if (!classes.includes("statin")) classes.push("statin", "myopathy_risk");
+    if ((t.includes("simva") || t.includes("\u0633\u064A\u0645\u0641\u0627") || t.includes("atorva") || t.includes("\u0627\u062A\u0648\u0631\u0641\u0627") || t.includes("\u0623\u062A\u0648\u0631\u0641\u0627")) && !classes.includes("statin_cyp3a4")) {
+      classes.push("statin_cyp3a4");
     }
   }
-
-  // Beta-Blockers (-olol / ولول)
-  if (t.endsWith('olol') || t.includes('olol') || t.endsWith('ولول') || t.includes('ولول')) {
-    if (!classes.includes('beta_blocker')) classes.push('beta_blocker', 'bradycardia_risk', 'hypoglycemia_mask');
+  if (t.endsWith("olol") || t.includes("olol") || t.endsWith("\u0648\u0644\u0648\u0644") || t.includes("\u0648\u0644\u0648\u0644")) {
+    if (!classes.includes("beta_blocker")) classes.push("beta_blocker", "bradycardia_risk", "hypoglycemia_mask");
   }
-
-  // ACE Inhibitors (-pril / بريل)
-  if (t.endsWith('pril') || t.includes('pril') || t.endsWith('بريل') || t.includes('بريل')) {
-    if (!classes.includes('raas_inhibitor')) classes.push('raas_inhibitor', 'hyperkalemia_risk', 'nephrotoxic_triple_whammy');
+  if (t.endsWith("pril") || t.includes("pril") || t.endsWith("\u0628\u0631\u064A\u0644") || t.includes("\u0628\u0631\u064A\u0644")) {
+    if (!classes.includes("raas_inhibitor")) classes.push("raas_inhibitor", "hyperkalemia_risk", "nephrotoxic_triple_whammy");
   }
-
-  // ARBs (-sartan / سارتان)
-  if (t.endsWith('sartan') || t.includes('sartan') || t.endsWith('سارتان') || t.includes('سارتان')) {
-    if (!classes.includes('raas_inhibitor')) classes.push('raas_inhibitor', 'hyperkalemia_risk', 'nephrotoxic_triple_whammy');
+  if (t.endsWith("sartan") || t.includes("sartan") || t.endsWith("\u0633\u0627\u0631\u062A\u0627\u0646") || t.includes("\u0633\u0627\u0631\u062A\u0627\u0646")) {
+    if (!classes.includes("raas_inhibitor")) classes.push("raas_inhibitor", "hyperkalemia_risk", "nephrotoxic_triple_whammy");
   }
-
-  // DHP Calcium Channel Blockers (-dipine / ديبين)
-  if (t.endsWith('dipine') || t.includes('dipine') || t.endsWith('ديبين') || t.includes('ديبين')) {
-    if (!classes.includes('ccb_dhp')) classes.push('ccb_dhp', 'antihypertensive');
+  if (t.endsWith("dipine") || t.includes("dipine") || t.endsWith("\u062F\u064A\u0628\u064A\u0646") || t.includes("\u062F\u064A\u0628\u064A\u0646")) {
+    if (!classes.includes("ccb_dhp")) classes.push("ccb_dhp", "antihypertensive");
   }
-
-  // Proton Pump Inhibitors (-prazole / برازول)
-  if (t.endsWith('prazole') || t.includes('prazole') || t.endsWith('برازول') || t.includes('برازول')) {
-    if (!classes.includes('ppi')) classes.push('ppi');
-    if ((t.includes('omeprazole') || t.includes('اوميبرازول') || t.includes('esomeprazole') || t.includes('ايزوميبرازول')) && !classes.includes('cyp2c19_inhibitor')) {
-      classes.push('cyp2c19_inhibitor', 'ppi_omeprazole');
+  if (t.endsWith("prazole") || t.includes("prazole") || t.endsWith("\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("\u0628\u0631\u0627\u0632\u0648\u0644")) {
+    if (!classes.includes("ppi")) classes.push("ppi");
+    if ((t.includes("omeprazole") || t.includes("\u0627\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644") || t.includes("esomeprazole") || t.includes("\u0627\u064A\u0632\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644")) && !classes.includes("cyp2c19_inhibitor")) {
+      classes.push("cyp2c19_inhibitor", "ppi_omeprazole");
     }
   }
-
-  // PDE-5 Inhibitors (-afil / افيل)
-  if (t.endsWith('afil') || t.includes('afil') || t.endsWith('افيل') || t.includes('افيل') || t.includes('نافيل')) {
-    if (!classes.includes('pde5_inhibitor')) classes.push('pde5_inhibitor', 'vasodilator');
+  if (t.endsWith("afil") || t.includes("afil") || t.endsWith("\u0627\u0641\u064A\u0644") || t.includes("\u0627\u0641\u064A\u0644") || t.includes("\u0646\u0627\u0641\u064A\u0644")) {
+    if (!classes.includes("pde5_inhibitor")) classes.push("pde5_inhibitor", "vasodilator");
   }
-
-  // Azole Antifungals (-conazole / -azole / كونازول)
-  if (t.includes('conazol') || t.includes('كونازول') || t.includes('فلوكونازول') || t.includes('ايتراكونازول') || t.includes('كيتوكونازول')) {
-    if (!classes.includes('azole_antifungal')) {
-      classes.push('azole_antifungal', 'cyp3a4_strong_inhibitor', 'cyp2c9_inhibitor', 'qt_prolonging');
+  if (t.includes("conazol") || t.includes("\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("\u0641\u0644\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("\u0627\u064A\u062A\u0631\u0627\u0643\u0648\u0646\u0627\u0632\u0648\u0644") || t.includes("\u0643\u064A\u062A\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644")) {
+    if (!classes.includes("azole_antifungal")) {
+      classes.push("azole_antifungal", "cyp3a4_strong_inhibitor", "cyp2c9_inhibitor", "qt_prolonging");
     }
   }
-
-  // DOACs (-xaban / كسابان / جاتران)
-  if (t.endsWith('xaban') || t.includes('xaban') || t.endsWith('كسابان') || t.includes('كسابان') || t.includes('gatran') || t.includes('جاتران')) {
-    if (!classes.includes('anticoagulant')) classes.push('anticoagulant_doac', 'anticoagulant', 'bleeding_risk');
+  if (t.endsWith("xaban") || t.includes("xaban") || t.endsWith("\u0643\u0633\u0627\u0628\u0627\u0646") || t.includes("\u0643\u0633\u0627\u0628\u0627\u0646") || t.includes("gatran") || t.includes("\u062C\u0627\u062A\u0631\u0627\u0646")) {
+    if (!classes.includes("anticoagulant")) classes.push("anticoagulant_doac", "anticoagulant", "bleeding_risk");
   }
-
-  // Heparins / LMWH (-parin / بارين)
-  if (t.includes('parin') || t.includes('بارين')) {
-    if (!classes.includes('anticoagulant')) classes.push('anticoagulant_heparin', 'anticoagulant', 'bleeding_risk');
+  if (t.includes("parin") || t.includes("\u0628\u0627\u0631\u064A\u0646")) {
+    if (!classes.includes("anticoagulant")) classes.push("anticoagulant_heparin", "anticoagulant", "bleeding_risk");
   }
-
-  // SGLT2 Inhibitors (-gliflozin / جليفلوزين)
-  if (t.includes('gliflozin') || t.includes('جليفلوزين') || t.includes('جليفلوتسين')) {
-    if (!classes.includes('sglt2_inhibitor')) classes.push('sglt2_inhibitor', 'antidiabetic', 'dehydration_risk');
+  if (t.includes("gliflozin") || t.includes("\u062C\u0644\u064A\u0641\u0644\u0648\u0632\u064A\u0646") || t.includes("\u062C\u0644\u064A\u0641\u0644\u0648\u062A\u0633\u064A\u0646")) {
+    if (!classes.includes("sglt2_inhibitor")) classes.push("sglt2_inhibitor", "antidiabetic", "dehydration_risk");
   }
-
-  // DPP-4 Inhibitors (-gliptin / جليبتين)
-  if (t.includes('gliptin') || t.includes('جليبتين')) {
-    if (!classes.includes('antidiabetic')) classes.push('antidiabetic');
+  if (t.includes("gliptin") || t.includes("\u062C\u0644\u064A\u0628\u062A\u064A\u0646")) {
+    if (!classes.includes("antidiabetic")) classes.push("antidiabetic");
   }
-
-  // GLP-1 Agonists (-glutide / -tide / جلوتايد / تايد)
-  if (t.includes('glutide') || t.includes('جلوتايد') || t.includes('جلوتيد')) {
-    if (!classes.includes('glp1_agonist')) classes.push('glp1_agonist', 'antidiabetic', 'delayed_gastric_emptying');
+  if (t.includes("glutide") || t.includes("\u062C\u0644\u0648\u062A\u0627\u064A\u062F") || t.includes("\u062C\u0644\u0648\u062A\u064A\u062F")) {
+    if (!classes.includes("glp1_agonist")) classes.push("glp1_agonist", "antidiabetic", "delayed_gastric_emptying");
   }
-
-  // Benzodiazepines (-azepam / -azolam / ازيبام / ازولام)
-  if (t.includes('azepam') || t.includes('azolam') || t.includes('ازيبام') || t.includes('ازولام')) {
-    if (!classes.includes('sedative_benzodiazepine')) classes.push('sedative_benzodiazepine', 'cns_respiratory_depressant');
+  if (t.includes("azepam") || t.includes("azolam") || t.includes("\u0627\u0632\u064A\u0628\u0627\u0645") || t.includes("\u0627\u0632\u0648\u0644\u0627\u0645")) {
+    if (!classes.includes("sedative_benzodiazepine")) classes.push("sedative_benzodiazepine", "cns_respiratory_depressant");
   }
-
-  // Tetracyclines (-cycline / سايكلين / سيكلين)
-  if (t.includes('cycline') || t.includes('سايكلين') || t.includes('سيكلين')) {
-    if (!classes.includes('chelation_risk')) classes.push('chelation_risk', 'tetracycline', 'antimicrobial');
+  if (t.includes("cycline") || t.includes("\u0633\u0627\u064A\u0643\u0644\u064A\u0646") || t.includes("\u0633\u064A\u0643\u0644\u064A\u0646")) {
+    if (!classes.includes("chelation_risk")) classes.push("chelation_risk", "tetracycline", "antimicrobial");
   }
-
-  // Macrolides (-thromycin / ثرومايسين / ثروميسين)
-  if (t.includes('thromycin') || t.includes('ثرومايسين') || t.includes('ثروميسين') || t.includes('ثرومايسن')) {
-    if (!classes.includes('macrolide')) classes.push('macrolide', 'qt_prolonging');
-    if ((t.includes('clarithro') || t.includes('كلاريثرو') || t.includes('erythro') || t.includes('اريثرو')) && !classes.includes('cyp3a4_strong_inhibitor')) {
-      classes.push('macrolide_potent', 'cyp3a4_strong_inhibitor');
+  if (t.includes("thromycin") || t.includes("\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u064A\u0646") || t.includes("\u062B\u0631\u0648\u0645\u064A\u0633\u064A\u0646") || t.includes("\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u0646")) {
+    if (!classes.includes("macrolide")) classes.push("macrolide", "qt_prolonging");
+    if ((t.includes("clarithro") || t.includes("\u0643\u0644\u0627\u0631\u064A\u062B\u0631\u0648") || t.includes("erythro") || t.includes("\u0627\u0631\u064A\u062B\u0631\u0648")) && !classes.includes("cyp3a4_strong_inhibitor")) {
+      classes.push("macrolide_potent", "cyp3a4_strong_inhibitor");
     }
-    if ((t.includes('azithro') || t.includes('ازيثر') || t.includes('أزيثر') || t.includes('زيزرو')) && !classes.includes('azithromycin')) {
-      classes.push('azithromycin');
+    if ((t.includes("azithro") || t.includes("\u0627\u0632\u064A\u062B\u0631") || t.includes("\u0623\u0632\u064A\u062B\u0631") || t.includes("\u0632\u064A\u0632\u0631\u0648")) && !classes.includes("azithromycin")) {
+      classes.push("azithromycin");
     }
   }
-
   return { name, classes };
 }
-
-export function evaluatePair(drugA, drugB) {
+function evaluatePair(drugA, drugB) {
   const cA = drugA.classes;
   const cB = drugB.classes;
-  const has = c => cA.includes(c) || cB.includes(c);
-  const both = (c1, c2) => (cA.includes(c1) && cB.includes(c2)) || (cA.includes(c2) && cB.includes(c1));
-
-  // 1. Sildenafil/Tadalafil + Nitrates
-  if (both('pde5_inhibitor', 'nitrate')) {
+  const has = (c) => cA.includes(c) || cB.includes(c);
+  const both = (c1, c2) => cA.includes(c1) && cB.includes(c2) || cA.includes(c2) && cB.includes(c1);
+  if (both("pde5_inhibitor", "nitrate")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض مميت ومحظور قطعياً (هبوط ضغط كارثي)',
-      mechanism: 'التثبيط المزدوج لأنزيم الفسفوديستراز مع تحفيز أوكسيد النيتريك يؤدي إلى تراكم هائل لمركب cGMP، مما يسبب توسعاً وعائياً حاداً وهبوطاً كارثياً في الضغط لا يستجيب للسوائل واحتشاء عضلة القلب.',
-      recommendation: 'يحظر الجمع بينهما مطلقاً. يجب الامتناع عن أخذ النيترات لمدة 24 ساعة بعد السيلدينافيل و48 ساعة بعد التادالافيل (سياليس).'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u0645\u0645\u064A\u062A \u0648\u0645\u062D\u0638\u0648\u0631 \u0642\u0637\u0639\u064A\u0627\u064B (\u0647\u0628\u0648\u0637 \u0636\u063A\u0637 \u0643\u0627\u0631\u062B\u064A)",
+      mechanism: "\u0627\u0644\u062A\u062B\u0628\u064A\u0637 \u0627\u0644\u0645\u0632\u062F\u0648\u062C \u0644\u0623\u0646\u0632\u064A\u0645 \u0627\u0644\u0641\u0633\u0641\u0648\u062F\u064A\u0633\u062A\u0631\u0627\u0632 \u0645\u0639 \u062A\u062D\u0641\u064A\u0632 \u0623\u0648\u0643\u0633\u064A\u062F \u0627\u0644\u0646\u064A\u062A\u0631\u064A\u0643 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0631\u0627\u0643\u0645 \u0647\u0627\u0626\u0644 \u0644\u0645\u0631\u0643\u0628 cGMP\u060C \u0645\u0645\u0627 \u064A\u0633\u0628\u0628 \u062A\u0648\u0633\u0639\u0627\u064B \u0648\u0639\u0627\u0626\u064A\u0627\u064B \u062D\u0627\u062F\u0627\u064B \u0648\u0647\u0628\u0648\u0637\u0627\u064B \u0643\u0627\u0631\u062B\u064A\u0627\u064B \u0641\u064A \u0627\u0644\u0636\u063A\u0637 \u0644\u0627 \u064A\u0633\u062A\u062C\u064A\u0628 \u0644\u0644\u0633\u0648\u0627\u0626\u0644 \u0648\u0627\u062D\u062A\u0634\u0627\u0621 \u0639\u0636\u0644\u0629 \u0627\u0644\u0642\u0644\u0628.",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646\u0647\u0645\u0627 \u0645\u0637\u0644\u0642\u0627\u064B. \u064A\u062C\u0628 \u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0639\u0646 \u0623\u062E\u0630 \u0627\u0644\u0646\u064A\u062A\u0631\u0627\u062A \u0644\u0645\u062F\u0629 24 \u0633\u0627\u0639\u0629 \u0628\u0639\u062F \u0627\u0644\u0633\u064A\u0644\u062F\u064A\u0646\u0627\u0641\u064A\u0644 \u064848 \u0633\u0627\u0639\u0629 \u0628\u0639\u062F \u0627\u0644\u062A\u0627\u062F\u0627\u0644\u0627\u0641\u064A\u0644 (\u0633\u064A\u0627\u0644\u064A\u0633)."
     };
   }
-
-  // 2. Anticoagulant + NSAID / Antiplatelet
-  if (
-    (has('anticoagulant_vka') || has('anticoagulant_doac') || has('anticoagulant_heparin')) &&
-    (has('nsaid') || has('antiplatelet_aspirin') || has('antiplatelet_p2y12'))
-  ) {
+  if ((has("anticoagulant_vka") || has("anticoagulant_doac") || has("anticoagulant_heparin")) && (has("nsaid") || has("antiplatelet_aspirin") || has("antiplatelet_p2y12"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (خطر نزيف هضمي ودماغي مهدد للحياة)',
-      mechanism: 'مضاد التخثر يعطل عوامل التجلط بينما مضاد الالتهاب أو الصفائح يعطل وظيفة الصفيحات الدموية ويسبب تآكلاً موضعياً لمخاطية المعدة، مما يضاعف خطر النزيف النزفي الحاد بمقدار 3 إلى 5 أضعاف.',
-      recommendation: 'تجنب الجمع التام واستبدال المسكن بالباراسيتامول كبديل مسكن آمن. إذا كان الجمع بين الأسبرين ومضاد التخثر موصوفاً من طبيب القلب لدعامات الشرايين، يجب حماية المعدة بحامي PPI ومراقبة علامات النزيف.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u062E\u0637\u0631 \u0646\u0632\u064A\u0641 \u0647\u0636\u0645\u064A \u0648\u062F\u0645\u0627\u063A\u064A \u0645\u0647\u062F\u062F \u0644\u0644\u062D\u064A\u0627\u0629)",
+      mechanism: "\u0645\u0636\u0627\u062F \u0627\u0644\u062A\u062E\u062B\u0631 \u064A\u0639\u0637\u0644 \u0639\u0648\u0627\u0645\u0644 \u0627\u0644\u062A\u062C\u0644\u0637 \u0628\u064A\u0646\u0645\u0627 \u0645\u0636\u0627\u062F \u0627\u0644\u0627\u0644\u062A\u0647\u0627\u0628 \u0623\u0648 \u0627\u0644\u0635\u0641\u0627\u0626\u062D \u064A\u0639\u0637\u0644 \u0648\u0638\u064A\u0641\u0629 \u0627\u0644\u0635\u0641\u064A\u062D\u0627\u062A \u0627\u0644\u062F\u0645\u0648\u064A\u0629 \u0648\u064A\u0633\u0628\u0628 \u062A\u0622\u0643\u0644\u0627\u064B \u0645\u0648\u0636\u0639\u064A\u0627\u064B \u0644\u0645\u062E\u0627\u0637\u064A\u0629 \u0627\u0644\u0645\u0639\u062F\u0629\u060C \u0645\u0645\u0627 \u064A\u0636\u0627\u0639\u0641 \u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u064A\u0641 \u0627\u0644\u0646\u0632\u0641\u064A \u0627\u0644\u062D\u0627\u062F \u0628\u0645\u0642\u062F\u0627\u0631 3 \u0625\u0644\u0649 5 \u0623\u0636\u0639\u0627\u0641.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0627\u0644\u062C\u0645\u0639 \u0627\u0644\u062A\u0627\u0645 \u0648\u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0645\u0633\u0643\u0646 \u0628\u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 \u0643\u0628\u062F\u064A\u0644 \u0645\u0633\u0643\u0646 \u0622\u0645\u0646. \u0625\u0630\u0627 \u0643\u0627\u0646 \u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646 \u0627\u0644\u0623\u0633\u0628\u0631\u064A\u0646 \u0648\u0645\u0636\u0627\u062F \u0627\u0644\u062A\u062E\u062B\u0631 \u0645\u0648\u0635\u0648\u0641\u0627\u064B \u0645\u0646 \u0637\u0628\u064A\u0628 \u0627\u0644\u0642\u0644\u0628 \u0644\u062F\u0639\u0627\u0645\u0627\u062A \u0627\u0644\u0634\u0631\u0627\u064A\u064A\u0646\u060C \u064A\u062C\u0628 \u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0645\u0639\u062F\u0629 \u0628\u062D\u0627\u0645\u064A PPI \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0639\u0644\u0627\u0645\u0627\u062A \u0627\u0644\u0646\u0632\u064A\u0641."
     };
   }
-
-  // 2.1. Anticoagulant (Warfarin/VKA/DOAC) + Macrolides (Azithromycin, Clarithromycin, Erythromycin) -> CRITICAL BLEEDING & HIGH INR
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && (has('macrolide') || has('azithromycin'))) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && (has("macrolide") || has("azithromycin"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (ارتفاع حاد في نسبة السيولة INR وخطر نزيف مهدد للحياة)',
-      mechanism: 'المضادات الحيوية الماكروليدية (خاصة الأزيثرومايسين والكلاريثرومايسين) تقضي على البكتيريا المعوية المصنعة لفيتامين K، وتثبط استقلاب الوارفارين أو تطرحه، مما يؤدي إلى قفزة مفاجئة وحادة في معدل السيولة (INR) مسببة نزيفاً باطنياً أو دماغياً مهدداً للحياة.',
-      recommendation: 'تجنب الجمع قدر الإمكان واختيار مضاد حيوي بديل، أو إجراء فحص سيولة الدم (INR) بعد 3 إلى 5 أيام من بدء المضاد مع تخفيض جرعة الوارفارين بنسبة 25% إلى 50% ومراقبة علامات النزف فوراً.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0627\u062F \u0641\u064A \u0646\u0633\u0628\u0629 \u0627\u0644\u0633\u064A\u0648\u0644\u0629 INR \u0648\u062E\u0637\u0631 \u0646\u0632\u064A\u0641 \u0645\u0647\u062F\u062F \u0644\u0644\u062D\u064A\u0627\u0629)",
+      mechanism: "\u0627\u0644\u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062D\u064A\u0648\u064A\u0629 \u0627\u0644\u0645\u0627\u0643\u0631\u0648\u0644\u064A\u062F\u064A\u0629 (\u062E\u0627\u0635\u0629 \u0627\u0644\u0623\u0632\u064A\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u064A\u0646 \u0648\u0627\u0644\u0643\u0644\u0627\u0631\u064A\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u064A\u0646) \u062A\u0642\u0636\u064A \u0639\u0644\u0649 \u0627\u0644\u0628\u0643\u062A\u064A\u0631\u064A\u0627 \u0627\u0644\u0645\u0639\u0648\u064A\u0629 \u0627\u0644\u0645\u0635\u0646\u0639\u0629 \u0644\u0641\u064A\u062A\u0627\u0645\u064A\u0646 K\u060C \u0648\u062A\u062B\u0628\u0637 \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0623\u0648 \u062A\u0637\u0631\u062D\u0647\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u0642\u0641\u0632\u0629 \u0645\u0641\u0627\u062C\u0626\u0629 \u0648\u062D\u0627\u062F\u0629 \u0641\u064A \u0645\u0639\u062F\u0644 \u0627\u0644\u0633\u064A\u0648\u0644\u0629 (INR) \u0645\u0633\u0628\u0628\u0629 \u0646\u0632\u064A\u0641\u0627\u064B \u0628\u0627\u0637\u0646\u064A\u0627\u064B \u0623\u0648 \u062F\u0645\u0627\u063A\u064A\u0627\u064B \u0645\u0647\u062F\u062F\u0627\u064B \u0644\u0644\u062D\u064A\u0627\u0629.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0627\u0644\u062C\u0645\u0639 \u0642\u062F\u0631 \u0627\u0644\u0625\u0645\u0643\u0627\u0646 \u0648\u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0636\u0627\u062F \u062D\u064A\u0648\u064A \u0628\u062F\u064A\u0644\u060C \u0623\u0648 \u0625\u062C\u0631\u0627\u0621 \u0641\u062D\u0635 \u0633\u064A\u0648\u0644\u0629 \u0627\u0644\u062F\u0645 (INR) \u0628\u0639\u062F 3 \u0625\u0644\u0649 5 \u0623\u064A\u0627\u0645 \u0645\u0646 \u0628\u062F\u0621 \u0627\u0644\u0645\u0636\u0627\u062F \u0645\u0639 \u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 25% \u0625\u0644\u0649 50% \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0639\u0644\u0627\u0645\u0627\u062A \u0627\u0644\u0646\u0632\u0641 \u0641\u0648\u0631\u0627\u064B."
     };
   }
-
-  // 2.2. Anticoagulant + Fluoroquinolones (Ciprofloxacin, Levofloxacin) -> CRITICAL BLEEDING
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('quinolone')) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && has("quinolone")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (ارتفاع حاد ومفاجئ في سيولة الدم INR)',
-      mechanism: 'الفلوروكينولونات تثبط الاستقلاب الكبدي للوارفارين وتستنزف البكتيريا المعوية المنتجة لفيتامين K، مما يرفع زمن البروثرومبين وخطر النزيف الحاد بمقدار 3 أضعاف.',
-      recommendation: 'مراقبة لصيقة لمعدل INR وتخفيض جرعة الوارفارين أو استخدام مضاد حيوي بديل لا يتداخل كبدياً.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0627\u062F \u0648\u0645\u0641\u0627\u062C\u0626 \u0641\u064A \u0633\u064A\u0648\u0644\u0629 \u0627\u0644\u062F\u0645 INR)",
+      mechanism: "\u0627\u0644\u0641\u0644\u0648\u0631\u0648\u0643\u064A\u0646\u0648\u0644\u0648\u0646\u0627\u062A \u062A\u062B\u0628\u0637 \u0627\u0644\u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0643\u0628\u062F\u064A \u0644\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0648\u062A\u0633\u062A\u0646\u0632\u0641 \u0627\u0644\u0628\u0643\u062A\u064A\u0631\u064A\u0627 \u0627\u0644\u0645\u0639\u0648\u064A\u0629 \u0627\u0644\u0645\u0646\u062A\u062C\u0629 \u0644\u0641\u064A\u062A\u0627\u0645\u064A\u0646 K\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u0632\u0645\u0646 \u0627\u0644\u0628\u0631\u0648\u062B\u0631\u0648\u0645\u0628\u064A\u0646 \u0648\u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u064A\u0641 \u0627\u0644\u062D\u0627\u062F \u0628\u0645\u0642\u062F\u0627\u0631 3 \u0623\u0636\u0639\u0627\u0641.",
+      recommendation: "\u0645\u0631\u0627\u0642\u0628\u0629 \u0644\u0635\u064A\u0642\u0629 \u0644\u0645\u0639\u062F\u0644 INR \u0648\u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0623\u0648 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0645\u0636\u0627\u062F \u062D\u064A\u0648\u064A \u0628\u062F\u064A\u0644 \u0644\u0627 \u064A\u062A\u062F\u0627\u062E\u0644 \u0643\u0628\u062F\u064A\u0627\u064B."
     };
   }
-
-  // 2.3. Anticoagulant + Metronidazole (Flagyl) -> CRITICAL BLEEDING (CYP2C9 INHIBITION)
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('metronidazole')) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && has("metronidazole")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج جداً (تثبيط عنيف لـ CYP2C9 ونزيف تلقائي مميت)',
-      mechanism: 'الميترونيدازول يثبط بشدة إنزيم CYP2C9 المسؤول عن التخلص من المتماكب الفعال للوارفارين (S-warfarin)، مما يرفع تركيزه لأكثر من 3 أضعاف ويسبب قفزة كارثية في INR (>10).',
-      recommendation: 'يحظر الجمع دون تخفيض جرعة الوارفارين فوراً بمقدار النصف (50%) وإجراء فحص INR كل 48 ساعة.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C \u062C\u062F\u0627\u064B (\u062A\u062B\u0628\u064A\u0637 \u0639\u0646\u064A\u0641 \u0644\u0640 CYP2C9 \u0648\u0646\u0632\u064A\u0641 \u062A\u0644\u0642\u0627\u0626\u064A \u0645\u0645\u064A\u062A)",
+      mechanism: "\u0627\u0644\u0645\u064A\u062A\u0631\u0648\u0646\u064A\u062F\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0628\u0634\u062F\u0629 \u0625\u0646\u0632\u064A\u0645 CYP2C9 \u0627\u0644\u0645\u0633\u0624\u0648\u0644 \u0639\u0646 \u0627\u0644\u062A\u062E\u0644\u0635 \u0645\u0646 \u0627\u0644\u0645\u062A\u0645\u0627\u0643\u0628 \u0627\u0644\u0641\u0639\u0627\u0644 \u0644\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 (S-warfarin)\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632\u0647 \u0644\u0623\u0643\u062B\u0631 \u0645\u0646 3 \u0623\u0636\u0639\u0627\u0641 \u0648\u064A\u0633\u0628\u0628 \u0642\u0641\u0632\u0629 \u0643\u0627\u0631\u062B\u064A\u0629 \u0641\u064A INR (>10).",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u062F\u0648\u0646 \u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0641\u0648\u0631\u0627\u064B \u0628\u0645\u0642\u062F\u0627\u0631 \u0627\u0644\u0646\u0635\u0641 (50%) \u0648\u0625\u062C\u0631\u0627\u0621 \u0641\u062D\u0635 INR \u0643\u0644 48 \u0633\u0627\u0639\u0629."
     };
   }
-
-  // 2.4. Anticoagulant + Azole Antifungals (Fluconazole, Ketoconazole) -> CRITICAL BLEEDING
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('azole_antifungal')) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && has("azole_antifungal")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج جداً (تثبيط كبدي لـ CYP2C9 ونزيف حاد)',
-      mechanism: 'الفلوكونازول يثبط بشدة استقلاب الوارفارين الكبدي، مما يؤدي إلى تراكم دوائي خطير وارتفاع حرج للـ INR مع خطر نزيف هضمي أو مخي.',
-      recommendation: 'خفض جرعة الوارفارين بنسبة 50% وفحص الـ INR بعد 48 ساعة من بدء مضاد الفطريات.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C \u062C\u062F\u0627\u064B (\u062A\u062B\u0628\u064A\u0637 \u0643\u0628\u062F\u064A \u0644\u0640 CYP2C9 \u0648\u0646\u0632\u064A\u0641 \u062D\u0627\u062F)",
+      mechanism: "\u0627\u0644\u0641\u0644\u0648\u0643\u0648\u0646\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0628\u0634\u062F\u0629 \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0627\u0644\u0643\u0628\u062F\u064A\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0631\u0627\u0643\u0645 \u062F\u0648\u0627\u0626\u064A \u062E\u0637\u064A\u0631 \u0648\u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0631\u062C \u0644\u0644\u0640 INR \u0645\u0639 \u062E\u0637\u0631 \u0646\u0632\u064A\u0641 \u0647\u0636\u0645\u064A \u0623\u0648 \u0645\u062E\u064A.",
+      recommendation: "\u062E\u0641\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 50% \u0648\u0641\u062D\u0635 \u0627\u0644\u0640 INR \u0628\u0639\u062F 48 \u0633\u0627\u0639\u0629 \u0645\u0646 \u0628\u062F\u0621 \u0645\u0636\u0627\u062F \u0627\u0644\u0641\u0637\u0631\u064A\u0627\u062A."
     };
   }
-
-  // 2.5. Anticoagulant + Cotrimoxazole (Bactrim / Septra) -> CRITICAL BLEEDING
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('cotrimoxazole')) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && has("cotrimoxazole")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج جداً (ازدواجية تثبيط استقلاب الوارفارين واستنزاف فيتامين K)',
-      mechanism: 'السلفاميثوكسازول يثبط إنزيم CYP2C9 بينما يثبط التريميثوبريم المسار الإنزيمي، مما يسبب قفزة خطيرة ومفاجئة في الـ INR.',
-      recommendation: 'تجنب الجمع تماماً واستخدام مضاد بديل، أو خفض جرعة الوارفارين بنسبة 50% مع فحص دوري يومي للـ INR.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C \u062C\u062F\u0627\u064B (\u0627\u0632\u062F\u0648\u0627\u062C\u064A\u0629 \u062A\u062B\u0628\u064A\u0637 \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0648\u0627\u0633\u062A\u0646\u0632\u0627\u0641 \u0641\u064A\u062A\u0627\u0645\u064A\u0646 K)",
+      mechanism: "\u0627\u0644\u0633\u0644\u0641\u0627\u0645\u064A\u062B\u0648\u0643\u0633\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 CYP2C9 \u0628\u064A\u0646\u0645\u0627 \u064A\u062B\u0628\u0637 \u0627\u0644\u062A\u0631\u064A\u0645\u064A\u062B\u0648\u0628\u0631\u064A\u0645 \u0627\u0644\u0645\u0633\u0627\u0631 \u0627\u0644\u0625\u0646\u0632\u064A\u0645\u064A\u060C \u0645\u0645\u0627 \u064A\u0633\u0628\u0628 \u0642\u0641\u0632\u0629 \u062E\u0637\u064A\u0631\u0629 \u0648\u0645\u0641\u0627\u062C\u0626\u0629 \u0641\u064A \u0627\u0644\u0640 INR.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0627\u0644\u062C\u0645\u0639 \u062A\u0645\u0627\u0645\u0627\u064B \u0648\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0645\u0636\u0627\u062F \u0628\u062F\u064A\u0644\u060C \u0623\u0648 \u062E\u0641\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 50% \u0645\u0639 \u0641\u062D\u0635 \u062F\u0648\u0631\u064A \u064A\u0648\u0645\u064A \u0644\u0644\u0640 INR."
     };
   }
-
-  // 2.6. Anticoagulant + SSRIs (Zoloft, Cipralex, Prozac) -> CRITICAL BLEEDING
-  if ((has('anticoagulant_vka') || has('anticoagulant')) && has('serotonergic_antidepressant')) {
+  if ((has("anticoagulant_vka") || has("anticoagulant")) && has("serotonergic_antidepressant")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (مضاعفة خطر النزيف الهضمي عبر شلل الصفائح)',
-      mechanism: 'مضادات الاكتئاب SSRI تمنع إعادة امتصاص السيروتونين داخل الصفائح الدموية مما يشل وظيفتها التراكمية، وعند اجتماعها مع مميع الدم يتضاعف خطر النزف الهضمي 4 أضعاف.',
-      recommendation: 'إعطاء دواء واقٍ للمعدة (PPI) ومراقبة علامات النزيف الخفي والبراز الأسود.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0645\u0636\u0627\u0639\u0641\u0629 \u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u064A\u0641 \u0627\u0644\u0647\u0636\u0645\u064A \u0639\u0628\u0631 \u0634\u0644\u0644 \u0627\u0644\u0635\u0641\u0627\u0626\u062D)",
+      mechanism: "\u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u0627\u0643\u062A\u0626\u0627\u0628 SSRI \u062A\u0645\u0646\u0639 \u0625\u0639\u0627\u062F\u0629 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0633\u064A\u0631\u0648\u062A\u0648\u0646\u064A\u0646 \u062F\u0627\u062E\u0644 \u0627\u0644\u0635\u0641\u0627\u0626\u062D \u0627\u0644\u062F\u0645\u0648\u064A\u0629 \u0645\u0645\u0627 \u064A\u0634\u0644 \u0648\u0638\u064A\u0641\u062A\u0647\u0627 \u0627\u0644\u062A\u0631\u0627\u0643\u0645\u064A\u0629\u060C \u0648\u0639\u0646\u062F \u0627\u062C\u062A\u0645\u0627\u0639\u0647\u0627 \u0645\u0639 \u0645\u0645\u064A\u0639 \u0627\u0644\u062F\u0645 \u064A\u062A\u0636\u0627\u0639\u0641 \u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u0641 \u0627\u0644\u0647\u0636\u0645\u064A 4 \u0623\u0636\u0639\u0627\u0641.",
+      recommendation: "\u0625\u0639\u0637\u0627\u0621 \u062F\u0648\u0627\u0621 \u0648\u0627\u0642\u064D \u0644\u0644\u0645\u0639\u062F\u0629 (PPI) \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0639\u0644\u0627\u0645\u0627\u062A \u0627\u0644\u0646\u0632\u064A\u0641 \u0627\u0644\u062E\u0641\u064A \u0648\u0627\u0644\u0628\u0631\u0627\u0632 \u0627\u0644\u0623\u0633\u0648\u062F."
     };
   }
-
-  // 2.7. Anticoagulant + Statins -> MODERATE INTERACTION
-  if (has('anticoagulant_vka') && has('statin')) {
+  if (has("anticoagulant_vka") && has("statin")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض استقلابي متوسط (زيادة طفيفة في زمن التخثر INR)',
-      mechanism: 'الستاتينات تنافس الوارفارين جزئياً على إنزيمات السيتوكروم الكبدية والارتباط بالبروتين، مما قد يرفع الـ INR بنسبة 15-20%.',
-      recommendation: 'فحص الـ INR بعد أسبوع من بدء الستاتين أو تعديل جرعته.'
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0627\u0633\u062A\u0642\u0644\u0627\u0628\u064A \u0645\u062A\u0648\u0633\u0637 (\u0632\u064A\u0627\u062F\u0629 \u0637\u0641\u064A\u0641\u0629 \u0641\u064A \u0632\u0645\u0646 \u0627\u0644\u062A\u062E\u062B\u0631 INR)",
+      mechanism: "\u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646\u0627\u062A \u062A\u0646\u0627\u0641\u0633 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u062C\u0632\u0626\u064A\u0627\u064B \u0639\u0644\u0649 \u0625\u0646\u0632\u064A\u0645\u0627\u062A \u0627\u0644\u0633\u064A\u062A\u0648\u0643\u0631\u0648\u0645 \u0627\u0644\u0643\u0628\u062F\u064A\u0629 \u0648\u0627\u0644\u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u0627\u0644\u0628\u0631\u0648\u062A\u064A\u0646\u060C \u0645\u0645\u0627 \u0642\u062F \u064A\u0631\u0641\u0639 \u0627\u0644\u0640 INR \u0628\u0646\u0633\u0628\u0629 15-20%.",
+      recommendation: "\u0641\u062D\u0635 \u0627\u0644\u0640 INR \u0628\u0639\u062F \u0623\u0633\u0628\u0648\u0639 \u0645\u0646 \u0628\u062F\u0621 \u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646 \u0623\u0648 \u062A\u0639\u062F\u064A\u0644 \u062C\u0631\u0639\u062A\u0647."
     };
   }
-
-  // 3. Statin + Strong CYP3A4 Inhibitor
-  if (both('statin_cyp3a4', 'cyp3a4_strong_inhibitor')) {
+  if (both("anticoagulant", "anticoagulant")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (انحلال الربيدات العضلية الحاد وفشل كلوي)',
-      mechanism: 'المثبط القوي لإنزيم CYP3A4 يمنع الاستقلاب الكبدي للستاتين، مما يرفع تركيز الستاتين في الدم لأكثر من 10 أضعاف مسبباً تحلل الألياف العضلية السريع، بيلة الميوغلوبين وفشلاً كلوياً حاداً.',
-      recommendation: 'إيقاف الستاتين مؤقتاً طوال فترة العلاج بالمضاد الحيوي واستئنافه بعد يومين من انتهاء الجرعة، أو استبدال المضاد بالأزيثرومايسين الذي لا يثبط CYP3A4.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0627\u0632\u062F\u0648\u0627\u062C\u064A\u0629 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062A\u062E\u062B\u0631)",
+      mechanism: "\u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646 \u062F\u0648\u0627\u0626\u064A\u0646 \u0645\u0646 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062A\u062E\u062B\u0631 \u064A\u0633\u0628\u0628 \u0641\u0631\u0637 \u0633\u064A\u0648\u0644\u0629 \u062F\u0645\u0648\u064A \u0634\u062F\u064A\u062F \u0628\u062F\u0648\u0646 \u0641\u0627\u0626\u062F\u0629 \u0633\u0631\u064A\u0631\u064A\u0629 \u0625\u0636\u0627\u0641\u064A\u0629\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u0641 \u0627\u0644\u062A\u0644\u0642\u0627\u0626\u064A \u0627\u0644\u062D\u0627\u062F.",
+      recommendation: "\u0644\u0627 \u064A\u064F\u062C\u0645\u0639 \u0628\u064A\u0646 \u0645\u0636\u0627\u062F\u064A \u062A\u062E\u062B\u0631 \u0625\u0644\u0627 \u0623\u062B\u0646\u0627\u0621 \u0641\u062A\u0631\u0627\u062A \u0627\u0644\u062C\u0633\u0631 \u0627\u0644\u0639\u0644\u0627\u062C\u064A (Bridging) \u0627\u0644\u0645\u062D\u062F\u062F\u0629 \u0645\u0646 \u0627\u0633\u062A\u0634\u0627\u0631\u064A \u0623\u0645\u0631\u0627\u0636 \u0627\u0644\u062F\u0645 \u0648\u0627\u0644\u0642\u0644\u0628."
     };
   }
-
-  // 4. Metronidazole + Alcohol
-  if (both('metronidazole', 'alcohol') || both('disulfiram_reactive', 'alcohol')) {
+  if (both("statin_cyp3a4", "cyp3a4_strong_inhibitor")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تفاعل شبيه بالديسولفيرام (Disulfiram-like Reaction)',
-      mechanism: 'الميترونيدازول يثبط إنزيم ألدهيد ديهيدروجيناز، مما يؤدي إلى تراكم الأسيتالدهيد السام في الدم مسبباً خفقاناً عنيفاً، هبوط ضغط، احمراراً جلدياً شديداً، قيئاً وصداعاً نابضاً.',
-      recommendation: 'الامتناع التام عن تناول المشروبات الكحولية أو الأدوية المحتوية على كحول أثناء العلاج بالفلاجيل ولمدة 48 ساعة كاملة بعد آخر جرعة.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0627\u0646\u062D\u0644\u0627\u0644 \u0627\u0644\u0631\u0628\u064A\u062F\u0627\u062A \u0627\u0644\u0639\u0636\u0644\u064A\u0629 \u0627\u0644\u062D\u0627\u062F \u0648\u0641\u0634\u0644 \u0643\u0644\u0648\u064A)",
+      mechanism: "\u0627\u0644\u0645\u062B\u0628\u0637 \u0627\u0644\u0642\u0648\u064A \u0644\u0625\u0646\u0632\u064A\u0645 CYP3A4 \u064A\u0645\u0646\u0639 \u0627\u0644\u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0643\u0628\u062F\u064A \u0644\u0644\u0633\u062A\u0627\u062A\u064A\u0646\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646 \u0641\u064A \u0627\u0644\u062F\u0645 \u0644\u0623\u0643\u062B\u0631 \u0645\u0646 10 \u0623\u0636\u0639\u0627\u0641 \u0645\u0633\u0628\u0628\u0627\u064B \u062A\u062D\u0644\u0644 \u0627\u0644\u0623\u0644\u064A\u0627\u0641 \u0627\u0644\u0639\u0636\u0644\u064A\u0629 \u0627\u0644\u0633\u0631\u064A\u0639\u060C \u0628\u064A\u0644\u0629 \u0627\u0644\u0645\u064A\u0648\u063A\u0644\u0648\u0628\u064A\u0646 \u0648\u0641\u0634\u0644\u0627\u064B \u0643\u0644\u0648\u064A\u0627\u064B \u062D\u0627\u062F\u0627\u064B.",
+      recommendation: "\u0625\u064A\u0642\u0627\u0641 \u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646 \u0645\u0624\u0642\u062A\u0627\u064B \u0637\u0648\u0627\u0644 \u0641\u062A\u0631\u0629 \u0627\u0644\u0639\u0644\u0627\u062C \u0628\u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A \u0648\u0627\u0633\u062A\u0626\u0646\u0627\u0641\u0647 \u0628\u0639\u062F \u064A\u0648\u0645\u064A\u0646 \u0645\u0646 \u0627\u0646\u062A\u0647\u0627\u0621 \u0627\u0644\u062C\u0631\u0639\u0629\u060C \u0623\u0648 \u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0645\u0636\u0627\u062F \u0628\u0627\u0644\u0623\u0632\u064A\u062B\u0631\u0648\u0645\u0627\u064A\u0633\u064A\u0646 \u0627\u0644\u0630\u064A \u0644\u0627 \u064A\u062B\u0628\u0637 CYP3A4."
     };
   }
-
-  // 5. Digoxin + Amiodarone
-  if (both('digoxin', 'amiodarone') || both('digoxin', 'pgp_inhibitor')) {
+  if (both("metronidazole", "alcohol") || both("disulfiram_reactive", "alcohol")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (تسمم الديجوكسين القاتل ولانظميات بطينية)',
-      mechanism: 'تثبيط بروتين النقل P-glycoprotein في الكلى والأمعاء يؤدي إلى تضاعف تركيز الديجوكسين في الدم، مسبباً بطء قلب شديداً، إحصاراً أذينياً بطينياً وتسرعات بطينية قاتلة.',
-      recommendation: 'تخفيض جرعة الديجوكسين فوراً بنسبة 50% عند البدء، وإجراء تخطيط قلب ECG دوري وفحص تركيز الديجوكسين والشوارد في الدم.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0641\u0627\u0639\u0644 \u0634\u0628\u064A\u0647 \u0628\u0627\u0644\u062F\u064A\u0633\u0648\u0644\u0641\u064A\u0631\u0627\u0645 (Disulfiram-like Reaction)",
+      mechanism: "\u0627\u0644\u0645\u064A\u062A\u0631\u0648\u0646\u064A\u062F\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 \u0623\u0644\u062F\u0647\u064A\u062F \u062F\u064A\u0647\u064A\u062F\u0631\u0648\u062C\u064A\u0646\u0627\u0632\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0631\u0627\u0643\u0645 \u0627\u0644\u0623\u0633\u064A\u062A\u0627\u0644\u062F\u0647\u064A\u062F \u0627\u0644\u0633\u0627\u0645 \u0641\u064A \u0627\u0644\u062F\u0645 \u0645\u0633\u0628\u0628\u0627\u064B \u062E\u0641\u0642\u0627\u0646\u0627\u064B \u0639\u0646\u064A\u0641\u0627\u064B\u060C \u0647\u0628\u0648\u0637 \u0636\u063A\u0637\u060C \u0627\u062D\u0645\u0631\u0627\u0631\u0627\u064B \u062C\u0644\u062F\u064A\u0627\u064B \u0634\u062F\u064A\u062F\u0627\u064B\u060C \u0642\u064A\u0626\u0627\u064B \u0648\u0635\u062F\u0627\u0639\u0627\u064B \u0646\u0627\u0628\u0636\u0627\u064B.",
+      recommendation: "\u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0627\u0644\u062A\u0627\u0645 \u0639\u0646 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0643\u062D\u0648\u0644\u064A\u0629 \u0623\u0648 \u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u0645\u062D\u062A\u0648\u064A\u0629 \u0639\u0644\u0649 \u0643\u062D\u0648\u0644 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0639\u0644\u0627\u062C \u0628\u0627\u0644\u0641\u0644\u0627\u062C\u064A\u0644 \u0648\u0644\u0645\u062F\u0629 48 \u0633\u0627\u0639\u0629 \u0643\u0627\u0645\u0644\u0629 \u0628\u0639\u062F \u0622\u062E\u0631 \u062C\u0631\u0639\u0629."
     };
   }
-
-  // 6. Serotonergic Drugs + Tramadol
-  if (both('serotonergic_antidepressant', 'serotonergic_opioid')) {
+  if (both("digoxin", "amiodarone") || both("digoxin", "pgp_inhibitor") || both("digoxin", "cyp3a4_strong_inhibitor")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض خطير (متلازمة السيروتونين ونوبات صرعية)',
-      mechanism: 'التراكم المشترك للسيروتونين في المشابك العصبية بالدماغ يؤدي إلى فرط تحفيز مستقبلات 5-HT، مع خفض الترامادول لعتبة التشنجات مسبباً صلابة عضلية، فرط حرارة خبيثاً، رجفاناً وتشنجات.',
-      recommendation: 'تجنب الجمع واستخدام مسكنات بديلة آمنة غير أفيونية كباراسيتامول، أو مضادات التهاب تحت الإشراف.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u062A\u0633\u0645\u0645 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0627\u0644\u0642\u0627\u062A\u0644 \u0648\u0644\u0627\u0646\u0638\u0645\u064A\u0627\u062A \u0628\u0637\u064A\u0646\u064A\u0629)",
+      mechanism: "\u062A\u062B\u0628\u064A\u0637 \u0628\u0631\u0648\u062A\u064A\u0646 \u0627\u0644\u0646\u0642\u0644 P-glycoprotein \u0641\u064A \u0627\u0644\u0643\u0644\u0649 \u0648\u0627\u0644\u0623\u0645\u0639\u0627\u0621 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0636\u0627\u0639\u0641 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0641\u064A \u0627\u0644\u062F\u0645\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u0628\u0637\u0621 \u0642\u0644\u0628 \u0634\u062F\u064A\u062F\u0627\u064B\u060C \u0625\u062D\u0635\u0627\u0631\u0627\u064B \u0623\u0630\u064A\u0646\u064A\u0627\u064B \u0628\u0637\u064A\u0646\u064A\u0627\u064B \u0648\u062A\u0633\u0631\u0639\u0627\u062A \u0628\u0637\u064A\u0646\u064A\u0629 \u0642\u0627\u062A\u0644\u0629.",
+      recommendation: "\u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0641\u0648\u0631\u0627\u064B \u0628\u0646\u0633\u0628\u0629 50% \u0639\u0646\u062F \u0627\u0644\u0628\u062F\u0621\u060C \u0648\u0625\u062C\u0631\u0627\u0621 \u062A\u062E\u0637\u064A\u0637 \u0642\u0644\u0628 ECG \u062F\u0648\u0631\u064A \u0648\u0641\u062D\u0635 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0648\u0627\u0644\u0634\u0648\u0627\u0631\u062F \u0641\u064A \u0627\u0644\u062F\u0645."
     };
   }
-
-  // 7. Opioids + Benzodiazepines
-  if (both('opioid', 'sedative_benzodiazepine') || both('cns_respiratory_depressant', 'sedative_benzodiazepine')) {
+  if (both("serotonergic_antidepressant", "serotonergic_opioid")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تحذير الصندوق الأسود (تثبيط تنفسي حاد وغيبوبة)',
-      mechanism: 'التثبيط التآزري للجهاز العصبي المركزي ومراكز التنفس في جذع الدماغ يؤدي إلى نقص أكسجة حاد، توقف التنفس والغيبوبة.',
-      recommendation: 'يحظر الجمع إلا تحت إشراف طبي متخصص وفي أدنى جرعات ممكنة مع توفير الترياق (Naloxone) ومراقبة مستمرة للتنفس.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062E\u0637\u064A\u0631 (\u0645\u062A\u0644\u0627\u0632\u0645\u0629 \u0627\u0644\u0633\u064A\u0631\u0648\u062A\u0648\u0646\u064A\u0646 \u0648\u0646\u0648\u0628\u0627\u062A \u0635\u0631\u0639\u064A\u0629)",
+      mechanism: "\u0627\u0644\u062A\u0631\u0627\u0643\u0645 \u0627\u0644\u0645\u0634\u062A\u0631\u0643 \u0644\u0644\u0633\u064A\u0631\u0648\u062A\u0648\u0646\u064A\u0646 \u0641\u064A \u0627\u0644\u0645\u0634\u0627\u0628\u0643 \u0627\u0644\u0639\u0635\u0628\u064A\u0629 \u0628\u0627\u0644\u062F\u0645\u0627\u063A \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u0641\u0631\u0637 \u062A\u062D\u0641\u064A\u0632 \u0645\u0633\u062A\u0642\u0628\u0644\u0627\u062A 5-HT\u060C \u0645\u0639 \u062E\u0641\u0636 \u0627\u0644\u062A\u0631\u0627\u0645\u0627\u062F\u0648\u0644 \u0644\u0639\u062A\u0628\u0629 \u0627\u0644\u062A\u0634\u0646\u062C\u0627\u062A \u0645\u0633\u0628\u0628\u0627\u064B \u0635\u0644\u0627\u0628\u0629 \u0639\u0636\u0644\u064A\u0629\u060C \u0641\u0631\u0637 \u062D\u0631\u0627\u0631\u0629 \u062E\u0628\u064A\u062B\u0627\u064B\u060C \u0631\u062C\u0641\u0627\u0646\u0627\u064B \u0648\u062A\u0634\u0646\u062C\u0627\u062A.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0627\u0644\u062C\u0645\u0639 \u0648\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0645\u0633\u0643\u0646\u0627\u062A \u0628\u062F\u064A\u0644\u0629 \u0622\u0645\u0646\u0629 \u063A\u064A\u0631 \u0623\u0641\u064A\u0648\u0646\u064A\u0629 \u0643\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644\u060C \u0623\u0648 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062A\u0647\u0627\u0628 \u062A\u062D\u062A \u0627\u0644\u0625\u0634\u0631\u0627\u0641."
     };
   }
-
-  // 8. ACEi/ARB + K-sparing Diuretics
-  if (both('raas_inhibitor', 'k_sparing_agent')) {
+  if (both("opioid", "sedative_benzodiazepine") || both("cns_respiratory_depressant", "sedative_benzodiazepine")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض حذر (فرط بوتاسيوم الدم الشديد Hyperkalemia)',
-      mechanism: 'تثبيط مفرط لإفراز الألدوستيرون واحتباس البوتاسيوم في الكلى، مما يرفع البوتاسيوم لمستويات سامة تسبب اضطرابات نظم قلبية وتوقف عضلة القلب.',
-      recommendation: 'مراقبة مستوى البوتاسيوم ووظائف الكلى دورياً (أسبوعياً ثم شهرياً)، وتجنب أملاح البوتاسيوم وبدائل الملح الصناعية.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u062D\u0630\u064A\u0631 \u0627\u0644\u0635\u0646\u062F\u0648\u0642 \u0627\u0644\u0623\u0633\u0648\u062F (\u062A\u062B\u0628\u064A\u0637 \u062A\u0646\u0641\u0633\u064A \u062D\u0627\u062F \u0648\u063A\u064A\u0628\u0648\u0628\u0629)",
+      mechanism: "\u0627\u0644\u062A\u062B\u0628\u064A\u0637 \u0627\u0644\u062A\u0622\u0632\u0631\u064A \u0644\u0644\u062C\u0647\u0627\u0632 \u0627\u0644\u0639\u0635\u0628\u064A \u0627\u0644\u0645\u0631\u0643\u0632\u064A \u0648\u0645\u0631\u0627\u0643\u0632 \u0627\u0644\u062A\u0646\u0641\u0633 \u0641\u064A \u062C\u0630\u0639 \u0627\u0644\u062F\u0645\u0627\u063A \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u0646\u0642\u0635 \u0623\u0643\u0633\u062C\u0629 \u062D\u0627\u062F\u060C \u062A\u0648\u0642\u0641 \u0627\u0644\u062A\u0646\u0641\u0633 \u0648\u0627\u0644\u063A\u064A\u0628\u0648\u0628\u0629.",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u0625\u0644\u0627 \u062A\u062D\u062A \u0625\u0634\u0631\u0627\u0641 \u0637\u0628\u064A \u0645\u062A\u062E\u0635\u0635 \u0648\u0641\u064A \u0623\u062F\u0646\u0649 \u062C\u0631\u0639\u0627\u062A \u0645\u0645\u0643\u0646\u0629 \u0645\u0639 \u062A\u0648\u0641\u064A\u0631 \u0627\u0644\u062A\u0631\u064A\u0627\u0642 (Naloxone) \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0645\u0633\u062A\u0645\u0631\u0629 \u0644\u0644\u062A\u0646\u0641\u0633."
     };
   }
-
-  // 9. Triple Whammy: ACEi/ARB + Diuretic + NSAID
-  if (has('raas_inhibitor') && has('nsaid') && (has('loop_diuretic') || has('thiazide_diuretic'))) {
+  if (both("raas_inhibitor", "k_sparing_agent")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 الصدمة الثلاثية الكلوية (Triple Whammy - فشل كلوي حاد)',
-      mechanism: 'المسكن يقبض الشريان الوارد للكبيبة الكلوية، وحاصر الرينين يوسع الشريان الصادر، والمدر ينقص حجم الدم، مما يؤدي إلى انهيار ضغط الترشيح الكلوي وحدوث قصور كلوي حاد (AKI).',
-      recommendation: 'تجنب إضافة مضادات الالتهاب غير الستيرويدية (NSAIDs) لمرضى الضغط والقلب الذين يتناولون حاصرات الضغط والمدرات؛ استخدم الباراسيتامول كمسكن بديل آمن تماماً.'
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u062D\u0630\u0631 (\u0641\u0631\u0637 \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u062F\u0645 \u0627\u0644\u0634\u062F\u064A\u062F Hyperkalemia)",
+      mechanism: "\u062A\u062B\u0628\u064A\u0637 \u0645\u0641\u0631\u0637 \u0644\u0625\u0641\u0631\u0627\u0632 \u0627\u0644\u0623\u0644\u062F\u0648\u0633\u062A\u064A\u0631\u0648\u0646 \u0648\u0627\u062D\u062A\u0628\u0627\u0633 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u0643\u0644\u0649\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0644\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0633\u0627\u0645\u0629 \u062A\u0633\u0628\u0628 \u0627\u0636\u0637\u0631\u0627\u0628\u0627\u062A \u0646\u0638\u0645 \u0642\u0644\u0628\u064A\u0629 \u0648\u062A\u0648\u0642\u0641 \u0639\u0636\u0644\u0629 \u0627\u0644\u0642\u0644\u0628.",
+      recommendation: "\u0645\u0631\u0627\u0642\u0628\u0629 \u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u0648\u0638\u0627\u0626\u0641 \u0627\u0644\u0643\u0644\u0649 \u062F\u0648\u0631\u064A\u0627\u064B (\u0623\u0633\u0628\u0648\u0639\u064A\u0627\u064B \u062B\u0645 \u0634\u0647\u0631\u064A\u0627\u064B)\u060C \u0648\u062A\u062C\u0646\u0628 \u0623\u0645\u0644\u0627\u062D \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D \u0627\u0644\u0635\u0646\u0627\u0639\u064A\u0629."
     };
   }
-
-  // 10. Methotrexate + NSAIDs
-  if (both('methotrexate', 'nsaid') || both('methotrexate', 'antiplatelet_aspirin')) {
+  if (has("raas_inhibitor") && has("nsaid") && (has("loop_diuretic") || has("thiazide_diuretic"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (فشل النخاع العظمي وتسمم الميثوتريكسات)',
-      mechanism: 'مضادات الالتهاب غير الستيرويدية تنافس الميثوتريكسات على الإفراز الأنبوبي الكلوي وتثبط تصفيته، مما يرفع مستوياته في الدم مسبباً قلة الكريات الشاملة (Pancytopenia) وتسمماً معوياً حاداً.',
-      recommendation: 'تجنب الجمع بالجرعات المتوسطة والعالية للميثوتريكسات؛ استخدام الباراسيتامول عند الحاجة لتسكين الألم.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u0627\u0644\u0635\u062F\u0645\u0629 \u0627\u0644\u062B\u0644\u0627\u062B\u064A\u0629 \u0627\u0644\u0643\u0644\u0648\u064A\u0629 (Triple Whammy - \u0641\u0634\u0644 \u0643\u0644\u0648\u064A \u062D\u0627\u062F)",
+      mechanism: "\u0627\u0644\u0645\u0633\u0643\u0646 \u064A\u0642\u0628\u0636 \u0627\u0644\u0634\u0631\u064A\u0627\u0646 \u0627\u0644\u0648\u0627\u0631\u062F \u0644\u0644\u0643\u0628\u064A\u0628\u0629 \u0627\u0644\u0643\u0644\u0648\u064A\u0629\u060C \u0648\u062D\u0627\u0635\u0631 \u0627\u0644\u0631\u064A\u0646\u064A\u0646 \u064A\u0648\u0633\u0639 \u0627\u0644\u0634\u0631\u064A\u0627\u0646 \u0627\u0644\u0635\u0627\u062F\u0631\u060C \u0648\u0627\u0644\u0645\u062F\u0631 \u064A\u0646\u0642\u0635 \u062D\u062C\u0645 \u0627\u0644\u062F\u0645\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u0627\u0646\u0647\u064A\u0627\u0631 \u0636\u063A\u0637 \u0627\u0644\u062A\u0631\u0634\u064A\u062D \u0627\u0644\u0643\u0644\u0648\u064A \u0648\u062D\u062F\u0648\u062B \u0642\u0635\u0648\u0631 \u0643\u0644\u0648\u064A \u062D\u0627\u062F (AKI).",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0625\u0636\u0627\u0641\u0629 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u0627\u0644\u062A\u0647\u0627\u0628 \u063A\u064A\u0631 \u0627\u0644\u0633\u062A\u064A\u0631\u0648\u064A\u062F\u064A\u0629 (NSAIDs) \u0644\u0645\u0631\u0636\u0649 \u0627\u0644\u0636\u063A\u0637 \u0648\u0627\u0644\u0642\u0644\u0628 \u0627\u0644\u0630\u064A\u0646 \u064A\u062A\u0646\u0627\u0648\u0644\u0648\u0646 \u062D\u0627\u0635\u0631\u0627\u062A \u0627\u0644\u0636\u063A\u0637 \u0648\u0627\u0644\u0645\u062F\u0631\u0627\u062A\u061B \u0627\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 \u0643\u0645\u0633\u0643\u0646 \u0628\u062F\u064A\u0644 \u0622\u0645\u0646 \u062A\u0645\u0627\u0645\u0627\u064B."
     };
   }
-
-  // 11. Lithium + NSAIDs / ACEi / Thiazides
-  if (has('lithium') && (has('nsaid') || has('raas_inhibitor') || has('thiazide_diuretic'))) {
+  if (both("methotrexate", "nsaid") || both("methotrexate", "antiplatelet_aspirin")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج (تسمم الليثيوم العصبي والكلوي)',
-      mechanism: 'انخفاض إطراح الليثيوم الكلوي نتيجة نقص تروية الكلى أو التنافس الأنبوبي، مما يرفع تركيز الليثيوم في المصل مسبباً رعاشاً، رنحاً، اختلاجات وتلفاً دماغياً.',
-      recommendation: 'تجنب أخذ المسكنات مثل البروفين والفولتارين مع الليثيوم تماماً ومراقبة مستويات الليثيوم في الدم دورياً.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0641\u0634\u0644 \u0627\u0644\u0646\u062E\u0627\u0639 \u0627\u0644\u0639\u0638\u0645\u064A \u0648\u062A\u0633\u0645\u0645 \u0627\u0644\u0645\u064A\u062B\u0648\u062A\u0631\u064A\u0643\u0633\u0627\u062A)",
+      mechanism: "\u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u0627\u0644\u062A\u0647\u0627\u0628 \u063A\u064A\u0631 \u0627\u0644\u0633\u062A\u064A\u0631\u0648\u064A\u062F\u064A\u0629 \u062A\u0646\u0627\u0641\u0633 \u0627\u0644\u0645\u064A\u062B\u0648\u062A\u0631\u064A\u0643\u0633\u0627\u062A \u0639\u0644\u0649 \u0627\u0644\u0625\u0641\u0631\u0627\u0632 \u0627\u0644\u0623\u0646\u0628\u0648\u0628\u064A \u0627\u0644\u0643\u0644\u0648\u064A \u0648\u062A\u062B\u0628\u0637 \u062A\u0635\u0641\u064A\u062A\u0647\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u0645\u0633\u062A\u0648\u064A\u0627\u062A\u0647 \u0641\u064A \u0627\u0644\u062F\u0645 \u0645\u0633\u0628\u0628\u0627\u064B \u0642\u0644\u0629 \u0627\u0644\u0643\u0631\u064A\u0627\u062A \u0627\u0644\u0634\u0627\u0645\u0644\u0629 (Pancytopenia) \u0648\u062A\u0633\u0645\u0645\u0627\u064B \u0645\u0639\u0648\u064A\u0627\u064B \u062D\u0627\u062F\u0627\u064B.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0627\u0644\u062C\u0645\u0639 \u0628\u0627\u0644\u062C\u0631\u0639\u0627\u062A \u0627\u0644\u0645\u062A\u0648\u0633\u0637\u0629 \u0648\u0627\u0644\u0639\u0627\u0644\u064A\u0629 \u0644\u0644\u0645\u064A\u062B\u0648\u062A\u0631\u064A\u0643\u0633\u0627\u062A\u061B \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 \u0639\u0646\u062F \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u062A\u0633\u0643\u064A\u0646 \u0627\u0644\u0623\u0644\u0645."
     };
   }
-
-  // 12. Ciprofloxacin (or CYP1A2 inhibitor) + Theophylline -> CRITICAL TOXICITY & FATAL CONVULSIONS
-  if ((has('theophylline') || (has('xanthine') && has('narrow_therapeutic_index'))) && (has('cyp1a2_inhibitor') || has('quinolone'))) {
+  if (has("lithium") && (has("nsaid") || has("raas_inhibitor") || has("thiazide_diuretic") || has("lithium_clearance_reducer"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض حرج جداً (تسمم ثيوفيلين حاد ونوبات صرع مميتة)',
-      mechanism: 'السيبروفلوكساسين يثبط بشدة إنزيم CYP1A2 الكبدي المسؤول عن تكسير الثيوفيلين، مما يؤدي إلى تراكم دوائي هائل وارتفاع تركيز الثيوفيلين في الدم بنسبة 200% إلى 300%، مسبباً سمية قلبية وعصبية قاتلة تشمل تسرع القلب البطيني، نوبات صرع واختلاجات مستمرة غير مستجيبة للعلاج، وتوقف القلب.',
-      recommendation: 'يحظر الجمع بين السيبروفلوكساسين والثيوفيلين تماماً وفق تحذيرات FDA. يجب استبدال السيبروفلوكساسين بمضاد حيوي بديل لا يثبط CYP1A2 (مثل السيفالوسبورينات أو البنسلينات)، أو تخفيض جرعة الثيوفيلين بنسبة 60% مع المراقبة اليومية الدقيقة لتركيزه في المصل.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u062A\u0633\u0645\u0645 \u0627\u0644\u0644\u064A\u062B\u064A\u0648\u0645 \u0627\u0644\u0639\u0635\u0628\u064A \u0648\u0627\u0644\u0643\u0644\u0648\u064A)",
+      mechanism: "\u0627\u0646\u062E\u0641\u0627\u0636 \u0625\u0637\u0631\u0627\u062D \u0627\u0644\u0644\u064A\u062B\u064A\u0648\u0645 \u0627\u0644\u0643\u0644\u0648\u064A \u0646\u062A\u064A\u062C\u0629 \u0646\u0642\u0635 \u062A\u0631\u0648\u064A\u0629 \u0627\u0644\u0643\u0644\u0649 \u0623\u0648 \u0627\u0644\u062A\u0646\u0627\u0641\u0633 \u0627\u0644\u0623\u0646\u0628\u0648\u0628\u064A\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u0644\u064A\u062B\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u0645\u0635\u0644 \u0645\u0633\u0628\u0628\u0627\u064B \u0631\u0639\u0627\u0634\u0627\u064B\u060C \u0631\u0646\u062D\u0627\u064B\u060C \u0627\u062E\u062A\u0644\u0627\u062C\u0627\u062A \u0648\u062A\u0644\u0641\u0627\u064B \u062F\u0645\u0627\u063A\u064A\u0627\u064B.",
+      recommendation: "\u062A\u062C\u0646\u0628 \u0623\u062E\u0630 \u0627\u0644\u0645\u0633\u0643\u0646\u0627\u062A \u0645\u062B\u0644 \u0627\u0644\u0628\u0631\u0648\u0641\u064A\u0646 \u0648\u0627\u0644\u0641\u0648\u0644\u062A\u0627\u0631\u064A\u0646 \u0645\u0639 \u0627\u0644\u0644\u064A\u062B\u064A\u0648\u0645 \u062A\u0645\u0627\u0645\u0627\u064B \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0627\u0644\u0644\u064A\u062B\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062F\u0645 \u062F\u0648\u0631\u064A\u0627\u064B."
     };
   }
-
-  // 12.1. Ciprofloxacin + Tizanidine -> CONTRAINDICATED (HYPOTENSIVE SHOCK)
-  if (has('tizanidine') && (has('cyp1a2_inhibitor') || has('quinolone'))) {
+  if ((has("theophylline") || has("xanthine") && has("narrow_therapeutic_index")) && (has("cyp1a2_inhibitor") || has("quinolone"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'critical',
-      severityLabel: '🔴 تعارض خطير محظور قطعياً (هبوط ضغط كارثي وغيبوبة)',
-      mechanism: 'السيبروفلوكساسين يرفع تركيز التيزانيدين (سيردالود) في الدم لأكثر من 10 أضعاف ويزيد مساحة تحت المنحنى (AUC) بمقدار 7 أضعاف عبر تثبيط CYP1A2، مسبباً هبوطاً حاداً ومميتاً في ضغط الدم، بطء نبض القلب، وتثبيطاً عصبياً شديداً.',
-      recommendation: 'يحظر استخدامهما معاً وفق تعليمات هيئة الغذاء والدواء الصارمة (Contraindicated). يجب استبدال المضاد الحيوي ببديل آمن أو إيقاف التيزانيدين واستخدام باسط عضلات آخر.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C \u062C\u062F\u0627\u064B (\u062A\u0633\u0645\u0645 \u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646 \u062D\u0627\u062F \u0648\u0646\u0648\u0628\u0627\u062A \u0635\u0631\u0639 \u0645\u0645\u064A\u062A\u0629)",
+      mechanism: "\u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u064A\u062B\u0628\u0637 \u0628\u0634\u062F\u0629 \u0625\u0646\u0632\u064A\u0645 CYP1A2 \u0627\u0644\u0643\u0628\u062F\u064A \u0627\u0644\u0645\u0633\u0624\u0648\u0644 \u0639\u0646 \u062A\u0643\u0633\u064A\u0631 \u0627\u0644\u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0631\u0627\u0643\u0645 \u062F\u0648\u0627\u0626\u064A \u0647\u0627\u0626\u0644 \u0648\u0627\u0631\u062A\u0641\u0627\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646 \u0641\u064A \u0627\u0644\u062F\u0645 \u0628\u0646\u0633\u0628\u0629 200% \u0625\u0644\u0649 300%\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u0633\u0645\u064A\u0629 \u0642\u0644\u0628\u064A\u0629 \u0648\u0639\u0635\u0628\u064A\u0629 \u0642\u0627\u062A\u0644\u0629 \u062A\u0634\u0645\u0644 \u062A\u0633\u0631\u0639 \u0627\u0644\u0642\u0644\u0628 \u0627\u0644\u0628\u0637\u064A\u0646\u064A\u060C \u0646\u0648\u0628\u0627\u062A \u0635\u0631\u0639 \u0648\u0627\u062E\u062A\u0644\u0627\u062C\u0627\u062A \u0645\u0633\u062A\u0645\u0631\u0629 \u063A\u064A\u0631 \u0645\u0633\u062A\u062C\u064A\u0628\u0629 \u0644\u0644\u0639\u0644\u0627\u062C\u060C \u0648\u062A\u0648\u0642\u0641 \u0627\u0644\u0642\u0644\u0628.",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646 \u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u0648\u0627\u0644\u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646 \u062A\u0645\u0627\u0645\u0627\u064B \u0648\u0641\u0642 \u062A\u062D\u0630\u064A\u0631\u0627\u062A FDA. \u064A\u062C\u0628 \u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u0628\u0645\u0636\u0627\u062F \u062D\u064A\u0648\u064A \u0628\u062F\u064A\u0644 \u0644\u0627 \u064A\u062B\u0628\u0637 CYP1A2 (\u0645\u062B\u0644 \u0627\u0644\u0633\u064A\u0641\u0627\u0644\u0648\u0633\u0628\u0648\u0631\u064A\u0646\u0627\u062A \u0623\u0648 \u0627\u0644\u0628\u0646\u0633\u0644\u064A\u0646\u0627\u062A)\u060C \u0623\u0648 \u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u062B\u064A\u0648\u0641\u064A\u0644\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 60% \u0645\u0639 \u0627\u0644\u0645\u0631\u0627\u0642\u0628\u0629 \u0627\u0644\u064A\u0648\u0645\u064A\u0629 \u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u062A\u0631\u0643\u064A\u0632\u0647 \u0641\u064A \u0627\u0644\u0645\u0635\u0644."
     };
   }
-
-  // 13. Clopidogrel + Omeprazole
-  if (both('antiplatelet_p2y12', 'cyp2c19_inhibitor') || (has('antiplatelet_p2y12') && has('ppi_omeprazole'))) {
+  if (has("tizanidine") && (has("cyp1a2_inhibitor") || has("quinolone"))) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض استقلابي (فقدان مفعول حماية القلب وتجلط الدعامات)',
-      mechanism: 'الأوميبرازول يثبط إنزيم CYP2C19 الكبدي اللازم لتحويل الكلوبيدوجريل إلى صورته الفعالة، مما يلغي حمايته للصفائح الدموية ويرفع خطر تخثر الدعامات التاجية.',
-      recommendation: 'استبدال الأوميبرازول بالبانتوبرازول (Pantoprazole) كبديل لحماية المعدة لأنه لا يثبط CYP2C19.'
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062E\u0637\u064A\u0631 \u0645\u062D\u0638\u0648\u0631 \u0642\u0637\u0639\u064A\u0627\u064B (\u0647\u0628\u0648\u0637 \u0636\u063A\u0637 \u0643\u0627\u0631\u062B\u064A \u0648\u063A\u064A\u0628\u0648\u0628\u0629)",
+      mechanism: "\u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u062A\u064A\u0632\u0627\u0646\u064A\u062F\u064A\u0646 (\u0633\u064A\u0631\u062F\u0627\u0644\u0648\u062F) \u0641\u064A \u0627\u0644\u062F\u0645 \u0644\u0623\u0643\u062B\u0631 \u0645\u0646 10 \u0623\u0636\u0639\u0627\u0641 \u0648\u064A\u0632\u064A\u062F \u0645\u0633\u0627\u062D\u0629 \u062A\u062D\u062A \u0627\u0644\u0645\u0646\u062D\u0646\u0649 (AUC) \u0628\u0645\u0642\u062F\u0627\u0631 7 \u0623\u0636\u0639\u0627\u0641 \u0639\u0628\u0631 \u062A\u062B\u0628\u064A\u0637 CYP1A2\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u0647\u0628\u0648\u0637\u0627\u064B \u062D\u0627\u062F\u0627\u064B \u0648\u0645\u0645\u064A\u062A\u0627\u064B \u0641\u064A \u0636\u063A\u0637 \u0627\u0644\u062F\u0645\u060C \u0628\u0637\u0621 \u0646\u0628\u0636 \u0627\u0644\u0642\u0644\u0628\u060C \u0648\u062A\u062B\u0628\u064A\u0637\u0627\u064B \u0639\u0635\u0628\u064A\u0627\u064B \u0634\u062F\u064A\u062F\u0627\u064B.",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0633\u062A\u062E\u062F\u0627\u0645\u0647\u0645\u0627 \u0645\u0639\u0627\u064B \u0648\u0641\u0642 \u062A\u0639\u0644\u064A\u0645\u0627\u062A \u0647\u064A\u0626\u0629 \u0627\u0644\u063A\u0630\u0627\u0621 \u0648\u0627\u0644\u062F\u0648\u0627\u0621 \u0627\u0644\u0635\u0627\u0631\u0645\u0629 (Contraindicated). \u064A\u062C\u0628 \u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A \u0628\u0628\u062F\u064A\u0644 \u0622\u0645\u0646 \u0623\u0648 \u0625\u064A\u0642\u0627\u0641 \u0627\u0644\u062A\u064A\u0632\u0627\u0646\u064A\u062F\u064A\u0646 \u0648\u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u0627\u0633\u0637 \u0639\u0636\u0644\u0627\u062A \u0622\u062E\u0631."
     };
   }
-
-  // 14. Levothyroxine + Cations
-  if (both('chelation_sensitive', 'chelator') || both('levothyroxine', 'multivalent_cation')) {
+  if (both("antiplatelet_p2y12", "cyp2c19_inhibitor") || has("antiplatelet_p2y12") && has("ppi_omeprazole")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض امتصاص معوي (فشل ضبط هرمون الغدة الدرقية)',
-      mechanism: 'الكالسيوم، الحديد أو مضادات الحموضة تتحد مع هرمون الثيروكسين في المعدة وتشكل مركبات غير قابلة للذوبان تقلل امتصاص الدواء بأكثر من 50%.',
-      recommendation: 'الفصل بـ 4 ساعات كاملة على الأقل بين حبة الغدة في الصباح الباكر على الريق وبين مكملات الكالسيوم أو الحديد أو مضادات الحموضة.'
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0627\u0633\u062A\u0642\u0644\u0627\u0628\u064A (\u0641\u0642\u062F\u0627\u0646 \u0645\u0641\u0639\u0648\u0644 \u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0642\u0644\u0628 \u0648\u062A\u062C\u0644\u0637 \u0627\u0644\u062F\u0639\u0627\u0645\u0627\u062A)",
+      mechanism: "\u0627\u0644\u0623\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 CYP2C19 \u0627\u0644\u0643\u0628\u062F\u064A \u0627\u0644\u0644\u0627\u0632\u0645 \u0644\u062A\u062D\u0648\u064A\u0644 \u0627\u0644\u0643\u0644\u0648\u0628\u064A\u062F\u0648\u062C\u0631\u064A\u0644 \u0625\u0644\u0649 \u0635\u0648\u0631\u062A\u0647 \u0627\u0644\u0641\u0639\u0627\u0644\u0629\u060C \u0645\u0645\u0627 \u064A\u0644\u063A\u064A \u062D\u0645\u0627\u064A\u062A\u0647 \u0644\u0644\u0635\u0641\u0627\u0626\u062D \u0627\u0644\u062F\u0645\u0648\u064A\u0629 \u0648\u064A\u0631\u0641\u0639 \u062E\u0637\u0631 \u062A\u062E\u062B\u0631 \u0627\u0644\u062F\u0639\u0627\u0645\u0627\u062A \u0627\u0644\u062A\u0627\u062C\u064A\u0629.",
+      recommendation: "\u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0623\u0648\u0645\u064A\u0628\u0631\u0627\u0632\u0648\u0644 \u0628\u0627\u0644\u0628\u0627\u0646\u062A\u0648\u0628\u0631\u0627\u0632\u0648\u0644 (Pantoprazole) \u0643\u0628\u062F\u064A\u0644 \u0644\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0645\u0639\u062F\u0629 \u0644\u0623\u0646\u0647 \u0644\u0627 \u064A\u062B\u0628\u0637 CYP2C19."
     };
   }
-
-  // 15. Quinolones + Cations
-  if (both('chelation_risk', 'chelator') || both('quinolone', 'multivalent_cation')) {
+  if (both("chelation_sensitive", "chelator") || both("levothyroxine", "multivalent_cation")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض استخلاب معوي (فشل المضاد الحيوي)',
-      mechanism: 'أيونات الكالسيوم والمغنيسيوم والألمنيوم والحديد تستخلب المضاد الحيوي في لمعة الأمعاء وتمنع امتصاصه مما يسبب فشل علاج الإنتان.',
-      recommendation: 'تناول المضاد الحيوي قبل ساعتين أو بعد 4 ساعات من مشتقات الحليب، المكملات ومضادات الحموضة.'
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0627\u0645\u062A\u0635\u0627\u0635 \u0645\u0639\u0648\u064A (\u0641\u0634\u0644 \u0636\u0628\u0637 \u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u063A\u062F\u0629 \u0627\u0644\u062F\u0631\u0642\u064A\u0629)",
+      mechanism: "\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645\u060C \u0627\u0644\u062D\u062F\u064A\u062F \u0623\u0648 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062D\u0645\u0648\u0636\u0629 \u062A\u062A\u062D\u062F \u0645\u0639 \u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646 \u0641\u064A \u0627\u0644\u0645\u0639\u062F\u0629 \u0648\u062A\u0634\u0643\u0644 \u0645\u0631\u0643\u0628\u0627\u062A \u063A\u064A\u0631 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u0630\u0648\u0628\u0627\u0646 \u062A\u0642\u0644\u0644 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062F\u0648\u0627\u0621 \u0628\u0623\u0643\u062B\u0631 \u0645\u0646 50%.",
+      recommendation: "\u0627\u0644\u0641\u0635\u0644 \u0628\u0640 4 \u0633\u0627\u0639\u0627\u062A \u0643\u0627\u0645\u0644\u0629 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0628\u064A\u0646 \u062D\u0628\u0629 \u0627\u0644\u063A\u062F\u0629 \u0641\u064A \u0627\u0644\u0635\u0628\u0627\u062D \u0627\u0644\u0628\u0627\u0643\u0631 \u0639\u0644\u0649 \u0627\u0644\u0631\u064A\u0642 \u0648\u0628\u064A\u0646 \u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0623\u0648 \u0627\u0644\u062D\u062F\u064A\u062F \u0623\u0648 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062D\u0645\u0648\u0636\u0629."
     };
   }
-
-  // 16. Aspirin + Ibuprofen
-  if (both('antiplatelet_aspirin', 'nsaid')) {
+  if (both("chelation_risk", "chelator") || both("quinolone", "multivalent_cation")) {
     return {
       drugA: drugA.name,
       drugB: drugB.name,
-      severity: 'warning',
-      severityLabel: '🟠 تعارض تنافسي على مستقبلات الصفائح',
-      mechanism: 'الإيبوبروفين يرتبط بموقع COX-1 الفعال ويمنع الأسبرين من تثبيط الصفائح الدائم، مما يلغي حماية القلب من الجلطات ويرفع تهيج المعدة.',
-      recommendation: 'تناول جرعة الأسبرين الوقائية قبل الإيبوبروفين بساعتين على الأقل، أو استبدال المسكن بالباراسيتامول.'
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0627\u0633\u062A\u062E\u0644\u0627\u0628 \u0645\u0639\u0648\u064A (\u0641\u0634\u0644 \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A)",
+      mechanism: "\u0623\u064A\u0648\u0646\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u0645\u063A\u0646\u064A\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u0623\u0644\u0645\u0646\u064A\u0648\u0645 \u0648\u0627\u0644\u062D\u062F\u064A\u062F \u062A\u0633\u062A\u062E\u0644\u0628 \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A \u0641\u064A \u0644\u0645\u0639\u0629 \u0627\u0644\u0623\u0645\u0639\u0627\u0621 \u0648\u062A\u0645\u0646\u0639 \u0627\u0645\u062A\u0635\u0627\u0635\u0647 \u0645\u0645\u0627 \u064A\u0633\u0628\u0628 \u0641\u0634\u0644 \u0639\u0644\u0627\u062C \u0627\u0644\u0625\u0646\u062A\u0627\u0646.",
+      recommendation: "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A \u0642\u0628\u0644 \u0633\u0627\u0639\u062A\u064A\u0646 \u0623\u0648 \u0628\u0639\u062F 4 \u0633\u0627\u0639\u0627\u062A \u0645\u0646 \u0645\u0634\u062A\u0642\u0627\u062A \u0627\u0644\u062D\u0644\u064A\u0628\u060C \u0627\u0644\u0645\u0643\u0645\u0644\u0627\u062A \u0648\u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u062D\u0645\u0648\u0636\u0629."
     };
   }
-
+  if (both("qt_prolonging", "qt_prolonging")) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u062A\u0631\u0627\u0643\u0645\u064A \u0641\u064A \u0643\u0647\u0631\u0628\u0627\u0626\u064A\u0629 \u0627\u0644\u0642\u0644\u0628 (\u0627\u0633\u062A\u0637\u0627\u0644\u0629 \u0632\u0645\u0646 QT)",
+      mechanism: "\u062A\u062B\u0628\u064A\u0637 \u0645\u0634\u062A\u0631\u0643 \u0644\u0642\u0646\u0648\u0627\u062A \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0641\u064A \u062E\u0644\u0627\u064A\u0627 \u0627\u0644\u0642\u0644\u0628 \u064A\u0633\u0628\u0628 \u0627\u0633\u062A\u0637\u0627\u0644\u0629 \u0641\u062A\u0631\u0629 QT \u0648\u062A\u0631\u0627\u0643\u0645 \u0645\u062E\u0627\u0637\u0631 \u062D\u062F\u0648\u062B \u0631\u062C\u0641\u0627\u0646 \u0628\u0637\u064A\u0646\u064A \u062E\u0637\u064A\u0631 (Torsades de Pointes).",
+      recommendation: "\u0645\u0631\u0627\u0642\u0628\u0629 \u062A\u062E\u0637\u064A\u0637 \u0627\u0644\u0642\u0644\u0628 ECG \u0648\u0641\u062D\u0635 \u0634\u0648\u0627\u0631\u062F \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u0645\u063A\u0646\u064A\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062F\u0645."
+    };
+  }
+  if (has("xanthine_oxidase_inhibitor") && (has("azathioprine") || has("immunosuppressant"))) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u062A\u0633\u0645\u0645 \u0646\u062E\u0627\u0639\u064A \u0634\u062F\u064A\u062F)",
+      mechanism: "\u062A\u062B\u0628\u064A\u0637 \u0625\u0646\u0632\u064A\u0645 \u0632\u0627\u0646\u062B\u064A\u0646 \u0623\u0648\u0643\u0633\u064A\u062F\u064A\u0632 \u064A\u0645\u0646\u0639 \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0622\u0632\u0627\u062B\u064A\u0648\u0628\u0631\u064A\u0646 \u0645\u0633\u0628\u0628\u0627\u064B \u062A\u062B\u0628\u064A\u0637\u0627\u064B \u0645\u0645\u064A\u062A\u0627\u064B \u0644\u0644\u0646\u062E\u0627\u0639 \u0627\u0644\u0639\u0638\u0645\u064A.",
+      recommendation: "\u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u0627\u0644\u0622\u0632\u0627\u062B\u064A\u0648\u0628\u0631\u064A\u0646 \u0625\u0644\u0649 25% \u0645\u0646 \u0627\u0644\u062C\u0631\u0639\u0629 \u0627\u0644\u0645\u0639\u062A\u0627\u062F\u0629 \u062A\u062D\u062A \u0627\u0644\u0645\u0631\u0627\u0642\u0628\u0629 \u0627\u0644\u062F\u0642\u064A\u0642\u0629 \u0644\u0644\u062F\u0645."
+    };
+  }
+  if (both("aminoglycoside", "loop_diuretic") || both("aminoglycoside", "vancomycin")) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C (\u0633\u0645\u064A\u0629 \u0633\u0645\u0639\u064A\u0629 \u0648\u0643\u0644\u0648\u064A\u0629 \u0645\u0636\u0627\u0639\u0641\u0629)",
+      mechanism: "\u062A\u0623\u062B\u064A\u0631 \u062A\u0631\u0627\u0643\u0645\u064A \u0633\u0627\u0645 \u0639\u0644\u0649 \u0627\u0644\u062E\u0644\u0627\u064A\u0627 \u0627\u0644\u0647\u062F\u0628\u064A\u0629 \u0641\u064A \u0627\u0644\u0642\u0648\u0642\u0639\u0629 \u0627\u0644\u0633\u0645\u0639\u064A\u0629 \u0648\u062E\u0644\u0627\u064A\u0627 \u0627\u0644\u0623\u0646\u0627\u0628\u064A\u0628 \u0627\u0644\u0643\u0644\u0648\u064A\u0629 \u0645\u0633\u0628\u0628\u0627\u064B \u0635\u0645\u0645\u0627\u064B \u062F\u0627\u0626\u0645\u0627\u064B \u0648\u0642\u0635\u0648\u0631\u0627\u064B \u0643\u0644\u0648\u064A\u0627\u064B.",
+      recommendation: "\u0645\u0631\u0627\u0642\u0628\u0629 \u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0627\u0644\u062F\u0648\u0627\u0621 \u0641\u064A \u0627\u0644\u0645\u0635\u0644 (Peak and Trough) \u0648\u0648\u0638\u0627\u0626\u0641 \u0627\u0644\u0643\u0644\u0649 \u0648\u0627\u0644\u0633\u0645\u0639."
+    };
+  }
+  if (both("antiplatelet_aspirin", "nsaid")) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u062A\u0646\u0627\u0641\u0633\u064A \u0639\u0644\u0649 \u0645\u0633\u062A\u0642\u0628\u0644\u0627\u062A \u0627\u0644\u0635\u0641\u0627\u0626\u062D",
+      mechanism: "\u0627\u0644\u0625\u064A\u0628\u0648\u0628\u0631\u0648\u0641\u064A\u0646 \u064A\u0631\u062A\u0628\u0637 \u0628\u0645\u0648\u0642\u0639 COX-1 \u0627\u0644\u0641\u0639\u0627\u0644 \u0648\u064A\u0645\u0646\u0639 \u0627\u0644\u0623\u0633\u0628\u0631\u064A\u0646 \u0645\u0646 \u062A\u062B\u0628\u064A\u0637 \u0627\u0644\u0635\u0641\u0627\u0626\u062D \u0627\u0644\u062F\u0627\u0626\u0645\u060C \u0645\u0645\u0627 \u064A\u0644\u063A\u064A \u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0642\u0644\u0628 \u0645\u0646 \u0627\u0644\u062C\u0644\u0637\u0627\u062A \u0648\u064A\u0631\u0641\u0639 \u062A\u0647\u064A\u062C \u0627\u0644\u0645\u0639\u062F\u0629.",
+      recommendation: "\u062A\u0646\u0627\u0648\u0644 \u062C\u0631\u0639\u0629 \u0627\u0644\u0623\u0633\u0628\u0631\u064A\u0646 \u0627\u0644\u0648\u0642\u0627\u0626\u064A\u0629 \u0642\u0628\u0644 \u0627\u0644\u0625\u064A\u0628\u0648\u0628\u0631\u0648\u0641\u064A\u0646 \u0628\u0633\u0627\u0639\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644\u060C \u0623\u0648 \u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0645\u0633\u0643\u0646 \u0628\u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644."
+    };
+  }
+  if (both("beta_blocker", "ccb_non_dhp")) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "critical",
+      severityLabel: "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u0642\u0644\u0628\u064A \u062E\u0637\u064A\u0631 (\u0628\u0637\u0621 \u0642\u0644\u0628 \u062D\u0627\u062F \u0648\u0625\u062D\u0635\u0627\u0631 \u0623\u0630\u064A\u0646\u064A \u0628\u0637\u064A\u0646\u064A)",
+      mechanism: "\u062A\u062B\u0628\u064A\u0637 \u0645\u0632\u062F\u0648\u062C \u0644\u0644\u0639\u0642\u062F\u0629 \u0627\u0644\u062C\u064A\u0628\u064A\u0629 \u0627\u0644\u0623\u0630\u064A\u0646\u064A\u0629 (SA node) \u0648\u0627\u0644\u0639\u0642\u062F\u0629 \u0627\u0644\u0623\u0630\u064A\u0646\u064A\u0629 \u0627\u0644\u0628\u0637\u064A\u0646\u064A\u0629 (AV node) \u0645\u0633\u0628\u0628\u0627\u064B \u0628\u0637\u0621 \u0642\u0644\u0628 \u062D\u0627\u062F\u0627\u064B\u060C \u0647\u0628\u0648\u0637 \u0646\u062A\u0627\u062C \u0627\u0644\u0642\u0644\u0628 \u0648\u0635\u062F\u0645\u0629 \u0642\u0644\u0628\u064A\u0629.",
+      recommendation: "\u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u0625\u0644\u0627 \u062A\u062D\u062A \u0625\u0634\u0631\u0627\u0641 \u0637\u0628\u064A\u0628 \u0627\u0644\u0642\u0644\u0628 \u0648\u0627\u0644\u0645\u0631\u0627\u0642\u0628\u0629 \u0627\u0644\u0633\u0631\u064A\u0631\u064A\u0629 \u0627\u0644\u0645\u0633\u062A\u0645\u0631\u0629 \u0644\u0646\u0628\u0636 \u0627\u0644\u0642\u0644\u0628 \u0648\u0627\u0644\u0636\u063A\u0637."
+    };
+  }
+  if (has("sulfonylurea") && (has("azole_antifungal") || has("cyp2c9_inhibitor"))) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0627\u0633\u062A\u0642\u0644\u0627\u0628\u064A (\u0647\u0628\u0648\u0637 \u0633\u0643\u0631 \u062D\u0627\u062F Severe Hypoglycemia)",
+      mechanism: "\u0627\u0644\u0645\u062B\u0628\u0637 \u0627\u0644\u0623\u0646\u0632\u064A\u0645\u064A \u064A\u0645\u0646\u0639 \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0633\u0644\u0641\u0648\u0646\u064A\u0644 \u064A\u0648\u0631\u064A\u0627 \u0648\u064A\u0631\u0641\u0639 \u0645\u0633\u062A\u0648\u0627\u0647\u0627 \u0641\u064A \u0627\u0644\u062F\u0645 \u0645\u0645\u0627 \u064A\u0633\u0628\u0628 \u0647\u0628\u0648\u0637\u0627\u064B \u062D\u0627\u062F\u0627\u064B \u0641\u064A \u0633\u0643\u0631 \u0627\u0644\u062F\u0645.",
+      recommendation: "\u062A\u062E\u0641\u064A\u0636 \u062C\u0631\u0639\u0629 \u062E\u0627\u0641\u0636 \u0627\u0644\u0633\u0643\u0631 \u0648\u0645\u0631\u0627\u0642\u0628\u0629 \u0642\u064A\u0627\u0633\u0627\u062A \u0627\u0644\u0633\u0643\u0631 \u0627\u0644\u0645\u0646\u0632\u0644\u064A\u0629 \u0639\u062F\u0629 \u0645\u0631\u0627\u062A \u064A\u0648\u0645\u064A\u0627\u064B \u0648\u0627\u0644\u0627\u062D\u062A\u0641\u0627\u0638 \u0628\u0645\u0635\u062F\u0631 \u0633\u0643\u0631 \u0633\u0631\u064A\u0639."
+    };
+  }
+  if (has("beta_blocker") && (has("insulin") || has("sulfonylurea"))) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "minor",
+      severityLabel: "\u{1F7E1} \u062A\u0646\u0628\u064A\u0647 \u0633\u0631\u064A\u0631\u064A (\u0625\u062E\u0641\u0627\u0621 \u0623\u0639\u0631\u0627\u0636 \u0647\u0628\u0648\u0637 \u0627\u0644\u0633\u0643\u0631)",
+      mechanism: "\u062D\u0627\u0635\u0631\u0627\u062A \u0628\u064A\u062A\u0627 \u062A\u062E\u0641\u064A \u0627\u0644\u0623\u0639\u0631\u0627\u0636 \u0627\u0644\u062A\u062D\u0630\u064A\u0631\u064A\u0629 \u0627\u0644\u0648\u062F\u064A\u0629 \u0644\u0647\u0628\u0648\u0637 \u0627\u0644\u0633\u0643\u0631 (\u0643\u0627\u0644\u0631\u0639\u0627\u0634 \u0648\u0627\u0644\u062E\u0641\u0642\u0627\u0646)\u060C \u0628\u064A\u0646\u0645\u0627 \u064A\u0628\u0642\u0649 \u0627\u0644\u062A\u0639\u0631\u0642 \u0627\u0644\u0639\u0631\u0636 \u0627\u0644\u0648\u062D\u064A\u062F \u0627\u0644\u0638\u0627\u0647\u0631.",
+      recommendation: "\u062A\u0646\u0628\u064A\u0647 \u0627\u0644\u0645\u0631\u064A\u0636 \u0628\u0627\u0644\u0627\u0639\u062A\u0645\u0627\u062F \u0639\u0644\u0649 \u0642\u064A\u0627\u0633 \u0627\u0644\u0633\u0643\u0631 \u0628\u0627\u0644\u062C\u0647\u0627\u0632 \u0639\u0646\u062F \u0627\u0644\u0634\u0639\u0648\u0631 \u0628\u0627\u0644\u0625\u0631\u0647\u0627\u0642 \u0623\u0648 \u0627\u0644\u062A\u0639\u0631\u0642 \u0627\u0644\u0645\u0641\u0627\u062C\u0626."
+    };
+  }
+  if (has("antidiabetic") && has("corticosteroid")) {
+    return {
+      drugA: drugA.name,
+      drugB: drugB.name,
+      severity: "warning",
+      severityLabel: "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0647\u0631\u0645\u0648\u0646\u064A (\u0627\u0631\u062A\u0641\u0627\u0639 \u062D\u0627\u062F \u0641\u064A \u0633\u0643\u0631 \u0627\u0644\u062F\u0645)",
+      mechanism: "\u0627\u0644\u0643\u0648\u0631\u062A\u064A\u0632\u0648\u0646 \u064A\u0632\u064A\u062F \u0645\u0646 \u0645\u0642\u0627\u0648\u0645\u0629 \u0627\u0644\u0625\u0646\u0633\u0648\u0644\u064A\u0646 \u0648\u064A\u062D\u0641\u0632 \u0627\u0633\u062A\u062D\u062F\u0627\u062B \u0627\u0644\u0633\u0643\u0631 \u0641\u064A \u0627\u0644\u0643\u0628\u062F\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u0633\u0643\u0631 \u0627\u0644\u062F\u0645 \u0648\u064A\u0644\u063A\u064A \u0636\u0628\u0637 \u0627\u0644\u062E\u0637\u0629 \u0627\u0644\u0639\u0644\u0627\u062C\u064A\u0629.",
+      recommendation: "\u062A\u0639\u062F\u064A\u0644 \u062C\u0631\u0639\u0627\u062A \u0627\u0644\u0625\u0646\u0633\u0648\u0644\u064A\u0646 \u0623\u0648 \u062E\u0627\u0641\u0636\u0627\u062A \u0627\u0644\u0633\u0643\u0631 \u0628\u0627\u0644\u0632\u064A\u0627\u062F\u0629 \u0627\u0644\u0645\u0624\u0642\u062A\u0629 \u0637\u0648\u0627\u0644 \u0641\u062A\u0631\u0629 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0643\u0648\u0631\u062A\u064A\u0632\u0648\u0646 \u062A\u062D\u062A \u0625\u0634\u0631\u0627\u0641 \u0627\u0644\u0637\u0628\u064A\u0628."
+    };
+  }
   return null;
 }
-
-export function analyzeAllMedications(tokens, lang = 'ar') {
-  const isAr = lang === 'ar';
-  const cleanTokens = (tokens || []).map(t => String(t).trim()).filter(Boolean);
-
+function analyzeAllMedications(tokens, lang = "ar") {
+  const isAr = lang === "ar";
+  const cleanTokens = tokens.map((t) => t.trim()).filter(Boolean);
   if (cleanTokens.length < 2) {
     return {
-      severity: 'safe',
-      severityLabel: isAr ? 'يرجى تحديد دوائين على الأقل' : 'Please specify at least 2 drugs',
+      severity: "safe",
+      severityLabel: isAr ? "\u064A\u0631\u062C\u0649 \u062A\u062D\u062F\u064A\u062F \u062F\u0648\u0627\u0626\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644" : "Please specify at least 2 drugs",
       isSafe: true,
-      mechanism: isAr ? 'أدخل دوائين للمقارنة' : 'Specify 2 medications',
-      recommendation: '',
-      clinicalDetails: '',
+      mechanism: isAr ? "\u0623\u062F\u062E\u0644 \u062F\u0648\u0627\u0626\u064A\u0646 \u0644\u0644\u0645\u0642\u0627\u0631\u0646\u0629" : "Specify 2 medications",
+      recommendation: "",
+      clinicalDetails: "",
       detectedInteractions: [],
       cumulativeRisks: [],
       analyzedDrugs: cleanTokens
     };
   }
-
   const profiles = cleanTokens.map(identifyDrugClasses);
   const detectedInteractions = [];
   const cumulativeRisks = [];
-
   for (let i = 0; i < profiles.length; i++) {
     for (let j = i + 1; j < profiles.length; j++) {
       const pairResult = evaluatePair(profiles[i], profiles[j]);
@@ -785,857 +603,733 @@ export function analyzeAllMedications(tokens, lang = 'ar') {
       }
     }
   }
-
-  const allClasses = profiles.flatMap(p => p.classes);
-  if (allClasses.filter(c => c === 'bleeding_risk').length >= 2) {
-    cumulativeRisks.push(isAr ? 'خطر نزف دموي تراكمي مرتفع (تداخل أكثر من مميع أو مسكن)' : 'High cumulative bleeding risk');
+  const allClasses = profiles.flatMap((p) => p.classes);
+  const bleedingCount = allClasses.filter((c) => c === "bleeding_risk").length;
+  if (bleedingCount >= 2) {
+    cumulativeRisks.push(isAr ? "\u062E\u0637\u0631 \u0646\u0632\u0641 \u062F\u0645\u0648\u064A \u062A\u0631\u0627\u0643\u0645\u064A \u0645\u0631\u062A\u0641\u0639 (\u062A\u062F\u0627\u062E\u0644 \u0623\u0643\u062B\u0631 \u0645\u0646 \u0645\u0645\u064A\u0639 \u0623\u0648 \u0645\u0633\u0643\u0646)" : "High cumulative bleeding risk");
   }
-  if (allClasses.filter(c => c === 'qt_prolonging').length >= 2) {
-    cumulativeRisks.push(isAr ? 'خطر اضطراب كهربائية القلب وتطاول زمن QT' : 'Cumulative QTc prolongation hazard');
+  const qtCount = allClasses.filter((c) => c === "qt_prolonging").length;
+  if (qtCount >= 2) {
+    cumulativeRisks.push(isAr ? "\u062E\u0637\u0631 \u0627\u0636\u0637\u0631\u0627\u0628 \u0643\u0647\u0631\u0628\u0627\u0626\u064A\u0629 \u0627\u0644\u0642\u0644\u0628 \u0648\u062A\u0637\u0627\u0648\u0644 \u0632\u0645\u0646 QT" : "Cumulative QTc prolongation hazard");
   }
-  if (allClasses.filter(c => c === 'cns_respiratory_depressant' || c === 'sedative_benzodiazepine').length >= 2) {
-    cumulativeRisks.push(isAr ? 'خطر تثبيط تنفسي وعصبي تراكمي (نعاس شديد وتباطؤ ردود الفعل)' : 'Cumulative CNS/respiratory depression');
+  const cnsCount = allClasses.filter((c) => c === "cns_respiratory_depressant" || c === "sedative_benzodiazepine" || c === "cns_depressant").length;
+  if (cnsCount >= 2) {
+    cumulativeRisks.push(isAr ? "\u062E\u0637\u0631 \u062A\u062B\u0628\u064A\u0637 \u062A\u0646\u0641\u0633\u064A \u0648\u0639\u0635\u0628\u064A \u062A\u0631\u0627\u0643\u0645\u064A (\u0646\u0639\u0627\u0633 \u0634\u062F\u064A\u062F \u0648\u062A\u0628\u0627\u0637\u0624 \u0631\u062F\u0648\u062F \u0627\u0644\u0641\u0639\u0644)" : "Cumulative CNS/respiratory depression");
   }
-  if (allClasses.filter(c => c === 'nephrotoxic' || c === 'nephrotoxic_triple_whammy').length >= 2) {
-    cumulativeRisks.push(isAr ? 'خطر إجهاد وزيادة الحمل الكلوي التراكمي' : 'Cumulative nephrotoxicity risk');
+  const nephroCount = allClasses.filter((c) => c === "nephrotoxic" || c === "nephrotoxic_triple_whammy").length;
+  if (nephroCount >= 2) {
+    cumulativeRisks.push(isAr ? "\u062E\u0637\u0631 \u0625\u062C\u0647\u0627\u062F \u0648\u0632\u064A\u0627\u062F\u0629 \u0627\u0644\u062D\u0645\u0644 \u0627\u0644\u0643\u0644\u0648\u064A \u0627\u0644\u062A\u0631\u0627\u0643\u0645\u064A" : "Cumulative nephrotoxicity risk");
   }
-
-  let severity = 'safe';
-  let severityLabel = '';
-  let mechanism = '';
-  let recommendation = '';
-  let clinicalDetails = '';
-
-  const hasCritical = detectedInteractions.some(i => i.severity === 'critical');
-  const hasWarning = detectedInteractions.some(i => i.severity === 'warning');
-
-  if (hasCritical) {
-    severity = 'critical';
-    severityLabel = isAr 
-      ? `🔴 تعارضات حرجة يحظر الجمع بينها (${detectedInteractions.length} تعارض مرصود)` 
-      : `🔴 Critical Contraindication Detected (${detectedInteractions.length} interactions)`;
-    mechanism = isAr
-      ? `تم رصد تعارضات سريرية شديدة الخطورة تهدد سلامة المريض (تؤثر على النزيف، الدورة الدموية، إنزيمات الكبد أو كهربائية القلب). التفاصيل السريرية مذكورة في بطاقات التعارض.`
-      : 'Severe clinical interactions detected that pose life-threatening hazards.';
-    recommendation = isAr
-      ? 'يجب مراجعة الطبيب المعالج أو الصيدلاني فوراً لإيقاف أو استبدال الأدوية المتعارضة بالبدائل الآمنة الموضحة.'
-      : 'Immediate physician/pharmacist intervention required to discontinue or substitute contraindicated medications.';
-    clinicalDetails = isAr
-      ? 'المؤشرات العاجلة للمراقبة: ضغط الدم، تخطيط القلب، صورة الدم الكاملة CBC، علامات النزيف، وظائف الكلى.'
-      : 'Monitor BP, ECG, CBC, bleeding signs, and renal function.';
-  } else if (hasWarning) {
-    severity = 'warning';
-    severityLabel = isAr 
-      ? `🟠 تعارضات متوسطة تتطلب الحذر والمباعدة (${detectedInteractions.length} تعارض)` 
-      : `🟠 Moderate Interactions Detected (${detectedInteractions.length} interactions)`;
-    mechanism = isAr
-      ? 'تم رصد تعارضات دوائية تؤثر على الامتصاص المعوي، استقلاب الإنزيمات أو شوارد الدم. تتطلب الخطة مباعدة زمنية بالساعات أو مراقبة مخبرية دورية.'
-      : 'Interactions affecting bioavailability, metabolism, or electrolytes identified.';
-    recommendation = isAr
-      ? 'افصل بين الأدوية بـ ساعتين إلى 4 ساعات بحسب التوصية السريرية، والتزم بالفحوصات المخبرية الدورية.'
-      : 'Separate medication administration by 2 to 4 hours as indicated.';
-    clinicalDetails = isAr
-      ? 'المؤشرات للمتابعة: قياسات السكر، وظائف الكبد والكلى، شوارد البوتاسيوم والصوديوم.'
-      : 'Monitor blood glucose, renal/hepatic panels, and serum electrolytes.';
+  const foodInteractions = evaluateFoodInteractions(cleanTokens, lang);
+  const foodFoodInteractions = evaluateFoodFoodInteractions(cleanTokens, lang);
+  const mealInstructions = getMealInstructions(cleanTokens, lang);
+  const matchesDietaryCategory = (token, fi) => {
+    const t = cleanDrugToken(token);
+    const id = fi.id.toLowerCase();
+    if (t.includes("\u062A\u064A\u0631\u0627\u0645\u064A\u0646") || t.includes("\u0645\u0639\u062A\u0642") || t.includes("\u0642\u062F\u064A\u0645") || t.includes("tyramine") || t.includes("\u0635\u0644\u0635\u0647 \u0627\u0644\u0635\u0648\u064A\u0627") || t.includes("\u0645\u062E\u0644\u0644")) {
+      return id.includes("tyramine");
+    }
+    if (t.includes("\u0633\u0628\u0627\u0646\u062E") || t.includes("\u0633\u0644\u0642") || t.includes("\u0645\u0644\u0648\u062E\u064A") || t.includes("\u0628\u0631\u0648\u0643\u0644\u064A") || t.includes("\u0648\u0631\u0642\u064A") || t.includes("\u062E\u0633") || t.includes("spinach") || t.includes("kale") || t.includes("vitk") || t.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 k") || t.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u0643")) {
+      return id.includes("vitk");
+    }
+    if (t.includes("\u062D\u0644\u064A\u0628") || t.includes("\u0644\u0628\u0646") || t.includes("\u0632\u0628\u0627\u062F\u064A") || t.includes("\u062C\u0628\u0646") || t.includes("\u0627\u062C\u0628\u0627\u0646") || t.includes("milk") || t.includes("dairy") || t.includes("\u0643\u0627\u0644\u0633\u064A\u0648\u0645") || t.includes("calcium")) {
+      return id.includes("dairy") || id.includes("calcium");
+    }
+    if (t.includes("\u062C\u0631\u064A\u0628") || t.includes("\u0641\u0631\u0648\u062A") || t.includes("\u0628\u0648\u0645\u0644\u064A") || t.includes("grapefruit") || t.includes("pomelo")) {
+      return id.includes("grapefruit");
+    }
+    if (t.includes("\u0634\u0627\u064A") || t.includes("\u0642\u0647\u0648\u0647") || t.includes("\u0643\u0627\u0641\u064A\u064A\u0646") || t.includes("\u0646\u0633\u0643\u0627\u0641\u064A\u0647") || t.includes("\u0645\u0646\u0628\u0647") || t.includes("tea") || t.includes("coffee") || t.includes("caffeine")) {
+      return id.includes("caffeine") || id.includes("tea") || id.includes("coffee");
+    }
+    if (t.includes("\u0633\u0648\u0633") || t.includes("\u0639\u0631\u0642") || t.includes("licorice") || t.includes("\u0639\u0631\u0642\u0633\u0648\u0633")) {
+      return id.includes("licorice");
+    }
+    if (t.includes("\u0643\u062D\u0648\u0644") || t.includes("\u062E\u0645\u0631") || t.includes("\u0646\u0628\u064A\u0630") || t.includes("alcohol") || t.includes("ethanol") || t.includes("wine")) {
+      return id.includes("alcohol");
+    }
+    if (t.includes("\u0645\u0644\u062D") || t.includes("\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645") || t.includes("salt") || t.includes("kcl") || t.includes("\u0628\u062F\u0627\u0621\u0644") || t.includes("\u0628\u062F\u0627\u0626\u0644") || t.includes("\u0628\u062F\u064A\u0644")) {
+      return id.includes("salt") || id.includes("potassium");
+    }
+    return false;
+  };
+  const directFoodCollisions = foodInteractions.filter(
+    (fi) => cleanTokens.some((token) => matchesDietaryCategory(token, fi))
+  );
+  let severity = "safe";
+  let severityLabel = "";
+  let mechanism = "";
+  let recommendation = "";
+  let clinicalDetails = "";
+  const hasCriticalDrug = detectedInteractions.some((i) => i.severity === "critical");
+  const hasWarningDrug = detectedInteractions.some((i) => i.severity === "warning");
+  const hasMinorDrug = detectedInteractions.some((i) => i.severity === "minor");
+  const hasCriticalDirectFood = directFoodCollisions.some((i) => i.severity === "critical");
+  const hasWarningDirectFood = directFoodCollisions.some((i) => i.severity === "warning");
+  const hasCriticalFoodFood = foodFoodInteractions.some((i) => i.severity === "critical");
+  const hasWarningFoodFood = foodFoodInteractions.some((i) => i.severity === "warning");
+  const hasSynergyFoodFood = foodFoodInteractions.some((i) => i.severity === "beneficial" || i.type === "synergy" || i.effectType === "synergy");
+  if (hasCriticalDrug || hasCriticalDirectFood || hasCriticalFoodFood) {
+    severity = "critical";
+    if (hasCriticalDrug) {
+      severityLabel = isAr ? `\u{1F534} \u062A\u0639\u0627\u0631\u0636\u0627\u062A \u062D\u0631\u062C\u0629 \u064A\u062D\u0638\u0631 \u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646\u0647\u0627 (${detectedInteractions.length} \u062A\u0639\u0627\u0631\u0636 \u0645\u0631\u0635\u0648\u062F)` : `\u{1F534} Critical Contraindication Detected (${detectedInteractions.length} interactions)`;
+      mechanism = isAr ? `\u062A\u0645 \u0631\u0635\u062F \u062A\u0639\u0627\u0631\u0636\u0627\u062A \u0633\u0631\u064A\u0631\u064A\u0629 \u0634\u062F\u064A\u062F\u0629 \u0627\u0644\u062E\u0637\u0648\u0631\u0629 \u062A\u0647\u062F\u062F \u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u0645\u0631\u064A\u0636 (\u062A\u0624\u062B\u0631 \u0639\u0644\u0649 \u0627\u0644\u0646\u0632\u064A\u0641\u060C \u0627\u0644\u062F\u0648\u0631\u0629 \u0627\u0644\u062F\u0645\u0648\u064A\u0629\u060C \u0625\u0646\u0632\u064A\u0645\u0627\u062A \u0627\u0644\u0643\u0628\u062F \u0623\u0648 \u0643\u0647\u0631\u0628\u0627\u0626\u064A\u0629 \u0627\u0644\u0642\u0644\u0628). \u0627\u0644\u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0633\u0631\u064A\u0631\u064A\u0629 \u0645\u0630\u0643\u0648\u0631\u0629 \u0641\u064A \u0628\u0637\u0627\u0642\u0627\u062A \u0627\u0644\u062A\u0639\u0627\u0631\u0636 \u0623\u062F\u0646\u0627\u0647.` : "Severe clinical interactions detected that pose life-threatening hazards (bleeding, hemodynamic collapse, or fatal arrhythmia).";
+      recommendation = isAr ? "\u064A\u062C\u0628 \u0645\u0631\u0627\u062C\u0639\u0629 \u0627\u0644\u0637\u0628\u064A\u0628 \u0627\u0644\u0645\u0639\u0627\u0644\u062C \u0623\u0648 \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A \u0641\u0648\u0631\u0627\u064B \u0644\u0625\u064A\u0642\u0627\u0641 \u0623\u0648 \u0627\u0633\u062A\u0628\u062F\u0627\u0644 \u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u0645\u062A\u0639\u0627\u0631\u0636\u0629 \u0628\u0627\u0644\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0622\u0645\u0646\u0629 \u0627\u0644\u0645\u0648\u0636\u062D\u0629." : "Immediate physician/pharmacist intervention required to discontinue or substitute contraindicated medications.";
+      clinicalDetails = isAr ? "\u0627\u0644\u0645\u0624\u0634\u0631\u0627\u062A \u0627\u0644\u0639\u0627\u062C\u0644\u0629 \u0644\u0644\u0645\u0631\u0627\u0642\u0628\u0629: \u0636\u063A\u0637 \u0627\u0644\u062F\u0645\u060C \u062A\u062E\u0637\u064A\u0637 \u0627\u0644\u0642\u0644\u0628\u060C \u0635\u0648\u0631\u0629 \u0627\u0644\u062F\u0645 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 CBC\u060C \u0639\u0644\u0627\u0645\u0627\u062A \u0627\u0644\u0646\u0632\u064A\u0641\u060C \u0648\u0638\u0627\u0626\u0641 \u0627\u0644\u0643\u0644\u0649." : "Monitor BP, ECG, CBC, bleeding signs, and renal function.";
+    } else if (hasCriticalDirectFood) {
+      const f = directFoodCollisions.find((i) => i.severity === "critical");
+      severityLabel = isAr ? `\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062F\u0648\u0627\u0626\u064A - \u063A\u0630\u0627\u0626\u064A \u062D\u0631\u062C (${f.affectedDrug} \u0645\u0639 ${f.foodCategory.split("(")[0].trim()})` : `\u{1F534} Critical Drug-Food Collision (${f.affectedDrug} + ${f.foodCategoryEn})`;
+      mechanism = f.mechanism;
+      recommendation = f.recommendation;
+      clinicalDetails = `${f.clinicalNote} | ${f.dietaryAdvice}`;
+    } else {
+      const ff = foodFoodInteractions.find((i) => i.severity === "critical");
+      severityLabel = isAr ? `\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u063A\u0630\u0627\u0626\u064A \u062D\u0631\u062C: ${ff.typeLabel}` : `\u{1F534} Critical Food-Food Interaction: ${ff.typeLabel}`;
+      mechanism = ff.mechanism;
+      recommendation = ff.recommendation;
+      clinicalDetails = ff.clinicalNote;
+    }
+  } else if (hasWarningDrug || hasWarningDirectFood || hasWarningFoodFood) {
+    severity = "warning";
+    if (hasWarningDrug) {
+      severityLabel = isAr ? `\u{1F7E0} \u062A\u0639\u0627\u0631\u0636\u0627\u062A \u0645\u062A\u0648\u0633\u0637\u0629 \u062A\u062A\u0637\u0644\u0628 \u0627\u0644\u062D\u0630\u0631 \u0648\u0627\u0644\u0645\u0628\u0627\u0639\u062F\u0629 (${detectedInteractions.length} \u062A\u0639\u0627\u0631\u0636)` : `\u{1F7E0} Moderate Interactions Detected (${detectedInteractions.length} interactions)`;
+      mechanism = isAr ? "\u062A\u0645 \u0631\u0635\u062F \u062A\u0639\u0627\u0631\u0636\u0627\u062A \u062F\u0648\u0627\u0626\u064A\u0629 \u062A\u0624\u062B\u0631 \u0639\u0644\u0649 \u0627\u0644\u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0645\u0639\u0648\u064A\u060C \u0627\u0633\u062A\u0642\u0644\u0627\u0628 \u0627\u0644\u0625\u0646\u0632\u064A\u0645\u0627\u062A \u0623\u0648 \u0634\u0648\u0627\u0631\u062F \u0627\u0644\u062F\u0645. \u062A\u062A\u0637\u0644\u0628 \u0627\u0644\u062E\u0637\u0629 \u0645\u0628\u0627\u0639\u062F\u0629 \u0632\u0645\u0646\u064A\u0629 \u0628\u0627\u0644\u0633\u0627\u0639\u0627\u062A \u0623\u0648 \u0645\u0631\u0627\u0642\u0628\u0629 \u0645\u062E\u0628\u0631\u064A\u0629 \u062F\u0648\u0631\u064A\u0629." : "Interactions affecting bioavailability, metabolism, or electrolytes identified. Dose separation and monitoring required.";
+      recommendation = isAr ? "\u0627\u0641\u0635\u0644 \u0628\u064A\u0646 \u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u0628\u0640 \u0633\u0627\u0639\u062A\u064A\u0646 \u0625\u0644\u0649 4 \u0633\u0627\u0639\u0627\u062A \u0628\u062D\u0633\u0628 \u0627\u0644\u062A\u0648\u0635\u064A\u0629 \u0627\u0644\u0633\u0631\u064A\u0631\u064A\u0629\u060C \u0648\u0627\u0644\u062A\u0632\u0645 \u0628\u0627\u0644\u0641\u062D\u0648\u0635\u0627\u062A \u0627\u0644\u0645\u062E\u0628\u0631\u064A\u0629 \u0627\u0644\u062F\u0648\u0631\u064A\u0629." : "Separate medication administration by 2 to 4 hours as indicated and conduct routine lab tests.";
+      clinicalDetails = isAr ? "\u0627\u0644\u0645\u0624\u0634\u0631\u0627\u062A \u0644\u0644\u0645\u062A\u0627\u0628\u0639\u0629: \u0642\u064A\u0627\u0633\u0627\u062A \u0627\u0644\u0633\u0643\u0631\u060C \u0648\u0638\u0627\u0626\u0641 \u0627\u0644\u0643\u0628\u062F \u0648\u0627\u0644\u0643\u0644\u0649\u060C \u0634\u0648\u0627\u0631\u062F \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645." : "Monitor blood glucose, renal/hepatic panels, and serum electrolytes.";
+    } else if (hasWarningDirectFood) {
+      const f = directFoodCollisions.find((i) => i.severity === "warning");
+      severityLabel = isAr ? `\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u062F\u0648\u0627\u0626\u064A - \u063A\u0630\u0627\u0626\u064A \u0647\u0627\u0645 (${f.affectedDrug} \u0645\u0639 ${f.foodCategory.split("(")[0].trim()})` : `\u{1F7E0} Moderate Drug-Food Interaction (${f.affectedDrug} + ${f.foodCategoryEn})`;
+      mechanism = f.mechanism;
+      recommendation = f.recommendation;
+      clinicalDetails = `${f.clinicalNote} | ${f.dietaryAdvice}`;
+    } else {
+      const ff = foodFoodInteractions.find((i) => i.severity === "warning");
+      severityLabel = isAr ? `\u{1F7E0} \u062A\u062F\u0627\u062E\u0644 \u063A\u0630\u0627\u0626\u064A \u0647\u0627\u0645: ${ff.typeLabel}` : `\u{1F7E0} Dietary Interaction Warning: ${ff.typeLabel}`;
+      mechanism = ff.mechanism;
+      recommendation = ff.recommendation;
+      clinicalDetails = ff.clinicalNote;
+    }
+  } else if (hasSynergyFoodFood && detectedInteractions.length === 0 && directFoodCollisions.length === 0) {
+    severity = "safe";
+    const ff = foodFoodInteractions.find((i) => i.severity === "beneficial" || i.type === "synergy" || i.effectType === "synergy");
+    severityLabel = isAr ? `\u{1F7E2} \u062A\u0622\u0632\u0631 \u063A\u0630\u0627\u0626\u064A \u0639\u0644\u0627\u062C\u064A \u0645\u0641\u064A\u062F \u0648\u0645\u062B\u0645\u0631 (${ff.typeLabel})` : `\u{1F7E2} Highly Beneficial Dietary Synergy (${ff.typeLabel})`;
+    mechanism = ff.mechanism;
+    recommendation = ff.recommendation;
+    clinicalDetails = ff.clinicalNote;
+  } else if (hasMinorDrug) {
+    severity = "minor";
+    severityLabel = isAr ? "\u{1F7E1} \u062A\u062F\u0627\u062E\u0644\u0627\u062A \u0637\u0641\u064A\u0641\u0629 (\u0622\u0645\u0646 \u0645\u0639 \u0627\u0644\u062A\u0648\u062C\u064A\u0647 \u0627\u0644\u0633\u0631\u064A\u0631\u064A)" : "\u{1F7E1} Minor Interactions (Safe with standard counseling)";
+    mechanism = isAr ? "\u0627\u0644\u062A\u062F\u0627\u062E\u0644\u0627\u062A \u0627\u0644\u0645\u0631\u0635\u0648\u062F\u0629 \u0637\u0641\u064A\u0641\u0629 \u0627\u0644\u062A\u0623\u062B\u064A\u0631 \u0627\u0644\u0633\u0631\u064A\u0631\u064A \u0648\u0644\u0627 \u062A\u0633\u062A\u062F\u0639\u064A \u0625\u064A\u0642\u0627\u0641 \u0627\u0644\u0639\u0644\u0627\u062C\u060C \u0645\u0639 \u0627\u0644\u0627\u0644\u062A\u0632\u0627\u0645 \u0628\u0627\u0644\u0646\u0635\u0627\u0626\u062D \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A\u0629 \u0627\u0644\u0645\u0631\u0641\u0642\u0629." : "Minor interactions noted with minimal clinical consequence; continuation appropriate with guidance.";
+    recommendation = isAr ? "\u0627\u0644\u062A\u0632\u0645 \u0628\u0645\u0648\u0627\u0639\u064A\u062F \u0627\u0644\u062F\u0648\u0627\u0621 \u0627\u0644\u0645\u062D\u062F\u062F\u0629 \u0648\u0627\u0633\u062A\u0634\u0631 \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A \u0639\u0646\u062F \u0638\u0647\u0648\u0631 \u0623\u064A \u0623\u0639\u0631\u0627\u0636 \u062C\u062F\u064A\u062F\u0629." : "Maintain scheduled dosing and report unexpected changes.";
+    clinicalDetails = isAr ? "\u0627\u0644\u0645\u062A\u0627\u0628\u0639\u0629 \u0627\u0644\u0631\u0648\u062A\u064A\u0646\u064A\u0629 \u0643\u0627\u0641\u064A\u0629 \u062F\u0648\u0646 \u0627\u0644\u062D\u0627\u062C\u0629 \u0644\u062A\u063A\u064A\u064A\u0631 \u0627\u0644\u062E\u0637\u0629 \u0627\u0644\u0639\u0644\u0627\u062C\u064A\u0629." : "Routine clinical monitoring is sufficient.";
   } else {
-    severity = 'safe';
-    severityLabel = isAr 
-      ? '🟢 آمن سريرياً (لا يوجد تعارض حرج مسجل بين هذه الأدوية)' 
-      : '🟢 Clinically Safe (No Known Adverse Interactions)';
-    mechanism = isAr
-      ? `تم فحص كافة التداخلات بين (${cleanTokens.join(' + ')}). لا يوجد تعارض استقلابي إنزيمي أو تضاد دوائي سلبي مسجل في المراجع الصيدلانية السريرية المعتمدة.`
-      : `All pairwise pathways checked for (${cleanTokens.join(' + ')}). No pharmacokinetic or pharmacodynamic contraindications identified.`;
-    recommendation = isAr
-      ? 'يمكن تناول الأدوية بأمان مع الالتزام بالفصل المعتاد بساعة إلى ساعتين بين العلاجات الفموية المختلفة لضمان الامتصاص الأمثل.'
-      : 'Medications can be taken safely with standard 1-2 hour oral spacing for optimal bioavailability.';
-    clinicalDetails = isAr
-      ? 'نصيحة الصيدلاني: استشر طبيبك دائماً قبل إضافة أي أعشاب أو مكملات غذائية للخطة العلاجية.'
-      : 'Pharmacist note: Consult healthcare provider before adding over-the-counter supplements.';
+    severity = "safe";
+    severityLabel = isAr ? "\u{1F7E2} \u0622\u0645\u0646 \u0633\u0631\u064A\u0631\u064A\u0627\u064B (\u0644\u0627 \u064A\u0648\u062C\u062F \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C \u0645\u0633\u062C\u0644 \u0628\u064A\u0646 \u0647\u0630\u0647 \u0627\u0644\u0645\u0648\u0627\u062F)" : "\u{1F7E2} Clinically Safe (No Known Adverse Interactions)";
+    mechanism = isAr ? `\u062A\u0645 \u0641\u062D\u0635 \u0643\u0627\u0641\u0629 \u0627\u0644\u062A\u062F\u0627\u062E\u0644\u0627\u062A \u0628\u064A\u0646 (${cleanTokens.join(" + ")}). \u0644\u0627 \u064A\u0648\u062C\u062F \u062A\u0639\u0627\u0631\u0636 \u0627\u0633\u062A\u0642\u0644\u0627\u0628\u064A \u0625\u0646\u0632\u064A\u0645\u064A \u0623\u0648 \u062A\u0636\u0627\u062F \u062F\u0648\u0627\u0626\u064A \u0623\u0648 \u063A\u0630\u0627\u0626\u064A \u0633\u0644\u0628\u064A \u0645\u0633\u062C\u0644 \u0641\u064A \u0627\u0644\u0645\u0631\u0627\u062C\u0639 \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A\u0629 \u0627\u0644\u0633\u0631\u064A\u0631\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629.` : `All pairwise pathways checked for (${cleanTokens.join(" + ")}). No pharmacokinetic or pharmacodynamic contraindications identified.`;
+    recommendation = isAr ? "\u064A\u0645\u0643\u0646 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0645\u0648\u0627\u062F \u0628\u0623\u0645\u0627\u0646 \u0645\u0639 \u0627\u0644\u0627\u0644\u062A\u0632\u0627\u0645 \u0628\u0627\u0644\u0641\u0635\u0644 \u0627\u0644\u0645\u0639\u062A\u0627\u062F \u0628\u0633\u0627\u0639\u0629 \u0625\u0644\u0649 \u0633\u0627\u0639\u062A\u064A\u0646 \u0628\u064A\u0646 \u0627\u0644\u0639\u0644\u0627\u062C\u0627\u062A \u0627\u0644\u0641\u0645\u0648\u064A\u0629 \u0627\u0644\u0645\u062E\u062A\u0644\u0641\u0629 \u0644\u0636\u0645\u0627\u0646 \u0627\u0644\u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0623\u0645\u062B\u0644." : "Medications can be taken safely with standard 1-2 hour oral spacing for optimal bioavailability.";
+    clinicalDetails = isAr ? "\u0646\u0635\u064A\u062D\u0629 \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A: \u0627\u0633\u062A\u0634\u0631 \u0637\u0628\u064A\u0628\u0643 \u062F\u0627\u0626\u0645\u0627\u064B \u0642\u0628\u0644 \u0625\u0636\u0627\u0641\u0629 \u0623\u064A \u0623\u0639\u0634\u0627\u0628 \u0623\u0648 \u0645\u0643\u0645\u0644\u0627\u062A \u063A\u0630\u0627\u0626\u064A\u0629 \u0644\u0644\u062E\u0637\u0629 \u0627\u0644\u0639\u0644\u0627\u062C\u064A\u0629." : "Pharmacist note: Consult healthcare provider before adding over-the-counter supplements.";
   }
-
   return {
     severity,
     severityLabel,
-    isSafe: severity === 'safe',
+    isSafe: severity === "safe" || severity === "minor",
     mechanism,
     recommendation,
     clinicalDetails,
     detectedInteractions,
     cumulativeRisks,
     analyzedDrugs: cleanTokens,
-    foodInteractions: evaluateFoodInteractions(cleanTokens, lang),
-    foodFoodInteractions: evaluateFoodFoodInteractions(cleanTokens, lang),
-    mealInstructions: getMealInstructions(cleanTokens, lang)
+    foodInteractions,
+    foodFoodInteractions,
+    mealInstructions
   };
 }
-
-export function evaluateFoodInteractions(tokens, lang = 'ar') {
-  const isAr = lang === 'ar';
+function evaluateFoodInteractions(tokens, lang = "ar") {
+  const isAr = lang === "ar";
   const foodInteractions = [];
-  const processedKeys = new Set();
-
+  const processedKeys = /* @__PURE__ */ new Set();
   for (const token of tokens) {
     const match = identifyDrugClasses(token);
     const classes = match.classes;
     const name = match.name;
-
-    // 1. Grapefruit & Citrus (CYP3A4 inhibition)
-    if (classes.includes('statin_cyp3a4')) {
+    if (classes.includes("statin_cyp3a4")) {
       const key = `grapefruit-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'عصير الجريب فروت والبوملي والحمضيات المرّة',
-          foodCategoryEn: 'Grapefruit & Citrus Juice',
-          foodIcon: '🍇',
+          foodCategory: "\u0639\u0635\u064A\u0631 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u0648\u0627\u0644\u0628\u0648\u0645\u0644\u064A \u0648\u0627\u0644\u062D\u0645\u0636\u064A\u0627\u062A \u0627\u0644\u0645\u0631\u0651\u0629",
+          foodCategoryEn: "Grapefruit & Citrus Juice",
+          foodIcon: "\u{1F347}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: انحلال العضلات المخططة وتسمم كبدي' : '🔴 Critical: Rhabdomyolysis & Liver Injury',
-          mechanism: isAr
-            ? 'يحتوي الجريب فروت على مركبات الفورانوكومارين التي تثبط إنزيم CYP3A4 المعوي والكبدي بشكل لا رجعة فيه، مما يرفع تركيز الستاتين في الدم بنسبة تصل إلى 15 ضعفاً، مسبباً ألماً عضلياً شديداً وانحلال الربيدات (Rhabdomyolysis) وفشلاً كلوياً حاداً.'
-            : 'Grapefruit furanocoumarins irreversibly inhibit intestinal CYP3A4, dramatically elevating statin bioavailability up to 15-fold and risking severe rhabdomyolysis and acute renal failure.',
-          recommendation: isAr
-            ? 'تجنب تناول الجريب فروت أو عصيره نهائياً طوال فترة العلاج بالستاتين (تأثير التثبيط يستمر حتى 72 ساعة بعد شرب العصير). كبديل آمن، يمكن استشارة الطبيب للتحويل إلى روزوفاستاتين أو برافاستاتين اللذين لا يتأثران بالجريب فروت.'
-            : 'Completely avoid grapefruit and Seville oranges. Consult physician for non-CYP3A4 alternatives like Rosuvastatin or Pravastatin.',
-          clinicalNote: isAr ? 'يشمل التحذير: سيمفاستاتين، أتورفاستاتين، لوفاستاتين.' : 'Applies to: Simvastatin, Atorvastatin, Lovastatin.',
-          dietaryAdvice: isAr ? 'البدائل الآمنة من الفواكه: البرتقال العادي، التفاح، الموز، الفراولة.' : 'Safe fruit alternatives: Sweet oranges, apples, bananas, berries.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0627\u0646\u062D\u0644\u0627\u0644 \u0627\u0644\u0639\u0636\u0644\u0627\u062A \u0627\u0644\u0645\u062E\u0637\u0637\u0629 \u0648\u062A\u0633\u0645\u0645 \u0643\u0628\u062F\u064A" : "\u{1F534} Critical: Rhabdomyolysis & Liver Injury",
+          mechanism: isAr ? "\u064A\u062D\u062A\u0648\u064A \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u0639\u0644\u0649 \u0645\u0631\u0643\u0628\u0627\u062A \u0627\u0644\u0641\u0648\u0631\u0627\u0646\u0648\u0643\u0648\u0645\u0627\u0631\u064A\u0646 \u0627\u0644\u062A\u064A \u062A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 CYP3A4 \u0627\u0644\u0645\u0639\u0648\u064A \u0648\u0627\u0644\u0643\u0628\u062F\u064A \u0628\u0634\u0643\u0644 \u0644\u0627 \u0631\u062C\u0639\u0629 \u0641\u064A\u0647\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646 \u0641\u064A \u0627\u0644\u062F\u0645 \u0628\u0646\u0633\u0628\u0629 \u062A\u0635\u0644 \u0625\u0644\u0649 15 \u0636\u0639\u0641\u0627\u064B\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u0623\u0644\u0645\u0627\u064B \u0639\u0636\u0644\u064A\u0627\u064B \u0634\u062F\u064A\u062F\u0627\u064B \u0648\u0627\u0646\u062D\u0644\u0627\u0644 \u0627\u0644\u0631\u0628\u064A\u062F\u0627\u062A (Rhabdomyolysis) \u0648\u0641\u0634\u0644\u0627\u064B \u0643\u0644\u0648\u064A\u0627\u064B \u062D\u0627\u062F\u0627\u064B." : "Grapefruit furanocoumarins irreversibly inhibit intestinal CYP3A4, dramatically elevating statin bioavailability up to 15-fold and risking severe rhabdomyolysis and acute renal failure.",
+          recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u0623\u0648 \u0639\u0635\u064A\u0631\u0647 \u0646\u0647\u0627\u0626\u064A\u0627\u064B \u0637\u0648\u0627\u0644 \u0641\u062A\u0631\u0629 \u0627\u0644\u0639\u0644\u0627\u062C \u0628\u0627\u0644\u0633\u062A\u0627\u062A\u064A\u0646 (\u062A\u0623\u062B\u064A\u0631 \u0627\u0644\u062A\u062B\u0628\u064A\u0637 \u064A\u0633\u062A\u0645\u0631 \u062D\u062A\u0649 72 \u0633\u0627\u0639\u0629 \u0628\u0639\u062F \u0634\u0631\u0628 \u0627\u0644\u0639\u0635\u064A\u0631). \u0643\u0628\u062F\u064A\u0644 \u0622\u0645\u0646\u060C \u064A\u0645\u0643\u0646 \u0627\u0633\u062A\u0634\u0627\u0631\u0629 \u0627\u0644\u0637\u0628\u064A\u0628 \u0644\u0644\u062A\u062D\u0648\u064A\u0644 \u0625\u0644\u0649 \u0631\u0648\u0632\u0648\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646 \u0623\u0648 \u0628\u0631\u0627\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646 \u0627\u0644\u0644\u0630\u064A\u0646 \u0644\u0627 \u064A\u062A\u0623\u062B\u0631\u0627\u0646 \u0628\u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A." : "Completely avoid grapefruit and Seville oranges. Consult physician for non-CYP3A4 alternatives like Rosuvastatin or Pravastatin.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644 \u0627\u0644\u062A\u062D\u0630\u064A\u0631: \u0633\u064A\u0645\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646\u060C \u0623\u062A\u0648\u0631\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646\u060C \u0644\u0648\u0641\u0627\u0633\u062A\u0627\u062A\u064A\u0646." : "Applies to: Simvastatin, Atorvastatin, Lovastatin.",
+          dietaryAdvice: isAr ? "\u0627\u0644\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0622\u0645\u0646\u0629 \u0645\u0646 \u0627\u0644\u0641\u0648\u0627\u0643\u0647: \u0627\u0644\u0628\u0631\u062A\u0642\u0627\u0644 \u0627\u0644\u0639\u0627\u062F\u064A\u060C \u0627\u0644\u062A\u0641\u0627\u062D\u060C \u0627\u0644\u0645\u0648\u0632\u060C \u0627\u0644\u0641\u0631\u0627\u0648\u0644\u0629." : "Safe fruit alternatives: Sweet oranges, apples, bananas, berries."
         });
       }
     }
-
-    if (classes.includes('ccb')) {
+    if (classes.includes("ccb")) {
       const key = `grapefruit-ccb-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'عصير الجريب فروت',
-          foodCategoryEn: 'Grapefruit Juice',
-          foodIcon: '🍇',
+          foodCategory: "\u0639\u0635\u064A\u0631 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A",
+          foodCategoryEn: "Grapefruit Juice",
+          foodIcon: "\u{1F347}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: هبوط ضغط حاد ودوار شديد' : '🔴 Critical: Severe Hypotension & Tachycardia',
-          mechanism: isAr
-            ? 'تثبيط CYP3A4 يزيد التوافر الحيوي لحاصرات قنوات الكالسيوم (أملوديبين، فيلوديبين، نيفيديبين)، مما يؤدي إلى توسع وعائي مفاجئ، هبوط حاد في ضغط الدم الشرياني، خفقان ارتدادي، ووذمات شديدة في الكاحلين.'
-            : 'Inhibition of CYP3A4 increases calcium channel blocker systemic exposure, precipitating profound hypotension, dizziness, and reflex tachycardia.',
-          recommendation: isAr
-            ? 'الامتناع التام عن الجريب فروت. راقب ضغط الدم بانتظام واشرب عصائر بديلة كالبرتقال أو التفاح.'
-            : 'Avoid grapefruit products. Monitor blood pressure routinely.',
-          clinicalNote: isAr ? 'تأثير الجريب فروت يستمر حتى 3 أيام بعد تناوله.' : 'Grapefruit effect lasts up to 72 hours.',
-          dietaryAdvice: isAr ? 'مسموح: عصير الليمون، عصير البرتقال العادي.' : 'Allowed: Regular orange and lemon juice.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0647\u0628\u0648\u0637 \u0636\u063A\u0637 \u062D\u0627\u062F \u0648\u062F\u0648\u0627\u0631 \u0634\u062F\u064A\u062F" : "\u{1F534} Critical: Severe Hypotension & Tachycardia",
+          mechanism: isAr ? "\u062A\u062B\u0628\u064A\u0637 CYP3A4 \u064A\u0632\u064A\u062F \u0627\u0644\u062A\u0648\u0627\u0641\u0631 \u0627\u0644\u062D\u064A\u0648\u064A \u0644\u062D\u0627\u0635\u0631\u0627\u062A \u0642\u0646\u0648\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 (\u0623\u0645\u0644\u0648\u062F\u064A\u0628\u064A\u0646\u060C \u0641\u064A\u0644\u0648\u062F\u064A\u0628\u064A\u0646\u060C \u0646\u064A\u0641\u064A\u062F\u064A\u0628\u064A\u0646)\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0625\u0644\u0649 \u062A\u0648\u0633\u0639 \u0648\u0639\u0627\u0626\u064A \u0645\u0641\u0627\u062C\u0626\u060C \u0647\u0628\u0648\u0637 \u062D\u0627\u062F \u0641\u064A \u0636\u063A\u0637 \u0627\u0644\u062F\u0645 \u0627\u0644\u0634\u0631\u064A\u0627\u0646\u064A\u060C \u062E\u0641\u0642\u0627\u0646 \u0627\u0631\u062A\u062F\u0627\u062F\u064A\u060C \u0648\u0648\u0630\u0645\u0627\u062A \u0634\u062F\u064A\u062F\u0629 \u0641\u064A \u0627\u0644\u0643\u0627\u062D\u0644\u064A\u0646." : "Inhibition of CYP3A4 increases calcium channel blocker systemic exposure, precipitating profound hypotension, dizziness, and reflex tachycardia.",
+          recommendation: isAr ? "\u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0627\u0644\u062A\u0627\u0645 \u0639\u0646 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A. \u0631\u0627\u0642\u0628 \u0636\u063A\u0637 \u0627\u0644\u062F\u0645 \u0628\u0627\u0646\u062A\u0638\u0627\u0645 \u0648\u0627\u0634\u0631\u0628 \u0639\u0635\u0627\u0626\u0631 \u0628\u062F\u064A\u0644\u0629 \u0643\u0627\u0644\u0628\u0631\u062A\u0642\u0627\u0644 \u0623\u0648 \u0627\u0644\u062A\u0641\u0627\u062D." : "Avoid grapefruit products. Monitor blood pressure routinely.",
+          clinicalNote: isAr ? "\u062A\u0623\u062B\u064A\u0631 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u064A\u0633\u062A\u0645\u0631 \u062D\u062A\u0649 3 \u0623\u064A\u0627\u0645 \u0628\u0639\u062F \u062A\u0646\u0627\u0648\u0644\u0647." : "Grapefruit effect lasts up to 72 hours.",
+          dietaryAdvice: isAr ? "\u0645\u0633\u0645\u0648\u062D: \u0639\u0635\u064A\u0631 \u0627\u0644\u0644\u064A\u0645\u0648\u0646\u060C \u0639\u0635\u064A\u0631 \u0627\u0644\u0628\u0631\u062A\u0642\u0627\u0644 \u0627\u0644\u0639\u0627\u062F\u064A." : "Allowed: Regular orange and lemon juice."
         });
       }
     }
-
-    if (classes.includes('pde5_inhibitor')) {
+    if (classes.includes("pde5_inhibitor")) {
       const key = `grapefruit-pde5-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الجريب فروت والبوملي',
-          foodCategoryEn: 'Grapefruit & Pomelo',
-          foodIcon: '🍇',
+          foodCategory: "\u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u0648\u0627\u0644\u0628\u0648\u0645\u0644\u064A",
+          foodCategoryEn: "Grapefruit & Pomelo",
+          foodIcon: "\u{1F347}",
           affectedDrug: name,
-          severity: 'warning',
-          severityLabel: isAr ? '🟠 تعارض متوسط: هبوط ضغط وصداع وخفقان' : '🟠 Moderate: Hypotension & Flushing',
-          mechanism: isAr
-            ? 'زيادة مستويات مثبطات الفوسفو داي إستراز (فياجرا، سياليس) في مصل الدم مما يضاعف الآثار الجانبية كالصداع واحمرار الوجه وهبوط الضغط الانتصابي.'
-            : 'Elevated PDE-5 inhibitor plasma concentrations leading to severe headache, dizziness, and postural hypotension.',
-          recommendation: isAr ? 'تجنب شرب عصير الجريب فروت قبل أو أثناء استخدام العلاج.' : 'Avoid grapefruit products around dosing.',
-          clinicalNote: isAr ? 'يشمل: سيلدينافيل وتادالافيل.' : 'Applies to: Sildenafil, Tadalafil.',
-          dietaryAdvice: isAr ? 'شرب الماء بكثرة عند تناول العلاج.' : 'Ensure adequate hydration.'
+          severity: "warning",
+          severityLabel: isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u062A\u0648\u0633\u0637: \u0647\u0628\u0648\u0637 \u0636\u063A\u0637 \u0648\u0635\u062F\u0627\u0639 \u0648\u062E\u0641\u0642\u0627\u0646" : "\u{1F7E0} Moderate: Hypotension & Flushing",
+          mechanism: isAr ? "\u0632\u064A\u0627\u062F\u0629 \u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0645\u062B\u0628\u0637\u0627\u062A \u0627\u0644\u0641\u0648\u0633\u0641\u0648 \u062F\u0627\u064A \u0625\u0633\u062A\u0631\u0627\u0632 (\u0641\u064A\u0627\u062C\u0631\u0627\u060C \u0633\u064A\u0627\u0644\u064A\u0633) \u0641\u064A \u0645\u0635\u0644 \u0627\u0644\u062F\u0645 \u0645\u0645\u0627 \u064A\u0636\u0627\u0639\u0641 \u0627\u0644\u0622\u062B\u0627\u0631 \u0627\u0644\u062C\u0627\u0646\u0628\u064A\u0629 \u0643\u0627\u0644\u0635\u062F\u0627\u0639 \u0648\u0627\u062D\u0645\u0631\u0627\u0631 \u0627\u0644\u0648\u062C\u0647 \u0648\u0647\u0628\u0648\u0637 \u0627\u0644\u0636\u063A\u0637 \u0627\u0644\u0627\u0646\u062A\u0635\u0627\u0628\u064A." : "Elevated PDE-5 inhibitor plasma concentrations leading to severe headache, dizziness, and postural hypotension.",
+          recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u0634\u0631\u0628 \u0639\u0635\u064A\u0631 \u0627\u0644\u062C\u0631\u064A\u0628 \u0641\u0631\u0648\u062A \u0642\u0628\u0644 \u0623\u0648 \u0623\u062B\u0646\u0627\u0621 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0627\u0644\u0639\u0644\u0627\u062C." : "Avoid grapefruit products around dosing.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0633\u064A\u0644\u062F\u064A\u0646\u0627\u0641\u064A\u0644 \u0648\u062A\u0627\u062F\u0627\u0644\u0627\u0641\u064A\u0644." : "Applies to: Sildenafil, Tadalafil.",
+          dietaryAdvice: isAr ? "\u0634\u0631\u0628 \u0627\u0644\u0645\u0627\u0621 \u0628\u0643\u062B\u0631\u0629 \u0639\u0646\u062F \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0639\u0644\u0627\u062C." : "Ensure adequate hydration."
         });
       }
     }
-
-    // 2. Dairy, Milk & Calcium (Chelation)
-    if (classes.includes('quinolone')) {
+    if (classes.includes("quinolone")) {
       const key = `dairy-quinolone-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الحليب ومشتقات الألبان والأجبان ومكملات الكالسيوم',
-          foodCategoryEn: 'Dairy Products & Calcium',
-          foodIcon: '🥛',
+          foodCategory: "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0645\u0634\u062A\u0642\u0627\u062A \u0627\u0644\u0623\u0644\u0628\u0627\u0646 \u0648\u0627\u0644\u0623\u062C\u0628\u0627\u0646 \u0648\u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645",
+          foodCategoryEn: "Dairy Products & Calcium",
+          foodIcon: "\u{1F95B}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: فشل العلاج المضاد للبكتيريا وتكون معقدات غير ممتصة' : '🔴 Critical: Chelation & Antibiotic Treatment Failure',
-          mechanism: isAr
-            ? 'ترتبط شوارد الكالسيوم والمغنيسيوم في الحليب والألبان بجزيئات المضاد الحيوي (الفلوروكينولون) لتكوّن معقداً غير قابل للذوبان أو الامتصاص (Chelation)، مما ينقص امتصاص الدواء بنسبة تصل إلى 70% ويؤدي لفشل علاج العدوى وتطور مقاومة بكتيرية.'
-            : 'Polyvalent cations in milk and dairy chelate fluoroquinolones, decreasing systemic absorption by up to 70%, resulting in clinical failure and resistance.',
-          recommendation: isAr
-            ? 'تناول المضاد الحيوي قبل الحليب أو الزبادي أو مكملات الكالسيوم بساعتين على الأقل، أو بعدها بـ 4 ساعات. يجب بلع الحبة مع كأس كامل من الماء العادي حصراً.'
-            : 'Administer antibiotic at least 2 hours before or 4 hours after dairy products or calcium supplements.',
-          clinicalNote: isAr ? 'ينطبق على سيبروفلوكساسين، ليفوفلوكساسين، موكسيفلوكساسين.' : 'Applies to: Ciprofloxacin, Levofloxacin, Moxifloxacin.',
-          dietaryAdvice: isAr ? 'يمكن تناول وجبات خالية من الألبان (أرز، دجاج، خضار مطبوخة) مع الدواء دون تعارض.' : 'Dairy-free meals do not impair absorption.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0641\u0634\u0644 \u0627\u0644\u0639\u0644\u0627\u062C \u0627\u0644\u0645\u0636\u0627\u062F \u0644\u0644\u0628\u0643\u062A\u064A\u0631\u064A\u0627 \u0648\u062A\u0643\u0648\u0646 \u0645\u0639\u0642\u062F\u0627\u062A \u063A\u064A\u0631 \u0645\u0645\u062A\u0635\u0629" : "\u{1F534} Critical: Chelation & Antibiotic Treatment Failure",
+          mechanism: isAr ? "\u062A\u0631\u062A\u0628\u0637 \u0634\u0648\u0627\u0631\u062F \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u0645\u063A\u0646\u064A\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0623\u0644\u0628\u0627\u0646 \u0628\u062C\u0632\u064A\u0626\u0627\u062A \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A (\u0627\u0644\u0641\u0644\u0648\u0631\u0648\u0643\u064A\u0646\u0648\u0644\u0648\u0646) \u0644\u062A\u0643\u0648\u0651\u0646 \u0645\u0639\u0642\u062F\u0627\u064B \u063A\u064A\u0631 \u0642\u0627\u0628\u0644 \u0644\u0644\u0630\u0648\u0628\u0627\u0646 \u0623\u0648 \u0627\u0644\u0627\u0645\u062A\u0635\u0627\u0635 (Chelation)\u060C \u0645\u0645\u0627 \u064A\u0646\u0642\u0635 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062F\u0648\u0627\u0621 \u0628\u0646\u0633\u0628\u0629 \u062A\u0635\u0644 \u0625\u0644\u0649 70% \u0648\u064A\u0624\u062F\u064A \u0644\u0641\u0634\u0644 \u0639\u0644\u0627\u062C \u0627\u0644\u0639\u062F\u0648\u0649 \u0648\u062A\u0637\u0648\u0631 \u0645\u0642\u0627\u0648\u0645\u0629 \u0628\u0643\u062A\u064A\u0631\u064A\u0629." : "Polyvalent cations in milk and dairy chelate fluoroquinolones, decreasing systemic absorption by up to 70%, resulting in clinical failure and resistance.",
+          recommendation: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0645\u0636\u0627\u062F \u0627\u0644\u062D\u064A\u0648\u064A \u0642\u0628\u0644 \u0627\u0644\u062D\u0644\u064A\u0628 \u0623\u0648 \u0627\u0644\u0632\u0628\u0627\u062F\u064A \u0623\u0648 \u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0628\u0633\u0627\u0639\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644\u060C \u0623\u0648 \u0628\u0639\u062F\u0647\u0627 \u0628\u0640 4 \u0633\u0627\u0639\u0627\u062A. \u064A\u062C\u0628 \u0628\u0644\u0639 \u0627\u0644\u062D\u0628\u0629 \u0645\u0639 \u0643\u0623\u0633 \u0643\u0627\u0645\u0644 \u0645\u0646 \u0627\u0644\u0645\u0627\u0621 \u0627\u0644\u0639\u0627\u062F\u064A \u062D\u0635\u0631\u0627\u064B." : "Administer antibiotic at least 2 hours before or 4 hours after dairy products or calcium supplements.",
+          clinicalNote: isAr ? "\u064A\u0646\u0637\u0628\u0642 \u0639\u0644\u0649 \u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646\u060C \u0644\u064A\u0641\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646\u060C \u0645\u0648\u0643\u0633\u064A\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646." : "Applies to: Ciprofloxacin, Levofloxacin, Moxifloxacin.",
+          dietaryAdvice: isAr ? "\u064A\u0645\u0643\u0646 \u062A\u0646\u0627\u0648\u0644 \u0648\u062C\u0628\u0627\u062A \u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0623\u0644\u0628\u0627\u0646 (\u0623\u0631\u0632\u060C \u062F\u062C\u0627\u062C\u060C \u062E\u0636\u0627\u0631 \u0645\u0637\u0628\u0648\u062E\u0629) \u0645\u0639 \u0627\u0644\u062F\u0648\u0627\u0621 \u062F\u0648\u0646 \u062A\u0639\u0627\u0631\u0636." : "Dairy-free meals do not impair absorption."
         });
       }
     }
-
-    if (classes.includes('tetracycline')) {
+    if (classes.includes("tetracycline")) {
       const key = `dairy-tetra-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الحليب والألبان ومكملات الكالسيوم',
-          foodCategoryEn: 'Milk & Dairy Products',
-          foodIcon: '🥛',
+          foodCategory: "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0623\u0644\u0628\u0627\u0646 \u0648\u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645",
+          foodCategoryEn: "Milk & Dairy Products",
+          foodIcon: "\u{1F95B}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: انعدام امتصاص التتراسيكلين' : '🔴 Critical: Impaired Tetracycline Absorption',
-          mechanism: isAr
-            ? 'الكالسيوم في الحليب والجبن يشكل معقداً خالياً من الفعالية الحيوية مع التتراسيكلين والدوكسيسيكلين في تجويف الأمعاء، مانعاً امتصاصه بالكامل.'
-            : 'Calcium binds tetracycline molecules into insoluble chelates, negating antibacterial efficacy.',
-          recommendation: isAr
-            ? 'افصل بين الدوكسيسيكلين أو التتراسيكلين وأي منتجات ألبان بساعتين إلى 3 ساعات، وتناوله مع كأس ماء كامل في وضعية الوقوف لتجنب تقرح المريء.'
-            : 'Separate by at least 2 to 3 hours from dairy products; swallow with plenty of water.',
-          clinicalNote: isAr ? 'يشمل: دوكسيسيكلين (فيبرامايسين)، تتراسيكلين.' : 'Applies to: Doxycycline, Tetracycline.',
-          dietaryAdvice: isAr ? 'لا تشرب الحليب لبلع حبة التتراسيكلين مطلقاً.' : 'Never take tetracyclines with a glass of milk.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0627\u0646\u0639\u062F\u0627\u0645 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062A\u062A\u0631\u0627\u0633\u064A\u0643\u0644\u064A\u0646" : "\u{1F534} Critical: Impaired Tetracycline Absorption",
+          mechanism: isAr ? "\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u062C\u0628\u0646 \u064A\u0634\u0643\u0644 \u0645\u0639\u0642\u062F\u0627\u064B \u062E\u0627\u0644\u064A\u0627\u064B \u0645\u0646 \u0627\u0644\u0641\u0639\u0627\u0644\u064A\u0629 \u0627\u0644\u062D\u064A\u0648\u064A\u0629 \u0645\u0639 \u0627\u0644\u062A\u062A\u0631\u0627\u0633\u064A\u0643\u0644\u064A\u0646 \u0648\u0627\u0644\u062F\u0648\u0643\u0633\u064A\u0633\u064A\u0643\u0644\u064A\u0646 \u0641\u064A \u062A\u062C\u0648\u064A\u0641 \u0627\u0644\u0623\u0645\u0639\u0627\u0621\u060C \u0645\u0627\u0646\u0639\u0627\u064B \u0627\u0645\u062A\u0635\u0627\u0635\u0647 \u0628\u0627\u0644\u0643\u0627\u0645\u0644." : "Calcium binds tetracycline molecules into insoluble chelates, negating antibacterial efficacy.",
+          recommendation: isAr ? "\u0627\u0641\u0635\u0644 \u0628\u064A\u0646 \u0627\u0644\u062F\u0648\u0643\u0633\u064A\u0633\u064A\u0643\u0644\u064A\u0646 \u0623\u0648 \u0627\u0644\u062A\u062A\u0631\u0627\u0633\u064A\u0643\u0644\u064A\u0646 \u0648\u0623\u064A \u0645\u0646\u062A\u062C\u0627\u062A \u0623\u0644\u0628\u0627\u0646 \u0628\u0633\u0627\u0639\u062A\u064A\u0646 \u0625\u0644\u0649 3 \u0633\u0627\u0639\u0627\u062A\u060C \u0648\u062A\u0646\u0627\u0648\u0644\u0647 \u0645\u0639 \u0643\u0623\u0633 \u0645\u0627\u0621 \u0643\u0627\u0645\u0644 \u0641\u064A \u0648\u0636\u0639\u064A\u0629 \u0627\u0644\u0648\u0642\u0648\u0641 \u0644\u062A\u062C\u0646\u0628 \u062A\u0642\u0631\u062D \u0627\u0644\u0645\u0631\u064A\u0621." : "Separate by at least 2 to 3 hours from dairy products; swallow with plenty of water.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u062F\u0648\u0643\u0633\u064A\u0633\u064A\u0643\u0644\u064A\u0646 (\u0641\u064A\u0628\u0631\u0627\u0645\u0627\u064A\u0633\u064A\u0646)\u060C \u062A\u062A\u0631\u0627\u0633\u064A\u0643\u0644\u064A\u0646." : "Applies to: Doxycycline, Tetracycline.",
+          dietaryAdvice: isAr ? "\u0644\u0627 \u062A\u0634\u0631\u0628 \u0627\u0644\u062D\u0644\u064A\u0628 \u0644\u0628\u0644\u0639 \u062D\u0628\u0629 \u0627\u0644\u062A\u062A\u0631\u0627\u0633\u064A\u0643\u0644\u064A\u0646 \u0645\u0637\u0644\u0642\u0627\u064B." : "Never take tetracyclines with a glass of milk."
         });
       }
     }
-
-    if (classes.includes('levothyroxine')) {
+    if (classes.includes("levothyroxine")) {
       const key = `dairy-thyro-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الحليب والألبان والقهوة والكالسيوم والحديد',
-          foodCategoryEn: 'Dairy, Coffee & Calcium Supplements',
-          foodIcon: '🥛',
+          foodCategory: "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0623\u0644\u0628\u0627\u0646 \u0648\u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u0627\u0644\u062D\u062F\u064A\u062F",
+          foodCategoryEn: "Dairy, Coffee & Calcium Supplements",
+          foodIcon: "\u{1F95B}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: هبوط امتصاص هرمون الغدة الدرقية وقصور درقي' : '🔴 Critical: Blocked Thyroid Hormone Absorption',
-          mechanism: isAr
-            ? 'الكالسيوم وفول الصويا والقهوة الصباحية والألياف ترتبط بقوة بهرمون الليفوثيروكسين وتمنع امتصاصه في الصائم والأمعاء الدقيقة، مما يعيد المريض لحالة قصور الدرق وارتفاع هرمون TSH.'
-            : 'Calcium, dairy, morning coffee, and dietary fiber severely impede levothyroxine absorption, causing clinical hypothyroidism.',
-          recommendation: isAr
-            ? 'القاعدة الذهبية للغدة: تناول حبة الثيروكسين فور الاستيقاظ على الريق مع نصف كوب ماء نقي، وانتظر 30 إلى 60 دقيقة قبل تناول الإفطار أو القهوة، وافصل مكملات الكالسيوم أو الحليب بـ 4 ساعات كاملة.'
-            : 'Take on an empty stomach with plain water at least 30-60 minutes before breakfast and coffee. Separate calcium/iron by 4 hours.',
-          clinicalNote: isAr ? 'يشمل: إيوثيروكس (Euthyrox)، ثيروكسين.' : 'Applies to: Euthyrox, Levothyroxine.',
-          dietaryAdvice: isAr ? 'تجنب منتجات الصويا ومكملات الألياف في وجبة الإفطار.' : 'Avoid soy and fiber supplements during breakfast.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0647\u0628\u0648\u0637 \u0627\u0645\u062A\u0635\u0627\u0635 \u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u063A\u062F\u0629 \u0627\u0644\u062F\u0631\u0642\u064A\u0629 \u0648\u0642\u0635\u0648\u0631 \u062F\u0631\u0642\u064A" : "\u{1F534} Critical: Blocked Thyroid Hormone Absorption",
+          mechanism: isAr ? "\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u0641\u0648\u0644 \u0627\u0644\u0635\u0648\u064A\u0627 \u0648\u0627\u0644\u0642\u0647\u0648\u0629 \u0627\u0644\u0635\u0628\u0627\u062D\u064A\u0629 \u0648\u0627\u0644\u0623\u0644\u064A\u0627\u0641 \u062A\u0631\u062A\u0628\u0637 \u0628\u0642\u0648\u0629 \u0628\u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u0644\u064A\u0641\u0648\u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646 \u0648\u062A\u0645\u0646\u0639 \u0627\u0645\u062A\u0635\u0627\u0635\u0647 \u0641\u064A \u0627\u0644\u0635\u0627\u0626\u0645 \u0648\u0627\u0644\u0623\u0645\u0639\u0627\u0621 \u0627\u0644\u062F\u0642\u064A\u0642\u0629\u060C \u0645\u0645\u0627 \u064A\u0639\u064A\u062F \u0627\u0644\u0645\u0631\u064A\u0636 \u0644\u062D\u0627\u0644\u0629 \u0642\u0635\u0648\u0631 \u0627\u0644\u062F\u0631\u0642 \u0648\u0627\u0631\u062A\u0641\u0627\u0639 \u0647\u0631\u0645\u0648\u0646 TSH." : "Calcium, dairy, morning coffee, and dietary fiber severely impede levothyroxine absorption, causing clinical hypothyroidism.",
+          recommendation: isAr ? "\u0627\u0644\u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0630\u0647\u0628\u064A\u0629 \u0644\u0644\u063A\u062F\u0629: \u062A\u0646\u0627\u0648\u0644 \u062D\u0628\u0629 \u0627\u0644\u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646 \u0641\u0648\u0631 \u0627\u0644\u0627\u0633\u062A\u064A\u0642\u0627\u0638 \u0639\u0644\u0649 \u0627\u0644\u0631\u064A\u0642 \u0645\u0639 \u0646\u0635\u0641 \u0643\u0648\u0628 \u0645\u0627\u0621 \u0646\u0642\u064A\u060C \u0648\u0627\u0646\u062A\u0638\u0631 30 \u0625\u0644\u0649 60 \u062F\u0642\u064A\u0642\u0629 \u0642\u0628\u0644 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0625\u0641\u0637\u0627\u0631 \u0623\u0648 \u0627\u0644\u0642\u0647\u0648\u0629\u060C \u0648\u0627\u0641\u0635\u0644 \u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0623\u0648 \u0627\u0644\u062D\u0644\u064A\u0628 \u0628\u0640 4 \u0633\u0627\u0639\u0627\u062A \u0643\u0627\u0645\u0644\u0629." : "Take on an empty stomach with plain water at least 30-60 minutes before breakfast and coffee. Separate calcium/iron by 4 hours.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0625\u064A\u0648\u062B\u064A\u0631\u0648\u0643\u0633 (Euthyrox)\u060C \u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646." : "Applies to: Euthyrox, Levothyroxine.",
+          dietaryAdvice: isAr ? "\u062A\u062C\u0646\u0628 \u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0635\u0648\u064A\u0627 \u0648\u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0623\u0644\u064A\u0627\u0641 \u0641\u064A \u0648\u062C\u0628\u0629 \u0627\u0644\u0625\u0641\u0637\u0627\u0631." : "Avoid soy and fiber supplements during breakfast."
         });
       }
     }
-
-    if (classes.includes('iron_supplement')) {
+    if (classes.includes("iron_supplement")) {
       const key = `iron-food-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الشاي، القهوة، الحليب، والبيض',
-          foodCategoryEn: 'Tea, Coffee, Dairy & Eggs',
-          foodIcon: '☕',
+          foodCategory: "\u0627\u0644\u0634\u0627\u064A\u060C \u0627\u0644\u0642\u0647\u0648\u0629\u060C \u0627\u0644\u062D\u0644\u064A\u0628\u060C \u0648\u0627\u0644\u0628\u064A\u0636",
+          foodCategoryEn: "Tea, Coffee, Dairy & Eggs",
+          foodIcon: "\u2615",
           affectedDrug: name,
-          severity: 'warning',
-          severityLabel: isAr ? '🟠 تعارض متوسط: نقص امتصاص الحديد بنسبة 60-80%' : '🟠 Moderate: Markedly Reduced Iron Absorption',
-          mechanism: isAr
-            ? 'التانينات في الشاي والبوليفينول في القهوة والكالسيوم في الحليب والفوسفوفيتين في صفار البيض ترتبط بالحديد وتشكل أملاحاً غير قابلة للامتصاص، مما يحرم الجسم من علاج فقر الدم.'
-            : 'Tannins in tea, coffee polyphenols, and dairy calcium bind iron into non-absorbable complexes, decreasing uptake by 60-80%.',
-          recommendation: isAr
-            ? 'افصل بين حبوب الحديد والشاي أو القهوة أو الحليب بساعتين على الأقل. نصيحة ذهبية: تناول حبة الحديد مع كوب من عصير البرتقال (فيتامين C) حيث يضاعف امتصاص الحديد بنسبة 300%!'
-            : 'Separate iron intake from tea/coffee/milk by at least 2 hours. Take with Vitamin C or orange juice to maximize absorption.',
-          clinicalNote: isAr ? 'يشمل: كبريتات الحديد، فيروز، فيروجلوبين.' : 'Applies to: Ferrous sulfate, iron supplements.',
-          dietaryAdvice: isAr ? 'فيتامين C الطبيعي (برتقال، كيوي، فلفل رومي) هو الصديق الأفضل لحبوب الحديد.' : 'Vitamin C boosts iron absorption significantly.'
+          severity: "warning",
+          severityLabel: isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u062A\u0648\u0633\u0637: \u0646\u0642\u0635 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062D\u062F\u064A\u062F \u0628\u0646\u0633\u0628\u0629 60-80%" : "\u{1F7E0} Moderate: Markedly Reduced Iron Absorption",
+          mechanism: isAr ? "\u0627\u0644\u062A\u0627\u0646\u064A\u0646\u0627\u062A \u0641\u064A \u0627\u0644\u0634\u0627\u064A \u0648\u0627\u0644\u0628\u0648\u0644\u064A\u0641\u064A\u0646\u0648\u0644 \u0641\u064A \u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0641\u0648\u0633\u0641\u0648\u0641\u064A\u062A\u064A\u0646 \u0641\u064A \u0635\u0641\u0627\u0631 \u0627\u0644\u0628\u064A\u0636 \u062A\u0631\u062A\u0628\u0637 \u0628\u0627\u0644\u062D\u062F\u064A\u062F \u0648\u062A\u0634\u0643\u0644 \u0623\u0645\u0644\u0627\u062D\u0627\u064B \u063A\u064A\u0631 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u0627\u0645\u062A\u0635\u0627\u0635\u060C \u0645\u0645\u0627 \u064A\u062D\u0631\u0645 \u0627\u0644\u062C\u0633\u0645 \u0645\u0646 \u0639\u0644\u0627\u062C \u0641\u0642\u0631 \u0627\u0644\u062F\u0645." : "Tannins in tea, coffee polyphenols, and dairy calcium bind iron into non-absorbable complexes, decreasing uptake by 60-80%.",
+          recommendation: isAr ? "\u0627\u0641\u0635\u0644 \u0628\u064A\u0646 \u062D\u0628\u0648\u0628 \u0627\u0644\u062D\u062F\u064A\u062F \u0648\u0627\u0644\u0634\u0627\u064A \u0623\u0648 \u0627\u0644\u0642\u0647\u0648\u0629 \u0623\u0648 \u0627\u0644\u062D\u0644\u064A\u0628 \u0628\u0633\u0627\u0639\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644. \u0646\u0635\u064A\u062D\u0629 \u0630\u0647\u0628\u064A\u0629: \u062A\u0646\u0627\u0648\u0644 \u062D\u0628\u0629 \u0627\u0644\u062D\u062F\u064A\u062F \u0645\u0639 \u0643\u0648\u0628 \u0645\u0646 \u0639\u0635\u064A\u0631 \u0627\u0644\u0628\u0631\u062A\u0642\u0627\u0644 (\u0641\u064A\u062A\u0627\u0645\u064A\u0646 C) \u062D\u064A\u062B \u064A\u0636\u0627\u0639\u0641 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062D\u062F\u064A\u062F \u0628\u0646\u0633\u0628\u0629 300%!" : "Separate iron intake from tea/coffee/milk by at least 2 hours. Take with Vitamin C or orange juice to maximize absorption.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0643\u0628\u0631\u064A\u062A\u0627\u062A \u0627\u0644\u062D\u062F\u064A\u062F\u060C \u0641\u064A\u0631\u0648\u0632\u060C \u0641\u064A\u0631\u0648\u062C\u0644\u0648\u0628\u064A\u0646." : "Applies to: Ferrous sulfate, iron supplements.",
+          dietaryAdvice: isAr ? "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 C \u0627\u0644\u0637\u0628\u064A\u0639\u064A (\u0628\u0631\u062A\u0642\u0627\u0644\u060C \u0643\u064A\u0648\u064A\u060C \u0641\u0644\u0641\u0644 \u0631\u0648\u0645\u064A) \u0647\u0648 \u0627\u0644\u0635\u062F\u064A\u0642 \u0627\u0644\u0623\u0641\u0636\u0644 \u0644\u062D\u0628\u0648\u0628 \u0627\u0644\u062D\u062F\u064A\u062F." : "Vitamin C boosts iron absorption significantly."
         });
       }
     }
-
-    // 3. Vitamin K & Green Leafy Vegetables (Warfarin Antagonism)
-    if (classes.includes('anticoagulant_vka')) {
+    if (classes.includes("anticoagulant_vka")) {
       const key = `vitk-warfarin-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الخضروات الورقية الغنية بفيتامين K (السبانخ، الكرنب، الملوخية، البروكلي، البقدونس، الخس)',
-          foodCategoryEn: 'Vitamin K Rich Leafy Greens (Spinach, Broccoli, Kale)',
-          foodIcon: '🥬',
+          foodCategory: "\u0627\u0644\u062E\u0636\u0631\u0648\u0627\u062A \u0627\u0644\u0648\u0631\u0642\u064A\u0629 \u0627\u0644\u063A\u0646\u064A\u0629 \u0628\u0641\u064A\u062A\u0627\u0645\u064A\u0646 K (\u0627\u0644\u0633\u0628\u0627\u0646\u062E\u060C \u0627\u0644\u0643\u0631\u0646\u0628\u060C \u0627\u0644\u0645\u0644\u0648\u062E\u064A\u0629\u060C \u0627\u0644\u0628\u0631\u0648\u0643\u0644\u064A\u060C \u0627\u0644\u0628\u0642\u062F\u0648\u0646\u0633\u060C \u0627\u0644\u062E\u0633)",
+          foodCategoryEn: "Vitamin K Rich Leafy Greens (Spinach, Broccoli, Kale)",
+          foodIcon: "\u{1F96C}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: هبوط حاد في تميع الدم (INR) وخطر الجلطات والسكتة' : '🔴 Critical: Antagonism of Warfarin, Decreased INR & Thrombosis Risk',
-          mechanism: isAr
-            ? 'فيتامين K الغذائي هو الركيزة الأساسية لتصنيع عوامل التخثر (II, VII, IX, X). تناول كميات متقلبة أو مفرطة يعاكس عمل الوارفارين ويسقط قيمة تميع الدم (INR) لأدنى من المستوى العلاجي، مما يعرض المريض لجلطات رئوية وسكتات دماغية مميتة.'
-            : 'Dietary Vitamin K directly antagonizes Warfarin inhibition of VKORC1, precipitating acute drops in INR and putting the patient at risk of stroke and thromboembolism.',
-          recommendation: isAr
-            ? 'القاعدة الطبية الذهبية لمرضى الوارفارين هي "الثبات في كمية الخضار وليس الامتناع" (Consistency). لا تفرط فجأة في تناول أطباق السبانخ أو الملوخية، ولا تقطعها فجأة. قم بإجراء فحص INR بانتظام عند أي تعديل في نظامك الغذائي.'
-            : 'Maintain a consistent, steady daily intake of Vitamin K greens rather than fluctuating drastically. Test INR if dietary habits shift.',
-          clinicalNote: isAr ? 'يشمل: وارفارين، كومادين، ماريفان.' : 'Applies to: Warfarin, Coumadin, Marevan.',
-          dietaryAdvice: isAr ? 'الخضروات الآمنة منخفضة فيتامين K: الخيار المقشر، الطماطم، الجزر، الكوسا، الذرة، البطاطس.' : 'Low Vitamin K veggies: Peeled cucumbers, tomatoes, carrots, potatoes.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0647\u0628\u0648\u0637 \u062D\u0627\u062F \u0641\u064A \u062A\u0645\u064A\u0639 \u0627\u0644\u062F\u0645 (INR) \u0648\u062E\u0637\u0631 \u0627\u0644\u062C\u0644\u0637\u0627\u062A \u0648\u0627\u0644\u0633\u0643\u062A\u0629" : "\u{1F534} Critical: Antagonism of Warfarin, Decreased INR & Thrombosis Risk",
+          mechanism: isAr ? "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 K \u0627\u0644\u063A\u0630\u0627\u0626\u064A \u0647\u0648 \u0627\u0644\u0631\u0643\u064A\u0632\u0629 \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u0629 \u0644\u062A\u0635\u0646\u064A\u0639 \u0639\u0648\u0627\u0645\u0644 \u0627\u0644\u062A\u062E\u062B\u0631 (II, VII, IX, X). \u062A\u0646\u0627\u0648\u0644 \u0643\u0645\u064A\u0627\u062A \u0645\u062A\u0642\u0644\u0628\u0629 \u0623\u0648 \u0645\u0641\u0631\u0637\u0629 \u064A\u0639\u0627\u0643\u0633 \u0639\u0645\u0644 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0648\u064A\u0633\u0642\u0637 \u0642\u064A\u0645\u0629 \u062A\u0645\u064A\u0639 \u0627\u0644\u062F\u0645 (INR) \u0644\u0623\u062F\u0646\u0649 \u0645\u0646 \u0627\u0644\u0645\u0633\u062A\u0648\u0649 \u0627\u0644\u0639\u0644\u0627\u062C\u064A\u060C \u0645\u0645\u0627 \u064A\u0639\u0631\u0636 \u0627\u0644\u0645\u0631\u064A\u0636 \u0644\u062C\u0644\u0637\u0627\u062A \u0631\u0626\u0648\u064A\u0629 \u0648\u0633\u0643\u062A\u0627\u062A \u062F\u0645\u0627\u063A\u064A\u0629 \u0645\u0645\u064A\u062A\u0629." : "Dietary Vitamin K directly antagonizes Warfarin inhibition of VKORC1, precipitating acute drops in INR and putting the patient at risk of stroke and thromboembolism.",
+          recommendation: isAr ? '\u0627\u0644\u0642\u0627\u0639\u062F\u0629 \u0627\u0644\u0637\u0628\u064A\u0629 \u0627\u0644\u0630\u0647\u0628\u064A\u0629 \u0644\u0645\u0631\u0636\u0649 \u0627\u0644\u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646 \u0647\u064A "\u0627\u0644\u062B\u0628\u0627\u062A \u0641\u064A \u0643\u0645\u064A\u0629 \u0627\u0644\u062E\u0636\u0627\u0631 \u0648\u0644\u064A\u0633 \u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639" (Consistency). \u0644\u0627 \u062A\u0641\u0631\u0637 \u0641\u062C\u0623\u0629 \u0641\u064A \u062A\u0646\u0627\u0648\u0644 \u0623\u0637\u0628\u0627\u0642 \u0627\u0644\u0633\u0628\u0627\u0646\u062E \u0623\u0648 \u0627\u0644\u0645\u0644\u0648\u062E\u064A\u0629\u060C \u0648\u0644\u0627 \u062A\u0642\u0637\u0639\u0647\u0627 \u0641\u062C\u0623\u0629. \u0642\u0645 \u0628\u0625\u062C\u0631\u0627\u0621 \u0641\u062D\u0635 INR \u0628\u0627\u0646\u062A\u0638\u0627\u0645 \u0639\u0646\u062F \u0623\u064A \u062A\u0639\u062F\u064A\u0644 \u0641\u064A \u0646\u0638\u0627\u0645\u0643 \u0627\u0644\u063A\u0630\u0627\u0626\u064A.' : "Maintain a consistent, steady daily intake of Vitamin K greens rather than fluctuating drastically. Test INR if dietary habits shift.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0648\u0627\u0631\u0641\u0627\u0631\u064A\u0646\u060C \u0643\u0648\u0645\u0627\u062F\u064A\u0646\u060C \u0645\u0627\u0631\u064A\u0641\u0627\u0646." : "Applies to: Warfarin, Coumadin, Marevan.",
+          dietaryAdvice: isAr ? "\u0627\u0644\u062E\u0636\u0631\u0648\u0627\u062A \u0627\u0644\u0622\u0645\u0646\u0629 \u0645\u0646\u062E\u0641\u0636\u0629 \u0641\u064A\u062A\u0627\u0645\u064A\u0646 K: \u0627\u0644\u062E\u064A\u0627\u0631 \u0627\u0644\u0645\u0642\u0634\u0631\u060C \u0627\u0644\u0637\u0645\u0627\u0637\u0645\u060C \u0627\u0644\u062C\u0632\u0631\u060C \u0627\u0644\u0643\u0648\u0633\u0627\u060C \u0627\u0644\u0630\u0631\u0629\u060C \u0627\u0644\u0628\u0637\u0627\u0637\u0633." : "Low Vitamin K veggies: Peeled cucumbers, tomatoes, carrots, potatoes."
         });
       }
     }
-
-    // 4. Caffeine, Coffee & Energy Drinks
-    if (classes.includes('xanthine')) {
+    if (classes.includes("xanthine")) {
       const key = `caffeine-theophylline-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'القهوة، الشاي، الكولا، ومشروبات الطاقة (الكافيين)',
-          foodCategoryEn: 'Coffee, Tea, Cola & Energy Drinks (Caffeine)',
-          foodIcon: '☕',
+          foodCategory: "\u0627\u0644\u0642\u0647\u0648\u0629\u060C \u0627\u0644\u0634\u0627\u064A\u060C \u0627\u0644\u0643\u0648\u0644\u0627\u060C \u0648\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0637\u0627\u0642\u0629 (\u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646)",
+          foodCategoryEn: "Coffee, Tea, Cola & Energy Drinks (Caffeine)",
+          foodIcon: "\u2615",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: سمية ميثيل زانثين، خفقان قلبي حاد وتشنجات' : '🔴 Critical: Methylxanthine Toxicity, Arrhythmia & Seizures',
-          mechanism: isAr
-            ? 'الكافيين والثيوفلين ينتميان لنفس العائلة الدوائية (الميثيل زانثين) ويتنافسان على إنزيم CYP1A2. الكافيين يرفع تركيز الثيوفلين في الدم ويحدث تأثيراً تحفيزياً مضاعفاً على القلب والجهاز العصبي، مسبباً تسارع نبض حاد، خفقان، رجفان، غثيان وتشنجات.'
-            : 'Caffeine and theophylline share identical methylxanthine mechanisms and compete for CYP1A2 metabolism, triggering severe cardiotoxicity, tremors, and arrhythmias.',
-          recommendation: isAr
-            ? 'تجنب تماماً تناول مشروبات الطاقة والقهوة والشاي المركز والشوكولاتة الداكنة أثناء العلاج بالثيوفلين. استشر الصيدلاني عند الشعور بأي رجفان باليدين أو خفقان في الصدر.'
-            : 'Strictly avoid high-caffeine beverages and energy drinks. Monitor serum theophylline levels.',
-          clinicalNote: isAr ? 'يشمل: ثيوفلين، أمينوفيلين، ثيودور، كويبرون.' : 'Applies to: Theophylline, Aminophylline.',
-          dietaryAdvice: isAr ? 'المشروبات البديلة: النعناع، الكاموميل، الماء، العصائر الطبيعية.' : 'Safe beverages: Herbal teas (chamomile, peppermint), water, fresh juices.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0633\u0645\u064A\u0629 \u0645\u064A\u062B\u064A\u0644 \u0632\u0627\u0646\u062B\u064A\u0646\u060C \u062E\u0641\u0642\u0627\u0646 \u0642\u0644\u0628\u064A \u062D\u0627\u062F \u0648\u062A\u0634\u0646\u062C\u0627\u062A" : "\u{1F534} Critical: Methylxanthine Toxicity, Arrhythmia & Seizures",
+          mechanism: isAr ? "\u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646 \u0648\u0627\u0644\u062B\u064A\u0648\u0641\u0644\u064A\u0646 \u064A\u0646\u062A\u0645\u064A\u0627\u0646 \u0644\u0646\u0641\u0633 \u0627\u0644\u0639\u0627\u0626\u0644\u0629 \u0627\u0644\u062F\u0648\u0627\u0626\u064A\u0629 (\u0627\u0644\u0645\u064A\u062B\u064A\u0644 \u0632\u0627\u0646\u062B\u064A\u0646) \u0648\u064A\u062A\u0646\u0627\u0641\u0633\u0627\u0646 \u0639\u0644\u0649 \u0625\u0646\u0632\u064A\u0645 CYP1A2. \u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646 \u064A\u0631\u0641\u0639 \u062A\u0631\u0643\u064A\u0632 \u0627\u0644\u062B\u064A\u0648\u0641\u0644\u064A\u0646 \u0641\u064A \u0627\u0644\u062F\u0645 \u0648\u064A\u062D\u062F\u062B \u062A\u0623\u062B\u064A\u0631\u0627\u064B \u062A\u062D\u0641\u064A\u0632\u064A\u0627\u064B \u0645\u0636\u0627\u0639\u0641\u0627\u064B \u0639\u0644\u0649 \u0627\u0644\u0642\u0644\u0628 \u0648\u0627\u0644\u062C\u0647\u0627\u0632 \u0627\u0644\u0639\u0635\u0628\u064A\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u062A\u0633\u0627\u0631\u0639 \u0646\u0628\u0636 \u062D\u0627\u062F\u060C \u062E\u0641\u0642\u0627\u0646\u060C \u0631\u062C\u0641\u0627\u0646\u060C \u063A\u062B\u064A\u0627\u0646 \u0648\u062A\u0634\u0646\u062C\u0627\u062A." : "Caffeine and theophylline share identical methylxanthine mechanisms and compete for CYP1A2 metabolism, triggering severe cardiotoxicity, tremors, and arrhythmias.",
+          recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u062A\u0645\u0627\u0645\u0627\u064B \u062A\u0646\u0627\u0648\u0644 \u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0637\u0627\u0642\u0629 \u0648\u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0634\u0627\u064A \u0627\u0644\u0645\u0631\u0643\u0632 \u0648\u0627\u0644\u0634\u0648\u0643\u0648\u0644\u0627\u062A\u0629 \u0627\u0644\u062F\u0627\u0643\u0646\u0629 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0639\u0644\u0627\u062C \u0628\u0627\u0644\u062B\u064A\u0648\u0641\u0644\u064A\u0646. \u0627\u0633\u062A\u0634\u0631 \u0627\u0644\u0635\u064A\u062F\u0644\u0627\u0646\u064A \u0639\u0646\u062F \u0627\u0644\u0634\u0639\u0648\u0631 \u0628\u0623\u064A \u0631\u062C\u0641\u0627\u0646 \u0628\u0627\u0644\u064A\u062F\u064A\u0646 \u0623\u0648 \u062E\u0641\u0642\u0627\u0646 \u0641\u064A \u0627\u0644\u0635\u062F\u0631." : "Strictly avoid high-caffeine beverages and energy drinks. Monitor serum theophylline levels.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u062B\u064A\u0648\u0641\u0644\u064A\u0646\u060C \u0623\u0645\u064A\u0646\u0648\u0641\u064A\u0644\u064A\u0646\u060C \u062B\u064A\u0648\u062F\u0648\u0631\u060C \u0643\u0648\u064A\u0628\u0631\u0648\u0646." : "Applies to: Theophylline, Aminophylline.",
+          dietaryAdvice: isAr ? "\u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0628\u062F\u064A\u0644\u0629: \u0627\u0644\u0646\u0639\u0646\u0627\u0639\u060C \u0627\u0644\u0643\u0627\u0645\u0648\u0645\u064A\u0644\u060C \u0627\u0644\u0645\u0627\u0621\u060C \u0627\u0644\u0639\u0635\u0627\u0626\u0631 \u0627\u0644\u0637\u0628\u064A\u0639\u064A\u0629." : "Safe beverages: Herbal teas (chamomile, peppermint), water, fresh juices."
         });
       }
     }
-
-    if (classes.includes('quinolone') && (cleanDrugToken(token).includes('cipro') || cleanDrugToken(token).includes('سيبرو'))) {
+    if (classes.includes("quinolone") && (cleanDrugToken(token).includes("cipro") || cleanDrugToken(token).includes("\u0633\u064A\u0628\u0631\u0648"))) {
       const key = `caffeine-cipro-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'القهوة والمنبهات (الكافيين)',
-          foodCategoryEn: 'Coffee & Caffeinated Drinks',
-          foodIcon: '☕',
+          foodCategory: "\u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0645\u0646\u0628\u0647\u0627\u062A (\u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646)",
+          foodCategoryEn: "Coffee & Caffeinated Drinks",
+          foodIcon: "\u2615",
           affectedDrug: name,
-          severity: 'warning',
-          severityLabel: isAr ? '🟠 تعارض متوسط: مضاعفة مفعول الكافيين وأرق ورجفان حاد' : '🟠 Moderate: Cipro Prolongs Caffeine Half-Life 3x',
-          mechanism: isAr
-            ? 'السيبروفلوكساسين مثبط قوي لإنزيم CYP1A2 المسؤول عن تكسير الكافيين، مما يقلل تصفية الكافيين بنسبة 70% ويطيل بقاءه في الجسم حتى 15 ساعة؛ كوب قهوة واحد قد يسبب لك رجفاناً وتوتراً وأرقاً شديداً.'
-            : 'Ciprofloxacin potently inhibits CYP1A2, reducing caffeine clearance by up to 70% and triggering agitation, palpitations, and sleep disturbances.',
-          recommendation: isAr
-            ? 'قلل استهلاك القهوة والشاي والمشروبات الغازية إلى أدنى حد أثناء كورس السيبروفلوكساسين.'
-            : 'Reduce or eliminate caffeine consumption while taking ciprofloxacin.',
-          clinicalNote: isAr ? 'التأثير خاص بالسيبروفلوكساسين بدرجة أكبر من باقي الكينولونات.' : 'Specifically pronounced with ciprofloxacin.',
-          dietaryAdvice: isAr ? 'شرب الماء بكثرة يساعد على سرعة تصفية الدواء وحماية الكلى.' : 'Drink copious amounts of plain water.'
+          severity: "warning",
+          severityLabel: isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u062A\u0648\u0633\u0637: \u0645\u0636\u0627\u0639\u0641\u0629 \u0645\u0641\u0639\u0648\u0644 \u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646 \u0648\u0623\u0631\u0642 \u0648\u0631\u062C\u0641\u0627\u0646 \u062D\u0627\u062F" : "\u{1F7E0} Moderate: Cipro Prolongs Caffeine Half-Life 3x",
+          mechanism: isAr ? "\u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u0645\u062B\u0628\u0637 \u0642\u0648\u064A \u0644\u0625\u0646\u0632\u064A\u0645 CYP1A2 \u0627\u0644\u0645\u0633\u0624\u0648\u0644 \u0639\u0646 \u062A\u0643\u0633\u064A\u0631 \u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646\u060C \u0645\u0645\u0627 \u064A\u0642\u0644\u0644 \u062A\u0635\u0641\u064A\u0629 \u0627\u0644\u0643\u0627\u0641\u064A\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 70% \u0648\u064A\u0637\u064A\u0644 \u0628\u0642\u0627\u0621\u0647 \u0641\u064A \u0627\u0644\u062C\u0633\u0645 \u062D\u062A\u0649 15 \u0633\u0627\u0639\u0629\u061B \u0643\u0648\u0628 \u0642\u0647\u0648\u0629 \u0648\u0627\u062D\u062F \u0642\u062F \u064A\u0633\u0628\u0628 \u0644\u0643 \u0631\u062C\u0641\u0627\u0646\u0627\u064B \u0648\u062A\u0648\u062A\u0631\u0627\u064B \u0648\u0623\u0631\u0642\u0627\u064B \u0634\u062F\u064A\u062F\u0627\u064B." : "Ciprofloxacin potently inhibits CYP1A2, reducing caffeine clearance by up to 70% and triggering agitation, palpitations, and sleep disturbances.",
+          recommendation: isAr ? "\u0642\u0644\u0644 \u0627\u0633\u062A\u0647\u0644\u0627\u0643 \u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0634\u0627\u064A \u0648\u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u063A\u0627\u0632\u064A\u0629 \u0625\u0644\u0649 \u0623\u062F\u0646\u0649 \u062D\u062F \u0623\u062B\u0646\u0627\u0621 \u0643\u0648\u0631\u0633 \u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646." : "Reduce or eliminate caffeine consumption while taking ciprofloxacin.",
+          clinicalNote: isAr ? "\u0627\u0644\u062A\u0623\u062B\u064A\u0631 \u062E\u0627\u0635 \u0628\u0627\u0644\u0633\u064A\u0628\u0631\u0648\u0641\u0644\u0648\u0643\u0633\u0627\u0633\u064A\u0646 \u0628\u062F\u0631\u062C\u0629 \u0623\u0643\u0628\u0631 \u0645\u0646 \u0628\u0627\u0642\u064A \u0627\u0644\u0643\u064A\u0646\u0648\u0644\u0648\u0646\u0627\u062A." : "Specifically pronounced with ciprofloxacin.",
+          dietaryAdvice: isAr ? "\u0634\u0631\u0628 \u0627\u0644\u0645\u0627\u0621 \u0628\u0643\u062B\u0631\u0629 \u064A\u0633\u0627\u0639\u062F \u0639\u0644\u0649 \u0633\u0631\u0639\u0629 \u062A\u0635\u0641\u064A\u0629 \u0627\u0644\u062F\u0648\u0627\u0621 \u0648\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0643\u0644\u0649." : "Drink copious amounts of plain water."
         });
       }
     }
-
-    // 5. Licorice / Glycyrrhizin (عرق السوس)
-    if (classes.includes('cardiac_glycoside')) {
+    if (classes.includes("cardiac_glycoside")) {
       const key = `licorice-digoxin-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'عرق السوس الطبيعي ومشروب السوس الرمضاني',
-          foodCategoryEn: 'Natural Black Licorice & Glycyrrhizin',
-          foodIcon: '🌿',
+          foodCategory: "\u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u0627\u0644\u0637\u0628\u064A\u0639\u064A \u0648\u0645\u0634\u0631\u0648\u0628 \u0627\u0644\u0633\u0648\u0633 \u0627\u0644\u0631\u0645\u0636\u0627\u0646\u064A",
+          foodCategoryEn: "Natural Black Licorice & Glycyrrhizin",
+          foodIcon: "\u{1F33F}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: هبوط البوتاسيوم وتسمم ديجيتالي قاتل' : '🔴 Critical: Hypokalemia & Lethal Digoxin Toxicity',
-          mechanism: isAr
-            ? 'مادة الجليسيريزين في عرق السوس تثبط إنزيم 11β-HSD2 في الكلى، مما يسبب طرحاً مفرطاً للبوتاسيوم في البول (Hypokalemia). هبوط بوتاسيوم الدم يحرّض فوراً سمية الديجوكسين القاتلة واضطراب نظم البطينين.'
-            : 'Glycyrrhizin inhibits renal 11beta-HSD2, inducing severe hypokalemia which dramatically potentiates digoxin cardiac toxicity and ventricular fibrillation.',
-          recommendation: isAr
-            ? 'يُمنع منعاً باتاً لمرضى الديجوكسين تناول عرق السوس الطبيعي أو شرب منقوع السوس بأي كمية.'
-            : 'Strict contraindication: Patients on digoxin must completely avoid real licorice and licorice beverages.',
-          clinicalNote: isAr ? 'يشمل: ديجوكسين ولانوكسين.' : 'Applies to: Digoxin, Lanoxin.',
-          dietaryAdvice: isAr ? 'تجنب الحلويات والمشروبات العشبية التي يدخل فيها مستخلص عرق السوس.' : 'Carefully inspect traditional herbal syrups for licorice extract.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0647\u0628\u0648\u0637 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u062A\u0633\u0645\u0645 \u062F\u064A\u062C\u064A\u062A\u0627\u0644\u064A \u0642\u0627\u062A\u0644" : "\u{1F534} Critical: Hypokalemia & Lethal Digoxin Toxicity",
+          mechanism: isAr ? "\u0645\u0627\u062F\u0629 \u0627\u0644\u062C\u0644\u064A\u0633\u064A\u0631\u064A\u0632\u064A\u0646 \u0641\u064A \u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u062A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 11\u03B2-HSD2 \u0641\u064A \u0627\u0644\u0643\u0644\u0649\u060C \u0645\u0645\u0627 \u064A\u0633\u0628\u0628 \u0637\u0631\u062D\u0627\u064B \u0645\u0641\u0631\u0637\u0627\u064B \u0644\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u0628\u0648\u0644 (Hypokalemia). \u0647\u0628\u0648\u0637 \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u062F\u0645 \u064A\u062D\u0631\u0651\u0636 \u0641\u0648\u0631\u0627\u064B \u0633\u0645\u064A\u0629 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0627\u0644\u0642\u0627\u062A\u0644\u0629 \u0648\u0627\u0636\u0637\u0631\u0627\u0628 \u0646\u0638\u0645 \u0627\u0644\u0628\u0637\u064A\u0646\u064A\u0646." : "Glycyrrhizin inhibits renal 11beta-HSD2, inducing severe hypokalemia which dramatically potentiates digoxin cardiac toxicity and ventricular fibrillation.",
+          recommendation: isAr ? "\u064A\u064F\u0645\u0646\u0639 \u0645\u0646\u0639\u0627\u064B \u0628\u0627\u062A\u0627\u064B \u0644\u0645\u0631\u0636\u0649 \u0627\u0644\u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u062A\u0646\u0627\u0648\u0644 \u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u0627\u0644\u0637\u0628\u064A\u0639\u064A \u0623\u0648 \u0634\u0631\u0628 \u0645\u0646\u0642\u0648\u0639 \u0627\u0644\u0633\u0648\u0633 \u0628\u0623\u064A \u0643\u0645\u064A\u0629." : "Strict contraindication: Patients on digoxin must completely avoid real licorice and licorice beverages.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u062F\u064A\u062C\u0648\u0643\u0633\u064A\u0646 \u0648\u0644\u0627\u0646\u0648\u0643\u0633\u064A\u0646." : "Applies to: Digoxin, Lanoxin.",
+          dietaryAdvice: isAr ? "\u062A\u062C\u0646\u0628 \u0627\u0644\u062D\u0644\u0648\u064A\u0627\u062A \u0648\u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0639\u0634\u0628\u064A\u0629 \u0627\u0644\u062A\u064A \u064A\u062F\u062E\u0644 \u0641\u064A\u0647\u0627 \u0645\u0633\u062A\u062E\u0644\u0635 \u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633." : "Carefully inspect traditional herbal syrups for licorice extract."
         });
       }
     }
-
-    if (classes.includes('ace_inhibitor') || classes.includes('arb') || classes.includes('beta_blocker') || classes.includes('diuretic_loop') || classes.includes('diuretic_thiazide')) {
+    if (classes.includes("ace_inhibitor") || classes.includes("arb") || classes.includes("beta_blocker") || classes.includes("diuretic_loop") || classes.includes("diuretic_thiazide")) {
       const key = `licorice-bp-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'عرق السوس الطبيعي (Licorice)',
-          foodCategoryEn: 'Natural Licorice',
-          foodIcon: '🌿',
+          foodCategory: "\u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u0627\u0644\u0637\u0628\u064A\u0639\u064A (Licorice)",
+          foodCategoryEn: "Natural Licorice",
+          foodIcon: "\u{1F33F}",
           affectedDrug: name,
-          severity: 'warning',
-          severityLabel: isAr ? '🟠 تعارض مهم: إبطال مفعول خافضات الضغط وارتفاع الصوديوم' : '🟠 Warning: Antagonizes Antihypertensives & Spikes Blood Pressure',
-          mechanism: isAr
-            ? 'عرق السوس يمتلك فعالية ألدوستيرونية كاذبة تحبس الصوديوم والماء في الجسم وتطرح البوتاسيوم، مما يعاكس مباشرة عمل أدوية الضغط ومدرات البول ويرفع قراءات الضغط بشكل مباغت.'
-            : 'Licorice triggers pseudoaldosteronism, retaining sodium and water while depleting potassium, directly neutralizing antihypertensive therapy.',
-          recommendation: isAr
-            ? 'الامتناع عن شرب عرق السوس لمرضى ضغط الدم المعالجين.'
-            : 'Avoid licorice products if being treated for hypertension.',
-          clinicalNote: isAr ? 'يشمل أدوية الضغط كافة ومدرات البول.' : 'Applies to all antihypertensives and diuretics.',
-          dietaryAdvice: isAr ? 'البدائل العشبية الآمنة لضغط الدم: الكركديه البارد، اليانسون، البابونج.' : 'Safe herbal alternatives: Hibiscus, anise, chamomile.'
+          severity: "warning",
+          severityLabel: isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u0647\u0645: \u0625\u0628\u0637\u0627\u0644 \u0645\u0641\u0639\u0648\u0644 \u062E\u0627\u0641\u0636\u0627\u062A \u0627\u0644\u0636\u063A\u0637 \u0648\u0627\u0631\u062A\u0641\u0627\u0639 \u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645" : "\u{1F7E0} Warning: Antagonizes Antihypertensives & Spikes Blood Pressure",
+          mechanism: isAr ? "\u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u064A\u0645\u062A\u0644\u0643 \u0641\u0639\u0627\u0644\u064A\u0629 \u0623\u0644\u062F\u0648\u0633\u062A\u064A\u0631\u0648\u0646\u064A\u0629 \u0643\u0627\u0630\u0628\u0629 \u062A\u062D\u0628\u0633 \u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645 \u0648\u0627\u0644\u0645\u0627\u0621 \u0641\u064A \u0627\u0644\u062C\u0633\u0645 \u0648\u062A\u0637\u0631\u062D \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645\u060C \u0645\u0645\u0627 \u064A\u0639\u0627\u0643\u0633 \u0645\u0628\u0627\u0634\u0631\u0629 \u0639\u0645\u0644 \u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u0636\u063A\u0637 \u0648\u0645\u062F\u0631\u0627\u062A \u0627\u0644\u0628\u0648\u0644 \u0648\u064A\u0631\u0641\u0639 \u0642\u0631\u0627\u0621\u0627\u062A \u0627\u0644\u0636\u063A\u0637 \u0628\u0634\u0643\u0644 \u0645\u0628\u0627\u063A\u062A." : "Licorice triggers pseudoaldosteronism, retaining sodium and water while depleting potassium, directly neutralizing antihypertensive therapy.",
+          recommendation: isAr ? "\u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0639\u0646 \u0634\u0631\u0628 \u0639\u0631\u0642 \u0627\u0644\u0633\u0648\u0633 \u0644\u0645\u0631\u0636\u0649 \u0636\u063A\u0637 \u0627\u0644\u062F\u0645 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u064A\u0646." : "Avoid licorice products if being treated for hypertension.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644 \u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u0636\u063A\u0637 \u0643\u0627\u0641\u0629 \u0648\u0645\u062F\u0631\u0627\u062A \u0627\u0644\u0628\u0648\u0644." : "Applies to all antihypertensives and diuretics.",
+          dietaryAdvice: isAr ? "\u0627\u0644\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0639\u0634\u0628\u064A\u0629 \u0627\u0644\u0622\u0645\u0646\u0629 \u0644\u0636\u063A\u0637 \u0627\u0644\u062F\u0645: \u0627\u0644\u0643\u0631\u0643\u062F\u064A\u0647 \u0627\u0644\u0628\u0627\u0631\u062F\u060C \u0627\u0644\u064A\u0627\u0646\u0633\u0648\u0646\u060C \u0627\u0644\u0628\u0627\u0628\u0648\u0646\u062C." : "Safe herbal alternatives: Hibiscus, anise, chamomile."
         });
       }
     }
-
-    // 6. High Potassium Foods & Salt Substitutes
-    if (classes.includes('potassium_sparing') || classes.includes('ace_inhibitor') || classes.includes('arb')) {
+    if (classes.includes("potassium_sparing") || classes.includes("ace_inhibitor") || classes.includes("arb")) {
       const key = `potassium-food-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الأطعمة الغنية بالبوتاسيوم وبدائل الملح (الموز، التمر، الأفوكادو، ملح الحمية Diet Salt)',
-          foodCategoryEn: 'High Potassium Foods & Potassium Salt Substitutes',
-          foodIcon: '🍌',
+          foodCategory: "\u0627\u0644\u0623\u0637\u0639\u0645\u0629 \u0627\u0644\u063A\u0646\u064A\u0629 \u0628\u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D (\u0627\u0644\u0645\u0648\u0632\u060C \u0627\u0644\u062A\u0645\u0631\u060C \u0627\u0644\u0623\u0641\u0648\u0643\u0627\u062F\u0648\u060C \u0645\u0644\u062D \u0627\u0644\u062D\u0645\u064A\u0629 Diet Salt)",
+          foodCategoryEn: "High Potassium Foods & Potassium Salt Substitutes",
+          foodIcon: "\u{1F34C}",
           affectedDrug: name,
-          severity: classes.includes('potassium_sparing') ? 'critical' : 'warning',
-          severityLabel: classes.includes('potassium_sparing')
-            ? (isAr ? '🔴 تعارض حرج: فرط بوتاسيوم الدم وتوقف عضلة القلب' : '🔴 Critical: Hyperkalemia & Cardiac Arrest')
-            : (isAr ? '🟠 تعارض مهم: ارتفاع البوتاسيوم في الدم' : '🟠 Warning: Risk of Hyperkalemia'),
-          mechanism: isAr
-            ? 'هذه الأدوية تقلل من إفراز الألدوستيرون أو تغلق قنوات الصوديوم الكلوية، مما يقلل طرح البوتاسيوم. تناول أملاح الحمية (المكونة من كلوريد البوتاسيوم KCl) أو الإفراط في التمر والموز يرفع بوتاسيوم المصل لمستويات سامة تؤثر على كهرباء القلب.'
-            : 'Inhibition of aldosterone or epithelial sodium channels reduces renal potassium excretion. Potassium-based salt substitutes can cause fatal hyperkalemia.',
-          recommendation: isAr
-            ? 'تجنب تماماً استخدام بدائل الملح الخالية من الصوديوم (Diet Salt / No-Salt) دون استشارة الطبيب، واعتدل في تناول الموز والتمر والفواكه المجففة مع الفحص المخبري الدوري للشوارد.'
-            : 'Avoid potassium chloride salt substitutes; consume high-potassium fruits in moderation.',
-          clinicalNote: isAr ? 'يشمل: سبيرونولاكتون (ألداكتون)، راميبريل، كابتوبريل، لوسارتان، فالسارتان.' : 'Applies to: Spironolactone, ACEIs, ARBs.',
-          dietaryAdvice: isAr ? 'استخدم البهارات الطبيعية والأعشاب وعصير الليمون كبديل لنكهة الملح بدلاً من أملاح البوتاسيوم.' : 'Use natural herbs, spices, and lemon juice for seasoning.'
+          severity: classes.includes("potassium_sparing") ? "critical" : "warning",
+          severityLabel: classes.includes("potassium_sparing") ? isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0641\u0631\u0637 \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u062F\u0645 \u0648\u062A\u0648\u0642\u0641 \u0639\u0636\u0644\u0629 \u0627\u0644\u0642\u0644\u0628" : "\u{1F534} Critical: Hyperkalemia & Cardiac Arrest" : isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u0647\u0645: \u0627\u0631\u062A\u0641\u0627\u0639 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0641\u064A \u0627\u0644\u062F\u0645" : "\u{1F7E0} Warning: Risk of Hyperkalemia",
+          mechanism: isAr ? "\u0647\u0630\u0647 \u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u062A\u0642\u0644\u0644 \u0645\u0646 \u0625\u0641\u0631\u0627\u0632 \u0627\u0644\u0623\u0644\u062F\u0648\u0633\u062A\u064A\u0631\u0648\u0646 \u0623\u0648 \u062A\u063A\u0644\u0642 \u0642\u0646\u0648\u0627\u062A \u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645 \u0627\u0644\u0643\u0644\u0648\u064A\u0629\u060C \u0645\u0645\u0627 \u064A\u0642\u0644\u0644 \u0637\u0631\u062D \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645. \u062A\u0646\u0627\u0648\u0644 \u0623\u0645\u0644\u0627\u062D \u0627\u0644\u062D\u0645\u064A\u0629 (\u0627\u0644\u0645\u0643\u0648\u0646\u0629 \u0645\u0646 \u0643\u0644\u0648\u0631\u064A\u062F \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 KCl) \u0623\u0648 \u0627\u0644\u0625\u0641\u0631\u0627\u0637 \u0641\u064A \u0627\u0644\u062A\u0645\u0631 \u0648\u0627\u0644\u0645\u0648\u0632 \u064A\u0631\u0641\u0639 \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u0645\u0635\u0644 \u0644\u0645\u0633\u062A\u0648\u064A\u0627\u062A \u0633\u0627\u0645\u0629 \u062A\u0624\u062B\u0631 \u0639\u0644\u0649 \u0643\u0647\u0631\u0628\u0627\u0621 \u0627\u0644\u0642\u0644\u0628." : "Inhibition of aldosterone or epithelial sodium channels reduces renal potassium excretion. Potassium-based salt substitutes can cause fatal hyperkalemia.",
+          recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u062A\u0645\u0627\u0645\u0627\u064B \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D \u0627\u0644\u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645 (Diet Salt / No-Salt) \u062F\u0648\u0646 \u0627\u0633\u062A\u0634\u0627\u0631\u0629 \u0627\u0644\u0637\u0628\u064A\u0628\u060C \u0648\u0627\u0639\u062A\u062F\u0644 \u0641\u064A \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0645\u0648\u0632 \u0648\u0627\u0644\u062A\u0645\u0631 \u0648\u0627\u0644\u0641\u0648\u0627\u0643\u0647 \u0627\u0644\u0645\u062C\u0641\u0641\u0629 \u0645\u0639 \u0627\u0644\u0641\u062D\u0635 \u0627\u0644\u0645\u062E\u0628\u0631\u064A \u0627\u0644\u062F\u0648\u0631\u064A \u0644\u0644\u0634\u0648\u0627\u0631\u062F." : "Avoid potassium chloride salt substitutes; consume high-potassium fruits in moderation.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0633\u0628\u064A\u0631\u0648\u0646\u0648\u0644\u0627\u0643\u062A\u0648\u0646 (\u0623\u0644\u062F\u0627\u0643\u062A\u0648\u0646)\u060C \u0631\u0627\u0645\u064A\u0628\u0631\u064A\u0644\u060C \u0643\u0627\u0628\u062A\u0648\u0628\u0631\u064A\u0644\u060C \u0644\u0648\u0633\u0627\u0631\u062A\u0627\u0646\u060C \u0641\u0627\u0644\u0633\u0627\u0631\u062A\u0627\u0646." : "Applies to: Spironolactone, ACEIs, ARBs.",
+          dietaryAdvice: isAr ? "\u0627\u0633\u062A\u062E\u062F\u0645 \u0627\u0644\u0628\u0647\u0627\u0631\u0627\u062A \u0627\u0644\u0637\u0628\u064A\u0639\u064A\u0629 \u0648\u0627\u0644\u0623\u0639\u0634\u0627\u0628 \u0648\u0639\u0635\u064A\u0631 \u0627\u0644\u0644\u064A\u0645\u0648\u0646 \u0643\u0628\u062F\u064A\u0644 \u0644\u0646\u0643\u0647\u0629 \u0627\u0644\u0645\u0644\u062D \u0628\u062F\u0644\u0627\u064B \u0645\u0646 \u0623\u0645\u0644\u0627\u062D \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645." : "Use natural herbs, spices, and lemon juice for seasoning."
         });
       }
     }
-
-    // 7. Tyramine-Rich Foods (Linezolid / MAOIs)
-    if (classes.includes('maoi') || cleanDrugToken(token).includes('linezolid') || cleanDrugToken(token).includes('لينيزوليد') || cleanDrugToken(token).includes('zyvox')) {
+    if (classes.includes("maoi") || cleanDrugToken(token).includes("linezolid") || cleanDrugToken(token).includes("\u0644\u064A\u0646\u064A\u0632\u0648\u0644\u064A\u062F") || cleanDrugToken(token).includes("zyvox")) {
       const key = `tyramine-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'الأغذية الغنية بالتيرامين (الأجبان المعتقة، اللحوم المصنعة والمقددة، المخللات، صلصة الصويا)',
-          foodCategoryEn: 'Tyramine-Rich Foods (Aged Cheese, Cured Meats, Soy Sauce)',
-          foodIcon: '🧀',
+          foodCategory: "\u0627\u0644\u0623\u063A\u0630\u064A\u0629 \u0627\u0644\u063A\u0646\u064A\u0629 \u0628\u0627\u0644\u062A\u064A\u0631\u0627\u0645\u064A\u0646 (\u0627\u0644\u0623\u062C\u0628\u0627\u0646 \u0627\u0644\u0645\u0639\u062A\u0642\u0629\u060C \u0627\u0644\u0644\u062D\u0648\u0645 \u0627\u0644\u0645\u0635\u0646\u0639\u0629 \u0648\u0627\u0644\u0645\u0642\u062F\u062F\u0629\u060C \u0627\u0644\u0645\u062E\u0644\u0644\u0627\u062A\u060C \u0635\u0644\u0635\u0629 \u0627\u0644\u0635\u0648\u064A\u0627)",
+          foodCategoryEn: "Tyramine-Rich Foods (Aged Cheese, Cured Meats, Soy Sauce)",
+          foodIcon: "\u{1F9C0}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: أزمة فرط ضغط الدم القاتلة (Cheese Reaction)' : '🔴 Critical: Hypertensive Crisis (Cheese Effect)',
-          mechanism: isAr
-            ? 'اللينيزوليد يثبط إنزيم مونوأمين أوكسيديز (MAO) في الأمعاء. تناول الأطعمة الغنية بالتيرامين يسمح بدخول التيرامين للدم مسبباً إفرازاً هائلاً للنورأدرينالين وانقباضاً وعائياً حاداً وارتفاعاً انفجارياً في ضغط الدم مع خطر النزف الدماغي.'
-            : 'Linezolid reversibly inhibits MAO; ingestion of dietary tyramine causes massive norepinephrine release and life-threatening hypertensive emergency.',
-          recommendation: isAr
-            ? 'حمية صارمة خالية من الأجبان القديمة (شيدر، بارميزان، جبن أزرق)، اللحوم المدخنة، المخللات وصلصة الصويا أثناء العلاج باللينيزوليد ولمدة أسبوعين بعد انتهائه.'
-            : 'Strictly avoid aged cheeses, cured meats, and fermented foods during and for 2 weeks after therapy.',
-          clinicalNote: isAr ? 'يشمل: لينيزوليد (زيفوكس)، مثبطات MAO.' : 'Applies to: Linezolid (Zyvox), MAOIs.',
-          dietaryAdvice: isAr ? 'المسموح: الأجبان الطازجة (جبن القريش، الريكوتا، جبن المثلثات الحديث) واللحوم الطازجة المطهوة تواً.' : 'Allowed: Fresh cottage cheese, ricotta, freshly cooked meats.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u0623\u0632\u0645\u0629 \u0641\u0631\u0637 \u0636\u063A\u0637 \u0627\u0644\u062F\u0645 \u0627\u0644\u0642\u0627\u062A\u0644\u0629 (Cheese Reaction)" : "\u{1F534} Critical: Hypertensive Crisis (Cheese Effect)",
+          mechanism: isAr ? "\u0627\u0644\u0644\u064A\u0646\u064A\u0632\u0648\u0644\u064A\u062F \u064A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 \u0645\u0648\u0646\u0648\u0623\u0645\u064A\u0646 \u0623\u0648\u0643\u0633\u064A\u062F\u064A\u0632 (MAO) \u0641\u064A \u0627\u0644\u0623\u0645\u0639\u0627\u0621. \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0623\u0637\u0639\u0645\u0629 \u0627\u0644\u063A\u0646\u064A\u0629 \u0628\u0627\u0644\u062A\u064A\u0631\u0627\u0645\u064A\u0646 \u064A\u0633\u0645\u062D \u0628\u062F\u062E\u0648\u0644 \u0627\u0644\u062A\u064A\u0631\u0627\u0645\u064A\u0646 \u0644\u0644\u062F\u0645 \u0645\u0633\u0628\u0628\u0627\u064B \u0625\u0641\u0631\u0627\u0632\u0627\u064B \u0647\u0627\u0626\u0644\u0627\u064B \u0644\u0644\u0646\u0648\u0631\u0623\u062F\u0631\u064A\u0646\u0627\u0644\u064A\u0646 \u0648\u0627\u0646\u0642\u0628\u0627\u0636\u0627\u064B \u0648\u0639\u0627\u0626\u064A\u0627\u064B \u062D\u0627\u062F\u0627\u064B \u0648\u0627\u0631\u062A\u0641\u0627\u0639\u0627\u064B \u0627\u0646\u0641\u062C\u0627\u0631\u064A\u0627\u064B \u0641\u064A \u0636\u063A\u0637 \u0627\u0644\u062F\u0645 \u0645\u0639 \u062E\u0637\u0631 \u0627\u0644\u0646\u0632\u0641 \u0627\u0644\u062F\u0645\u0627\u063A\u064A." : "Linezolid reversibly inhibits MAO; ingestion of dietary tyramine causes massive norepinephrine release and life-threatening hypertensive emergency.",
+          recommendation: isAr ? "\u062D\u0645\u064A\u0629 \u0635\u0627\u0631\u0645\u0629 \u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0623\u062C\u0628\u0627\u0646 \u0627\u0644\u0642\u062F\u064A\u0645\u0629 (\u0634\u064A\u062F\u0631\u060C \u0628\u0627\u0631\u0645\u064A\u0632\u0627\u0646\u060C \u062C\u0628\u0646 \u0623\u0632\u0631\u0642)\u060C \u0627\u0644\u0644\u062D\u0648\u0645 \u0627\u0644\u0645\u062F\u062E\u0646\u0629\u060C \u0627\u0644\u0645\u062E\u0644\u0644\u0627\u062A \u0648\u0635\u0644\u0635\u0629 \u0627\u0644\u0635\u0648\u064A\u0627 \u0623\u062B\u0646\u0627\u0621 \u0627\u0644\u0639\u0644\u0627\u062C \u0628\u0627\u0644\u0644\u064A\u0646\u064A\u0632\u0648\u0644\u064A\u062F \u0648\u0644\u0645\u062F\u0629 \u0623\u0633\u0628\u0648\u0639\u064A\u0646 \u0628\u0639\u062F \u0627\u0646\u062A\u0647\u0627\u0626\u0647." : "Strictly avoid aged cheeses, cured meats, and fermented foods during and for 2 weeks after therapy.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0644\u064A\u0646\u064A\u0632\u0648\u0644\u064A\u062F (\u0632\u064A\u0641\u0648\u0643\u0633)\u060C \u0645\u062B\u0628\u0637\u0627\u062A MAO." : "Applies to: Linezolid (Zyvox), MAOIs.",
+          dietaryAdvice: isAr ? "\u0627\u0644\u0645\u0633\u0645\u0648\u062D: \u0627\u0644\u0623\u062C\u0628\u0627\u0646 \u0627\u0644\u0637\u0627\u0632\u062C\u0629 (\u062C\u0628\u0646 \u0627\u0644\u0642\u0631\u064A\u0634\u060C \u0627\u0644\u0631\u064A\u0643\u0648\u062A\u0627\u060C \u062C\u0628\u0646 \u0627\u0644\u0645\u062B\u0644\u062B\u0627\u062A \u0627\u0644\u062D\u062F\u064A\u062B) \u0648\u0627\u0644\u0644\u062D\u0648\u0645 \u0627\u0644\u0637\u0627\u0632\u062C\u0629 \u0627\u0644\u0645\u0637\u0647\u0648\u0629 \u062A\u0648\u0627\u064B." : "Allowed: Fresh cottage cheese, ricotta, freshly cooked meats."
         });
       }
     }
-
-    // 8. Alcohol (الكحول)
-    if (classes.includes('metronidazole') || cleanDrugToken(token).includes('flagyl') || cleanDrugToken(token).includes('فلاجيل')) {
+    if (classes.includes("metronidazole") || cleanDrugToken(token).includes("flagyl") || cleanDrugToken(token).includes("\u0641\u0644\u0627\u062C\u064A\u0644")) {
       const key = `alcohol-metro-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'المشروبات الكحولية والأدوية الحاوية على الكحول',
-          foodCategoryEn: 'Alcohol & Ethanol Products',
-          foodIcon: '🍷',
+          foodCategory: "\u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0643\u062D\u0648\u0644\u064A\u0629 \u0648\u0627\u0644\u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u062D\u0627\u0648\u064A\u0629 \u0639\u0644\u0649 \u0627\u0644\u0643\u062D\u0648\u0644",
+          foodCategoryEn: "Alcohol & Ethanol Products",
+          foodIcon: "\u{1F377}",
           affectedDrug: name,
-          severity: 'critical',
-          severityLabel: isAr ? '🔴 تعارض حرج: تفاعل شبيه بالديسولفيرام (قيء مقذوف وهبوط دوراني)' : '🔴 Critical: Disulfiram-Like Reaction',
-          mechanism: isAr
-            ? 'الميترونيدازول يثبط إنزيم ألدهيد ديهيدروجينيز (ALDH)، مما يؤدي لتراكم مادة الأسيتالدهيد السامة في الدم بسرعة فائقة مسببة احمراراً وجهياً عنيفاً، صداعاً نابضاً، غثياناً وقيئاً شديداً، خفقاناً وهبوط ضغط.'
-            : 'Metronidazole inhibits aldehyde dehydrogenase, precipitating toxic acetaldehyde accumulation with violent vomiting, flushing, and hypotension.',
-          recommendation: isAr
-            ? 'الامتناع التام عن أي منتجات كحولية طوال فترة أخذ الفلاجيل ولمدة 48 إلى 72 ساعة بعد آخر جرعة.'
-            : 'Avoid all alcohol during treatment and for at least 72 hours post-completion.',
-          clinicalNote: isAr ? 'انتبه أيضاً لشرابات السعال وغسول الفم المحتوي على كحول إيثيلي.' : 'Check mouthwashes and cough syrups for hidden alcohol.',
-          dietaryAdvice: isAr ? 'شرب كميات وفيرة من الماء وعصائر الفاكهة الطبيعية.' : 'Drink plenty of water and fresh fruit juices.'
+          severity: "critical",
+          severityLabel: isAr ? "\u{1F534} \u062A\u0639\u0627\u0631\u0636 \u062D\u0631\u062C: \u062A\u0641\u0627\u0639\u0644 \u0634\u0628\u064A\u0647 \u0628\u0627\u0644\u062F\u064A\u0633\u0648\u0644\u0641\u064A\u0631\u0627\u0645 (\u0642\u064A\u0621 \u0645\u0642\u0630\u0648\u0641 \u0648\u0647\u0628\u0648\u0637 \u062F\u0648\u0631\u0627\u0646\u064A)" : "\u{1F534} Critical: Disulfiram-Like Reaction",
+          mechanism: isAr ? "\u0627\u0644\u0645\u064A\u062A\u0631\u0648\u0646\u064A\u062F\u0627\u0632\u0648\u0644 \u064A\u062B\u0628\u0637 \u0625\u0646\u0632\u064A\u0645 \u0623\u0644\u062F\u0647\u064A\u062F \u062F\u064A\u0647\u064A\u062F\u0631\u0648\u062C\u064A\u0646\u064A\u0632 (ALDH)\u060C \u0645\u0645\u0627 \u064A\u0624\u062F\u064A \u0644\u062A\u0631\u0627\u0643\u0645 \u0645\u0627\u062F\u0629 \u0627\u0644\u0623\u0633\u064A\u062A\u0627\u0644\u062F\u0647\u064A\u062F \u0627\u0644\u0633\u0627\u0645\u0629 \u0641\u064A \u0627\u0644\u062F\u0645 \u0628\u0633\u0631\u0639\u0629 \u0641\u0627\u0626\u0642\u0629 \u0645\u0633\u0628\u0628\u0629 \u0627\u062D\u0645\u0631\u0627\u0631\u0627\u064B \u0648\u062C\u0647\u064A\u0627\u064B \u0639\u0646\u064A\u0641\u0627\u064B\u060C \u0635\u062F\u0627\u0639\u0627\u064B \u0646\u0627\u0628\u0636\u0627\u064B\u060C \u063A\u062B\u064A\u0627\u0646\u0627\u064B \u0648\u0642\u064A\u0626\u0627\u064B \u0634\u062F\u064A\u062F\u0627\u064B\u060C \u062E\u0641\u0642\u0627\u0646\u0627\u064B \u0648\u0647\u0628\u0648\u0637 \u0636\u063A\u0637." : "Metronidazole inhibits aldehyde dehydrogenase, precipitating toxic acetaldehyde accumulation with violent vomiting, flushing, and hypotension.",
+          recommendation: isAr ? "\u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0627\u0644\u062A\u0627\u0645 \u0639\u0646 \u0623\u064A \u0645\u0646\u062A\u062C\u0627\u062A \u0643\u062D\u0648\u0644\u064A\u0629 \u0637\u0648\u0627\u0644 \u0641\u062A\u0631\u0629 \u0623\u062E\u0630 \u0627\u0644\u0641\u0644\u0627\u062C\u064A\u0644 \u0648\u0644\u0645\u062F\u0629 48 \u0625\u0644\u0649 72 \u0633\u0627\u0639\u0629 \u0628\u0639\u062F \u0622\u062E\u0631 \u062C\u0631\u0639\u0629." : "Avoid all alcohol during treatment and for at least 72 hours post-completion.",
+          clinicalNote: isAr ? "\u0627\u0646\u062A\u0628\u0647 \u0623\u064A\u0636\u0627\u064B \u0644\u0634\u0631\u0627\u0628\u0627\u062A \u0627\u0644\u0633\u0639\u0627\u0644 \u0648\u063A\u0633\u0648\u0644 \u0627\u0644\u0641\u0645 \u0627\u0644\u0645\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0643\u062D\u0648\u0644 \u0625\u064A\u062B\u064A\u0644\u064A." : "Check mouthwashes and cough syrups for hidden alcohol.",
+          dietaryAdvice: isAr ? "\u0634\u0631\u0628 \u0643\u0645\u064A\u0627\u062A \u0648\u0641\u064A\u0631\u0629 \u0645\u0646 \u0627\u0644\u0645\u0627\u0621 \u0648\u0639\u0635\u0627\u0626\u0631 \u0627\u0644\u0641\u0627\u0643\u0647\u0629 \u0627\u0644\u0637\u0628\u064A\u0639\u064A\u0629." : "Drink plenty of water and fresh fruit juices."
         });
       }
     }
-
-    if (classes.includes('paracetamol')) {
+    if (classes.includes("paracetamol")) {
       const key = `alcohol-para-${name}`;
       if (!processedKeys.has(key)) {
         processedKeys.add(key);
         foodInteractions.push({
           id: key,
-          foodCategory: 'المشروبات الكحولية',
-          foodCategoryEn: 'Alcoholic Beverages',
-          foodIcon: '🍷',
+          foodCategory: "\u0627\u0644\u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0627\u0644\u0643\u062D\u0648\u0644\u064A\u0629",
+          foodCategoryEn: "Alcoholic Beverages",
+          foodIcon: "\u{1F377}",
           affectedDrug: name,
-          severity: 'warning',
-          severityLabel: isAr ? '🟠 تعارض مهم: تحفيز تلف الكبد الحاد حتى بالجرعات الاعتيادية' : '🟠 Warning: Synergistic Hepatotoxicity Risk',
-          mechanism: isAr
-            ? 'تناول الكحول يحفز إنزيم CYP2E1 الكبدي، مما يحول نسبة أكبر من الباراسيتامول إلى المركب السام (NAPQI) مع استنفاد مخزون الجلوتاثيون الواقي للكبد، مما يرفع خطر النخر الكبدي.'
-            : 'Chronic alcohol use induces CYP2E1, shifting acetaminophen toward toxic NAPQI metabolite and depleting glutathione.',
-          recommendation: isAr
-            ? 'لا تتجاوز جرعة 2 غرام (4 أقراص عيار 500 ملغ) يومياً عند وجود تاريخ لتناول الكحول أو اعتلال كبدي.'
-            : 'Limit acetaminophen dose to under 2g/day in individuals who consume alcohol.',
-          clinicalNote: isAr ? 'يشمل: بانادول، أدول، باراسيتامول.' : 'Applies to: Paracetamol, Panadol, Tylenol.',
-          dietaryAdvice: isAr ? 'تناول الباراسيتامول مع الماء العادي بعد وجبة خفيفة.' : 'Take with water after a light meal.'
+          severity: "warning",
+          severityLabel: isAr ? "\u{1F7E0} \u062A\u0639\u0627\u0631\u0636 \u0645\u0647\u0645: \u062A\u062D\u0641\u064A\u0632 \u062A\u0644\u0641 \u0627\u0644\u0643\u0628\u062F \u0627\u0644\u062D\u0627\u062F \u062D\u062A\u0649 \u0628\u0627\u0644\u062C\u0631\u0639\u0627\u062A \u0627\u0644\u0627\u0639\u062A\u064A\u0627\u062F\u064A\u0629" : "\u{1F7E0} Warning: Synergistic Hepatotoxicity Risk",
+          mechanism: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0643\u062D\u0648\u0644 \u064A\u062D\u0641\u0632 \u0625\u0646\u0632\u064A\u0645 CYP2E1 \u0627\u0644\u0643\u0628\u062F\u064A\u060C \u0645\u0645\u0627 \u064A\u062D\u0648\u0644 \u0646\u0633\u0628\u0629 \u0623\u0643\u0628\u0631 \u0645\u0646 \u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u0631\u0643\u0628 \u0627\u0644\u0633\u0627\u0645 (NAPQI) \u0645\u0639 \u0627\u0633\u062A\u0646\u0641\u0627\u062F \u0645\u062E\u0632\u0648\u0646 \u0627\u0644\u062C\u0644\u0648\u062A\u0627\u062B\u064A\u0648\u0646 \u0627\u0644\u0648\u0627\u0642\u064A \u0644\u0644\u0643\u0628\u062F\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u062E\u0637\u0631 \u0627\u0644\u0646\u062E\u0631 \u0627\u0644\u0643\u0628\u062F\u064A." : "Chronic alcohol use induces CYP2E1, shifting acetaminophen toward toxic NAPQI metabolite and depleting glutathione.",
+          recommendation: isAr ? "\u0644\u0627 \u062A\u062A\u062C\u0627\u0648\u0632 \u062C\u0631\u0639\u0629 2 \u063A\u0631\u0627\u0645 (4 \u0623\u0642\u0631\u0627\u0635 \u0639\u064A\u0627\u0631 500 \u0645\u0644\u063A) \u064A\u0648\u0645\u064A\u0627\u064B \u0639\u0646\u062F \u0648\u062C\u0648\u062F \u062A\u0627\u0631\u064A\u062E \u0644\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0643\u062D\u0648\u0644 \u0623\u0648 \u0627\u0639\u062A\u0644\u0627\u0644 \u0643\u0628\u062F\u064A." : "Limit acetaminophen dose to under 2g/day in individuals who consume alcohol.",
+          clinicalNote: isAr ? "\u064A\u0634\u0645\u0644: \u0628\u0627\u0646\u0627\u062F\u0648\u0644\u060C \u0623\u062F\u0648\u0644\u060C \u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644." : "Applies to: Paracetamol, Panadol, Tylenol.",
+          dietaryAdvice: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0628\u0627\u0631\u0627\u0633\u064A\u062A\u0627\u0645\u0648\u0644 \u0645\u0639 \u0627\u0644\u0645\u0627\u0621 \u0627\u0644\u0639\u0627\u062F\u064A \u0628\u0639\u062F \u0648\u062C\u0628\u0629 \u062E\u0641\u064A\u0641\u0629." : "Take with water after a light meal."
         });
       }
     }
   }
-
   return foodInteractions;
 }
-
-export function getMealInstructions(tokens, lang = 'ar') {
-  const isAr = lang === 'ar';
+function getMealInstructions(tokens, lang = "ar") {
+  const isAr = lang === "ar";
   const instructions = [];
-  const processed = new Set();
-
+  const processed = /* @__PURE__ */ new Set();
   for (const token of tokens) {
     const match = identifyDrugClasses(token);
     const classes = match.classes;
     const name = match.name;
     const t = cleanDrugToken(token);
-
     if (processed.has(name)) continue;
     processed.add(name);
-
-    if (classes.includes('ppi')) {
+    if (classes.includes("ppi")) {
       instructions.push({
         drug: name,
-        timing: 'empty_stomach',
-        timingLabel: isAr ? 'على معدة فارغة قبل الأكل بـ 30-60 دقيقة' : 'Empty stomach, 30-60 min before breakfast',
-        instructions: isAr
-          ? 'تناول الحبة صباحاً فور الاستيقاظ وقبل وجبة الإفطار بنصف ساعة إلى ساعة مع كأس ماء، دون مضغ أو كسر الحبة.'
-          : 'Take 30-60 minutes before first meal with a full glass of water. Swallow whole.',
-        rationale: isAr
-          ? 'مضخات البروتون في المعدة تنشط بكثافة عند تناول أول وجبة؛ وجود الدواء في الدم قبيل الوجبة يحقق أعلى نسبة تثبيط لإفراز الحمض المعدي.'
-          : 'Proton pumps are most active post-prandially; pre-meal administration ensures peak drug exposure when pumps fire.'
+        timing: "empty_stomach",
+        timingLabel: isAr ? "\u0639\u0644\u0649 \u0645\u0639\u062F\u0629 \u0641\u0627\u0631\u063A\u0629 \u0642\u0628\u0644 \u0627\u0644\u0623\u0643\u0644 \u0628\u0640 30-60 \u062F\u0642\u064A\u0642\u0629" : "Empty stomach, 30-60 min before breakfast",
+        instructions: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062D\u0628\u0629 \u0635\u0628\u0627\u062D\u0627\u064B \u0641\u0648\u0631 \u0627\u0644\u0627\u0633\u062A\u064A\u0642\u0627\u0638 \u0648\u0642\u0628\u0644 \u0648\u062C\u0628\u0629 \u0627\u0644\u0625\u0641\u0637\u0627\u0631 \u0628\u0646\u0635\u0641 \u0633\u0627\u0639\u0629 \u0625\u0644\u0649 \u0633\u0627\u0639\u0629 \u0645\u0639 \u0643\u0623\u0633 \u0645\u0627\u0621\u060C \u062F\u0648\u0646 \u0645\u0636\u063A \u0623\u0648 \u0643\u0633\u0631 \u0627\u0644\u062D\u0628\u0629." : "Take 30-60 minutes before first meal with a full glass of water. Swallow whole.",
+        rationale: isAr ? "\u0645\u0636\u062E\u0627\u062A \u0627\u0644\u0628\u0631\u0648\u062A\u0648\u0646 \u0641\u064A \u0627\u0644\u0645\u0639\u062F\u0629 \u062A\u0646\u0634\u0637 \u0628\u0643\u062B\u0627\u0641\u0629 \u0639\u0646\u062F \u062A\u0646\u0627\u0648\u0644 \u0623\u0648\u0644 \u0648\u062C\u0628\u0629\u061B \u0648\u062C\u0648\u062F \u0627\u0644\u062F\u0648\u0627\u0621 \u0641\u064A \u0627\u0644\u062F\u0645 \u0642\u0628\u064A\u0644 \u0627\u0644\u0648\u062C\u0628\u0629 \u064A\u062D\u0642\u0642 \u0623\u0639\u0644\u0649 \u0646\u0633\u0628\u0629 \u062A\u062B\u0628\u064A\u0637 \u0644\u0625\u0641\u0631\u0627\u0632 \u0627\u0644\u062D\u0645\u0636 \u0627\u0644\u0645\u0639\u062F\u064A." : "Proton pumps are most active post-prandially; pre-meal administration ensures peak drug exposure when pumps fire."
       });
-    } else if (classes.includes('nsaid')) {
+    } else if (classes.includes("nsaid")) {
       instructions.push({
         drug: name,
-        timing: 'after_food',
-        timingLabel: isAr ? 'بعد وجبة طعام كاملة مع كأس ماء وفير' : 'After a full meal with a large glass of water',
-        instructions: isAr
-          ? 'تناول الجرعة بعد وجبة طعام رئيسية أو مع كأس حليب، ولا تستلقِ لمدة 15 دقيقة بعد البلع.'
-          : 'Take immediately after food with plenty of water. Do not lie down for 15 minutes.',
-        rationale: isAr
-          ? 'مضادات الالتهاب غير الستيرويدية تثبط البروستاجلاندين الواقي لبطانة المعدة؛ تناولها بعد الطعام يحمي الغشاء المخاطي من التخريش والتقرح.'
-          : 'Reduces direct gastric irritation and ulceration caused by mucosal prostaglandin inhibition.'
+        timing: "after_food",
+        timingLabel: isAr ? "\u0628\u0639\u062F \u0648\u062C\u0628\u0629 \u0637\u0639\u0627\u0645 \u0643\u0627\u0645\u0644\u0629 \u0645\u0639 \u0643\u0623\u0633 \u0645\u0627\u0621 \u0648\u0641\u064A\u0631" : "After a full meal with a large glass of water",
+        instructions: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062C\u0631\u0639\u0629 \u0628\u0639\u062F \u0648\u062C\u0628\u0629 \u0637\u0639\u0627\u0645 \u0631\u0626\u064A\u0633\u064A\u0629 \u0623\u0648 \u0645\u0639 \u0643\u0623\u0633 \u062D\u0644\u064A\u0628\u060C \u0648\u0644\u0627 \u062A\u0633\u062A\u0644\u0642\u0650 \u0644\u0645\u062F\u0629 15 \u062F\u0642\u064A\u0642\u0629 \u0628\u0639\u062F \u0627\u0644\u0628\u0644\u0639." : "Take immediately after food with plenty of water. Do not lie down for 15 minutes.",
+        rationale: isAr ? "\u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u0627\u0644\u062A\u0647\u0627\u0628 \u063A\u064A\u0631 \u0627\u0644\u0633\u062A\u064A\u0631\u0648\u064A\u062F\u064A\u0629 \u062A\u062B\u0628\u0637 \u0627\u0644\u0628\u0631\u0648\u0633\u062A\u0627\u062C\u0644\u0627\u0646\u062F\u064A\u0646 \u0627\u0644\u0648\u0627\u0642\u064A \u0644\u0628\u0637\u0627\u0646\u0629 \u0627\u0644\u0645\u0639\u062F\u0629\u061B \u062A\u0646\u0627\u0648\u0644\u0647\u0627 \u0628\u0639\u062F \u0627\u0644\u0637\u0639\u0627\u0645 \u064A\u062D\u0645\u064A \u0627\u0644\u063A\u0634\u0627\u0621 \u0627\u0644\u0645\u062E\u0627\u0637\u064A \u0645\u0646 \u0627\u0644\u062A\u062E\u0631\u064A\u0634 \u0648\u0627\u0644\u062A\u0642\u0631\u062D." : "Reduces direct gastric irritation and ulceration caused by mucosal prostaglandin inhibition."
       });
-    } else if (classes.includes('metformin') || t.includes('metformin') || t.includes('ميتفورمين') || t.includes('glucophage') || t.includes('جلوكوفاج')) {
+    } else if (classes.includes("metformin") || t.includes("metformin") || t.includes("\u0645\u064A\u062A\u0641\u0648\u0631\u0645\u064A\u0646") || t.includes("glucophage") || t.includes("\u062C\u0644\u0648\u0643\u0648\u0641\u0627\u062C")) {
       instructions.push({
         drug: name,
-        timing: 'with_food',
-        timingLabel: isAr ? 'مع الوجبة أو بعدها مباشرة' : 'With meals or immediately after',
-        instructions: isAr
-          ? 'تناول الحبة مع أول لقمة من وجبة الطعام أو فور الانتهاء منها.'
-          : 'Take with or right after your meals.',
-        rationale: isAr
-          ? 'يقلل بشكل فعال من الأعراض الجانبية الهضمية الشائعة مثل المغص، الانتفاخ، الغثيان، والإسهال.'
-          : 'Minimizes common gastrointestinal side effects including nausea, cramps, and diarrhea.'
+        timing: "with_food",
+        timingLabel: isAr ? "\u0645\u0639 \u0627\u0644\u0648\u062C\u0628\u0629 \u0623\u0648 \u0628\u0639\u062F\u0647\u0627 \u0645\u0628\u0627\u0634\u0631\u0629" : "With meals or immediately after",
+        instructions: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062D\u0628\u0629 \u0645\u0639 \u0623\u0648\u0644 \u0644\u0642\u0645\u0629 \u0645\u0646 \u0648\u062C\u0628\u0629 \u0627\u0644\u0637\u0639\u0627\u0645 \u0623\u0648 \u0641\u0648\u0631 \u0627\u0644\u0627\u0646\u062A\u0647\u0627\u0621 \u0645\u0646\u0647\u0627." : "Take with or right after your meals.",
+        rationale: isAr ? "\u064A\u0642\u0644\u0644 \u0628\u0634\u0643\u0644 \u0641\u0639\u0627\u0644 \u0645\u0646 \u0627\u0644\u0623\u0639\u0631\u0627\u0636 \u0627\u0644\u062C\u0627\u0646\u0628\u064A\u0629 \u0627\u0644\u0647\u0636\u0645\u064A\u0629 \u0627\u0644\u0634\u0627\u0626\u0639\u0629 \u0645\u062B\u0644 \u0627\u0644\u0645\u063A\u0635\u060C \u0627\u0644\u0627\u0646\u062A\u0641\u0627\u062E\u060C \u0627\u0644\u063A\u062B\u064A\u0627\u0646\u060C \u0648\u0627\u0644\u0625\u0633\u0647\u0627\u0644." : "Minimizes common gastrointestinal side effects including nausea, cramps, and diarrhea."
       });
-    } else if (classes.includes('levothyroxine')) {
+    } else if (classes.includes("levothyroxine")) {
       instructions.push({
         drug: name,
-        timing: 'empty_stomach',
-        timingLabel: isAr ? 'على الريق صباحاً قبل الفطور بـ 60 دقيقة' : 'Empty stomach, 60 min before breakfast',
-        instructions: isAr
-          ? 'يؤخذ فور الاستيقاظ مع ماء نقي فقط، مع الامتناع عن أي طعام أو قهوة أو شاي لمدة ساعة كاملة.'
-          : 'Take first thing in the morning with plain water only; wait 60 min before eating or drinking coffee.',
-        rationale: isAr
-          ? 'أبسط بقايا الطعام أو المنبهات أو المعادن تقلل امتصاص هرمون الثيروكسين بنسبة كبيرة مسببة فشل الضبط الهرموني.'
-          : 'Food, coffee, and minerals severely impair thyroxine bioavailability.'
+        timing: "empty_stomach",
+        timingLabel: isAr ? "\u0639\u0644\u0649 \u0627\u0644\u0631\u064A\u0642 \u0635\u0628\u0627\u062D\u0627\u064B \u0642\u0628\u0644 \u0627\u0644\u0641\u0637\u0648\u0631 \u0628\u0640 60 \u062F\u0642\u064A\u0642\u0629" : "Empty stomach, 60 min before breakfast",
+        instructions: isAr ? "\u064A\u0624\u062E\u0630 \u0641\u0648\u0631 \u0627\u0644\u0627\u0633\u062A\u064A\u0642\u0627\u0638 \u0645\u0639 \u0645\u0627\u0621 \u0646\u0642\u064A \u0641\u0642\u0637\u060C \u0645\u0639 \u0627\u0644\u0627\u0645\u062A\u0646\u0627\u0639 \u0639\u0646 \u0623\u064A \u0637\u0639\u0627\u0645 \u0623\u0648 \u0642\u0647\u0648\u0629 \u0623\u0648 \u0634\u0627\u064A \u0644\u0645\u062F\u0629 \u0633\u0627\u0639\u0629 \u0643\u0627\u0645\u0644\u0629." : "Take first thing in the morning with plain water only; wait 60 min before eating or drinking coffee.",
+        rationale: isAr ? "\u0623\u0628\u0633\u0637 \u0628\u0642\u0627\u064A\u0627 \u0627\u0644\u0637\u0639\u0627\u0645 \u0623\u0648 \u0627\u0644\u0645\u0646\u0628\u0647\u0627\u062A \u0623\u0648 \u0627\u0644\u0645\u0639\u0627\u062F\u0646 \u062A\u0642\u0644\u0644 \u0627\u0645\u062A\u0635\u0627\u0635 \u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u062B\u064A\u0631\u0648\u0643\u0633\u064A\u0646 \u0628\u0646\u0633\u0628\u0629 \u0643\u0628\u064A\u0631\u0629 \u0645\u0633\u0628\u0628\u0629 \u0641\u0634\u0644 \u0627\u0644\u0636\u0628\u0637 \u0627\u0644\u0647\u0631\u0645\u0648\u0646\u064A." : "Food, coffee, and minerals severely impair thyroxine bioavailability."
       });
-    } else if (t.includes('isotretinoin') || t.includes('روأكوتان') || t.includes('roaccutane') || t.includes('curacne')) {
+    } else if (t.includes("isotretinoin") || t.includes("\u0631\u0648\u0623\u0643\u0648\u062A\u0627\u0646") || t.includes("roaccutane") || t.includes("curacne")) {
       instructions.push({
         drug: name,
-        timing: 'with_food',
-        timingLabel: isAr ? 'مع وجبة رئيسية دسمة تحتوي على دهون صحية' : 'With a high-fat main meal',
-        instructions: isAr
-          ? 'يجب تناول الكبسولة في منتصف وجبة الغداء أو العشاء التي تحتوي على زيت زيتون، بيض، أو مكسرات.'
-          : 'Take capsule midway through a meal containing dietary fats.',
-        rationale: isAr
-          ? 'الروأكوتان دواء شديد الذوبان في الدهون؛ تناوله مع وجبة دسمة يضاعف امتصاصه مرتين مقارنة بالمعدة الفارغة.'
-          : 'Lipophilic medication whose bioavailability doubles when consumed with dietary lipids.'
+        timing: "with_food",
+        timingLabel: isAr ? "\u0645\u0639 \u0648\u062C\u0628\u0629 \u0631\u0626\u064A\u0633\u064A\u0629 \u062F\u0633\u0645\u0629 \u062A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u062F\u0647\u0648\u0646 \u0635\u062D\u064A\u0629" : "With a high-fat main meal",
+        instructions: isAr ? "\u064A\u062C\u0628 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0643\u0628\u0633\u0648\u0644\u0629 \u0641\u064A \u0645\u0646\u062A\u0635\u0641 \u0648\u062C\u0628\u0629 \u0627\u0644\u063A\u062F\u0627\u0621 \u0623\u0648 \u0627\u0644\u0639\u0634\u0627\u0621 \u0627\u0644\u062A\u064A \u062A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0632\u064A\u062A \u0632\u064A\u062A\u0648\u0646\u060C \u0628\u064A\u0636\u060C \u0623\u0648 \u0645\u0643\u0633\u0631\u0627\u062A." : "Take capsule midway through a meal containing dietary fats.",
+        rationale: isAr ? "\u0627\u0644\u0631\u0648\u0623\u0643\u0648\u062A\u0627\u0646 \u062F\u0648\u0627\u0621 \u0634\u062F\u064A\u062F \u0627\u0644\u0630\u0648\u0628\u0627\u0646 \u0641\u064A \u0627\u0644\u062F\u0647\u0648\u0646\u061B \u062A\u0646\u0627\u0648\u0644\u0647 \u0645\u0639 \u0648\u062C\u0628\u0629 \u062F\u0633\u0645\u0629 \u064A\u0636\u0627\u0639\u0641 \u0627\u0645\u062A\u0635\u0627\u0635\u0647 \u0645\u0631\u062A\u064A\u0646 \u0645\u0642\u0627\u0631\u0646\u0629 \u0628\u0627\u0644\u0645\u0639\u062F\u0629 \u0627\u0644\u0641\u0627\u0631\u063A\u0629." : "Lipophilic medication whose bioavailability doubles when consumed with dietary lipids."
       });
-    } else if (classes.includes('quinolone')) {
+    } else if (classes.includes("quinolone")) {
       instructions.push({
         drug: name,
-        timing: 'flexible',
-        timingLabel: isAr ? 'مع أو بدون طعام (مع تجنب الألبان)' : 'With or without food (strictly avoid dairy)',
-        instructions: isAr
-          ? 'يمكن تناوله مع وجبة خفيفة خالية من الحليب والأجبان، مع شرب كأس ماء كبير.'
-          : 'Can be taken with non-dairy meals and a full glass of water.',
-        rationale: isAr
-          ? 'لحماية الكلى من ترسب بلورات الدواء وتجنب معقدات الكالسيوم غير الذوابة.'
-          : 'Ensures proper hydration and avoids insoluble chelate formation.'
+        timing: "flexible",
+        timingLabel: isAr ? "\u0645\u0639 \u0623\u0648 \u0628\u062F\u0648\u0646 \u0637\u0639\u0627\u0645 (\u0645\u0639 \u062A\u062C\u0646\u0628 \u0627\u0644\u0623\u0644\u0628\u0627\u0646)" : "With or without food (strictly avoid dairy)",
+        instructions: isAr ? "\u064A\u0645\u0643\u0646 \u062A\u0646\u0627\u0648\u0644\u0647 \u0645\u0639 \u0648\u062C\u0628\u0629 \u062E\u0641\u064A\u0641\u0629 \u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0623\u062C\u0628\u0627\u0646\u060C \u0645\u0639 \u0634\u0631\u0628 \u0643\u0623\u0633 \u0645\u0627\u0621 \u0643\u0628\u064A\u0631." : "Can be taken with non-dairy meals and a full glass of water.",
+        rationale: isAr ? "\u0644\u062D\u0645\u0627\u064A\u0629 \u0627\u0644\u0643\u0644\u0649 \u0645\u0646 \u062A\u0631\u0633\u0628 \u0628\u0644\u0648\u0631\u0627\u062A \u0627\u0644\u062F\u0648\u0627\u0621 \u0648\u062A\u062C\u0646\u0628 \u0645\u0639\u0642\u062F\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u063A\u064A\u0631 \u0627\u0644\u0630\u0648\u0627\u0628\u0629." : "Ensures proper hydration and avoids insoluble chelate formation."
       });
     }
   }
-
   return instructions;
 }
-
-export function evaluateFoodFoodInteractions(tokens, lang = 'ar') {
-  const isAr = lang === 'ar';
+function evaluateFoodFoodInteractions(tokens, lang = "ar") {
+  const isAr = lang === "ar";
   const interactions = [];
-
-  const hasIron = tokens.some(t => {
+  const hasIron = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('حديد') || c.includes('iron') || c.includes('ferrous') || c.includes('كبده') || c.includes('لحوم حمراء') || c.includes('عدس');
+    return c.includes("\u062D\u062F\u064A\u062F") || c.includes("iron") || c.includes("ferrous") || c.includes("\u0643\u0628\u062F\u0647") || c.includes("\u0644\u062D\u0648\u0645 \u062D\u0645\u0631\u0627\u0621") || c.includes("\u0639\u062F\u0633");
   });
-
-  const hasTeaOrCoffee = tokens.some(t => {
+  const hasTeaOrCoffee = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('شاي') || c.includes('قهوه') || c.includes('كافيين') || c.includes('tea') || c.includes('coffee') || c.includes('caffeine') || c.includes('نسكافيه');
+    return c.includes("\u0634\u0627\u064A") || c.includes("\u0642\u0647\u0648\u0647") || c.includes("\u0643\u0627\u0641\u064A\u064A\u0646") || c.includes("tea") || c.includes("coffee") || c.includes("caffeine") || c.includes("\u0646\u0633\u0643\u0627\u0641\u064A\u0647");
   });
-
-  const hasVitC = tokens.some(t => {
+  const hasVitC = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('فيتامين س') || c.includes('فيتامين c') || c.includes('ليمون') || c.includes('برتقال') || c.includes('حمضيات') || c.includes('طماطم') || c.includes('vitamin c') || c.includes('اسكوربيك');
+    return c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u0633") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 c") || c.includes("\u0644\u064A\u0645\u0648\u0646") || c.includes("\u0628\u0631\u062A\u0642\u0627\u0644") || c.includes("\u062D\u0645\u0636\u064A\u0627\u062A") || c.includes("\u0637\u0645\u0627\u0637\u0645") || c.includes("vitamin c") || c.includes("\u0627\u0633\u0643\u0648\u0631\u0628\u064A\u0643");
   });
-
-  const hasCalciumOrDairy = tokens.some(t => {
+  const hasCalciumOrDairy = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('حليب') || c.includes('لبن') || c.includes('زبادي') || c.includes('جبن') || c.includes('أجبان') || c.includes('كالسيوم') || c.includes('milk') || c.includes('dairy') || c.includes('calcium') || c.includes('yogurt') || c.includes('cheese');
+    return c.includes("\u062D\u0644\u064A\u0628") || c.includes("\u0644\u0628\u0646") || c.includes("\u0632\u0628\u0627\u062F\u064A") || c.includes("\u062C\u0628\u0646") || c.includes("\u0623\u062C\u0628\u0627\u0646") || c.includes("\u0643\u0627\u0644\u0633\u064A\u0648\u0645") || c.includes("milk") || c.includes("dairy") || c.includes("calcium") || c.includes("yogurt") || c.includes("cheese");
   });
-
-  const hasSpinachOrOxalate = tokens.some(t => {
+  const hasSpinachOrOxalate = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('سبانخ') || c.includes('سلق') || c.includes('شمندر') || c.includes('اوكسالات') || c.includes('spinach') || c.includes('oxalate');
+    return c.includes("\u0633\u0628\u0627\u0646\u062E") || c.includes("\u0633\u0644\u0642") || c.includes("\u0634\u0645\u0646\u062F\u0631") || c.includes("\u0627\u0648\u0643\u0633\u0627\u0644\u0627\u062A") || c.includes("spinach") || c.includes("oxalate");
   });
-
-  const hasVitD = tokens.some(t => {
+  const hasVitD = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('فيتامين د') || c.includes('فيتامين d') || c.includes('vitamin d');
+    return c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u062F") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 d") || c.includes("vitamin d");
   });
-
-  const hasHealthyFats = tokens.some(t => {
+  const hasHealthyFats = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('زيت زيتون') || c.includes('افوكادو') || c.includes('مكسرات') || c.includes('دهون صحيه') || c.includes('olive oil');
+    return c.includes("\u0632\u064A\u062A \u0632\u064A\u062A\u0648\u0646") || c.includes("\u0627\u0641\u0648\u0643\u0627\u062F\u0648") || c.includes("\u0645\u0643\u0633\u0631\u0627\u062A") || c.includes("\u062F\u0647\u0648\u0646 \u0635\u062D\u064A\u0647") || c.includes("olive oil");
   });
-
-  const hasFatSolubleVitamins = tokens.some(t => {
+  const hasFatSolubleVitamins = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('جزر') || c.includes('بيتا كاروتين') || c.includes('فيتامين ا') || c.includes('فيتامين a') || c.includes('فيتامين ه') || c.includes('فيتامين e') || c.includes('فيتامين ك') || c.includes('فيتامين k');
+    return c.includes("\u062C\u0632\u0631") || c.includes("\u0628\u064A\u062A\u0627 \u0643\u0627\u0631\u0648\u062A\u064A\u0646") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u0627") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 a") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u0647") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 e") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u0643") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 k");
   });
-
-  const hasHighPotassiumFood = tokens.some(t => {
+  const hasHighPotassiumFood = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('موز') || c.includes('تمر') || c.includes('افوكادو') || c.includes('banana') || c.includes('dates') || c.includes('potassium');
+    return c.includes("\u0645\u0648\u0632") || c.includes("\u062A\u0645\u0631") || c.includes("\u0627\u0641\u0648\u0643\u0627\u062F\u0648") || c.includes("banana") || c.includes("dates") || c.includes("potassium");
   });
-
-  const hasSaltSubstitute = tokens.some(t => {
+  const hasSaltSubstitute = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('بديل ملح') || c.includes('بدائل الملح') || c.includes('ملح دايت') || c.includes('ملح بوتاسيوم') || c.includes('diet salt') || c.includes('salt substitute');
+    return c.includes("\u0628\u062F\u0627\u0621\u0644") || c.includes("\u0628\u062F\u0627\u0626\u0644") || c.includes("\u0628\u062F\u064A\u0644") || c.includes("\u0645\u0644\u062D \u062F\u0627\u064A\u062A") || c.includes("\u0645\u0644\u062D \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645") || c.includes("diet salt") || c.includes("salt substitute") || c.includes("kcl");
   });
-
-  const hasRawEgg = tokens.some(t => {
+  const hasRawEgg = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('بياض بيض') || c.includes('بيض ني') || c.includes('raw egg') || c.includes('افيدين');
+    return c.includes("\u0628\u064A\u0636") && (c.includes("\u0628\u064A\u0627\u0636") || c.includes("\u0646\u064A")) || c.includes("raw egg") || c.includes("\u0627\u0641\u064A\u062F\u064A\u0646") || c.includes("avidin");
   });
-
-  const hasBiotin = tokens.some(t => {
+  const hasBiotin = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('بيوتين') || c.includes('biotin') || c.includes('فيتامين b7');
+    return c.includes("\u0628\u064A\u0648\u062A\u064A\u0646") || c.includes("biotin") || c.includes("\u0641\u064A\u062A\u0627\u0645\u064A\u0646 b7");
   });
-
-  const hasHighFiber = tokens.some(t => {
+  const hasHighFiber = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('رده') || c.includes('نخاله') || c.includes('شيا') || c.includes('الياف مركزه') || c.includes('wheat bran') || c.includes('fiber');
+    return c.includes("\u0631\u062F\u0647") || c.includes("\u0646\u062E\u0627\u0644\u0647") || c.includes("\u0634\u064A\u0627") || c.includes("\u0627\u0644\u064A\u0627\u0641 \u0645\u0631\u0643\u0632\u0647") || c.includes("wheat bran") || c.includes("fiber");
   });
-
-  const hasMinerals = tokens.some(t => {
+  const hasMinerals = tokens.some((t) => {
     const c = cleanDrugToken(t);
-    return c.includes('زنك') || c.includes('مغنيسيوم') || c.includes('حديد') || c.includes('كالسيوم') || c.includes('zinc') || c.includes('magnesium');
+    return c.includes("\u0632\u0646\u0643") || c.includes("\u0645\u063A\u0646\u064A\u0633\u064A\u0648\u0645") || c.includes("\u062D\u062F\u064A\u062F") || c.includes("\u0643\u0627\u0644\u0633\u064A\u0648\u0645") || c.includes("zinc") || c.includes("magnesium");
   });
-
-  // 1. Iron + Tea / Coffee (Antagonism)
   if (hasIron && hasTeaOrCoffee) {
     interactions.push({
-      id: 'iron-tea',
-      foodA: isAr ? 'أطعمة ومكملات الحديد' : 'Iron-rich foods / supplements',
-      foodB: isAr ? 'الشاي والقهوة (التانينات والبوليفينول)' : 'Tea & Coffee (Tannins & Polyphenols)',
-      foodIconA: '🥩',
-      foodIconB: '☕',
-      type: 'antagonism',
-      typeLabel: isAr ? 'تثبيط امتصاص بنسبة 60-80%' : 'Severe Absorption Inhibition',
-      severity: 'warning',
-      mechanism: isAr
-        ? 'مركبات التانين (Tannins) والبوليفينول في الشاي والقهوة ترتبط بشوارد الحديد غير الهيم في الأمعاء وتشكل أملاحاً معقدة غير قابلة للامتصاص، مما يحرم الجسم من الحديد ويؤدي لفقر الدم.'
-        : 'Polyphenols and tannins in tea and coffee bind non-heme iron into insoluble chelates, reducing bioavailability by 60-80%.',
-      recommendation: isAr
-        ? 'اشرب الشاي أو القهوة بعد وجبة اللحوم أو حبوب الحديد بساعة إلى ساعتين على الأقل.'
-        : 'Separate tea/coffee consumption by at least 1-2 hours from iron-rich meals or supplements.',
-      clinicalNote: isAr ? 'ينطبق على الشاي الأسود والأخضر والقهوة والنسكافيه.' : 'Applies to black tea, green tea, and coffee.'
+      id: "iron-tea",
+      foodA: isAr ? "\u0623\u0637\u0639\u0645\u0629 \u0648\u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u062D\u062F\u064A\u062F" : "Iron-rich foods / supplements",
+      foodB: isAr ? "\u0627\u0644\u0634\u0627\u064A \u0648\u0627\u0644\u0642\u0647\u0648\u0629 (\u0627\u0644\u062A\u0627\u0646\u064A\u0646\u0627\u062A \u0648\u0627\u0644\u0628\u0648\u0644\u064A\u0641\u064A\u0646\u0648\u0644)" : "Tea & Coffee (Tannins & Polyphenols)",
+      foodIconA: "\u{1F969}",
+      foodIconB: "\u2615",
+      type: "antagonism",
+      typeLabel: isAr ? "\u062A\u062B\u0628\u064A\u0637 \u0627\u0645\u062A\u0635\u0627\u0635 \u0628\u0646\u0633\u0628\u0629 60-80%" : "Severe Absorption Inhibition",
+      severity: "warning",
+      mechanism: isAr ? "\u0645\u0631\u0643\u0628\u0627\u062A \u0627\u0644\u062A\u0627\u0646\u064A\u0646 (Tannins) \u0648\u0627\u0644\u0628\u0648\u0644\u064A\u0641\u064A\u0646\u0648\u0644 \u0641\u064A \u0627\u0644\u0634\u0627\u064A \u0648\u0627\u0644\u0642\u0647\u0648\u0629 \u062A\u0631\u062A\u0628\u0637 \u0628\u0634\u0648\u0627\u0631\u062F \u0627\u0644\u062D\u062F\u064A\u062F \u063A\u064A\u0631 \u0627\u0644\u0647\u064A\u0645 \u0641\u064A \u0627\u0644\u0623\u0645\u0639\u0627\u0621 \u0648\u062A\u0634\u0643\u0644 \u0623\u0645\u0644\u0627\u062D\u0627\u064B \u0645\u0639\u0642\u062F\u0629 \u063A\u064A\u0631 \u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u0627\u0645\u062A\u0635\u0627\u0635\u060C \u0645\u0645\u0627 \u064A\u062D\u0631\u0645 \u0627\u0644\u062C\u0633\u0645 \u0645\u0646 \u0627\u0644\u062D\u062F\u064A\u062F \u0648\u064A\u0624\u062F\u064A \u0644\u0641\u0642\u0631 \u0627\u0644\u062F\u0645." : "Polyphenols and tannins in tea and coffee bind non-heme iron into insoluble chelates, reducing bioavailability by 60-80%.",
+      recommendation: isAr ? "\u0627\u0634\u0631\u0628 \u0627\u0644\u0634\u0627\u064A \u0623\u0648 \u0627\u0644\u0642\u0647\u0648\u0629 \u0628\u0639\u062F \u0648\u062C\u0628\u0629 \u0627\u0644\u0644\u062D\u0648\u0645 \u0623\u0648 \u062D\u0628\u0648\u0628 \u0627\u0644\u062D\u062F\u064A\u062F \u0628\u0633\u0627\u0639\u0629 \u0625\u0644\u0649 \u0633\u0627\u0639\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644." : "Separate tea/coffee consumption by at least 1-2 hours from iron-rich meals or supplements.",
+      clinicalNote: isAr ? "\u064A\u0646\u0637\u0628\u0642 \u0639\u0644\u0649 \u0627\u0644\u0634\u0627\u064A \u0627\u0644\u0623\u0633\u0648\u062F \u0648\u0627\u0644\u0623\u062E\u0636\u0631 \u0648\u0627\u0644\u0642\u0647\u0648\u0629 \u0648\u0627\u0644\u0646\u0633\u0643\u0627\u0641\u064A\u0647." : "Applies to black tea, green tea, and coffee."
     });
   }
-
-  // 2. Iron + Vitamin C (Synergy)
   if (hasIron && hasVitC) {
     interactions.push({
-      id: 'iron-vitc',
-      foodA: isAr ? 'أطعمة/مكملات الحديد (اللحوم، العدس، السبانخ)' : 'Iron-rich foods (meat, lentils, spinach)',
-      foodB: isAr ? 'فيتامين C (الحمضيات، الليمون، الطماطم)' : 'Vitamin C (Citrus, lemon, tomato)',
-      foodIconA: '🥩',
-      foodIconB: '🍋',
-      type: 'synergy',
-      typeLabel: isAr ? 'تآزر غذائي ممتاز (مضاعفة الامتصاص 300%)' : 'Nutrient Synergy (Triple Absorption)',
-      severity: 'beneficial',
-      mechanism: isAr
-        ? 'حمض الأسكوربيك (فيتامين C) يختزل الحديد الثلاثي (Fe3+) إلى الحديد الثنائي (Fe2+) الذائب والأسهل امتصاصاً في الاثني عشر، مما يرفع امتصاص الحديد بأكثر من 300%!'
-        : 'Ascorbic acid reduces ferric iron (Fe3+) to highly soluble ferrous iron (Fe2+), boosting gastrointestinal absorption more than 3-fold.',
-      recommendation: isAr
-        ? 'تركيبة مثالية: اعصر الليمون دائماً على العدس والسلطة والسبانخ، أو اشرب عصير برتقال طازج مع وجبة الحديد.'
-        : 'Ideal pairing: Squeeze lemon juice onto lentils/greens, or take iron with fresh orange juice.',
-      clinicalNote: isAr ? 'من أفضل الطرق الطبيعية المعتمدة لعلاج أنيميا نقص الحديد.' : 'One of the most effective dietary synergies for anemia.'
+      id: "iron-vitc",
+      foodA: isAr ? "\u0623\u0637\u0639\u0645\u0629/\u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u062D\u062F\u064A\u062F (\u0627\u0644\u0644\u062D\u0648\u0645\u060C \u0627\u0644\u0639\u062F\u0633\u060C \u0627\u0644\u0633\u0628\u0627\u0646\u062E)" : "Iron-rich foods (meat, lentils, spinach)",
+      foodB: isAr ? "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 C (\u0627\u0644\u062D\u0645\u0636\u064A\u0627\u062A\u060C \u0627\u0644\u0644\u064A\u0645\u0648\u0646\u060C \u0627\u0644\u0637\u0645\u0627\u0637\u0645)" : "Vitamin C (Citrus, lemon, tomato)",
+      foodIconA: "\u{1F969}",
+      foodIconB: "\u{1F34B}",
+      type: "synergy",
+      typeLabel: isAr ? "\u062A\u0622\u0632\u0631 \u063A\u0630\u0627\u0626\u064A \u0645\u0645\u062A\u0627\u0632 (\u0645\u0636\u0627\u0639\u0641\u0629 \u0627\u0644\u0627\u0645\u062A\u0635\u0627\u0635 300%)" : "Nutrient Synergy (Triple Absorption)",
+      severity: "beneficial",
+      mechanism: isAr ? "\u062D\u0645\u0636 \u0627\u0644\u0623\u0633\u0643\u0648\u0631\u0628\u064A\u0643 (\u0641\u064A\u062A\u0627\u0645\u064A\u0646 C) \u064A\u062E\u062A\u0632\u0644 \u0627\u0644\u062D\u062F\u064A\u062F \u0627\u0644\u062B\u0644\u0627\u062B\u064A (Fe3+) \u0625\u0644\u0649 \u0627\u0644\u062D\u062F\u064A\u062F \u0627\u0644\u062B\u0646\u0627\u0626\u064A (Fe2+) \u0627\u0644\u0630\u0627\u0626\u0628 \u0648\u0627\u0644\u0623\u0633\u0647\u0644 \u0627\u0645\u062A\u0635\u0627\u0635\u0627\u064B \u0641\u064A \u0627\u0644\u0627\u062B\u0646\u064A \u0639\u0634\u0631\u060C \u0645\u0645\u0627 \u064A\u0631\u0641\u0639 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u062D\u062F\u064A\u062F \u0628\u0623\u0643\u062B\u0631 \u0645\u0646 300%!" : "Ascorbic acid reduces ferric iron (Fe3+) to highly soluble ferrous iron (Fe2+), boosting gastrointestinal absorption more than 3-fold.",
+      recommendation: isAr ? "\u062A\u0631\u0643\u064A\u0628\u0629 \u0645\u062B\u0627\u0644\u064A\u0629: \u0627\u0639\u0635\u0631 \u0627\u0644\u0644\u064A\u0645\u0648\u0646 \u062F\u0627\u0626\u0645\u0627\u064B \u0639\u0644\u0649 \u0627\u0644\u0639\u062F\u0633 \u0648\u0627\u0644\u0633\u0644\u0637\u0629 \u0648\u0627\u0644\u0633\u0628\u0627\u0646\u062E\u060C \u0623\u0648 \u0627\u0634\u0631\u0628 \u0639\u0635\u064A\u0631 \u0628\u0631\u062A\u0642\u0627\u0644 \u0637\u0627\u0632\u062C \u0645\u0639 \u0648\u062C\u0628\u0629 \u0627\u0644\u062D\u062F\u064A\u062F." : "Ideal pairing: Squeeze lemon juice onto lentils/greens, or take iron with fresh orange juice.",
+      clinicalNote: isAr ? "\u0645\u0646 \u0623\u0641\u0636\u0644 \u0627\u0644\u0637\u0631\u0642 \u0627\u0644\u0637\u0628\u064A\u0639\u064A\u0629 \u0627\u0644\u0645\u0639\u062A\u0645\u062F\u0629 \u0644\u0639\u0644\u0627\u062C \u0623\u0646\u064A\u0645\u064A\u0627 \u0646\u0642\u0635 \u0627\u0644\u062D\u062F\u064A\u062F." : "One of the most effective dietary synergies for anemia."
     });
   }
-
-  // 3. Iron + Calcium / Dairy (Antagonism)
   if (hasIron && hasCalciumOrDairy) {
     interactions.push({
-      id: 'iron-calcium',
-      foodA: isAr ? 'أطعمة ومصادر الحديد' : 'Iron-rich foods',
-      foodB: isAr ? 'الحليب ومشتقات الألبان (الكالسيوم)' : 'Milk & Dairy Products (Calcium)',
-      foodIconA: '🥩',
-      foodIconB: '🥛',
-      type: 'antagonism',
-      typeLabel: isAr ? 'تنافس شديد على الامتصاص' : 'Absorption Competition',
-      severity: 'warning',
-      mechanism: isAr
-        ? 'شوارد الكالسيوم تتنافس مع شوارد الحديد على نفس الناقل الخلوي في الأمعاء (DMT-1). وجود كمية كبيرة من الكالسيوم (كوب حليب أو قطعة جبن) يزيح الحديد ويقلل امتصاصه بنسبة تفوق 50%.'
-        : 'Calcium directly competes with iron for divalent metal transporter 1 (DMT-1), significantly depressing iron bioavailability.',
-      recommendation: isAr
-        ? 'تجنب شرب الحليب أو تناول اللبن والزبادي مع وجبة اللحوم أو العدس، وافصل بينهما بساعتين على الأقل.'
-        : 'Avoid dairy during high-iron meals; separate by 2 hours for optimal hematologic benefit.',
-      clinicalNote: isAr ? 'خطأ شائع: شرب اللبن أو الحليب مع اللحوم الحمراء أو الكبدة.' : 'Common dietary mistake: consuming dairy alongside red meats.'
+      id: "iron-calcium",
+      foodA: isAr ? "\u0623\u0637\u0639\u0645\u0629 \u0648\u0645\u0635\u0627\u062F\u0631 \u0627\u0644\u062D\u062F\u064A\u062F" : "Iron-rich foods",
+      foodB: isAr ? "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0645\u0634\u062A\u0642\u0627\u062A \u0627\u0644\u0623\u0644\u0628\u0627\u0646 (\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645)" : "Milk & Dairy Products (Calcium)",
+      foodIconA: "\u{1F969}",
+      foodIconB: "\u{1F95B}",
+      type: "antagonism",
+      typeLabel: isAr ? "\u062A\u0646\u0627\u0641\u0633 \u0634\u062F\u064A\u062F \u0639\u0644\u0649 \u0627\u0644\u0627\u0645\u062A\u0635\u0627\u0635" : "Absorption Competition",
+      severity: "warning",
+      mechanism: isAr ? "\u0634\u0648\u0627\u0631\u062F \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u062A\u062A\u0646\u0627\u0641\u0633 \u0645\u0639 \u0634\u0648\u0627\u0631\u062F \u0627\u0644\u062D\u062F\u064A\u062F \u0639\u0644\u0649 \u0646\u0641\u0633 \u0627\u0644\u0646\u0627\u0642\u0644 \u0627\u0644\u062E\u0644\u0648\u064A \u0641\u064A \u0627\u0644\u0623\u0645\u0639\u0627\u0621 (DMT-1). \u0648\u062C\u0648\u062F \u0643\u0645\u064A\u0629 \u0643\u0628\u064A\u0631\u0629 \u0645\u0646 \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 (\u0643\u0648\u0628 \u062D\u0644\u064A\u0628 \u0623\u0648 \u0642\u0637\u0639\u0629 \u062C\u0628\u0646) \u064A\u0632\u064A\u062D \u0627\u0644\u062D\u062F\u064A\u062F \u0648\u064A\u0642\u0644\u0644 \u0627\u0645\u062A\u0635\u0627\u0635\u0647 \u0628\u0646\u0633\u0628\u0629 \u062A\u0641\u0648\u0642 50%." : "Calcium directly competes with iron for divalent metal transporter 1 (DMT-1), significantly depressing iron bioavailability.",
+      recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u0634\u0631\u0628 \u0627\u0644\u062D\u0644\u064A\u0628 \u0623\u0648 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0644\u0628\u0646 \u0648\u0627\u0644\u0632\u0628\u0627\u062F\u064A \u0645\u0639 \u0648\u062C\u0628\u0629 \u0627\u0644\u0644\u062D\u0648\u0645 \u0623\u0648 \u0627\u0644\u0639\u062F\u0633\u060C \u0648\u0627\u0641\u0635\u0644 \u0628\u064A\u0646\u0647\u0645\u0627 \u0628\u0633\u0627\u0639\u062A\u064A\u0646 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644." : "Avoid dairy during high-iron meals; separate by 2 hours for optimal hematologic benefit.",
+      clinicalNote: isAr ? "\u062E\u0637\u0623 \u0634\u0627\u0626\u0639: \u0634\u0631\u0628 \u0627\u0644\u0644\u0628\u0646 \u0623\u0648 \u0627\u0644\u062D\u0644\u064A\u0628 \u0645\u0639 \u0627\u0644\u0644\u062D\u0648\u0645 \u0627\u0644\u062D\u0645\u0631\u0627\u0621 \u0623\u0648 \u0627\u0644\u0643\u0628\u062F\u0629." : "Common dietary mistake: consuming dairy alongside red meats."
     });
   }
-
-  // 4. Spinach / Oxalates + Calcium / Dairy (Stone Risk & Blocked Calcium)
   if (hasSpinachOrOxalate && hasCalciumOrDairy) {
     interactions.push({
-      id: 'spinach-calcium',
-      foodA: isAr ? 'السبانخ والسلق والشمندر (حمض الأوكساليك)' : 'Spinach & Swiss Chard (Oxalic Acid)',
-      foodB: isAr ? 'الحليب والأجبان (الكالسيوم)' : 'Dairy Products (Calcium)',
-      foodIconA: '🥬',
-      foodIconB: '🧀',
-      type: 'risk',
-      typeLabel: isAr ? 'تكون بلورات أوكسالات الكالسيوم وحصى الكلى' : 'Calcium Oxalate Precipitation',
-      severity: 'warning',
-      mechanism: isAr
-        ? 'حمض الأوكساليك الموجود بكثافة في السبانخ يرتبط بشوارد الكالسيوم ويشكل بلورات أوكسالات الكالسيوم غير القابلة للذوبان؛ هذا يقلل امتصاص الكالسيوم ويزيد من خطر ترسب الحصيات الكلوية لدى المعرضين.'
-        : 'Oxalic acid binds dietary calcium into insoluble calcium oxalate crystals, lowering calcium absorption and increasing nephrolithiasis risk in stone-formers.',
-      recommendation: isAr
-        ? 'سلق السبانخ أو طهيها بالبخار والتخلص من ماء السلق يتخلص من 80% من الأوكسالات. احرص على شرب 2-3 لتر ماء يومياً.'
-        : 'Blanching or boiling spinach significantly reduces soluble oxalate content. Ensure high daily water hydration.',
-      clinicalNote: isAr ? 'الأشخاص الذين لديهم تاريخ لحصوات الكلى يجب أن ينتبهوا لهذه التركيبة.' : 'Important for patients with a personal history of kidney stones.'
+      id: "spinach-calcium",
+      foodA: isAr ? "\u0627\u0644\u0633\u0628\u0627\u0646\u062E \u0648\u0627\u0644\u0633\u0644\u0642 \u0648\u0627\u0644\u0634\u0645\u0646\u062F\u0631 (\u062D\u0645\u0636 \u0627\u0644\u0623\u0648\u0643\u0633\u0627\u0644\u064A\u0643)" : "Spinach & Swiss Chard (Oxalic Acid)",
+      foodB: isAr ? "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0627\u0644\u0623\u062C\u0628\u0627\u0646 (\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645)" : "Dairy Products (Calcium)",
+      foodIconA: "\u{1F96C}",
+      foodIconB: "\u{1F9C0}",
+      type: "risk",
+      typeLabel: isAr ? "\u062A\u0643\u0648\u0646 \u0628\u0644\u0648\u0631\u0627\u062A \u0623\u0648\u0643\u0633\u0627\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u062D\u0635\u0649 \u0627\u0644\u0643\u0644\u0649" : "Calcium Oxalate Precipitation",
+      severity: "warning",
+      mechanism: isAr ? "\u062D\u0645\u0636 \u0627\u0644\u0623\u0648\u0643\u0633\u0627\u0644\u064A\u0643 \u0627\u0644\u0645\u0648\u062C\u0648\u062F \u0628\u0643\u062B\u0627\u0641\u0629 \u0641\u064A \u0627\u0644\u0633\u0628\u0627\u0646\u062E \u064A\u0631\u062A\u0628\u0637 \u0628\u0634\u0648\u0627\u0631\u062F \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u064A\u0634\u0643\u0644 \u0628\u0644\u0648\u0631\u0627\u062A \u0623\u0648\u0643\u0633\u0627\u0644\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u063A\u064A\u0631 \u0627\u0644\u0642\u0627\u0628\u0644\u0629 \u0644\u0644\u0630\u0648\u0628\u0627\u0646\u061B \u0647\u0630\u0627 \u064A\u0642\u0644\u0644 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u064A\u0632\u064A\u062F \u0645\u0646 \u062E\u0637\u0631 \u062A\u0631\u0633\u0628 \u0627\u0644\u062D\u0635\u064A\u0627\u062A \u0627\u0644\u0643\u0644\u0648\u064A\u0629 \u0644\u062F\u0649 \u0627\u0644\u0645\u0639\u0631\u0636\u064A\u0646." : "Oxalic acid binds dietary calcium into insoluble calcium oxalate crystals, lowering calcium absorption and increasing nephrolithiasis risk in stone-formers.",
+      recommendation: isAr ? "\u0633\u0644\u0642 \u0627\u0644\u0633\u0628\u0627\u0646\u062E \u0623\u0648 \u0637\u0647\u064A\u0647\u0627 \u0628\u0627\u0644\u0628\u062E\u0627\u0631 \u0648\u0627\u0644\u062A\u062E\u0644\u0635 \u0645\u0646 \u0645\u0627\u0621 \u0627\u0644\u0633\u0644\u0642 \u064A\u062A\u062E\u0644\u0635 \u0645\u0646 80% \u0645\u0646 \u0627\u0644\u0623\u0648\u0643\u0633\u0627\u0644\u0627\u062A. \u0627\u062D\u0631\u0635 \u0639\u0644\u0649 \u0634\u0631\u0628 2-3 \u0644\u062A\u0631 \u0645\u0627\u0621 \u064A\u0648\u0645\u064A\u0627\u064B." : "Blanching or boiling spinach significantly reduces soluble oxalate content. Ensure high daily water hydration.",
+      clinicalNote: isAr ? "\u0627\u0644\u0623\u0634\u062E\u0627\u0635 \u0627\u0644\u0630\u064A\u0646 \u0644\u062F\u064A\u0647\u0645 \u062A\u0627\u0631\u064A\u062E \u0644\u062D\u0635\u0648\u0627\u062A \u0627\u0644\u0643\u0644\u0649 \u064A\u062C\u0628 \u0623\u0646 \u064A\u0646\u062A\u0628\u0647\u0648\u0627 \u0644\u0647\u0630\u0647 \u0627\u0644\u062A\u0631\u0643\u064A\u0628\u0629." : "Important for patients with a personal history of kidney stones."
     });
   }
-
-  // 5. Calcium + Vitamin D (Synergy)
   if (hasCalciumOrDairy && hasVitD) {
     interactions.push({
-      id: 'calcium-vitd',
-      foodA: isAr ? 'الحليب ومنتجات الكالسيوم' : 'Calcium-rich dairy products',
-      foodB: isAr ? 'فيتامين D (البيض، الأسماك، الشمس)' : 'Vitamin D (Eggs, fatty fish, sunlight)',
-      foodIconA: '🥛',
-      foodIconB: '☀️',
-      type: 'synergy',
-      typeLabel: isAr ? 'تآزر ممتاز لبناء كثافة العظام' : 'Vital Bone Synergy',
-      severity: 'beneficial',
-      mechanism: isAr
-        ? 'فيتامين د هو الهرمون المنشط لقنوات امتصاص الكالسيوم المعوية وتصنيع بروتين Calbindin، وبدونه لا يستطيع الجسم امتصاص أكثر من 10-15% من كالسيوم الطعام.'
-        : 'Vitamin D stimulates active transcellular calcium transport and calbindin protein synthesis in enterocytes.',
-      recommendation: isAr
-        ? 'تناول الحليب المدعم بفيتامين د أو تناول الأجبان مع البيض والأسماك الدهنية للحفاظ على كثافة العظام والوقاية من الهشاشة.'
-        : 'Combine calcium sources with vitamin D for peak skeletal density and osteoporosis prevention.',
-      clinicalNote: isAr ? 'ثنائي سريري ذهبي لصحة العظام والأسنان.' : 'The gold-standard combination for skeletal integrity.'
+      id: "calcium-vitd",
+      foodA: isAr ? "\u0627\u0644\u062D\u0644\u064A\u0628 \u0648\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645" : "Calcium-rich dairy products",
+      foodB: isAr ? "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 D (\u0627\u0644\u0628\u064A\u0636\u060C \u0627\u0644\u0623\u0633\u0645\u0627\u0643\u060C \u0627\u0644\u0634\u0645\u0633)" : "Vitamin D (Eggs, fatty fish, sunlight)",
+      foodIconA: "\u{1F95B}",
+      foodIconB: "\u2600\uFE0F",
+      type: "synergy",
+      typeLabel: isAr ? "\u062A\u0622\u0632\u0631 \u0645\u0645\u062A\u0627\u0632 \u0644\u0628\u0646\u0627\u0621 \u0643\u062B\u0627\u0641\u0629 \u0627\u0644\u0639\u0638\u0627\u0645" : "Vital Bone Synergy",
+      severity: "beneficial",
+      mechanism: isAr ? "\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u062F \u0647\u0648 \u0627\u0644\u0647\u0631\u0645\u0648\u0646 \u0627\u0644\u0645\u0646\u0634\u0637 \u0644\u0642\u0646\u0648\u0627\u062A \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0627\u0644\u0645\u0639\u0648\u064A\u0629 \u0648\u062A\u0635\u0646\u064A\u0639 \u0628\u0631\u0648\u062A\u064A\u0646 Calbindin\u060C \u0648\u0628\u062F\u0648\u0646\u0647 \u0644\u0627 \u064A\u0633\u062A\u0637\u064A\u0639 \u0627\u0644\u062C\u0633\u0645 \u0627\u0645\u062A\u0635\u0627\u0635 \u0623\u0643\u062B\u0631 \u0645\u0646 10-15% \u0645\u0646 \u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0627\u0644\u0637\u0639\u0627\u0645." : "Vitamin D stimulates active transcellular calcium transport and calbindin protein synthesis in enterocytes.",
+      recommendation: isAr ? "\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062D\u0644\u064A\u0628 \u0627\u0644\u0645\u062F\u0639\u0645 \u0628\u0641\u064A\u062A\u0627\u0645\u064A\u0646 \u062F \u0623\u0648 \u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u0623\u062C\u0628\u0627\u0646 \u0645\u0639 \u0627\u0644\u0628\u064A\u0636 \u0648\u0627\u0644\u0623\u0633\u0645\u0627\u0643 \u0627\u0644\u062F\u0647\u0646\u064A\u0629 \u0644\u0644\u062D\u0641\u0627\u0638 \u0639\u0644\u0649 \u0643\u062B\u0627\u0641\u0629 \u0627\u0644\u0639\u0638\u0627\u0645 \u0648\u0627\u0644\u0648\u0642\u0627\u064A\u0629 \u0645\u0646 \u0627\u0644\u0647\u0634\u0627\u0634\u0629." : "Combine calcium sources with vitamin D for peak skeletal density and osteoporosis prevention.",
+      clinicalNote: isAr ? "\u062B\u0646\u0627\u0626\u064A \u0633\u0631\u064A\u0631\u064A \u0630\u0647\u0628\u064A \u0644\u0635\u062D\u0629 \u0627\u0644\u0639\u0638\u0627\u0645 \u0648\u0627\u0644\u0623\u0633\u0646\u0627\u0646." : "The gold-standard combination for skeletal integrity."
     });
   }
-
-  // 6. Healthy Fats + Fat Soluble Vitamins (Synergy)
   if (hasHealthyFats && hasFatSolubleVitamins) {
     interactions.push({
-      id: 'fats-vitamins',
-      foodA: isAr ? 'الدهون الصحية (زيت الزيتون، الأفوكادو)' : 'Healthy Fats (Olive oil, avocado)',
-      foodB: isAr ? 'الخضروات الملونة (فيتامينات A, D, E, K والبيتاكاروتين)' : 'Fat-Soluble Vitamins (A, D, E, K & Carotenoids)',
-      foodIconA: '🫒',
-      foodIconB: '🥕',
-      type: 'synergy',
-      typeLabel: isAr ? 'تعزيز امتصاص مضادات الأكسدة والفيتامينات' : 'Antioxidant & Carotenoid Boost',
-      severity: 'beneficial',
-      mechanism: isAr
-        ? 'الفيتامينات (A, D, E, K) والبيتاكاروتين والليكوبين في الجزر والطماطم لا تذوب في الماء؛ تحتاج إلى دهون لتكوين المذيلات الدهنية (Micelles) الممتصة في الأمعاء. تناول سلطة خالية من الزيت يحرمك من 90% من قيمتها الغذائية!'
-        : 'Lipophilic carotenoids and vitamins A, D, E, and K require lipid micelles for intestinal absorption.',
-      recommendation: isAr
-        ? 'أضف دائماً ملعقة من زيت الزيتون البكر أو قطع الأفوكادو إلى أطباق السلطة والجزر والطماطم.'
-        : 'Always dress salads and cooked vegetables with virgin olive oil or avocado slices.',
-      clinicalNote: isAr ? 'السلطات خالية الدسم غير صحية لامتصاص الفيتامينات الحيوية.' : 'Fat-free dressings fail to unlock fat-soluble micronutrients.'
+      id: "fats-vitamins",
+      foodA: isAr ? "\u0627\u0644\u062F\u0647\u0648\u0646 \u0627\u0644\u0635\u062D\u064A\u0629 (\u0632\u064A\u062A \u0627\u0644\u0632\u064A\u062A\u0648\u0646\u060C \u0627\u0644\u0623\u0641\u0648\u0643\u0627\u062F\u0648)" : "Healthy Fats (Olive oil, avocado)",
+      foodB: isAr ? "\u0627\u0644\u062E\u0636\u0631\u0648\u0627\u062A \u0627\u0644\u0645\u0644\u0648\u0646\u0629 (\u0641\u064A\u062A\u0627\u0645\u064A\u0646\u0627\u062A A, D, E, K \u0648\u0627\u0644\u0628\u064A\u062A\u0627\u0643\u0627\u0631\u0648\u062A\u064A\u0646)" : "Fat-Soluble Vitamins (A, D, E, K & Carotenoids)",
+      foodIconA: "\u{1FAD2}",
+      foodIconB: "\u{1F955}",
+      type: "synergy",
+      typeLabel: isAr ? "\u062A\u0639\u0632\u064A\u0632 \u0627\u0645\u062A\u0635\u0627\u0635 \u0645\u0636\u0627\u062F\u0627\u062A \u0627\u0644\u0623\u0643\u0633\u062F\u0629 \u0648\u0627\u0644\u0641\u064A\u062A\u0627\u0645\u064A\u0646\u0627\u062A" : "Antioxidant & Carotenoid Boost",
+      severity: "beneficial",
+      mechanism: isAr ? "\u0627\u0644\u0641\u064A\u062A\u0627\u0645\u064A\u0646\u0627\u062A (A, D, E, K) \u0648\u0627\u0644\u0628\u064A\u062A\u0627\u0643\u0627\u0631\u0648\u062A\u064A\u0646 \u0648\u0627\u0644\u0644\u064A\u0643\u0648\u0628\u064A\u0646 \u0641\u064A \u0627\u0644\u062C\u0632\u0631 \u0648\u0627\u0644\u0637\u0645\u0627\u0637\u0645 \u0644\u0627 \u062A\u0630\u0648\u0628 \u0641\u064A \u0627\u0644\u0645\u0627\u0621\u061B \u062A\u062D\u062A\u0627\u062C \u0625\u0644\u0649 \u062F\u0647\u0648\u0646 \u0644\u062A\u0643\u0648\u064A\u0646 \u0627\u0644\u0645\u0630\u064A\u0644\u0627\u062A \u0627\u0644\u062F\u0647\u0646\u064A\u0629 (Micelles) \u0627\u0644\u0645\u0645\u062A\u0635\u0629 \u0641\u064A \u0627\u0644\u0623\u0645\u0639\u0627\u0621. \u062A\u0646\u0627\u0648\u0644 \u0633\u0644\u0637\u0629 \u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0632\u064A\u062A \u064A\u062D\u0631\u0645\u0643 \u0645\u0646 90% \u0645\u0646 \u0642\u064A\u0645\u062A\u0647\u0627 \u0627\u0644\u063A\u0630\u0627\u0626\u064A\u0629!" : "Lipophilic carotenoids and vitamins A, D, E, and K require lipid micelles for intestinal absorption.",
+      recommendation: isAr ? "\u0623\u0636\u0641 \u062F\u0627\u0626\u0645\u0627\u064B \u0645\u0644\u0639\u0642\u0629 \u0645\u0646 \u0632\u064A\u062A \u0627\u0644\u0632\u064A\u062A\u0648\u0646 \u0627\u0644\u0628\u0643\u0631 \u0623\u0648 \u0642\u0637\u0639 \u0627\u0644\u0623\u0641\u0648\u0643\u0627\u062F\u0648 \u0625\u0644\u0649 \u0623\u0637\u0628\u0627\u0642 \u0627\u0644\u0633\u0644\u0637\u0629 \u0648\u0627\u0644\u062C\u0632\u0631 \u0648\u0627\u0644\u0637\u0645\u0627\u0637\u0645." : "Always dress salads and cooked vegetables with virgin olive oil or avocado slices.",
+      clinicalNote: isAr ? "\u0627\u0644\u0633\u0644\u0637\u0627\u062A \u062E\u0627\u0644\u064A\u0629 \u0627\u0644\u062F\u0633\u0645 \u063A\u064A\u0631 \u0635\u062D\u064A\u0629 \u0644\u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0641\u064A\u062A\u0627\u0645\u064A\u0646\u0627\u062A \u0627\u0644\u062D\u064A\u0648\u064A\u0629." : "Fat-free dressings fail to unlock fat-soluble micronutrients."
     });
   }
-
-  // 7. Potassium Foods + Salt Substitutes (Critical Risk)
   if (hasHighPotassiumFood && hasSaltSubstitute) {
     interactions.push({
-      id: 'potassium-salt',
-      foodA: isAr ? 'الأغذية عالية البوتاسيوم (الموز، التمر)' : 'High potassium foods (Bananas, dates)',
-      foodB: isAr ? 'بدائل الملح الخالية من الصوديوم (كلوريد البوتاسيوم KCl)' : 'Potassium Salt Substitutes (No-Salt / Diet Salt)',
-      foodIconA: '🍌',
-      foodIconB: '🧂',
-      type: 'risk',
-      typeLabel: isAr ? 'خطر فرط البوتاسيوم وتوقف عضلة القلب' : 'Severe Hyperkalemia Risk',
-      severity: 'critical',
-      mechanism: isAr
-        ? 'بدائل الملح المخصصة لمرضى الضغط تتكون من كلوريد البوتاسيوم النقي (KCl)؛ الجمع بينها وبين وجبات غنية بالبوتاسيوم (موز، تمر، أفوكادو) قد يحدث قفزة حادة ومفاجئة في بوتاسيوم الدم مهددة لنظم القلب.'
-        : 'Dietary potassium load combined with KCl-based salt substitutes can trigger dangerous hyperkalemia.',
-      recommendation: isAr
-        ? 'تجنب استخدام بدائل الملح البوتاسية عند تناول كميات وافرة من الفواكه الغنية بالبوتاسيوم.'
-        : 'Exercise extreme caution when using potassium-based salts alongside high-potassium foods.',
-      clinicalNote: isAr ? 'تحذير مضاعف لمرضى الكلى ومستخدمي أدوية الضغط.' : 'Double caution for renal patients.'
+      id: "potassium-salt",
+      foodA: isAr ? "\u0627\u0644\u0623\u063A\u0630\u064A\u0629 \u0639\u0627\u0644\u064A\u0629 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 (\u0627\u0644\u0645\u0648\u0632\u060C \u0627\u0644\u062A\u0645\u0631)" : "High potassium foods (Bananas, dates)",
+      foodB: isAr ? "\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D \u0627\u0644\u062E\u0627\u0644\u064A\u0629 \u0645\u0646 \u0627\u0644\u0635\u0648\u062F\u064A\u0648\u0645 (\u0643\u0644\u0648\u0631\u064A\u062F \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 KCl)" : "Potassium Salt Substitutes (No-Salt / Diet Salt)",
+      foodIconA: "\u{1F34C}",
+      foodIconB: "\u{1F9C2}",
+      type: "risk",
+      typeLabel: isAr ? "\u062E\u0637\u0631 \u0641\u0631\u0637 \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0648\u062A\u0648\u0642\u0641 \u0639\u0636\u0644\u0629 \u0627\u0644\u0642\u0644\u0628" : "Severe Hyperkalemia Risk",
+      severity: "critical",
+      mechanism: isAr ? "\u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D \u0627\u0644\u0645\u062E\u0635\u0635\u0629 \u0644\u0645\u0631\u0636\u0649 \u0627\u0644\u0636\u063A\u0637 \u062A\u062A\u0643\u0648\u0646 \u0645\u0646 \u0643\u0644\u0648\u0631\u064A\u062F \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u0646\u0642\u064A (KCl)\u061B \u0627\u0644\u062C\u0645\u0639 \u0628\u064A\u0646\u0647\u0627 \u0648\u0628\u064A\u0646 \u0648\u062C\u0628\u0627\u062A \u063A\u0646\u064A\u0629 \u0628\u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 (\u0645\u0648\u0632\u060C \u062A\u0645\u0631\u060C \u0623\u0641\u0648\u0643\u0627\u062F\u0648) \u0642\u062F \u064A\u062D\u062F\u062B \u0642\u0641\u0632\u0629 \u062D\u0627\u062F\u0629 \u0648\u0645\u0641\u0627\u062C\u0626\u0629 \u0641\u064A \u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645 \u0627\u0644\u062F\u0645 \u0645\u0647\u062F\u062F\u0629 \u0644\u0646\u0638\u0645 \u0627\u0644\u0642\u0644\u0628." : "Dietary potassium load combined with KCl-based salt substitutes can trigger dangerous hyperkalemia.",
+      recommendation: isAr ? "\u062A\u062C\u0646\u0628 \u0627\u0633\u062A\u062E\u062F\u0627\u0645 \u0628\u062F\u0627\u0626\u0644 \u0627\u0644\u0645\u0644\u062D \u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0629 \u0639\u0646\u062F \u062A\u0646\u0627\u0648\u0644 \u0643\u0645\u064A\u0627\u062A \u0648\u0627\u0641\u0631\u0629 \u0645\u0646 \u0627\u0644\u0641\u0648\u0627\u0643\u0647 \u0627\u0644\u063A\u0646\u064A\u0629 \u0628\u0627\u0644\u0628\u0648\u062A\u0627\u0633\u064A\u0648\u0645." : "Exercise extreme caution when using potassium-based salts alongside high-potassium foods.",
+      clinicalNote: isAr ? "\u062A\u062D\u0630\u064A\u0631 \u0645\u0636\u0627\u0639\u0641 \u0644\u0645\u0631\u0636\u0649 \u0627\u0644\u0643\u0644\u0649 \u0648\u0645\u0633\u062A\u062E\u062F\u0645\u064A \u0623\u062F\u0648\u064A\u0629 \u0627\u0644\u0636\u063A\u0637." : "Double caution for renal patients."
     });
   }
-
-  // 8. Raw Egg White + Biotin (Antagonism)
   if (hasRawEgg && hasBiotin) {
     interactions.push({
-      id: 'rawegg-biotin',
-      foodA: isAr ? 'بياض البيض النيء' : 'Raw egg whites',
-      foodB: isAr ? 'البيوتين (فيتامين B7 - صفار البيض، الكبدة، المكسرات)' : 'Biotin (Vitamin B7)',
-      foodIconA: '🥚',
-      foodIconB: '🥜',
-      type: 'antagonism',
-      typeLabel: isAr ? 'نقص البيوتين وتساقط الشعر' : 'Biotin Deficiency & Hair Loss',
-      severity: 'warning',
-      mechanism: isAr
-        ? 'بياض البيض النيء يحتوي على بروتين الأفيدين (Avidin) الذي يرتبط بجزيء البيوتين برباط كيميائي فائق القوة لا يمكن للأمعاء تفكيكه، مسبباً نقص البيوتين وتساقط الشعر والتهاب الجلد.'
-        : 'Avidin in raw egg whites binds biotin with near-covalent affinity, preventing absorption.',
-      recommendation: isAr
-        ? 'طهي البيض بالحرارة (سلق أو قلي) يفكك بروتين الأفيدين تماماً ويجعله آمناً ومغذياً.'
-        : 'Cook egg whites thoroughly; heat denatures avidin completely.',
-      clinicalNote: isAr ? 'لا تشرب البيض النيء مطلقاً في مشروبات كمال الأجسام.' : 'Never ingest raw egg whites in bodybuilding smoothies.'
+      id: "rawegg-biotin",
+      foodA: isAr ? "\u0628\u064A\u0627\u0636 \u0627\u0644\u0628\u064A\u0636 \u0627\u0644\u0646\u064A\u0621" : "Raw egg whites",
+      foodB: isAr ? "\u0627\u0644\u0628\u064A\u0648\u062A\u064A\u0646 (\u0641\u064A\u062A\u0627\u0645\u064A\u0646 B7 - \u0635\u0641\u0627\u0631 \u0627\u0644\u0628\u064A\u0636\u060C \u0627\u0644\u0643\u0628\u062F\u0629\u060C \u0627\u0644\u0645\u0643\u0633\u0631\u0627\u062A)" : "Biotin (Vitamin B7)",
+      foodIconA: "\u{1F95A}",
+      foodIconB: "\u{1F95C}",
+      type: "antagonism",
+      typeLabel: isAr ? "\u0646\u0642\u0635 \u0627\u0644\u0628\u064A\u0648\u062A\u064A\u0646 \u0648\u062A\u0633\u0627\u0642\u0637 \u0627\u0644\u0634\u0639\u0631" : "Biotin Deficiency & Hair Loss",
+      severity: "warning",
+      mechanism: isAr ? "\u0628\u064A\u0627\u0636 \u0627\u0644\u0628\u064A\u0636 \u0627\u0644\u0646\u064A\u0621 \u064A\u062D\u062A\u0648\u064A \u0639\u0644\u0649 \u0628\u0631\u0648\u062A\u064A\u0646 \u0627\u0644\u0623\u0641\u064A\u062F\u064A\u0646 (Avidin) \u0627\u0644\u0630\u064A \u064A\u0631\u062A\u0628\u0637 \u0628\u062C\u0632\u064A\u0621 \u0627\u0644\u0628\u064A\u0648\u062A\u064A\u0646 \u0628\u0631\u0628\u0627\u0637 \u0643\u064A\u0645\u064A\u0627\u0626\u064A \u0641\u0627\u0626\u0642 \u0627\u0644\u0642\u0648\u0629 \u0644\u0627 \u064A\u0645\u0643\u0646 \u0644\u0644\u0623\u0645\u0639\u0627\u0621 \u062A\u0641\u0643\u064A\u0643\u0647\u060C \u0645\u0633\u0628\u0628\u0627\u064B \u0646\u0642\u0635 \u0627\u0644\u0628\u064A\u0648\u062A\u064A\u0646 \u0648\u062A\u0633\u0627\u0642\u0637 \u0627\u0644\u0634\u0639\u0631 \u0648\u0627\u0644\u062A\u0647\u0627\u0628 \u0627\u0644\u062C\u0644\u062F." : "Avidin in raw egg whites binds biotin with near-covalent affinity, preventing absorption.",
+      recommendation: isAr ? "\u0637\u0647\u064A \u0627\u0644\u0628\u064A\u0636 \u0628\u0627\u0644\u062D\u0631\u0627\u0631\u0629 (\u0633\u0644\u0642 \u0623\u0648 \u0642\u0644\u064A) \u064A\u0641\u0643\u0643 \u0628\u0631\u0648\u062A\u064A\u0646 \u0627\u0644\u0623\u0641\u064A\u062F\u064A\u0646 \u062A\u0645\u0627\u0645\u0627\u064B \u0648\u064A\u062C\u0639\u0644\u0647 \u0622\u0645\u0646\u0627\u064B \u0648\u0645\u063A\u0630\u064A\u0627\u064B." : "Cook egg whites thoroughly; heat denatures avidin completely.",
+      clinicalNote: isAr ? "\u0644\u0627 \u062A\u0634\u0631\u0628 \u0627\u0644\u0628\u064A\u0636 \u0627\u0644\u0646\u064A\u0621 \u0645\u0637\u0644\u0642\u0627\u064B \u0641\u064A \u0645\u0634\u0631\u0648\u0628\u0627\u062A \u0643\u0645\u0627\u0644 \u0627\u0644\u0623\u062C\u0633\u0627\u0645." : "Never ingest raw egg whites in bodybuilding smoothies."
     });
   }
-
-  // 9. High Fiber / Bran + Minerals (Antagonism)
   if (hasHighFiber && hasMinerals) {
     interactions.push({
-      id: 'fiber-minerals',
-      foodA: isAr ? 'النخالة والألياف المركزة (ردة القمح، بذور الشيا)' : 'Concentrated wheat bran & dietary fiber',
-      foodB: isAr ? 'المعادن الأساسية (الحديد، الزنك، الكالسيوم)' : 'Essential minerals (Iron, Zinc, Calcium)',
-      foodIconA: '🌾',
-      foodIconB: '💊',
-      type: 'antagonism',
-      typeLabel: isAr ? 'ارتباط بحمض الفايتيك ونقص امتصاص المعادن' : 'Phytate Chelation of Minerals',
-      severity: 'warning',
-      mechanism: isAr
-        ? 'حبوب النخالة غير المعالجة غنية بحمض الفايتيك (Phytic Acid) الذي يرتبط بالزنك والحديد والكالسيوم ويشكل معقدات غير ممتصة تخرج مع الفضلات.'
-        : 'Phytic acid in raw wheat bran chelates divalent minerals, depressing bioavailability.',
-      recommendation: isAr
-        ? 'افصل بين تناول مكملات المعادن أو وجبات اللحوم ونخالة القمح بساعتين، وتناول الخبز المخمر حيث تحطم الخميرة حمض الفايتيك.'
-        : 'Separate mineral supplements from raw bran by 2 hours. Yeast fermentation breaks down phytates.',
-      clinicalNote: isAr ? 'التخمير الطبيعي للخبز يكسر الفايتات ويحرر المعادن.' : 'Sourdough fermentation liberates bound minerals.'
+      id: "fiber-minerals",
+      foodA: isAr ? "\u0627\u0644\u0646\u062E\u0627\u0644\u0629 \u0648\u0627\u0644\u0623\u0644\u064A\u0627\u0641 \u0627\u0644\u0645\u0631\u0643\u0632\u0629 (\u0631\u062F\u0629 \u0627\u0644\u0642\u0645\u062D\u060C \u0628\u0630\u0648\u0631 \u0627\u0644\u0634\u064A\u0627)" : "Concentrated wheat bran & dietary fiber",
+      foodB: isAr ? "\u0627\u0644\u0645\u0639\u0627\u062F\u0646 \u0627\u0644\u0623\u0633\u0627\u0633\u064A\u0629 (\u0627\u0644\u062D\u062F\u064A\u062F\u060C \u0627\u0644\u0632\u0646\u0643\u060C \u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645)" : "Essential minerals (Iron, Zinc, Calcium)",
+      foodIconA: "\u{1F33E}",
+      foodIconB: "\u{1F48A}",
+      type: "antagonism",
+      typeLabel: isAr ? "\u0627\u0631\u062A\u0628\u0627\u0637 \u0628\u062D\u0645\u0636 \u0627\u0644\u0641\u0627\u064A\u062A\u064A\u0643 \u0648\u0646\u0642\u0635 \u0627\u0645\u062A\u0635\u0627\u0635 \u0627\u0644\u0645\u0639\u0627\u062F\u0646" : "Phytate Chelation of Minerals",
+      severity: "warning",
+      mechanism: isAr ? "\u062D\u0628\u0648\u0628 \u0627\u0644\u0646\u062E\u0627\u0644\u0629 \u063A\u064A\u0631 \u0627\u0644\u0645\u0639\u0627\u0644\u062C\u0629 \u063A\u0646\u064A\u0629 \u0628\u062D\u0645\u0636 \u0627\u0644\u0641\u0627\u064A\u062A\u064A\u0643 (Phytic Acid) \u0627\u0644\u0630\u064A \u064A\u0631\u062A\u0628\u0637 \u0628\u0627\u0644\u0632\u0646\u0643 \u0648\u0627\u0644\u062D\u062F\u064A\u062F \u0648\u0627\u0644\u0643\u0627\u0644\u0633\u064A\u0648\u0645 \u0648\u064A\u0634\u0643\u0644 \u0645\u0639\u0642\u062F\u0627\u062A \u063A\u064A\u0631 \u0645\u0645\u062A\u0635\u0629 \u062A\u062E\u0631\u062C \u0645\u0639 \u0627\u0644\u0641\u0636\u0644\u0627\u062A." : "Phytic acid in raw wheat bran chelates divalent minerals, depressing bioavailability.",
+      recommendation: isAr ? "\u0627\u0641\u0635\u0644 \u0628\u064A\u0646 \u062A\u0646\u0627\u0648\u0644 \u0645\u0643\u0645\u0644\u0627\u062A \u0627\u0644\u0645\u0639\u0627\u062F\u0646 \u0623\u0648 \u0648\u062C\u0628\u0627\u062A \u0627\u0644\u0644\u062D\u0648\u0645 \u0648\u0646\u062E\u0627\u0644\u0629 \u0627\u0644\u0642\u0645\u062D \u0628\u0633\u0627\u0639\u062A\u064A\u0646\u060C \u0648\u062A\u0646\u0627\u0648\u0644 \u0627\u0644\u062E\u0628\u0632 \u0627\u0644\u0645\u062E\u0645\u0631 \u062D\u064A\u062B \u062A\u062D\u0637\u0645 \u0627\u0644\u062E\u0645\u064A\u0631\u0629 \u062D\u0645\u0636 \u0627\u0644\u0641\u0627\u064A\u062A\u064A\u0643." : "Separate mineral supplements from raw bran by 2 hours. Yeast fermentation breaks down phytates.",
+      clinicalNote: isAr ? "\u0627\u0644\u062A\u062E\u0645\u064A\u0631 \u0627\u0644\u0637\u0628\u064A\u0639\u064A \u0644\u0644\u062E\u0628\u0632 \u064A\u0643\u0633\u0631 \u0627\u0644\u0641\u0627\u064A\u062A\u0627\u062A \u0648\u064A\u062D\u0631\u0631 \u0627\u0644\u0645\u0639\u0627\u062F\u0646." : "Sourdough fermentation liberates bound minerals."
     });
   }
-
-  return interactions.map(item => ({
+  return interactions.map((item) => ({
     ...item,
     foodAIcon: item.foodIconA,
     foodBIcon: item.foodIconB,
     effectType: item.type,
     severityLabel: item.typeLabel,
-    culinaryTip: item.clinicalNote,
+    culinaryTip: item.clinicalNote
   }));
 }
+export {
+  analyzeAllMedications,
+  cleanDrugToken,
+  evaluateFoodFoodInteractions,
+  evaluateFoodInteractions,
+  evaluatePair,
+  getMealInstructions,
+  identifyDrugClasses
+};

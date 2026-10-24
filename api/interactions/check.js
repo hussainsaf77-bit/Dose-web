@@ -169,9 +169,10 @@ Output strictly valid JSON with this structure:
     }
   }
 
-  // 2. Comprehensive Pharmacological Local Fallback Engine (Zero-Failure Guarantee)
+  // 2. Comprehensive Pharmacological Local Engine (Ground Truth Guarantee)
+  const localResult = analyzeAllMedications(drugList, lang);
+
   if (!mechanism) {
-    const localResult = analyzeAllMedications(drugList, lang);
     severity = localResult.severity;
     severityLabel = localResult.severityLabel;
     mechanism = localResult.mechanism;
@@ -179,6 +180,24 @@ Output strictly valid JSON with this structure:
     clinicalDetails = localResult.clinicalDetails;
     detectedInteractions = localResult.detectedInteractions;
     cumulativeRisks = localResult.cumulativeRisks;
+  } else {
+    // If Gemini evaluated the regimen, ensure it doesn't contradict a critical/warning local finding
+    if (localResult.severity === 'critical' && severity !== 'critical') {
+      severity = 'critical';
+      severityLabel = localResult.severityLabel;
+      mechanism = `${localResult.mechanism}\n\n${mechanism}`;
+      recommendation = `${localResult.recommendation}\n\n${recommendation}`;
+    } else if (localResult.severity === 'warning' && severity === 'safe') {
+      severity = 'warning';
+      severityLabel = localResult.severityLabel;
+      mechanism = localResult.mechanism;
+      recommendation = localResult.recommendation;
+    }
+
+    // Merge detected interactions
+    if (detectedInteractions.length === 0 && localResult.detectedInteractions.length > 0) {
+      detectedInteractions = localResult.detectedInteractions;
+    }
   }
 
   res.status(200).json({
@@ -194,9 +213,9 @@ Output strictly valid JSON with this structure:
     clinicalDetails,
     detectedInteractions,
     cumulativeRisks,
-    foodInteractions: evaluateFoodInteractions(drugList, lang),
-    foodFoodInteractions: evaluateFoodFoodInteractions(drugList, lang),
-    mealInstructions: getMealInstructions(drugList, lang),
+    foodInteractions: localResult.foodInteractions,
+    foodFoodInteractions: localResult.foodFoodInteractions,
+    mealInstructions: localResult.mealInstructions,
     disclaimerAr: '⚠️ إخلاء مسؤولية: هذا الفحص استرشادي صيدلاني للأغراض التثقيفية والسريرية، ولا يغني عن تقييم الطبيب المعالج.',
     disclaimerEn: '⚠️ Disclaimer: Clinical decision support tool for educational purposes only; does not replace medical consultation.'
   });

@@ -302,12 +302,12 @@ export function identifyDrugClasses(token: string): DrugClassMatch {
   if (
     t.includes('digoxin') || t.includes('ديجوكسين') || t.includes('lanoxin') || t.includes('لانوكسين')
   ) {
-    classes.push('digoxin', 'narrow_therapeutic_index', 'arrhythmia_risk');
+    classes.push('digoxin', 'cardiac_glycoside', 'narrow_therapeutic_index', 'arrhythmia_risk');
   }
 
   // 16. Amiodarone
   if (
-    t.includes('amiodarone') || t.includes('أميودارون') || t.includes('cordarone') || t.includes('كوردارون')
+    t.includes('amiodarone') || t.includes('اميودارون') || t.includes('أميودارون') || t.includes('cordarone') || t.includes('كوردارون')
   ) {
     classes.push('amiodarone', 'cyp_strong_inhibitor', 'pgp_inhibitor', 'qt_prolonging', 'bradycardia_risk');
   }
@@ -452,13 +452,15 @@ export function identifyDrugClasses(token: string): DrugClassMatch {
     name = 'ميترونيدازول (Flagyl / Metronidazole)';
   }
 
-  // 27.5. Cotrimoxazole (Bactrim / Septra)
+  // 27.5. Cotrimoxazole (Bactrim / Septra / Septazole)
   if (
     t.includes('bactrim') || t.includes('باكتريم') || t.includes('septra') || t.includes('سبترا') ||
-    t.includes('cotrimoxazol') || t.includes('كوتريموكسازول') || t.includes('trimethoprim') || t.includes('تريميثوبريم')
+    t.includes('cotrimoxazol') || t.includes('كوتريموكسازول') || t.includes('trimethoprim') || t.includes('تريميثوبريم') ||
+    t.includes('sulfamethoxazol') || t.includes('سلفاميثوكسازول') || t.includes('septazole') || t.includes('سيبتازول') ||
+    t.includes('septrin') || t.includes('سيبترين') || t.includes('chemotrim') || t.includes('كيموتريم')
   ) {
-    classes.push('cotrimoxazole', 'cyp2c9_inhibitor', 'hyperkalemia_risk');
-    name = 'باكتريم (Bactrim / Septra)';
+    classes.push('cotrimoxazole', 'cyp2c9_inhibitor', 'hyperkalemia_risk', 'potassium_sparing', 'sulfonamide');
+    name = 'باكتريم (Bactrim / Cotrimoxazole)';
   }
 
   // 28. Alcohol
@@ -1112,46 +1114,153 @@ export function analyzeAllMedications(tokens: string[], lang: 'ar' | 'en' = 'ar'
     cumulativeRisks.push(isAr ? 'خطر إجهاد وزيادة الحمل الكلوي التراكمي' : 'Cumulative nephrotoxicity risk');
   }
 
-  // Calculate overall severity
+  // Evaluate dietary and meal guidance across tokens
+  const foodInteractions = evaluateFoodInteractions(cleanTokens, lang);
+  const foodFoodInteractions = evaluateFoodFoodInteractions(cleanTokens, lang);
+  const mealInstructions = getMealInstructions(cleanTokens, lang);
+
+  // Detect if any food category in foodInteractions is explicitly named in the user input tokens
+  const matchesDietaryCategory = (token: string, fi: DrugFoodInteraction) => {
+    const t = cleanDrugToken(token);
+    const id = fi.id.toLowerCase();
+    // 1. Tyramine (must precede general dairy so aged cheese matches tyramine)
+    if (t.includes('تيرامين') || t.includes('معتق') || t.includes('قديم') || t.includes('tyramine') || t.includes('صلصه الصويا') || t.includes('مخلل')) {
+      return id.includes('tyramine');
+    }
+    // 2. Vitamin K
+    if (t.includes('سبانخ') || t.includes('سلق') || t.includes('ملوخي') || t.includes('بروكلي') || t.includes('ورقي') || t.includes('خس') || t.includes('spinach') || t.includes('kale') || t.includes('vitk') || t.includes('فيتامين k') || t.includes('فيتامين ك')) {
+      return id.includes('vitk');
+    }
+    // 3. Dairy / Calcium
+    if (t.includes('حليب') || t.includes('لبن') || t.includes('زبادي') || t.includes('جبن') || t.includes('اجبان') || t.includes('milk') || t.includes('dairy') || t.includes('كالسيوم') || t.includes('calcium')) {
+      return id.includes('dairy') || id.includes('calcium');
+    }
+    // 4. Grapefruit
+    if (t.includes('جريب') || t.includes('فروت') || t.includes('بوملي') || t.includes('grapefruit') || t.includes('pomelo')) {
+      return id.includes('grapefruit');
+    }
+    // 5. Coffee / Caffeine
+    if (t.includes('شاي') || t.includes('قهوه') || t.includes('كافيين') || t.includes('نسكافيه') || t.includes('منبه') || t.includes('tea') || t.includes('coffee') || t.includes('caffeine')) {
+      return id.includes('caffeine') || id.includes('tea') || id.includes('coffee');
+    }
+    // 6. Licorice / Glycyrrhizin
+    if (t.includes('سوس') || t.includes('عرق') || t.includes('licorice') || t.includes('عرقسوس')) {
+      return id.includes('licorice');
+    }
+    // 7. Alcohol
+    if (t.includes('كحول') || t.includes('خمر') || t.includes('نبيذ') || t.includes('alcohol') || t.includes('ethanol') || t.includes('wine')) {
+      return id.includes('alcohol');
+    }
+    // 8. Potassium / Salt Substitutes
+    if (t.includes('ملح') || t.includes('بوتاسيوم') || t.includes('salt') || t.includes('kcl') || t.includes('بداءل') || t.includes('بدائل') || t.includes('بديل')) {
+      return id.includes('salt') || id.includes('potassium');
+    }
+    return false;
+  };
+
+  const directFoodCollisions = foodInteractions.filter(fi =>
+    cleanTokens.some(token => matchesDietaryCategory(token, fi))
+  );
+
+  // Calculate overall severity across all interaction categories
   let severity: 'critical' | 'warning' | 'minor' | 'safe' = 'safe';
   let severityLabel = '';
   let mechanism = '';
   let recommendation = '';
   let clinicalDetails = '';
 
-  const hasCritical = detectedInteractions.some(i => i.severity === 'critical');
-  const hasWarning = detectedInteractions.some(i => i.severity === 'warning');
-  const hasMinor = detectedInteractions.some(i => i.severity === 'minor');
+  const hasCriticalDrug = detectedInteractions.some(i => i.severity === 'critical');
+  const hasWarningDrug = detectedInteractions.some(i => i.severity === 'warning');
+  const hasMinorDrug = detectedInteractions.some(i => i.severity === 'minor');
 
-  if (hasCritical) {
+  const hasCriticalDirectFood = directFoodCollisions.some(i => i.severity === 'critical');
+  const hasWarningDirectFood = directFoodCollisions.some(i => i.severity === 'warning');
+
+  const hasCriticalFoodFood = foodFoodInteractions.some(i => i.severity === 'critical');
+  const hasWarningFoodFood = foodFoodInteractions.some(i => i.severity === 'warning');
+  const hasSynergyFoodFood = foodFoodInteractions.some(i => i.severity === 'beneficial' || i.type === 'synergy' || (i as any).effectType === 'synergy');
+
+  // 1. CRITICAL PRIORITY (Drug-Drug, Direct Drug-Food, or Food-Food)
+  if (hasCriticalDrug || hasCriticalDirectFood || hasCriticalFoodFood) {
     severity = 'critical';
-    severityLabel = isAr 
-      ? `🔴 تعارضات حرجة يحظر الجمع بينها (${detectedInteractions.length} تعارض مرصود)` 
-      : `🔴 Critical Contraindication Detected (${detectedInteractions.length} interactions)`;
-    mechanism = isAr
-      ? `تم رصد تعارضات سريرية شديدة الخطورة تهدد سلامة المريض (تؤثر على النزيف، الدورة الدموية، إنزيمات الكبد أو كهربائية القلب). التفاصيل السريرية مذكورة في بطاقات التعارض أدناه.`
-      : 'Severe clinical interactions detected that pose life-threatening hazards (bleeding, hemodynamic collapse, or fatal arrhythmia).';
-    recommendation = isAr
-      ? 'يجب مراجعة الطبيب المعالج أو الصيدلاني فوراً لإيقاف أو استبدال الأدوية المتعارضة بالبدائل الآمنة الموضحة.'
-      : 'Immediate physician/pharmacist intervention required to discontinue or substitute contraindicated medications.';
-    clinicalDetails = isAr
-      ? 'المؤشرات العاجلة للمراقبة: ضغط الدم، تخطيط القلب، صورة الدم الكاملة CBC، علامات النزيف، وظائف الكلى.'
-      : 'Monitor BP, ECG, CBC, bleeding signs, and renal function.';
-  } else if (hasWarning) {
+    if (hasCriticalDrug) {
+      severityLabel = isAr 
+        ? `🔴 تعارضات حرجة يحظر الجمع بينها (${detectedInteractions.length} تعارض مرصود)` 
+        : `🔴 Critical Contraindication Detected (${detectedInteractions.length} interactions)`;
+      mechanism = isAr
+        ? `تم رصد تعارضات سريرية شديدة الخطورة تهدد سلامة المريض (تؤثر على النزيف، الدورة الدموية، إنزيمات الكبد أو كهربائية القلب). التفاصيل السريرية مذكورة في بطاقات التعارض أدناه.`
+        : 'Severe clinical interactions detected that pose life-threatening hazards (bleeding, hemodynamic collapse, or fatal arrhythmia).';
+      recommendation = isAr
+        ? 'يجب مراجعة الطبيب المعالج أو الصيدلاني فوراً لإيقاف أو استبدال الأدوية المتعارضة بالبدائل الآمنة الموضحة.'
+        : 'Immediate physician/pharmacist intervention required to discontinue or substitute contraindicated medications.';
+      clinicalDetails = isAr
+        ? 'المؤشرات العاجلة للمراقبة: ضغط الدم، تخطيط القلب، صورة الدم الكاملة CBC، علامات النزيف، وظائف الكلى.'
+        : 'Monitor BP, ECG, CBC, bleeding signs, and renal function.';
+    } else if (hasCriticalDirectFood) {
+      const f = directFoodCollisions.find(i => i.severity === 'critical')!;
+      severityLabel = isAr
+        ? `🔴 تعارض دوائي - غذائي حرج (${f.affectedDrug} مع ${f.foodCategory.split('(')[0].trim()})`
+        : `🔴 Critical Drug-Food Collision (${f.affectedDrug} + ${f.foodCategoryEn})`;
+      mechanism = f.mechanism;
+      recommendation = f.recommendation;
+      clinicalDetails = `${f.clinicalNote} | ${f.dietaryAdvice}`;
+    } else {
+      const ff = foodFoodInteractions.find(i => i.severity === 'critical')!;
+      severityLabel = isAr
+        ? `🔴 تعارض غذائي حرج: ${ff.typeLabel}`
+        : `🔴 Critical Food-Food Interaction: ${ff.typeLabel}`;
+      mechanism = ff.mechanism;
+      recommendation = ff.recommendation;
+      clinicalDetails = ff.clinicalNote;
+    }
+  } 
+  // 2. WARNING PRIORITY (Drug-Drug, Direct Drug-Food, or Food-Food)
+  else if (hasWarningDrug || hasWarningDirectFood || hasWarningFoodFood) {
     severity = 'warning';
-    severityLabel = isAr 
-      ? `🟠 تعارضات متوسطة تتطلب الحذر والمباعدة (${detectedInteractions.length} تعارض)` 
-      : `🟠 Moderate Interactions Detected (${detectedInteractions.length} interactions)`;
-    mechanism = isAr
-      ? 'تم رصد تعارضات دوائية تؤثر على الامتصاص المعوي، استقلاب الإنزيمات أو شوارد الدم. تتطلب الخطة مباعدة زمنية بالساعات أو مراقبة مخبرية دورية.'
-      : 'Interactions affecting bioavailability, metabolism, or electrolytes identified. Dose separation and monitoring required.';
-    recommendation = isAr
-      ? 'افصل بين الأدوية بـ ساعتين إلى 4 ساعات بحسب التوصية السريرية، والتزم بالفحوصات المخبرية الدورية.'
-      : 'Separate medication administration by 2 to 4 hours as indicated and conduct routine lab tests.';
-    clinicalDetails = isAr
-      ? 'المؤشرات للمتابعة: قياسات السكر، وظائف الكبد والكلى، شوارد البوتاسيوم والصوديوم.'
-      : 'Monitor blood glucose, renal/hepatic panels, and serum electrolytes.';
-  } else if (hasMinor) {
+    if (hasWarningDrug) {
+      severityLabel = isAr 
+        ? `🟠 تعارضات متوسطة تتطلب الحذر والمباعدة (${detectedInteractions.length} تعارض)` 
+        : `🟠 Moderate Interactions Detected (${detectedInteractions.length} interactions)`;
+      mechanism = isAr
+        ? 'تم رصد تعارضات دوائية تؤثر على الامتصاص المعوي، استقلاب الإنزيمات أو شوارد الدم. تتطلب الخطة مباعدة زمنية بالساعات أو مراقبة مخبرية دورية.'
+        : 'Interactions affecting bioavailability, metabolism, or electrolytes identified. Dose separation and monitoring required.';
+      recommendation = isAr
+        ? 'افصل بين الأدوية بـ ساعتين إلى 4 ساعات بحسب التوصية السريرية، والتزم بالفحوصات المخبرية الدورية.'
+        : 'Separate medication administration by 2 to 4 hours as indicated and conduct routine lab tests.';
+      clinicalDetails = isAr
+        ? 'المؤشرات للمتابعة: قياسات السكر، وظائف الكبد والكلى، شوارد البوتاسيوم والصوديوم.'
+        : 'Monitor blood glucose, renal/hepatic panels, and serum electrolytes.';
+    } else if (hasWarningDirectFood) {
+      const f = directFoodCollisions.find(i => i.severity === 'warning')!;
+      severityLabel = isAr
+        ? `🟠 تعارض دوائي - غذائي هام (${f.affectedDrug} مع ${f.foodCategory.split('(')[0].trim()})`
+        : `🟠 Moderate Drug-Food Interaction (${f.affectedDrug} + ${f.foodCategoryEn})`;
+      mechanism = f.mechanism;
+      recommendation = f.recommendation;
+      clinicalDetails = `${f.clinicalNote} | ${f.dietaryAdvice}`;
+    } else {
+      const ff = foodFoodInteractions.find(i => i.severity === 'warning')!;
+      severityLabel = isAr
+        ? `🟠 تداخل غذائي هام: ${ff.typeLabel}`
+        : `🟠 Dietary Interaction Warning: ${ff.typeLabel}`;
+      mechanism = ff.mechanism;
+      recommendation = ff.recommendation;
+      clinicalDetails = ff.clinicalNote;
+    }
+  } 
+  // 3. BENEFICIAL SYNERGY (Food-Food synergy e.g. Iron + Vit C, Calcium + Vit D, Olive Oil + Carrots)
+  else if (hasSynergyFoodFood && detectedInteractions.length === 0 && directFoodCollisions.length === 0) {
+    severity = 'safe';
+    const ff = foodFoodInteractions.find(i => i.severity === 'beneficial' || i.type === 'synergy' || (i as any).effectType === 'synergy')!;
+    severityLabel = isAr
+      ? `🟢 تآزر غذائي علاجي مفيد ومثمر (${ff.typeLabel})`
+      : `🟢 Highly Beneficial Dietary Synergy (${ff.typeLabel})`;
+    mechanism = ff.mechanism;
+    recommendation = ff.recommendation;
+    clinicalDetails = ff.clinicalNote;
+  }
+  // 4. MINOR DRUG INTERACTIONS
+  else if (hasMinorDrug) {
     severity = 'minor';
     severityLabel = isAr 
       ? '🟡 تداخلات طفيفة (آمن مع التوجيه السريري)' 
@@ -1162,16 +1271,21 @@ export function analyzeAllMedications(tokens: string[], lang: 'ar' | 'en' = 'ar'
     recommendation = isAr
       ? 'التزم بمواعيد الدواء المحددة واستشر الصيدلاني عند ظهور أي أعراض جديدة.'
       : 'Maintain scheduled dosing and report unexpected changes.';
-  } else {
+    clinicalDetails = isAr
+      ? 'المتابعة الروتينية كافية دون الحاجة لتغيير الخطة العلاجية.'
+      : 'Routine clinical monitoring is sufficient.';
+  } 
+  // 5. CLINICALLY SAFE
+  else {
     severity = 'safe';
     severityLabel = isAr 
-      ? '🟢 آمن سريرياً (لا يوجد تعارض حرج مسجل بين هذه الأدوية)' 
+      ? '🟢 آمن سريرياً (لا يوجد تعارض حرج مسجل بين هذه المواد)' 
       : '🟢 Clinically Safe (No Known Adverse Interactions)';
     mechanism = isAr
-      ? `تم فحص كافة التداخلات بين (${cleanTokens.join(' + ')}). لا يوجد تعارض استقلابي إنزيمي أو تضاد دوائي سلبي مسجل في المراجع الصيدلانية السريرية المعتمدة.`
+      ? `تم فحص كافة التداخلات بين (${cleanTokens.join(' + ')}). لا يوجد تعارض استقلابي إنزيمي أو تضاد دوائي أو غذائي سلبي مسجل في المراجع الصيدلانية السريرية المعتمدة.`
       : `All pairwise pathways checked for (${cleanTokens.join(' + ')}). No pharmacokinetic or pharmacodynamic contraindications identified.`;
     recommendation = isAr
-      ? 'يمكن تناول الأدوية بأمان مع الالتزام بالفصل المعتاد بساعة إلى ساعتين بين العلاجات الفموية المختلفة لضمان الامتصاص الأمثل.'
+      ? 'يمكن تناول المواد بأمان مع الالتزام بالفصل المعتاد بساعة إلى ساعتين بين العلاجات الفموية المختلفة لضمان الامتصاص الأمثل.'
       : 'Medications can be taken safely with standard 1-2 hour oral spacing for optimal bioavailability.';
     clinicalDetails = isAr
       ? 'نصيحة الصيدلاني: استشر طبيبك دائماً قبل إضافة أي أعشاب أو مكملات غذائية للخطة العلاجية.'
@@ -1188,9 +1302,9 @@ export function analyzeAllMedications(tokens: string[], lang: 'ar' | 'en' = 'ar'
     detectedInteractions,
     cumulativeRisks,
     analyzedDrugs: cleanTokens,
-    foodInteractions: evaluateFoodInteractions(cleanTokens, lang),
-    foodFoodInteractions: evaluateFoodFoodInteractions(cleanTokens, lang),
-    mealInstructions: getMealInstructions(cleanTokens, lang)
+    foodInteractions,
+    foodFoodInteractions,
+    mealInstructions
   };
 }
 
@@ -1743,12 +1857,12 @@ export function evaluateFoodFoodInteractions(tokens: string[], lang: 'ar' | 'en'
 
   const hasSaltSubstitute = tokens.some(t => {
     const c = cleanDrugToken(t);
-    return c.includes('بديل ملح') || c.includes('بدائل الملح') || c.includes('ملح دايت') || c.includes('ملح بوتاسيوم') || c.includes('diet salt') || c.includes('salt substitute');
+    return c.includes('بداءل') || c.includes('بدائل') || c.includes('بديل') || c.includes('ملح دايت') || c.includes('ملح بوتاسيوم') || c.includes('diet salt') || c.includes('salt substitute') || c.includes('kcl');
   });
 
   const hasRawEgg = tokens.some(t => {
     const c = cleanDrugToken(t);
-    return c.includes('بياض بيض') || c.includes('بيض ني') || c.includes('raw egg') || c.includes('افيدين');
+    return (c.includes('بيض') && (c.includes('بياض') || c.includes('ني'))) || c.includes('raw egg') || c.includes('افيدين') || c.includes('avidin');
   });
 
   const hasBiotin = tokens.some(t => {
