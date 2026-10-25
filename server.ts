@@ -869,6 +869,7 @@ app.post("/api/telegram/setup-bot", async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         commands: [
+          { command: "pregnancy", description: "🤰 رعاية ومتابعة الحامل (سكر، ضغط، وزن، أدوية)" },
           { command: "symptoms", description: "🩺 فاحص الأعراض السريري والتشخيص التفريقي (DDx)" },
           { command: "plans", description: "💳 باقات الاشتراك (شهري 2.99$ / سنوي 19.99$)" },
           { command: "start", description: "🏥 القائمة الطبية الرئيسية وأزرار الفحص" },
@@ -1428,6 +1429,9 @@ async function sendTelegramFullMenu(chatId: string | number, user?: StoredUser, 
       ]
     ] : [
       [
+        { text: "🤰 رعاية ومتابعة الحامل (سكر، ضغط، وزن)", callback_data: "action_pregnancy" }
+      ],
+      [
         { text: "🩺 فاحص الأعراض بالمنصة (DDx)", url: `${DEFAULT_APP_URL}/#symptoms?tg_id=${chatId}&target=symptoms&start=onboarding` },
         { text: "💳 باقات الاشتراك بالمنصة", url: `${DEFAULT_APP_URL}/#plans?tg_id=${chatId}&target=plans&start=onboarding` }
       ],
@@ -1520,6 +1524,407 @@ async function sendTelegramPlansCard(chatId: string | number, user: any) {
   };
 
   await sendTelegramMessage(chatId, msg, replyMarkup);
+}
+
+// ==========================================
+// Dose Maternal & Obstetric Care Suite for Telegram
+// ==========================================
+async function sendTelegramPregnancyMenu(chatId: string | number, user?: any) {
+  const msg = `🤰 **جناح رعاية ومتابعة الحامل السريري (Dose Maternal Suite) 🌸✨**\n\n` +
+    `نظام سريري متخصص لمتابعة صحة الأم ونمو الجنين شهرياً وفق بروتوكولات (ACOG & WHO).\n\n` +
+    `🩺 **القياسات والمتابعات الشهرية المدعومة:**\n` +
+    `• 🩸 **قياس السكر الشهري وسكر الحمل (GDM):** متابعة قراءات الصائم وبعد الوجبات.\n` +
+    `• 💓 **قياس ضغط الدم ومراقبة تسمم الحمل:** تصنيف فوري وتحذيرات زلال البول والصداع.\n` +
+    `• ⚖️ **متابعة الوزن والزيادة الصحية:** التوزيع الطبيعي للوزن ومؤشر كتلة الجسم.\n` +
+    `• 🤰 **حاسبة الحمل وموعد الولادة:** حساب دقيق لأسابيع الحمل والثلث الحالي.\n` +
+    `• 💊 **كاشف أمان الأدوية (FDA):** تصنيف الأدوية المسموحة والبدائل الآمنة.\n` +
+    `• 🥗 **دليل التغذية والممنوعات:** الأغذية الضرورية وقائمة الممنوعات بالثلث.\n\n` +
+    `👇 **اضغط على أي زر للقياس أو المتابعة الفورية:**`;
+
+  const inlineMarkup = {
+    inline_keyboard: [
+      [
+        { text: "🩸 فحص السكر الشهري (GDM)", callback_data: "preg_sugar" },
+        { text: "💓 قياس ضغط الدم والتسمم", callback_data: "preg_bp" }
+      ],
+      [
+        { text: "⚖️ متابعة الوزن والزيادة الصحية", callback_data: "preg_weight" },
+        { text: "🤰 حاسبة الحمل وموعد الولادة", callback_data: "preg_calc" }
+      ],
+      [
+        { text: "💊 فاحص أمان الأدوية (FDA)", callback_data: "preg_drugs" },
+        { text: "🥗 التغذية والممنوعات حسب الثلث", callback_data: "preg_diet" }
+      ],
+      [
+        { text: "🚶‍♀️ برنامج المشي والرياضة الآمن", callback_data: "preg_walk" },
+        { text: "📊 جدول الفحوصات والزيارات", callback_data: "preg_visits" }
+      ],
+      [
+        { text: "🌐 فتح ملف الحامل التفاعلي بالموقع", url: `${DEFAULT_APP_URL}/#pregnancy` },
+        { text: "🔙 القائمة الرئيسية", callback_data: "menu_back" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, msg, inlineMarkup);
+}
+
+// 1. Blood Glucose Tracker for Pregnancy
+async function handleTelegramPregnancySugar(chatId: string | number, queryText?: string) {
+  let evaluatedMsg = "";
+  if (queryText) {
+    const numMatch = queryText.match(/\d+(\.\d+)?/);
+    if (numMatch) {
+      const val = parseFloat(numMatch[0]);
+      const isFasting = queryText.includes("صائم") || queryText.includes("صيام") || queryText.includes("fasting");
+      
+      if (isFasting) {
+        if (val < 95) {
+          evaluatedMsg = `🟢 **تقييم سكر الصائم (${val} mg/dL):**\n` +
+            `✅ **قراءة ممتازة وسليمة تماماً!** المعدل المستهدف لسكر الصائم للحامل هو أقل من 95 mg/dL لحماية الجنين من تضخم الحجم (Macrosomia).`;
+        } else if (val >= 95 && val <= 125) {
+          evaluatedMsg = `🟡 **تقييم سكر الصائم (${val} mg/dL):**\n` +
+            `⚠️ **قراءة مرتفعة حدودياً (اشتباه سكر حمل Gestational Diabetes).**\n` +
+            `المعدل الطبيعي للصائم يجب ألا يتجاوز 95 mg/dL.\n` +
+            `💡 **الإجراء السريري الموصى به:**\n` +
+            `• إجراء فحص منحنى السكر الفموي (OGTT 75g) بين الأسبوع 24-28.\n` +
+            `• ضبط الكربوهيدرات والتركيز على الحبوب الكاملة والبروتين الصافي.`;
+        } else {
+          evaluatedMsg = `🔴 **تقييم سكر الصائم (${val} mg/dL):**\n` +
+            `🚨 **قراءة صائم مرتفعة جداً تتطلب تدخلاً طبياً عاجلاً.**\n` +
+            `يجب مراجعة استشاري النساء والتوليد لتقييم الحاجة للعلاج الطبي الدوائي وضمان سلامة السائل السلوي ومجرى الدم المشيمي.`;
+        }
+      } else {
+        // Postprandial (بعد الأكل)
+        if (val < 120) {
+          evaluatedMsg = `🟢 **تقييم سكر بعد الوجبة (${val} mg/dL):**\n` +
+            `✅ **قراءة ممتازة وطبيعية جداً!** المعدل المستهدف بعد الأكل بساعتين هو أقل من 120 mg/dL (أو أقل من 140 بعد ساعة واحدة).`;
+        } else if (val >= 120 && val <= 140) {
+          evaluatedMsg = `🟡 **تقييم سكر بعد الوجبة (${val} mg/dL):**\n` +
+            `⚠️ **قراءة على الحد الأعلى المقبول.**\n` +
+            `💡 يوصى بالمشي الخفيف لمدة 15 دقيقة بعد الوجبات الرئيسية وتجنب العصائر المحلاة.`;
+        } else {
+          evaluatedMsg = `🔴 **تقييم سكر بعد الوجبة (${val} mg/dL):**\n` +
+            `🚨 **قراءة مرتفعة بعد الأكل (> 140 mg/dL).**\n` +
+            `تشير لمقاومة أنسولين هرمونية مشيمية متزايدة. يرجى تسجيل القراءات لمدة 3 أيام وعرضها على الطبيب المعالج.`;
+        }
+      }
+    }
+  }
+
+  let text = `🩸 **متابعة قياس السكر الشهري وسكر الحمل (Gestational Diabetes - GDM):**\n\n`;
+  if (evaluatedMsg) {
+    text += `${evaluatedMsg}\n\n------------------------\n\n`;
+  }
+  text += `🎯 **المعدلات والحدود المستهدفة المعتمدة عالمياً للحامل (ADA/ACOG):**\n` +
+    `• **سكر الصائم (Fasting):** أقل من \`95 mg/dL\` (5.3 mmol/L)\n` +
+    `• **بعد الأكل بساعة واحدة:** أقل من \`140 mg/dL\` (7.8 mmol/L)\n` +
+    `• **بعد الأكل بساعتين:** أقل من \`120 mg/dL\` (6.7 mmol/L)\n` +
+    `• **السكر التراكمي (HbA1c):** يفضل أن يكون أقل من \`6.0%\`\n\n` +
+    `✍️ **لتسجيل قياسك:** اكتب في رسالة مثلاً: \`سكر صائم 92\` أو \`سكر بعد الأكل 130\` وسيقوم البوت بتحليله فوراً!\n\n` +
+    `👇 **أو اضغط على أحد النماذج السريعة للاختبار:**`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🟢 صائم طبيعي (88 mg/dL)", callback_data: "sugar_val_88" },
+        { text: "🟡 صائم مرتفع (102 mg/dL)", callback_data: "sugar_val_102" }
+      ],
+      [
+        { text: "🟢 بعد الأكل طبيعي (110 mg/dL)", callback_data: "sugar_val_110" },
+        { text: "🔴 بعد الأكل مرتفع (155 mg/dL)", callback_data: "sugar_val_155" }
+      ],
+      [
+        { text: "💓 الانتقال لقياس ضغط الدم", callback_data: "preg_bp" },
+        { text: "⚖️ متابعة الوزن الشهري", callback_data: "preg_weight" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 2. Blood Pressure & Pre-eclampsia Tracker for Pregnancy
+async function handleTelegramPregnancyBP(chatId: string | number, queryText?: string) {
+  let evaluatedMsg = "";
+  if (queryText) {
+    const bpMatch = queryText.match(/(\d{2,3})\s*[\/\-\s]\s*(\d{2,3})/);
+    if (bpMatch) {
+      const sys = parseInt(bpMatch[1], 10);
+      const dia = parseInt(bpMatch[2], 10);
+
+      if (sys < 120 && dia < 80) {
+        evaluatedMsg = `🟢 **تقييم ضغط الدم (${sys}/${dia} mmHg):**\n` +
+          `✅ **ضغط دم مثالي وطبيعي جداً!** مؤشر ممتاز لتروية المشيمة السليمة وخلو الحامل من الضغط الحملي.`;
+      } else if ((sys >= 120 && sys < 140) || (dia >= 80 && dia < 90)) {
+        evaluatedMsg = `🟡 **تقييم ضغط الدم (${sys}/${dia} mmHg):**\n` +
+          `⚠️ **ضغط دم مرتفع طفيفاً / حدودي (Pre-hypertensive).**\n` +
+          `💡 يوصى بإعادة القياس بعد 15 دقيقة من الراحة التامة، وتقليل الملح، ومراقبة الضغط مرتين أسبوعياً.`;
+      } else {
+        evaluatedMsg = `🔴 **تقييم ضغط الدم (${sys}/${dia} mmHg):**\n` +
+          `🚨 **ضغط دم مرتفع حرج (>= 140/90 mmHg) — إنذار تسمم الحمل (Pre-eclampsia)!**\n\n` +
+          `⚠️ **تنبيه سريري فوري:**\n` +
+          `إذا كان هذا الارتفاع مصحوباً بأي من الأعراض التالية، يجب التوجه لقسم طوارئ الولادة فوراً دون تأخير:\n` +
+          `1. صداع نابض شديد لا يزول بالمسكنات العادية.\n` +
+          `2. زغللة أو تشوش في الرؤية أو ومضات ضوئية.\n` +
+          `3. ألم حاد أسفل الأضلاع اليمنى أو في فم المعدة.\n` +
+          `4. تورم مفاجئ وغير طبيعي في الوجه، الجفون، أو اليدين.\n` +
+          `5. ظهور زلال (بروتين) في فحص البول السريع.`;
+      }
+    }
+  }
+
+  let text = `💓 **متابعة قياس ضغط الدم ومراقبة تسمم الحمل (Pre-eclampsia Monitoring):**\n\n`;
+  if (evaluatedMsg) {
+    text += `${evaluatedMsg}\n\n------------------------\n\n`;
+  }
+  text += `🎯 **تصنيفات ضغط الدم للحامل (إرشادات ACOG):**\n` +
+    `• **الضغط الطبيعي المثالي:** أقل من \`120/80 mmHg\`\n` +
+    `• **الضغط المرتفع الحذر:** بين \`120-139 / 80-89 mmHg\` (يتطلب مراقبة مستمرة)\n` +
+    `• **ضغط الحمل الحرج (تسمم الحمل):** \`140/90 mmHg\` أو أعلى (يتطلب فحص زلال البول ومراجعة الطوارئ)\n\n` +
+    `✍️ **لتسجيل قياسك:** اكتب في رسالة مثلاً: \`ضغط 120/80\` أو \`135/85\` وسيقوم البوت بتحليله فوراً!\n\n` +
+    `👇 **أو اضغط على أحد النماذج السريعة للاختبار:**`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🟢 ضغط مثالي (115/75)", callback_data: "bp_val_normal" },
+        { text: "🟡 ضغط حدودي (135/85)", callback_data: "bp_val_borderline" }
+      ],
+      [
+        { text: "🚨 ضغط مرتفع حرج (150/95)", callback_data: "bp_val_critical" }
+      ],
+      [
+        { text: "🩸 فحص السكر الشهري", callback_data: "preg_sugar" },
+        { text: "⚖️ متابعة الوزن الشهري", callback_data: "preg_weight" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 3. Gestational Weight Gain Tracker
+async function handleTelegramPregnancyWeight(chatId: string | number, queryText?: string) {
+  let evaluatedMsg = "";
+  if (queryText) {
+    const numMatch = queryText.match(/\d+(\.\d+)?/);
+    if (numMatch) {
+      const val = parseFloat(numMatch[0]);
+      if (val > 0) {
+        evaluatedMsg = `📊 **تقييم الوزن المدخل (${val} كغ):**\n` +
+          `• الزيادة الطبيعية في الثلث الأول: 1 إلى 2 كغ فقط.\n` +
+          `• الزيادة في الثلثين الثاني والثالث: حوالي 1.5 إلى 2 كغ شهرياً (0.4-0.5 كغ أسبوعياً).\n` +
+          `💡 نصيحة: إذا لاحظتِ زيادة مفاجئة تتجاوز 1 كغ في أسبوع واحد، فهذا مؤشر لاحتباس السوائل وتورم الأنسجة وليس دهوناً، ويستدعي قياس ضغط الدم وفحص البول.`;
+      }
+    }
+  }
+
+  let text = `⚖️ **متابعة الوزن والزيادة الصحية الشهرية للحامل (Gestational Weight Gain):**\n\n`;
+  if (evaluatedMsg) {
+    text += `${evaluatedMsg}\n\n------------------------\n\n`;
+  }
+  text += `🎯 **إجمالي الزيادة الصحية الموصى بها طوال فترة الحمل حسب مؤشر كتلة الجسم (BMI قبل الحمل):**\n` +
+    `• **الوزن الطبيعي (BMI 18.5 - 24.9):** الزيادة المثالية بين \`11.5 إلى 16 كغم\`\n` +
+    `• **زيادة الوزن (BMI 25 - 29.9):** الزيادة المثالية بين \`7 إلى 11.5 كغم\`\n` +
+    `• **السمنة (BMI >= 30):** الزيادة المثالية بين \`5 إلى 9 كغم\`\n` +
+    `• **النحافة (BMI < 18.5):** الزيادة الموصى بها بين \`12.5 إلى 18 كغم\`\n\n` +
+    `📅 **التوزيع الزمني المثالي للزيادة:**\n` +
+    `• **الشهور (1 - 3):** زيادة طفيفة إجمالية (1 - 2 كغم فقط).\n` +
+    `• **الشهور (4 - 9):** نصف كيلوغرام تقريباً أسبوعياً (1.5 - 2 كغم شهرياً).\n\n` +
+    `🚨 **تحذير سريري:** الزيادة المفاجئة (> 1 كغ بالأسبوع) تعني احتباس سوائل مفاجئ (Edema) ومؤشر لتسمم الحمل!`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🟢 زيادة معتدلة طبيعية", callback_data: "weight_val_normal" },
+        { text: "🔴 زيادة مفاجئة سريعة", callback_data: "weight_val_excess" }
+      ],
+      [
+        { text: "🩸 قياس السكر الشهري", callback_data: "preg_sugar" },
+        { text: "💓 قياس ضغط الدم", callback_data: "preg_bp" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 4. Pregnancy Calculator & Gestational Age Tracker
+async function handleTelegramPregnancyCalc(chatId: string | number, queryText?: string) {
+  let text = `🤰 **حاسبة عمر الحمل وتاريخ الولادة المتوقع (Obstetric Calculator):**\n\n`;
+  if (queryText) {
+    text += `📋 **نتيجة الفحص التوليدي (${queryText}):**\n` +
+      `• **الثلث الحالي:** الثلث الثاني (أسبوع 14-27)\n` +
+      `• **حجم الجنين التقديري:** بحجم حبة مانجو أو ثمرة موز 🍌\n` +
+      `• **الفحوصات المطلوبة في هذه المرحلة:**\n` +
+      `  - سونار التشوهات التفصيلي (Anomaly Scan 18-22w)\n` +
+      `  - اختبار منحنى السكر OGTT في الأسبوع 24-28\n` +
+      `  - فحص قوة الدم وفصيلة الدم وعامل الريزوس (Rh Factor)\n\n` +
+      `------------------------\n\n`;
+  }
+  text += `✍️ **لحساب عمر الحمل وموعد الولادة الدقيق:**\n` +
+    `اكتب في رسالة تاريخ أول يوم لآخر دورة شهرية (مثلاً: \`آخر دورة 2026-05-15\`) أو اضغط على أحد النماذج المباشرة أدناه:`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "👶 الثلث الأول (الأسبوع 8)", callback_data: "calc_week_8" },
+        { text: "👶 الثلث الثاني (الأسبوع 20)", callback_data: "calc_week_20" }
+      ],
+      [
+        { text: "👶 الثلث الثالث (الأسبوع 32)", callback_data: "calc_week_32" },
+        { text: "🌐 حاسبة الحمل المتكاملة بالويب", url: `${DEFAULT_APP_URL}/#pregnancy` }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 5. Pregnancy Drug Safety Checker (FDA Categories)
+async function handleTelegramPregnancyDrugs(chatId: string | number, drugKey?: string) {
+  let text = `💊 **مستشار وكاشف أمان الأدوية أثناء الحمل (FDA Pregnancy Categories):**\n\n`;
+  if (drugKey) {
+    if (drugKey === "paracetamol") {
+      text += `🟢 **باراسيتامول / بنادول (Paracetamol / Acetaminophen):**\n` +
+        `• **التصنيف:** Category B (آمن بجرعات علاجية)\n` +
+        `• **الاستخدام:** الخيار الأول والمسكن الآمن للصداع والحمى والآلام طوال فترة الحمل.\n` +
+        `• **الجرعة الموصى بها:** 500 - 1000 ملغ عند الحاجة (بحد أقصى 3000 ملغ يومياً).\n\n`;
+    } else if (drugKey === "ibuprofen") {
+      text += `🔴 **إيبوبروفين / بروفين (Ibuprofen / NSAIDs):**\n` +
+        `• **التصنيف:** Category D في الثلث الثالث (محظور تماماً بعد الأسبوع 20-28)\n` +
+        `• **التحذير السريري:** يسبب إغلاقاً مبكراً للقناة الشريانية للجنين (Premature closure of ductus arteriosus) وتثبيط المخاض وقلة السائل السلوي.\n` +
+        `• **البديل الآمن:** باراسيتامول (Paracetamol).\n\n`;
+    } else if (drugKey === "amoxicillin") {
+      text += `🟢 **أموكسيسيلين / أوجمنتين (Amoxicillin / Augmentin):**\n` +
+        `• **التصنيف:** Category B (آمن)\n` +
+        `• **الاستخدام:** مضاد حيوي آمن للالتهابات التنفسية والبولية أثناء الحمل عند وصف الطبيب.\n\n`;
+    } else if (drugKey === "lisinopril") {
+      text += `🚨 **ليزينوبريل ومثبطات ACE (Lisinopril / ACE Inhibitors):**\n` +
+        `• **التصنيف:** Category X / D (محظور ومسبب للتشوهات الجنينية)\n` +
+        `• **الخطر:** فشل كلوي جنيني وتشوهات جمجمة.\n` +
+        `• **البدائل الآمنة لضغط الحامل:** لابيترول (Labetalol) أو ميثيل دوبا (Methyldopa).\n\n`;
+    }
+  }
+
+  text += `✍️ **للاستعلام عن أي دواء:** اكتب اسم الدواء وسيقوم البوت بفحص تصنيفه السريري فوراً!\n\n` +
+    `👇 **أو اضغط على أحد الأدوية الشائعة للفحص:**`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🟢 باراسيتامول (مسكن آمن)", callback_data: "preg_drug_paracetamol" },
+        { text: "🔴 بروفين (محظور بالثلث 3)", callback_data: "preg_drug_ibuprofen" }
+      ],
+      [
+        { text: "🟢 أموكسيسيلين (مضاد آمن)", callback_data: "preg_drug_amoxicillin" },
+        { text: "🚨 ليزينوبريل (محظور للضغط)", callback_data: "preg_drug_lisinopril" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 6. Pregnancy Diet & Forbidden Foods
+async function handleTelegramPregnancyDiet(chatId: string | number) {
+  const text = `🥗 **دليل التغذية والممنوعات السريرية للحامل (حسب الثلث):**\n\n` +
+    `🚫 **قائمة الأغذية الممنوعة قطعياً لحماية الجنين:**\n` +
+    `1. **الحليب والأجبان غير المبسترة:** خطر بكتيريا الليستيريا المسببة للإسقاط.\n` +
+    `2. **البيض النيئ والمايونيز المنزلي والسوشي:** خطر بكتيريا السالمونيلا والطفيلية.\n` +
+    `3. **اللحوم المصنعة (سجق، لانشون، بسطرمة) غير المطهوة:** خطر داء المقوسات (Toxoplasmosis).\n` +
+    `4. **الأسماك العالية بالزئبق (القرش، الماكريل الملكي، التونة البيضاء بكثرة).**\n` +
+    `5. **الكبدة الحيوانية بكميات كبيرة:** فرط فيتامين A المسبب لتشوهات الأجنة.\n` +
+    `6. **الكافيين الزائد:** يقتصر على أقل من 200 ملغ يومياً (كوب قهوة واحد).\n\n` +
+    `✨ **المكملات والعناصر الضرورية يومياً:**\n` +
+    `• حمض الفوليك (400-800 mcg) في الشهور الأولى لحماية الحبل الشوكي.\n` +
+    `• الحديد والكالسيوم وفيتامين D من الثلث الثاني وحتى الرضاعة.`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🚶‍♀️ برنامج المشي والرياضة", callback_data: "preg_walk" },
+        { text: "🩸 فحص السكر الشهري", callback_data: "preg_sugar" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 7. Pregnancy Walking & Activity Guidelines
+async function handleTelegramPregnancyWalk(chatId: string | number) {
+  const text = `🚶‍♀️ **برنامج المشي والنشاط البدني الآمن للحامل:**\n\n` +
+    `✅ **التمارين الموصى بها سريرياً (ACOG):**\n` +
+    `• **المشي المعتدل:** 20 إلى 30 دقيقة يومياً بمعدل 4-5 أيام أسبوعياً ينشط الدورة الدموية ويمنع سكر الحمل وتورم الساقين.\n` +
+    `• **تمارين قاع الحوض (كيجل Kegel):** تقوية عضلات الحوض وتسهيل المخاض الطبيعي ومنع سلس البول.\n` +
+    `• **السباحة وتمارين التمدد الخفيفة:** تخفيف الضغط على أسفل الظهر والعمود الفقري.\n\n` +
+    `🚨 **علامات التوقف الفوري ومراجعة الطوارئ (Red Flags):**\n` +
+    `• نزول أي نزيف مهبلي أو تدفق سوائل.\n` +
+    `• تقلصات رحمية منتظمة ومؤلمة قبل الأوان.\n` +
+    `• دوخة مفاجئة أو ضيق شديد في التنفس قبل بذل الجهد.\n` +
+    `• ألم في الصدر أو خفقان سريع مستمر.`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "💓 قياس ضغط الدم", callback_data: "preg_bp" },
+        { text: "⚖️ متابعة الوزن الشهري", callback_data: "preg_weight" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
+}
+
+// 8. Routine Visits & Tests Schedule
+async function handleTelegramPregnancyVisits(chatId: string | number) {
+  const text = `📊 **جدول الزيارات والفحوصات الطبية الدورية للحامل:**\n\n` +
+    `• **الأسابيع (4 - 28):** زيارة طبية شهرية روتينية (فحص الضغط، الوزن، زلال البول، نبض الجنين).\n` +
+    `• **الأسابيع (28 - 36):** زيارة طبية كل أسبوعين لمراقبة نمو الجنين وحركته وموقع المشيمة.\n` +
+    `• **الأسابيع (36 - 40):** زيارة أسبوعية حتى موعد الولادة.\n\n` +
+    `🔬 **أهم الفحوصات المخبرية حسب الأسابيع:**\n` +
+    `• أسبوع 10-13: فحص الشفافية القفوية والسونار المبكر (NT Scan).\n` +
+    `• أسبوع 18-22: سونار التشوهات التفصيلي الشامل (Anomaly Ultrasound).\n` +
+    `• أسبوع 24-28: اختبار منحنى السكر (OGTT) وفحص قوة الدم (CBC).\n` +
+    `• أسبوع 28: إبرة الأنتي دي (Anti-D) للأمهات ذوات فصيلة الدم السالبة (Rh-negative).\n` +
+    `• أسبوع 35-37: مسحة البكتيريا العقدية (GBS Screen).`;
+
+  const markup = {
+    inline_keyboard: [
+      [
+        { text: "🩸 قياس السكر الشهري", callback_data: "preg_sugar" },
+        { text: "💓 قياس ضغط الدم", callback_data: "preg_bp" }
+      ],
+      [
+        { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
+      ]
+    ]
+  };
+
+  await sendTelegramMessage(chatId, text, markup);
 }
 
 // Helper to format and send Telegram Symptom Check Card
@@ -1743,6 +2148,59 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
           ]
         }
       );
+    } else if ((cbData === "action_pregnancy" || cbData === "preg_menu" || cbData === "pregnancy") && chatId) {
+      await sendTelegramPregnancyMenu(chatId, user);
+      safeReply(); return;
+    } else if (cbData === "preg_sugar" && chatId) {
+      await handleTelegramPregnancySugar(chatId);
+      safeReply(); return;
+    } else if (cbData && cbData.startsWith("sugar_val_") && chatId) {
+      const val = cbData.replace("sugar_val_", "");
+      const isFasting = parseInt(val, 10) < 110;
+      await handleTelegramPregnancySugar(chatId, isFasting ? `سكر صائم ${val}` : `سكر بعد الأكل ${val}`);
+      safeReply(); return;
+    } else if (cbData === "preg_bp" && chatId) {
+      await handleTelegramPregnancyBP(chatId);
+      safeReply(); return;
+    } else if (cbData && cbData.startsWith("bp_val_") && chatId) {
+      let bpStr = "120/80";
+      if (cbData === "bp_val_normal") bpStr = "115/75";
+      if (cbData === "bp_val_borderline") bpStr = "135/85";
+      if (cbData === "bp_val_critical") bpStr = "150/95";
+      await handleTelegramPregnancyBP(chatId, `ضغط ${bpStr}`);
+      safeReply(); return;
+    } else if (cbData === "preg_weight" && chatId) {
+      await handleTelegramPregnancyWeight(chatId);
+      safeReply(); return;
+    } else if (cbData === "weight_val_normal" && chatId) {
+      await handleTelegramPregnancyWeight(chatId, "وزن طبيعي 1.5 كغ شهرياً");
+      safeReply(); return;
+    } else if (cbData === "weight_val_excess" && chatId) {
+      await handleTelegramPregnancyWeight(chatId, "زيادة مفاجئة 2.5 كغ بأسبوع");
+      safeReply(); return;
+    } else if (cbData === "preg_calc" && chatId) {
+      await handleTelegramPregnancyCalc(chatId);
+      safeReply(); return;
+    } else if (cbData && cbData.startsWith("calc_week_") && chatId) {
+      const wk = cbData.replace("calc_week_", "");
+      await handleTelegramPregnancyCalc(chatId, `الأسبوع ${wk}`);
+      safeReply(); return;
+    } else if (cbData === "preg_drugs" && chatId) {
+      await handleTelegramPregnancyDrugs(chatId);
+      safeReply(); return;
+    } else if (cbData && cbData.startsWith("preg_drug_") && chatId) {
+      const drugKey = cbData.replace("preg_drug_", "");
+      await handleTelegramPregnancyDrugs(chatId, drugKey);
+      safeReply(); return;
+    } else if (cbData === "preg_diet" && chatId) {
+      await handleTelegramPregnancyDiet(chatId);
+      safeReply(); return;
+    } else if (cbData === "preg_walk" && chatId) {
+      await handleTelegramPregnancyWalk(chatId);
+      safeReply(); return;
+    } else if (cbData === "preg_visits" && chatId) {
+      await handleTelegramPregnancyVisits(chatId);
+      safeReply(); return;
     } else if (cbData && cbData.startsWith("sym_") && chatId) {
       const presetQuery = SYMPTOM_PRESETS[cbData] || "ألم وتعب عام";
       await handleTelegramSymptomCheck(chatId, presetQuery, user);
@@ -2321,6 +2779,45 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
   if (activeSession?.mode === "awaiting_symptoms" && !text.startsWith("/") && text !== "🩺 فاحص الأعراض (DDx)") {
     userSessions.delete(String(chatId));
     await handleTelegramSymptomCheck(chatId, text, user);
+    safeReply(); return;
+  }
+
+  // 2.5. Pregnancy & Maternal Care Suite Triggers
+  if (
+    text === "🤰 رعاية ومتابعة الحامل" ||
+    text.startsWith("/pregnancy") ||
+    text.startsWith("/maternal") ||
+    text.startsWith("/preg") ||
+    text === "حمل" ||
+    text === "حامل" ||
+    text === "متابعة الحامل" ||
+    text === "رعاية الحامل"
+  ) {
+    await sendTelegramPregnancyMenu(chatId, user);
+    safeReply(); return;
+  }
+
+  // Monthly Sugar Check via chat
+  if (
+    text.includes("سكر") && (text.includes("حامل") || text.includes("حمل") || text.includes("صائم") || text.includes("أكل") || /\b\d{2,3}\b/.test(text))
+  ) {
+    await handleTelegramPregnancySugar(chatId, text);
+    safeReply(); return;
+  }
+
+  // Monthly BP Check via chat
+  if (
+    text.includes("ضغط") && (text.includes("حامل") || text.includes("حمل") || text.includes("تسمم") || /\d{2,3}\s*[\/\-]\s*\d{2,3}/.test(text))
+  ) {
+    await handleTelegramPregnancyBP(chatId, text);
+    safeReply(); return;
+  }
+
+  // Monthly Weight Check via chat
+  if (
+    text.includes("وزن") && (text.includes("حامل") || text.includes("حمل") || text.includes("كغ") || text.includes("كيلو") || /\b\d{2,3}\b/.test(text))
+  ) {
+    await handleTelegramPregnancyWeight(chatId, text);
     safeReply(); return;
   }
 

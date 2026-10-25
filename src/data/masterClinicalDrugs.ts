@@ -860,3 +860,5 @@ export const MASTER_CLINICAL_DRUGS: DrugInfo[] = [
   }
 ];
 
+export const COMPREHENSIVE_CATALOG = MASTER_CLINICAL_DRUGS;
+

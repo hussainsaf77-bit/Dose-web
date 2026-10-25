@@ -36,7 +36,57 @@ import {
 
 export const PregnancyCareSection: React.FC = () => {
   // Navigation internal tabs
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'drugs' | 'nutrition' | 'activity'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'vitals' | 'drugs' | 'nutrition' | 'activity'>('profile');
+
+  // Monthly Vitals Tracker States
+  const [vitalGlucoseType, setVitalGlucoseType] = useState<'fasting' | 'postprandial' | 'random'>('fasting');
+  const [vitalGlucoseVal, setVitalGlucoseVal] = useState<number>(88);
+  const [vitalSystolic, setVitalSystolic] = useState<number>(115);
+  const [vitalDiastolic, setVitalDiastolic] = useState<number>(75);
+  const [vitalWeightPre, setVitalWeightPre] = useState<number>(62);
+  const [vitalWeightCurrent, setVitalWeightCurrent] = useState<number>(66);
+  const [vitalHeightCm, setVitalHeightCm] = useState<number>(165);
+  const [vitalMonth, setVitalMonth] = useState<number>(4);
+  const [peSymptoms, setPeSymptoms] = useState<{
+    headache: boolean;
+    blurryVision: boolean;
+    epigastricPain: boolean;
+    swelling: boolean;
+    proteinuria: boolean;
+  }>({
+    headache: false,
+    blurryVision: false,
+    epigastricPain: false,
+    swelling: false,
+    proteinuria: false,
+  });
+
+  // Recorded Vitals Log
+  const [vitalsLog, setVitalsLog] = useState<Array<{
+    id: string;
+    date: string;
+    month: number;
+    glucose: { type: string; val: number; status: 'normal' | 'borderline' | 'high' };
+    bp: { sys: number; dia: number; status: 'normal' | 'borderline' | 'high' };
+    weight: { current: number; gain: number; status: 'normal' | 'high' | 'low' };
+  }>>([
+    {
+      id: 'v_demo_1',
+      date: new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+      month: 3,
+      glucose: { type: 'صائم', val: 86, status: 'normal' },
+      bp: { sys: 112, dia: 72, status: 'normal' },
+      weight: { current: 63.5, gain: 1.5, status: 'normal' }
+    },
+    {
+      id: 'v_demo_2',
+      date: new Date().toISOString().split('T')[0],
+      month: 4,
+      glucose: { type: 'صائم', val: 91, status: 'normal' },
+      bp: { sys: 118, dia: 76, status: 'normal' },
+      weight: { current: 65.5, gain: 3.5, status: 'normal' }
+    }
+  ]);
 
   // Obstetric Profile Inputs
   const [maternalAge, setMaternalAge] = useState<number>(28);
@@ -200,6 +250,20 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
           >
             <FileText className="w-4 h-4" />
             <span>الملف التوليدي وحساب الحمل</span>
+          </button>
+          <button
+            onClick={() => setActiveSubTab('vitals')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
+              activeSubTab === 'vitals'
+                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
+                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Activity className="w-4 h-4 text-emerald-400" />
+            <span>سجل القياسات الشهرية (سكر، ضغط، وزن)</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-emerald-950/80 text-[10px] text-emerald-300 border border-emerald-500/40 font-mono">
+              جديد
+            </span>
           </button>
           <button
             onClick={() => setActiveSubTab('drugs')}
@@ -582,6 +646,405 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
                 <p className="text-sm font-bold text-slate-200">يرجى إدخال تاريخ أول يوم لآخر دورة شهرية (LMP) لحساب الحمل.</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: MONTHLY VITALS TRACKER (SUGAR, BP, WEIGHT) */}
+      {activeSubTab === 'vitals' && (
+        <div className="space-y-6">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                <Activity className="w-4 h-4" />
+                <span>بروتوكول الفحص الدوري الشهري للحامل (ACOG Guidelines)</span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-extrabold text-white">
+                سجل المتابعة الشهرية: السكر، ضغط الدم، والزيادة الصحية للوزن
+              </h3>
+              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                مراقبة دقيقة للأرقام الحيوية للكشف المبكر عن سكر الحمل (GDM)، ارتفاع ضغط الدم وتسمم الحمل (Pre-eclampsia)، وضمان نمو الجنين بأمان.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                const newLog = {
+                  id: `v_${Date.now()}`,
+                  date: new Date().toISOString().split('T')[0],
+                  month: vitalMonth,
+                  glucose: {
+                    type: vitalGlucoseType === 'fasting' ? 'صائم' : vitalGlucoseType === 'postprandial' ? 'بعد الأكل بساعتين' : 'عشوائي',
+                    val: vitalGlucoseVal,
+                    status: (vitalGlucoseType === 'fasting' && vitalGlucoseVal < 95) || (vitalGlucoseType === 'postprandial' && vitalGlucoseVal < 120) ? 'normal' : vitalGlucoseVal < 140 ? 'borderline' : 'high'
+                  } as any,
+                  bp: {
+                    sys: vitalSystolic,
+                    dia: vitalDiastolic,
+                    status: (vitalSystolic < 120 && vitalDiastolic < 80) ? 'normal' : (vitalSystolic < 140 && vitalDiastolic < 90) ? 'borderline' : 'high'
+                  } as any,
+                  weight: {
+                    current: vitalWeightCurrent,
+                    gain: Number((vitalWeightCurrent - vitalWeightPre).toFixed(1)),
+                    status: 'normal'
+                  } as any
+                };
+                setVitalsLog(prev => [newLog, ...prev]);
+              }}
+              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>حفظ القياسات الحالية بالسجل</span>
+            </button>
+          </div>
+
+          {/* Three Interactive Cards Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* 1. Blood Glucose Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
+                  <Heart className="w-4 h-4" />
+                  <h4>1. فحص السكر الشهري (GDM)</h4>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  mg/dL
+                </span>
+              </div>
+
+              {/* Glucose Type Selector */}
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setVitalGlucoseType('fasting')}
+                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
+                    vitalGlucoseType === 'fasting' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  صائم (Fasting)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVitalGlucoseType('postprandial')}
+                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
+                    vitalGlucoseType === 'postprandial' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  بعد الأكل (2h)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVitalGlucoseType('random')}
+                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
+                    vitalGlucoseType === 'random' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  عشوائي
+                </button>
+              </div>
+
+              {/* Value Input */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-xs">
+                  <label className="text-slate-300 font-bold">قراءة السكر الحالية:</label>
+                  <span className="text-rose-400 font-mono font-bold text-base">{vitalGlucoseVal} mg/dL</span>
+                </div>
+                <input
+                  type="range"
+                  min="60"
+                  max="220"
+                  value={vitalGlucoseVal}
+                  onChange={e => setVitalGlucoseVal(Number(e.target.value))}
+                  className="w-full accent-rose-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+                  <span>60 (منخفض)</span>
+                  <span>95 (حد الصيام)</span>
+                  <span>140</span>
+                  <span>220</span>
+                </div>
+              </div>
+
+              {/* Clinical Interpretation */}
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">التقييم السريري:</span>
+                  {vitalGlucoseType === 'fasting' ? (
+                    vitalGlucoseVal < 95 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 صائم مثالي وسليم</span>
+                    ) : vitalGlucoseVal <= 125 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 اشتباه سكر حمل</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🔴 سكر صائم مرتفع حرج</span>
+                    )
+                  ) : (
+                    vitalGlucoseVal < 120 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 بعد الأكل طبيعي</span>
+                    ) : vitalGlucoseVal <= 140 ? (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 حد أعلى مقبول</span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🔴 مرتفع بعد الوجبة</span>
+                    )
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  {vitalGlucoseType === 'fasting'
+                    ? (vitalGlucoseVal < 95
+                        ? 'القيمة تحت 95 mg/dL ممتازة وتحمي الجنين من فرط النمو أو انخفاض السكر بعد الولادة.'
+                        : 'سكر الصائم فوق 95 mg/dL يستدعي فحص OGTT 75g في الأسبوع 24-28 لتأكيد أو استبعاد سكر الحمل.')
+                    : (vitalGlucoseVal < 120
+                        ? 'القيمة بعد الأكل بساعتين تحت 120 mg/dL تؤكد كفاءة إفراز الأنسولين وحسن استجابة الجسم.'
+                        : 'القيمة أعلى من 120 mg/dL تستدعي توزيع النشويات والمشي الخفيف بعد الوجبات الرئيسية.')}
+                </p>
+              </div>
+            </div>
+
+            {/* 2. Blood Pressure Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
+                  <Activity className="w-4 h-4" />
+                  <h4>2. قياس ضغط الدم وتسمم الحمل</h4>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  mmHg
+                </span>
+              </div>
+
+              {/* BP Inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-slate-400 font-bold">الانقباضي (العالي):</label>
+                  <input
+                    type="number"
+                    min="80"
+                    max="200"
+                    value={vitalSystolic}
+                    onChange={e => setVitalSystolic(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold text-base focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-[10px] text-slate-500 block text-center">المثالي: &lt; 120</span>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-slate-400 font-bold">الانبساطي (الواطي):</label>
+                  <input
+                    type="number"
+                    min="50"
+                    max="130"
+                    value={vitalDiastolic}
+                    onChange={e => setVitalDiastolic(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold text-base focus:border-indigo-500 outline-none"
+                  />
+                  <span className="text-[10px] text-slate-500 block text-center">المثالي: &lt; 80</span>
+                </div>
+              </div>
+
+              {/* Pre-eclampsia Quick Screening Checkboxes */}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-[11px] font-bold text-slate-300 block">فحص أعراض تسمم الحمل (Pre-eclampsia):</label>
+                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={peSymptoms.headache}
+                      onChange={e => setPeSymptoms(prev => ({ ...prev, headache: e.target.checked }))}
+                      className="accent-rose-500 rounded"
+                    />
+                    <span>صداع نابض مستمر</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={peSymptoms.blurryVision}
+                      onChange={e => setPeSymptoms(prev => ({ ...prev, blurryVision: e.target.checked }))}
+                      className="accent-rose-500 rounded"
+                    />
+                    <span>زغللة بالعين/ومضات</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={peSymptoms.epigastricPain}
+                      onChange={e => setPeSymptoms(prev => ({ ...prev, epigastricPain: e.target.checked }))}
+                      className="accent-rose-500 rounded"
+                    />
+                    <span>ألم فم المعدة</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+                    <input
+                      type="checkbox"
+                      checked={peSymptoms.swelling}
+                      onChange={e => setPeSymptoms(prev => ({ ...prev, swelling: e.target.checked }))}
+                      className="accent-rose-500 rounded"
+                    />
+                    <span>انتفاخ مفاجئ بالوجه</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Clinical BP Interpretation */}
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400">تقييم الضغط:</span>
+                  {vitalSystolic < 120 && vitalDiastolic < 80 ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 طبيعي ومثالي</span>
+                  ) : vitalSystolic < 140 && vitalDiastolic < 90 ? (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 ضغط حدودي للمتابعة</span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🚨 إنذار تسمم الحمل (حرج)</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  {vitalSystolic >= 140 || vitalDiastolic >= 90 || Object.values(peSymptoms).some(Boolean)
+                    ? '⚠️ تحذير: قراءة الضغط >= 140/90 أو وجود أعراض عينية وصداع يستدعي مراجعة طوارئ الولادة لفحص زلال البول وضمان سلامة المشيمة.'
+                    : 'ضغط دم سليم يضمن تدفق الدم الكافي عبر المشيمة ونقل الأكسجين والغذاء للجنين.'}
+                </p>
+              </div>
+            </div>
+
+            {/* 3. Weight Gain Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+                  <Baby className="w-4 h-4" />
+                  <h4>3. متابعة الوزن والزيادة الصحية</h4>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                  kg
+                </span>
+              </div>
+
+              {/* Weight Inputs */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">قبل الحمل (كغ):</label>
+                  <input
+                    type="number"
+                    value={vitalWeightPre}
+                    onChange={e => setVitalWeightPre(Number(e.target.value))}
+                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">الوزن الحالي (كغ):</label>
+                  <input
+                    type="number"
+                    value={vitalWeightCurrent}
+                    onChange={e => setVitalWeightCurrent(Number(e.target.value))}
+                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 font-bold block">شهر الحمل (1-9):</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="9"
+                    value={vitalMonth}
+                    onChange={e => setVitalMonth(Number(e.target.value))}
+                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                  />
+                </div>
+              </div>
+
+              {/* Calculations Box */}
+              {(() => {
+                const heightM = (vitalHeightCm || 165) / 100;
+                const preBMI = Number(((vitalWeightPre || 60) / (heightM * heightM)).toFixed(1));
+                const totalGain = Number(((vitalWeightCurrent || 60) - (vitalWeightPre || 60)).toFixed(1));
+                const expectedGainForMonth = vitalMonth <= 3 ? 1.5 : 1.5 + (vitalMonth - 3) * 1.8;
+                const isRapidGain = totalGain > expectedGainForMonth + 3.0;
+
+                return (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                        <span className="text-[10px] text-slate-400 block">مؤشر BMI قبل الحمل:</span>
+                        <strong className="text-cyan-400 font-mono text-sm">{preBMI}</strong>
+                        <span className="text-[10px] text-slate-500 block">
+                          {preBMI < 18.5 ? 'نحافة' : preBMI < 25 ? 'وزن طبيعي' : preBMI < 30 ? 'زيادة وزن' : 'سمنة'}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                        <span className="text-[10px] text-slate-400 block">الزيادة التراكمية:</span>
+                        <strong className={`font-mono text-sm ${totalGain < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                          {totalGain > 0 ? `+${totalGain}` : totalGain} كغ
+                        </strong>
+                        <span className="text-[10px] text-slate-500 block">
+                          المتوقع للشهر {vitalMonth}: ~{expectedGainForMonth.toFixed(1)} كغ
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
+                      {isRapidGain ? (
+                        <span className="text-amber-400 font-bold block">
+                          ⚠️ تنبيه زيادة سريعة: زيادة تفوق المعدل الطبيعي قد تشير لاحتباس سوائل وتورم أنسجة (Edema). يرجى قياس الضغط ومراقبة تناول الأملاح.
+                        </span>
+                      ) : (
+                        <span>
+                          🟢 زيادة تدريجية وصحية متوافقة مع نمو الجنين، المشيمة، والسائل السلوي بحسب إرشادات IOM العالمية.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+          </div>
+
+          {/* Historical Visits & Vitals Log */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <FileText className="w-4 h-4 text-emerald-400" />
+                <h4>سجل المتابعات الشهرية الموثقة للحامل</h4>
+              </div>
+              <span className="text-xs text-slate-400 font-mono">
+                {vitalsLog.length} تسجيلات موثقة
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-right text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 font-bold text-[11px]">
+                    <th className="py-2 px-3">التاريخ</th>
+                    <th className="py-2 px-3">الشهر</th>
+                    <th className="py-2 px-3">السكر (mg/dL)</th>
+                    <th className="py-2 px-3">ضغط الدم (mmHg)</th>
+                    <th className="py-2 px-3">الوزن والزيادة</th>
+                    <th className="py-2 px-3 text-center">الحالة العامة</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-mono">
+                  {vitalsLog.map((log) => (
+                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="py-2.5 px-3 text-slate-300 font-sans">{log.date}</td>
+                      <td className="py-2.5 px-3 text-rose-300 font-sans">الشهر {log.month}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-bold text-white">{log.glucose.val}</span>{' '}
+                        <span className="text-[10px] text-slate-400 font-sans">({log.glucose.type})</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-indigo-300 font-bold">
+                        {log.bp.sys} / {log.bp.dia}
+                      </td>
+                      <td className="py-2.5 px-3 text-cyan-300">
+                        {log.weight.current} كغ{' '}
+                        <span className="text-[10px] text-emerald-400 font-sans">(+{log.weight.gain})</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-center font-sans">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold">
+                          مطمئن وسليم
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
