@@ -26,12 +26,14 @@ import {
   CheckCircle2,
   Send,
   Download,
-  Loader2
+  Loader2,
+  Heart
 } from 'lucide-react';
 import { downloadZipFile } from '../utils/downloadHelper';
 
 export type ActiveTabType =
   | 'drugs'
+  | 'pregnancy'
   | 'lab_imaging'
   | 'symptoms'
   | 'pediatric'
@@ -97,6 +99,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const navItems: { id: ActiveTabType; label: string; icon: any; isNew?: boolean }[] = [
     { id: 'symptoms', label: t.tab_symptoms, icon: Stethoscope, isNew: true },
+    { id: 'pregnancy', label: t.tab_pregnancy || (language === 'ar' ? 'صحة الحامل' : 'Maternal Care'), icon: Heart, isNew: true },
     { id: 'lab_imaging', label: t.tab_lab, icon: FileText, isNew: true },
     { id: 'drugs', label: t.tab_drugs, icon: Pill },
     { id: 'pediatric', label: t.tab_pediatric, icon: Baby },

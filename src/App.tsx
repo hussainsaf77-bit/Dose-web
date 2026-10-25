@@ -20,10 +20,11 @@ import { LabAndImagingAnalyzer } from './components/LabAndImagingAnalyzer';
 import { TherapeuticDietSection } from './components/TherapeuticDietSection';
 import { ClinicalSymptomChecker } from './components/ClinicalSymptomChecker';
 import { MedicalUserGuideSection } from './components/MedicalUserGuideSection';
+import { PregnancyCareSection } from './components/PregnancyCareSection';
 import { Language, TRANSLATIONS } from './utils/translations';
 import { downloadZipFile } from './utils/downloadHelper';
 
-import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope, Download } from 'lucide-react';
+import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope, Download, Heart } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
   const clean = h.replace(/^#\/?/, '').split('?')[0].toLowerCase();
@@ -31,6 +32,7 @@ const resolveTab = (h: string): ActiveTabType => {
   if (clean === 'guide' || clean === 'user_guide') return 'guide';
   if (clean === 'integration' || clean === 'bot_sync') return 'integration';
   if (clean === 'crm' || clean === 'subscribers_crm') return 'crm';
+  if (clean === 'pregnancy' || clean === 'maternal' || clean === 'pregnant' || clean === 'obstetric' || clean === 'حمل' || clean === 'حوامل') return 'pregnancy';
   if (clean === 'symptoms' || clean === 'ddx') return 'symptoms';
   if (clean === 'lab_imaging' || clean === 'xray' || clean === 'lab') return 'lab_imaging';
   if (clean === 'pediatric') return 'pediatric';
@@ -290,6 +292,15 @@ export default function App() {
               </button>
 
               <button
+                id="hero-quick-pregnancy"
+                onClick={() => setActiveTab('pregnancy')}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Heart className="w-4 h-4 text-rose-400" />
+                <span>{language === 'ar' ? 'صحة الحامل' : 'Maternal Care'}</span>
+              </button>
+
+              <button
                 id="hero-quick-ai"
                 onClick={() => setActiveTab('ai_chat')}
                 className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
@@ -395,6 +406,11 @@ export default function App() {
             userTier={currentUser?.subscription.tier || 'free'}
             onUpgradeClick={() => setActiveTab('plans')}
           />
+        )}
+
+        {/* 2.1 Maternal & Pregnancy Care Suite */}
+        {activeTab === 'pregnancy' && (
+          <PregnancyCareSection />
         )}
 
         {/* 3. Drug-Drug Interactions Checker */}

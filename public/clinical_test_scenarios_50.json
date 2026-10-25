@@ -1,0 +1,61 @@
+{
+  "totalScenarios": 50,
+  "updatedAt": "2026-10-24",
+  "categories": [
+    {
+      "nameAr": "تداخلات دوائية حرجة (Severe Drug-Drug)",
+      "items": [
+        {"id": 1, "drugs": ["Methotrexate", "Ibuprofen"], "severity": "severe", "noteAr": "تثبيط إطراح الميثوتريكسات وتسمم نخاع العظم"},
+        {"id": 2, "drugs": ["Warfarin", "Bactrim"], "severity": "severe", "noteAr": "تثبيط CYP2C9 ومضاعفة مفعول الوارفارين وخطر النزيف"},
+        {"id": 3, "drugs": ["Warfarin", "Ciprofloxacin"], "severity": "severe", "noteAr": "تثبيط CYP1A2 وخطر نزيف حاد"},
+        {"id": 4, "drugs": ["Clopidogrel", "Omeprazole"], "severity": "major", "noteAr": "تثبيط CYP2C19 وانخفاض فاعلية مميع البلاتيليت"},
+        {"id": 5, "drugs": ["Spironolactone", "Captopril"], "severity": "major", "noteAr": "احتباس مزدوج للبوتاسيوم وخطر فرط بوتاسيوم حاد"},
+        {"id": 6, "drugs": ["Digoxin", "Clarithromycin"], "severity": "severe", "noteAr": "تثبيط P-gp وسمية ديجوكسين واضطراب نظم القلب"},
+        {"id": 7, "drugs": ["Sildenafil", "Nitroglycerin"], "severity": "contraindicated", "noteAr": "هبوط قاتل في ضغط الدم نتيجة تراكم cGMP"},
+        {"id": 8, "drugs": ["Sertraline", "Tramadol"], "severity": "severe", "noteAr": "متلازمة السيروتونين المميتة والنوبات التشنجية"},
+        {"id": 9, "drugs": ["Amiodarone", "Levofloxacin"], "severity": "severe", "noteAr": "استطالة خطيرة في فترة QT واضطراب نظم بطيني"},
+        {"id": 10, "drugs": ["Verapamil", "Atenolol"], "severity": "major", "noteAr": "هبوط شديد في النبض وحصار قلبي حاد"},
+        {"id": 11, "drugs": ["Lithium", "Diclofenac"], "severity": "major", "noteAr": "انخفاض إطراح الليثيوم وسمية كلوية وعصبية"},
+        {"id": 12, "drugs": ["Atorvastatin", "Clarithromycin"], "severity": "major", "noteAr": "تثبيط CYP3A4 وانحلال العضلات المخططة"},
+        {"id": 13, "drugs": ["Ciprofloxacin", "Theophylline"], "severity": "major", "noteAr": "تثبيط استقلاب الثيوفيلين ونوبات صرعية"},
+        {"id": 14, "drugs": ["Phenytoin", "Fluconazole"], "severity": "major", "noteAr": "تثبيط CYP2C9 وسمية عصبية للفينيتوين"},
+        {"id": 15, "drugs": ["Metformin", "Contrast Media"], "severity": "severe", "noteAr": "قصور كلوي حاد وحماض لاكتيكي"}
+      ]
+    },
+    {
+      "nameAr": "تداخلات الأدوية مع الأغذية والأعشاب",
+      "items": [
+        {"id": 21, "pair": ["Warfarin", "Spinach"], "severity": "major", "noteAr": "فيتامين K يعاكس مفعول الوارفارين ويزيد التجلط"},
+        {"id": 22, "pair": ["Atorvastatin", "Grapefruit"], "severity": "major", "noteAr": "الجريب فروت يضاعف تركيز الستاتين وتلف العضلات"},
+        {"id": 23, "pair": ["Amlodipine", "Grapefruit"], "severity": "moderate", "noteAr": "زيادة هبوط ضغط الدم والدوخة"},
+        {"id": 24, "pair": ["Phenelzine", "Aged Cheese"], "severity": "severe", "noteAr": "التيرامين يسبب أزمة ضغط حادة مميتة"},
+        {"id": 25, "pair": ["Spironolactone", "Salt Substitutes"], "severity": "major", "noteAr": "كلوريد البوتاسيوم يسبب فرط بوتاسيوم الدم"},
+        {"id": 26, "pair": ["Captopril", "Bananas"], "severity": "moderate", "noteAr": "زيادة خطر تراكم البوتاسيوم"},
+        {"id": 27, "pair": ["Tetracycline", "Milk"], "severity": "major", "noteAr": "خلب الكالسيوم يمنع امتصاص المضاد بنسبة 80%"},
+        {"id": 28, "pair": ["Iron", "Tea"], "severity": "moderate", "noteAr": "حمض التانيك يرسب الحديد ويمنع امتصاصه"},
+        {"id": 29, "pair": ["Iron", "Orange Juice"], "severity": "synergistic", "noteAr": "فيتامين C يزيد امتصاص الحديد بثلاثة أضعاف"},
+        {"id": 30, "pair": ["Warfarin", "Ginger"], "severity": "moderate", "noteAr": "زيادة ميوعة الدم وخطر النزيف"}
+      ]
+    },
+    {
+      "nameAr": "تداخلات الأغذية مع بعضها (Food-Food)",
+      "items": [
+        {"id": 31, "pair": ["Spinach", "Milk"], "severity": "moderate", "noteAr": "تكون بلورات أكسالات الكالسيوم وحصى الكلى"},
+        {"id": 32, "pair": ["Liver", "Black Tea"], "severity": "moderate", "noteAr": "فقدان امتصاص حديد الكبدة بسبب التانين"},
+        {"id": 33, "pair": ["Milk", "Coffee"], "severity": "mild", "noteAr": "الكافيين يسرع الإخراج البولي للكالسيوم"},
+        {"id": 34, "pair": ["Raw Egg", "Tuna"], "severity": "moderate", "noteAr": "الأفيدين يرتبط بالبيوتين ويسبب نقصه"},
+        {"id": 35, "pair": ["Legumes", "Lemon"], "severity": "synergistic", "noteAr": "تعزيز امتصاص الحديد النباتي"}
+      ]
+    },
+    {
+      "nameAr": "أمان الأدوية للحوامل (Pregnancy Safety)",
+      "items": [
+        {"id": 46, "drug": "Ibuprofen", "stage": "3rd Trimester", "safety": "Contraindicated", "reasonAr": "إغلاق مبكر للقناة الشريانية وقصور كلوي جنيني"},
+        {"id": 47, "drug": "Paracetamol", "stage": "All Trimesters", "safety": "Compatible / Safe", "reasonAr": "المسكن الآمن المعتمد عالمياً في الحمل"},
+        {"id": 48, "drug": "Lisinopril", "stage": "2nd & 3rd Trimester", "safety": "Contraindicated", "reasonAr": "تشوهات كلوية وعظمية مميتة للجنين"},
+        {"id": 49, "drug": "Warfarin", "stage": "1st Trimester", "safety": "Contraindicated", "reasonAr": "اعتلال جنين الوارفارين وتشوهات هيكلية"},
+        {"id": 50, "drug": "Methotrexate", "stage": "All Stages", "safety": "Absolute Contraindication", "reasonAr": "تشوهات جنينية قاتلة وإجهاض"}
+      ]
+    }
+  ]
+}

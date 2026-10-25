@@ -73,10 +73,26 @@ app.get([
   "/update.zip",
   "/dose_pediatric_update.zip"
 ], (req, res) => {
-  const zipPath = path.join(process.cwd(), "public", "dose_update_new.zip");
-  const fallbackPath = path.join(process.cwd(), "public", "dose_v36_final.zip");
-  const finalPath = fs.existsSync(zipPath) ? zipPath : fallbackPath;
-  res.download(finalPath, "dose_update_new.zip");
+  const candidatePaths = [
+    path.join(process.cwd(), "public", "dose_update_new.zip"),
+    path.join(process.cwd(), "dist", "dose_update_new.zip"),
+    path.join(process.cwd(), "dose_update_new.zip"),
+    path.join(process.cwd(), "public", "dose_v36_final.zip")
+  ];
+  const finalPath = candidatePaths.find(p => fs.existsSync(p));
+  if (!finalPath) {
+    return res.status(404).send("Update archive not ready yet");
+  }
+  const stat = fs.statSync(finalPath);
+  res.writeHead(200, {
+    "Content-Type": "application/zip",
+    "Content-Disposition": 'attachment; filename="dose_update_new.zip"',
+    "Content-Length": stat.size,
+    "Access-Control-Allow-Origin": "*",
+    "Cache-Control": "no-cache"
+  });
+  const readStream = fs.createReadStream(finalPath);
+  readStream.pipe(res);
 });
 
 // Lazy-loaded Gemini AI client
