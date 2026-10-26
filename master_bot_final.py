@@ -1379,6 +1379,7 @@ def kb_lang():
 
 def kb_main(lang):
     return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤰 " + ("رعاية ومتابعة الحامل (حساب، سكر، ضغط، وزن)" if lang=="ar" else "Maternal & Pregnancy Care"), callback_data="m_pregnancy")],
         [InlineKeyboardButton("🩺 " + ("فاحص الأعراض والتشخيص السريري (DDx)" if lang=="ar" else "Symptom Checker (DDx)"), callback_data="m_symptoms")],
         [InlineKeyboardButton("🩻 " + ("فحص وقراءة الأشعة (X-Ray)" if lang=="ar" else "X-Ray Analysis"), callback_data="m_xray")],
         [InlineKeyboardButton("🧪 " + ("تحليل الفحوصات المخبرية" if lang=="ar" else "Lab Tests Analysis"), callback_data="m_lab")],
@@ -1965,6 +1966,226 @@ async def main_cb(u, ctx):
                "I will interpret the abnormal values and clinical insights instantly!")
         await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
         return STATE_LAB
+    elif q.data == "m_pregnancy":
+        await q.answer()
+        txt = (
+            "🤰 *جناح رعاية ومتابعة صحة الحامل السريري (Dose Maternal Care)*\n\n"
+            "مرحباً بكِ في القسم المتخصص لطب التوليد ورعاية الأم والجنين المبني على المعايير السريرية العالمية (ACOG / ADA / WHO).\n\n"
+            "👇 *اختر الأداة السريرية المطلوبة:*"
+        ) if lang == "ar" else (
+            "🤰 *Clinical Maternal & Obstetric Care Suite*\n\n"
+            "Evidence-based prenatal care and maternal guidance based on ACOG / ADA standards.\n\n"
+            "👇 *Select a clinical module:*"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📅 " + ("حاسبة الحمل وموعد الولادة (EDD)" if lang=="ar" else "Gestational Age & EDD Calculator"), callback_data="preg_calc")],
+            [InlineKeyboardButton("🩸 " + ("سكر الحمل السريري (GDM Target)" if lang=="ar" else "Gestational Diabetes Targets"), callback_data="preg_sugar"),
+             InlineKeyboardButton("🩺 " + ("ضغط الدم وتسمم الحمل" if lang=="ar" else "Blood Pressure & Pre-eclampsia"), callback_data="preg_bp")],
+            [InlineKeyboardButton("⚖️ " + ("الوزن المثالي والزيادة الآمنة" if lang=="ar" else "Gestational Weight Gain"), callback_data="preg_weight"),
+             InlineKeyboardButton("💊 " + ("أمان الأدوية للحامل (FDA)" if lang=="ar" else "FDA Drug Safety"), callback_data="preg_drugs")],
+            [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
+             InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
+            [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
+            [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_calc":
+        await q.answer()
+        txt = (
+            "📅 *حاسبة عمر الحمل وموعد الولادة المتوقع (EDD Calculator):*\n\n"
+            "تعتمد الحاسبة قاعدة ناغل (Naegele’s Rule) ومعايير الكلية الأمريكية لأطباء النساء والتوليد (ACOG).\n\n"
+            "✨ *اختر أحد الأسابيع السريرية لمعاينة التقرير الفوري، أو اكتب في رسالة تاريخ أول يوم لآخر دورة شهرية (مثال: دورة 2026-05-15):*"
+        ) if lang == "ar" else (
+            "📅 *Gestational Age & EDD Calculator (ACOG Standards):*\n\n"
+            "Choose a quick week stage or send your Last Menstrual Period date (e.g. cycle 2026-05-15):"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌱 الأسبوع 8 (شهر 2)", callback_data="pweek_8"),
+             InlineKeyboardButton("🍋 الأسبوع 12 (نهاية الثلث 1)", callback_data="pweek_12")],
+            [InlineKeyboardButton("🍌 الأسبوع 20 (منتصف الحمل)", callback_data="pweek_20"),
+             InlineKeyboardButton("🍆 الأسبوع 28 (بداية الثلث 3)", callback_data="pweek_28")],
+            [InlineKeyboardButton("🍉 الأسبوع 36 (استعداد للولادة)", callback_data="pweek_36")],
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data.startswith("pweek_"):
+        await q.answer()
+        w_map = {
+            "pweek_8": ("الأسبوع الثامن (8)", "الثلث الأول (First Trimester)", "الشهر الثاني", "حبة توت بري (Blueberry)", "224 يوماً", "20%", "سونار التأكد من نبض الجنين، فحص فصيلة الدم وعامل الريزوس (Rh)، وتحليل بول شامل."),
+            "pweek_12": ("الأسبوع الثاني عشر (12)", "نهاية الثلث الأول", "الشهر الثالث", "ليمونة صغيرة (Lime)", "196 يوماً", "30%", "سونار الشفافية القفوية (NT Scan)، فحص مسحي للكرموسومات، قياس ضغط الدم الأساسي."),
+            "pweek_20": ("الأسبوع العشرون (20)", "الثلث الثاني (Second Trimester)", "الشهر الخامس", "حبة موز (Banana)", "140 يوماً", "50%", "سونار التفاصيل والتشوهات الجنينية (Detailed Anomaly Ultrasound)، فحص طول عنق الرحم وموقع المشيمة."),
+            "pweek_28": ("الأسبوع الثامن والعشرون (28)", "بداية الثلث الثالث (Third Trimester)", "الشهر السابع", "باذنجانة كبيرة (Eggplant)", "84 يوماً", "70%", "فحص سكر الحمل (75g OGTT)، إعادة فحص خضاب الدم والحديد، إبرة Anti-D للحوامل ذات Rh سالب."),
+            "pweek_36": ("الأسبوع السادس والثلاثون (36)", "الثلث الثالث (Third Trimester)", "الشهر التاسع", "بطيخة صيفية (Watermelon)", "28 يوماً", "90%", "مسحة بكتيريا المكورات العقدية (GBS Swab)، فحص وضعية الجنين ونزول الرأس بالحوض، مراقبة ضغط الدم وحركة الجنين.")
+        }
+        item = w_map.get(q.data, w_map["pweek_20"])
+        txt = (
+            f"📋 *التقرير السريري لمتابعة الحمل ({item[0]}):*\n\n"
+            f"• 🤰 *المرحلة:* {item[1]} — {item[2]}\n"
+            f"• 👶 *حجم ووزن الجنين التقديري:* بحجم {item[3]}\n"
+            f"• ⏳ *الأيام المتبقية التقريبية للولادة:* {item[4]} (اكتمل {item[5]} من رحلة الحمل)\n\n"
+            f"🔬 *أهم الفحوصات الطبية المطلوبة في هذه المرحلة:*\n"
+            f"{item[6]}\n\n"
+            f"⚠️ *ملاحظة:* يرجى دائماً مراجعة طبيب التوليد المختص لإجراء التقييم السريري الدقيق."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📅 اختيار أسبوع آخر", callback_data="preg_calc")],
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_sugar":
+        await q.answer()
+        txt = (
+            "🩸 *المعايير السريرية لسكر الحمل (GDM Clinical Targets):*\n\n"
+            "توصيات الجمعية الأمريكية للسكري (ADA) والكلية الأمريكية لأطباء النساء والتوليد (ACOG):\n\n"
+            "• 🟢 *سكر الصائم:* أقل من **95 mg/dL** (5.3 mmol/L)\n"
+            "• 🟢 *بعد الأكل بساعة:* أقل من **140 mg/dL** (7.8 mmol/L)\n"
+            "• 🟢 *بعد الأكل بساعتين:* أقل من **120 mg/dL** (6.7 mmol/L)\n"
+            "• 🟢 *مخزون السكر التراكمي (HbA1c):* المستهدف **أقل من 6.0%**\n\n"
+            "🔍 *بروتوكول التشخيص المخبري:*\n"
+            "إجراء فحص تحمل الجلوكوز 75g Oral Glucose Tolerance Test بين الأسبوعين 24 و 28 لجميع الحوامل.\n\n"
+            "💊 *خطة العلاج:*\n"
+            "1. حمية غذائية منخفضة المؤشر الجلايسيمي وموزعة على 3 وجبات رئيسية ووجبتين خفيفتين.\n"
+            "2. إذا لم تتحقق الأرقام خلال أسبوع إلى أسبوعين، يُبدأ العلاج الدوائي بالإنسولين تحت إشراف الطبيب."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_bp":
+        await q.answer()
+        txt = (
+            "🩺 *ضغط الدم السريري ومخاطر تسمم الحمل (Pre-eclampsia Protocol):*\n\n"
+            "معايير وضوابط الكلية الأمريكية ACOG لمراقبة ضغط دم الحامل:\n\n"
+            "• 🟢 *طبيعي:* أقل من **120/80 mmHg**\n"
+            "• 🟡 *مرتفع خفيف:* من **120/80** إلى **139/89 mmHg** (مراقبة أسبوعية وتكرار القياس)\n"
+            "• 🔴 *حرج / اشتباه تسمم حمل:* **140/90 mmHg فما فوق** في قراءتين بفارق 4 ساعات!\n\n"
+            "🚨 *علامات الخطر التحذيرية الحمراء (Red Flags) - تستوجب الطوارئ فوراً:*\n"
+            "1. صداع شديد نابض ومستمر لا يستجيب للمسكنات.\n"
+            "2. اضطراب الرؤية أو رؤية بقع مضيئة (Aura / Blurry vision).\n"
+            "3. ألم حاد ومفاجئ في أعلى يمين البطن تحت القفص الصدري.\n"
+            "4. تورم مفاجئ وسريع في الوجه أو حول العينين أو اليدين.\n\n"
+            "🛡️ *الوقاية بالأسبرين:*\n"
+            "يوصى بجرعة منخفضة من الأسبرين (75 - 150 mg يومياً) بدءاً من الأسبوع 12 إلى 16 للحوامل ذوات الخطورة العالية."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_weight":
+        await q.answer()
+        txt = (
+            "⚖️ *الزيادة الموصى بها في وزن الحامل (IOM / ACOG Guidelines):*\n\n"
+            "تُحدد الزيادة الصحية طوال فترة الحمل بحسب مؤشر كتلة الجسم (BMI) قبل الحمل:\n\n"
+            "• 🔹 *النحافة (BMI أقل من 18.5):* الزيادة الصحية **12.5 - 18 كجم**\n"
+            "• 🔹 *الوزن الطبيعي (BMI من 18.5 إلى 24.9):* الزيادة الصحية **11.5 - 16 كجم**\n"
+            "• 🔹 *زيادة الوزن (BMI من 25.0 إلى 29.9):* الزيادة الصحية **7 - 11.5 كجم**\n"
+            "• 🔹 *السمنة (BMI من 30.0 فما فوق):* الزيادة الصحية **5 - 9 كجم**\n\n"
+            "⚠️ *تنبيه سريري هام:* الزيادة السريعة المفاجئة في الوزن (أكثر من 1 كجم في الأسبوع خلال الثلثين الثاني أو الثالث) غالباً ما تكون احتباس سوائل مرضي وتستدعي فحص ضغط الدم وزلال البول فوراً."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_drugs":
+        await q.answer()
+        txt = (
+            "💊 *دليل أمان الأدوية أثناء الحمل (FDA Pregnancy Risk Categories):*\n\n"
+            "• ✅ *فئة A (آمنة تماماً):* دراسات محكمة أثبتت عدم وجود خطر (مثل: حمض الفوليك، فيتامين B6 بجرعاته المحددة).\n"
+            "• 🟢 *فئة B (آمنة وتستخدم عند الحاجة):* دراسات الحيوانات آمنة ولا توجد أدلة خطر على البشر:\n"
+            "  - مسكنات: باراسيتامول (Paracetamol) هو الخيار الأول الآمن.\n"
+            "  - مضادات حيوية: أموكسيسيلين (Amoxicillin)، أوجمينتين، سيفالكسين، أزيثروميسين.\n"
+            "• 🟡 *فئة C (تستخدم بحذر شديد):* تُعطى فقط إذا كانت الفائدة ترجح الخطر تحت إشراف الطبيب.\n"
+            "• 🚫 *فئة D و X (ممنوعة قطعياً وتسبب تشوهات):*\n"
+            "  - أدوية الضغط من عائلة ACE inhibitors (مثل Lisinopril، Enalapril، Losartan).\n"
+            "  - مشتقات فيتامين A (مثل Roaccutane / Isotretinoin).\n"
+            "  - مضادات التخثر الفموية مثل Warfarin (يُستبدل بالإينوكسابارين / Clexane).\n"
+            "  - البروفين والمسكنات غير الستيرويدية (NSAIDs) ممنوعة قطعياً في الثلث الثالث لإغلاقها القناة الشريانية مبكراً."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_diet":
+        await q.answer()
+        txt = (
+            "🥗 *التغذية العلاجية والممنوعات الغذائية للحامل:*\n\n"
+            "🚫 *أطعمة ومشروبات يجب تجنبها تماماً:*\n"
+            "1. الألبان والأجبان غير المبسترة مثل الجبن الأزرق والفيتا التقليدية (خطر بكتيريا الليستيريا Listeria).\n"
+            "2. اللحوم المصنعة، السوشي، والبيض غير المطهو جيداً (خطر طفيل التوكسوبلازما والسالمونيلا).\n"
+            "3. الأسماك عالية الزئبق (سمك القرش، أبو سيف، الماكريل الملكي، والحد من التونة المعلبة).\n"
+            "4. التقليل الشديد من الكافيين (بحد أقصى كوب واحد يومياً < 200 ملغ).\n\n"
+            "🌿 *المكملات الغذائية الضرورية:*\n"
+            "• حمض الفوليك (Folic Acid): 400 - 800 مكغ يومياً لمنع تشوهات الأنبوب العصبي.\n"
+            "• الحديد: 27 - 30 ملغ يومياً بعد الثلث الأول لمنع فقر الدم.\n"
+            "• الكالسيوم وفيتامين D: لبناء عظام الجنين والحفاظ على كثافة عظام الأم."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_walk":
+        await q.answer()
+        txt = (
+            "🚶‍♀️ *النشاط البدني والمشي الآمن وتمارين كيجل للحامل:*\n\n"
+            "• 🏃‍♀️ *المشي الهوائي المعتدل:* 20 إلى 30 دقيقة يومياً لمدة 4-5 أيام أسبوعياً، يساعد في ضبط السكر وتسهيل الولادة وتخفيف آلام الظهر.\n"
+            "• 🧘‍♀️ *تمارين كيجل (Kegel Exercises):* تقوية عضلات قاع الحوض لمنع سلس البول بعد الولادة وتسريع التعافي.\n\n"
+            "🚨 *موانع الاستمرار - توقفي عن الحركة وتوجهي للطوارئ فوراً إذا شعرتِ بـ:*\n"
+            "1. نزيف مهبلي أو نزول بقع دم.\n"
+            "2. تدفق أو تسرب سوائل مهبلية (ماء الجنين).\n"
+            "3. انقباضات رحمية مؤلمة ومنتظمة قبل الأسبوع 37.\n"
+            "4. دوخة حادة، إغماء، أو ضيق تنفس شديد أثناء الراحة."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_visits":
+        await q.answer()
+        txt = (
+            "🗓️ *جدول الزيارات والفحوصات الدورية أثناء الحمل:*\n\n"
+            "• 🩺 *الزيارات الروتينية لعيادة التوليد:*\n"
+            "  - حتى الأسبوع 28: زيارة واحدة كل 4 أسابيع.\n"
+            "  - من الأسبوع 28 إلى 36: زيارة واحدة كل أسبوعين.\n"
+            "  - من الأسبوع 36 حتى موعد الولادة: زيارة أسبوعية.\n\n"
+            "📡 *محطات السونار (Ultrasound Milestones):*\n"
+            "1. الأسبوع 6 - 8: سونار التأكد من وجود الحمل داخل الرحم وسماع نبض الجنين.\n"
+            "2. الأسبوع 11 - 13: سونار قياس الشفافية القفوية وفحص عظم الأنف.\n"
+            "3. الأسبوع 18 - 22: سونار التشوهات الشامل (Anomaly Scan) لفحص أعضاء الجنين بالتفصيل.\n"
+            "4. الثلث الثالث: سونار متابعة نمو الجنين وحجم السائل الأمنيوسي ووضعية المشيمة."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
     elif q.data == "m_symptoms":
         await q.answer()
         txt = (
@@ -5047,10 +5268,38 @@ async def stats_cmd(u, ctx):
         msg = "\n".join(lines)
     await u.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
+async def cmd_pregnancy(u, ctx):
+    """فتح قسم رعاية الحامل مباشرة عبر الأمر /pregnancy"""
+    lang = get_lang(ctx)
+    txt = (
+        "🤰 *جناح رعاية ومتابعة صحة الحامل السريري (Dose Maternal Care)*\n\n"
+        "مرحباً بكِ في القسم المتخصص لطب التوليد ورعاية الأم والجنين المبني على المعايير السريرية العالمية (ACOG / ADA / WHO).\n\n"
+        "👇 *اختر الأداة السريرية المطلوبة:*"
+    ) if lang == "ar" else (
+        "🤰 *Clinical Maternal & Obstetric Care Suite*\n\n"
+        "Evidence-based prenatal care and maternal guidance based on ACOG / ADA standards.\n\n"
+        "👇 *Select a clinical module:*"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 " + ("حاسبة الحمل وموعد الولادة (EDD)" if lang=="ar" else "Gestational Age & EDD Calculator"), callback_data="preg_calc")],
+        [InlineKeyboardButton("🩸 " + ("سكر الحمل السريري (GDM Target)" if lang=="ar" else "Gestational Diabetes Targets"), callback_data="preg_sugar"),
+         InlineKeyboardButton("🩺 " + ("ضغط الدم وتسمم الحمل" if lang=="ar" else "Blood Pressure & Pre-eclampsia"), callback_data="preg_bp")],
+        [InlineKeyboardButton("⚖️ " + ("الوزن المثالي والزيادة الآمنة" if lang=="ar" else "Gestational Weight Gain"), callback_data="preg_weight"),
+         InlineKeyboardButton("💊 " + ("أمان الأدوية للحامل (FDA)" if lang=="ar" else "FDA Drug Safety"), callback_data="preg_drugs")],
+        [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
+         InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
+        [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
+        [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+        [InlineKeyboardButton("🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="back")]
+    ])
+    await u.message.reply_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    return STATE_MAIN_MENU
+
 def build_conv():
     return ConversationHandler(
         entry_points=[
             CommandHandler("start", start),
+            CommandHandler("pregnancy", cmd_pregnancy),
         ],
         states={
             STATE_CAL_GENDER: [
@@ -5742,6 +5991,7 @@ def main():
     app.add_handler(CallbackQueryHandler(rem_done, pattern="^rem_done_"), group=2)
     app.add_handler(CallbackQueryHandler(rem_show_photo, pattern="^rem_showphoto_"), group=2)
     app.add_handler(CallbackQueryHandler(rem_later, pattern="^rem_snooze_"), group=2)
+    app.add_handler(CommandHandler("pregnancy", cmd_pregnancy))
     app.add_handler(CommandHandler("link", link_account_cmd))
     app.add_handler(CommandHandler("upgrade", upgrade_cmd))
     app.add_handler(CommandHandler("stats", stats_cmd))
