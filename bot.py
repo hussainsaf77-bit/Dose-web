@@ -145,8 +145,25 @@ def upgrade_user_in_cloud(telegram_id, plan="pro", package_id="monthly", user_na
 # 4. لوحات المفاتيح والأزرار التفاعلية
 # -------------------------------------------------------------
 def get_main_reply_keyboard(lang="ar"):
-    """إزالة لوحة المفاتيح السفلية والاختصارات بالكامل"""
-    return types.ReplyKeyboardRemove()
+    """لوحة المفاتيح السريعة السفلية الدائمة عند خانة الكتابة"""
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+    markup.add(
+        types.KeyboardButton("🤰 رعاية ومتابعة الحامل"),
+        types.KeyboardButton("🩺 فاحص الأعراض (DDx)")
+    )
+    markup.add(
+        types.KeyboardButton("💳 الباقات والاشتراكات"),
+        types.KeyboardButton("💊 دليل الأدوية والجرعات")
+    )
+    markup.add(
+        types.KeyboardButton("👶 حاسبة جرعات الأطفال"),
+        types.KeyboardButton("🧪 التحاليل المخبرية")
+    )
+    markup.add(
+        types.KeyboardButton("🩻 فحص الأشعة السينية"),
+        types.KeyboardButton("📊 باقتي وإحصائياتي")
+    )
+    return markup
 
 import urllib.parse
 
@@ -178,6 +195,7 @@ def get_medical_inline_menu(lang="ar", telegram_id="", name=""):
 
     markup = types.InlineKeyboardMarkup(row_width=2)
     if lang == "en":
+        btn0 = types.InlineKeyboardButton("🤰 Maternal & Pregnancy Care (Vitals)", callback_data="act_pregnancy")
         btn1 = types.InlineKeyboardButton("🩺 Symptoms Checker (DDx)", url=web_symptoms_url)
         btn2 = types.InlineKeyboardButton(f"💳 Plans ({plan_name})", url=web_plans_url)
         btn3 = types.InlineKeyboardButton("🩻 X-Ray & Radiology AI", callback_data="act_xray")
@@ -188,6 +206,7 @@ def get_medical_inline_menu(lang="ar", telegram_id="", name=""):
         btn8 = types.InlineKeyboardButton("📊 My Account & Credits", callback_data="act_myplan")
         btn9 = types.InlineKeyboardButton("🌐 Open Live Web Platform", url=web_welcome_url)
     else:
+        btn0 = types.InlineKeyboardButton("🤰 رعاية ومتابعة الحامل (سكر، ضغط، وزن)", callback_data="act_pregnancy")
         btn1 = types.InlineKeyboardButton("🩺 فاحص الأعراض بالمنصة (DDx)", url=web_symptoms_url)
         btn2 = types.InlineKeyboardButton(f"💳 باقات الاشتراك ({plan_name})", url=web_plans_url)
         btn3 = types.InlineKeyboardButton("🩻 فحص وتحليل صور الأشعة", callback_data="act_xray")
@@ -198,6 +217,7 @@ def get_medical_inline_menu(lang="ar", telegram_id="", name=""):
         btn8 = types.InlineKeyboardButton(f"📊 رصيدي ({quota} استشارة متبقية)", callback_data="act_myplan")
         btn9 = types.InlineKeyboardButton("🌐 فتح موقع المنصة المباشر", url=web_welcome_url)
 
+    markup.add(btn0)
     markup.add(btn1, btn2)
     markup.add(btn3, btn4)
     markup.add(btn5, btn6)
@@ -249,8 +269,49 @@ def get_plans_keyboard(telegram_id="", name=""):
     )
     return markup
 
+def get_pregnancy_keyboard(telegram_id="", name=""):
+    """أزرار جناح رعاية ومتابعة الحامل والقياسات الشهرية"""
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🩸 فحص السكر الشهري (GDM)", callback_data="preg_sugar"),
+        types.InlineKeyboardButton("💓 قياس ضغط الدم والتسمم", callback_data="preg_bp")
+    )
+    markup.add(
+        types.InlineKeyboardButton("⚖️ متابعة الوزن والزيادة الصحية", callback_data="preg_weight"),
+        types.InlineKeyboardButton("🤰 حاسبة الحمل وتاريخ الولادة", callback_data="preg_calc")
+    )
+    markup.add(
+        types.InlineKeyboardButton("💊 كاشف أمان الأدوية (FDA)", callback_data="preg_drugs"),
+        types.InlineKeyboardButton("🥗 التغذية والممنوعات بالثلث", callback_data="preg_diet")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🚶‍♀️ برنامج المشي والرياضة", callback_data="preg_walk"),
+        types.InlineKeyboardButton("📊 جدول الفحوصات والزيارات", callback_data="preg_visits")
+    )
+    markup.add(
+        types.InlineKeyboardButton("🌐 فتح ملف الحامل التفاعلي بالموقع", url=build_web_url("pregnancy", telegram_id, name)),
+        types.InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="act_menu")
+    )
+    return markup
+
+def trigger_pregnancy_flow(chat_id, user_id="", name=""):
+    """إرسال القائمة التوليدية لرعاية ومتابعة الحامل"""
+    msg = (
+        "🤰 *جناح رعاية ومتابعة الحامل السريري (Dose Maternal Suite) 🌸✨*\n\n"
+        "نظام سريري متخصص لمتابعة صحة الأم ونمو الجنين شهرياً وفق بروتوكولات (ACOG & WHO).\n\n"
+        "🩺 *القياسات والمتابعات الشهرية المتاحة:*\n"
+        "• 🩸 *قياس السكر الشهري (GDM):* متابعة الصائم وبعد الأكل وسكر الحمل.\n"
+        "• 💓 *قياس ضغط الدم وتسمم الحمل:* رصد مؤشرات Pre-eclampsia وزلال البول.\n"
+        "• ⚖️ *متابعة زيادة الوزن الصحية:* المعدلات الموصى بها حسب BMI.\n"
+        "• 🤰 *حاسبة أسابيع الحمل والولادة:* تحديد الثلث الحالي وحجم الجنين.\n"
+        "• 💊 *أمان الأدوية أثناء الحمل (FDA):* تصنيفات السلامة والبدائل.\n"
+        "• 🥗 *دليل التغذية والممنوعات:* المحاذير والمكملات الأساسية.\n\n"
+        "👇 *اضغطي أو اضغط على أي زر للمتابعة أو الفحص الفوري:*"
+    )
+    bot.send_message(chat_id, msg, reply_markup=get_pregnancy_keyboard(user_id, name))
+
 # -------------------------------------------------------------
-# 5. معالجات الأوامر الأساسية (/start, /menu, /help, /symptoms, /plans)
+# 5. معالجات الأوامر الأساسية (/start, /menu, /help, /symptoms, /plans, /pregnancy)
 # -------------------------------------------------------------
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
@@ -260,15 +321,11 @@ def cmd_start(message):
 
     welcome_text = (
         f"👋 *أهلاً بك يا {first_name} في منصة جرعة (Dose) الطبية الذكية!* 🏥✨\n\n"
-        "نظام سريري متكامل يجمع بين استشارات البوت الفورية وتطبيقات موقع الويب بحساب واشتراك موحد.\n\n"
-        "🌐 *اختر لغة الاستخدام للبدء / Choose Language:*"
+        "نظام سريري متكامل لمتابعة الحامل والأمومة، فاحص الأعراض، وحساب الجرعات الدوائية.\n\n"
+        "👇 *اختر الخدمة الطبية المطلوبة من القائمة أو الأزرار السريعة بالأسفل:*"
     )
-    lang_markup = types.InlineKeyboardMarkup(row_width=2)
-    lang_markup.add(
-        types.InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"),
-        types.InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
-    )
-    bot.send_message(chat_id, welcome_text, reply_markup=lang_markup)
+    bot.send_message(chat_id, welcome_text, reply_markup=get_main_reply_keyboard("ar"))
+    bot.send_message(chat_id, "🏥 *القائمة الطبية الشاملة المباشرة:*", reply_markup=get_medical_inline_menu("ar", user_id, first_name))
 
 @bot.message_handler(commands=['menu'])
 def cmd_menu(message):
@@ -282,6 +339,11 @@ def cmd_menu(message):
         "👇 اختر الميزة السريرية التي تحتاجها للبدء فوراً:"
     )
     bot.send_message(chat_id, msg, reply_markup=get_medical_inline_menu(lang, user_id, first_name))
+    bot.send_message(chat_id, "💡 تم تحديث أزرار الوصول السريع بالأسفل.", reply_markup=get_main_reply_keyboard(lang))
+
+@bot.message_handler(commands=['pregnancy', 'maternal', 'preg'])
+def cmd_pregnancy(message):
+    trigger_pregnancy_flow(message.chat.id, str(message.from_user.id), message.from_user.first_name or "")
 
 @bot.message_handler(commands=['symptoms'])
 def cmd_symptoms(message):
@@ -356,6 +418,155 @@ def handle_callbacks(call):
     # 4. باقات الاشتراك
     elif data == "act_plans":
         trigger_plans_flow(chat_id, user_id, user_name)
+
+    # 4.5. جناح رعاية ومتابعة الحامل والقياسات الشهرية
+    elif data == "act_pregnancy" or data == "preg_menu":
+        trigger_pregnancy_flow(chat_id, user_id, user_name)
+
+    elif data == "preg_sugar":
+        sugar_msg = (
+            "🩸 *متابعة قياس السكر الشهري وسكر الحمل (Gestational Diabetes - GDM):*\n\n"
+            "🎯 *المعدلات المعتمدة سريرياً للحامل (ADA/ACOG):*\n"
+            "• *سكر الصائم:* أقل من `95 mg/dL`\n"
+            "• *بعد الأكل بساعة:* أقل من `140 mg/dL`\n"
+            "• *بعد الأكل بساعتين:* أقل من `120 mg/dL`\n"
+            "• *السكر التراكمي (HbA1c):* أقل من `6.0%`\n\n"
+            "✍️ *لتسجيل فحصك:* اكتبي مثلاً: `سكر صائم 92` أو `سكر 125` وسأقوم بتقييمه فوراً!\n\n"
+            "👇 *أو اختاري أحد النماذج السريعة:*"
+        )
+        s_mk = types.InlineKeyboardMarkup(row_width=2)
+        s_mk.add(
+            types.InlineKeyboardButton("🟢 صائم مثالي (88 mg/dL)", callback_data="sug_88"),
+            types.InlineKeyboardButton("🟡 صائم مرتفع (102 mg/dL)", callback_data="sug_102")
+        )
+        s_mk.add(
+            types.InlineKeyboardButton("🟢 بعد الأكل طبيعي (110)", callback_data="sug_110"),
+            types.InlineKeyboardButton("🔴 بعد الأكل مرتفع (155)", callback_data="sug_155")
+        )
+        s_mk.add(
+            types.InlineKeyboardButton("💓 قياس ضغط الدم", callback_data="preg_bp"),
+            types.InlineKeyboardButton("⚖️ متابعة الوزن", callback_data="preg_weight")
+        )
+        s_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
+        bot.send_message(chat_id, sugar_msg, reply_markup=s_mk)
+
+    elif data.startswith("sug_"):
+        val = int(data.replace("sug_", ""))
+        if val < 95:
+            res_text = f"🟢 *تقييم سكر الصائم ({val} mg/dL):*\n✅ قراءة طبيعية وممتازة تحمي الجنين من العملقة وتضمن سلامة المشيمة."
+        elif val <= 125:
+            res_text = f"🟡 *تقييم سكر الصائم ({val} mg/dL):*\n⚠️ قراءة مرتفعة حدودياً (اشتباه سكر حمل GDM). يرجى عمل اختبار OGTT 75g في الأسبوع 24-28."
+        else:
+            res_text = f"🔴 *تقييم سكر الصائم ({val} mg/dL):*\n🚨 قراءة مرتفعة تستدعي مراجعة طبيب التوليد لضبط النشويات وتقييم العلاج الدوائي."
+        bot.send_message(chat_id, res_text)
+
+    elif data == "preg_bp":
+        bp_msg = (
+            "💓 *متابعة قياس ضغط الدم ومراقبة تسمم الحمل (Pre-eclampsia):*\n\n"
+            "🎯 *تصنيفات الضغط للحامل (ACOG):*\n"
+            "• *الضغط المثالي:* أقل من `120/80 mmHg`\n"
+            "• *الضغط المرتفع الحذر:* بين `120-139 / 80-89 mmHg`\n"
+            "• *ضغط الحمل الحرج:* `140/90 mmHg` فما فوق (خطر تسمم حمل)\n\n"
+            "🚨 *علامات الطوارئ:* صداع نابض، زغللة عيون، ألم فم المعدة، تورم الوجه، زلال البول.\n\n"
+            "✍️ *لتسجيل قياسك:* اكتبي مثلاً: `ضغط 115/75` أو `140/90` للتقييم الفوري!"
+        )
+        bp_mk = types.InlineKeyboardMarkup(row_width=2)
+        bp_mk.add(
+            types.InlineKeyboardButton("🟢 ضغط مثالي (115/75)", callback_data="bpp_norm"),
+            types.InlineKeyboardButton("🟡 ضغط حدودي (135/85)", callback_data="bpp_bord")
+        )
+        bp_mk.add(
+            types.InlineKeyboardButton("🚨 ضغط مرتفع حرج (150/95)", callback_data="bpp_crit")
+        )
+        bp_mk.add(
+            types.InlineKeyboardButton("🩸 قياس السكر الشهري", callback_data="preg_sugar"),
+            types.InlineKeyboardButton("⚖️ متابعة الوزن", callback_data="preg_weight")
+        )
+        bp_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
+        bot.send_message(chat_id, bp_msg, reply_markup=bp_mk)
+
+    elif data.startswith("bpp_"):
+        if data == "bpp_norm":
+            res_bp = "🟢 *تقييم ضغط الدم (115/75):*\n✅ ضغط دم سليم ومثالي يضمن تدفق الدم الكافي والمغذي للجنين عبر الحبل السري."
+        elif data == "bpp_bord":
+            res_bp = "🟡 *تقييم ضغط الدم (135/85):*\n⚠️ ضغط دم حدودي مرتفع طفيفاً. يوصى بالراحة وتقليل الملح والقياس مرتين أسبوعياً."
+        else:
+            res_bp = "🚨 *تقييم ضغط الدم (150/95):*\n🔴 ضغط دم مرتفع حرج! يرجى مراجعة قسم طوارئ الولادة فوراً لفحص زلال البول واستبعاد تسمم الحمل."
+        bot.send_message(chat_id, res_bp)
+
+    elif data == "preg_weight":
+        w_msg = (
+            "⚖️ *متابعة زيادة الوزن الصحية للحامل:*\n\n"
+            "• *الشهور 1-3 (الثلث الأول):* زيادة خفيفة إجمالية (1 إلى 2 كغ فقط).\n"
+            "• *الشهور 4-9 (الثلث الثاني والثالث):* نصف كيلوغرام أسبوعياً (1.5 إلى 2 كغ شهرياً).\n"
+            "• *إجمالي الزيادة الصحية:* 11.5 - 16 كغ لصاحبات الوزن الطبيعي.\n\n"
+            "⚠️ *تنبيه:* الزيادة السريعة (> 1 كغ بالأسبوع) تعني احتباس سوائل مفاجئ (Edema) وقد تشير لتسمم الحمل."
+        )
+        w_mk = types.InlineKeyboardMarkup(row_width=2)
+        w_mk.add(
+            types.InlineKeyboardButton("🩸 فحص السكر الشهري", callback_data="preg_sugar"),
+            types.InlineKeyboardButton("💓 قياس ضغط الدم", callback_data="preg_bp")
+        )
+        w_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
+        bot.send_message(chat_id, w_msg, reply_markup=w_mk)
+
+    elif data == "preg_calc":
+        c_msg = (
+            "🤰 *حاسبة عمر الحمل وموعد الولادة التقديري:*\n\n"
+            "✍️ اكتبي في رسالة تاريخ أول يوم لآخر دورة شهرية (مثلاً: `آخر دورة 2026-05-15`) أو اختاري أحد النماذج المباشرة:"
+        )
+        c_mk = types.InlineKeyboardMarkup(row_width=2)
+        c_mk.add(
+            types.InlineKeyboardButton("👶 الأسبوع 8 (الثلث الأول)", callback_data="cwk_8"),
+            types.InlineKeyboardButton("👶 الأسبوع 20 (الثلث الثاني)", callback_data="cwk_20")
+        )
+        c_mk.add(
+            types.InlineKeyboardButton("👶 الأسبوع 32 (الثلث الثالث)", callback_data="cwk_32"),
+            types.InlineKeyboardButton("🌐 فتح حاسبة الحمل بالموقع", url=build_web_url("pregnancy", user_id, user_name))
+        )
+        c_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
+        bot.send_message(chat_id, c_msg, reply_markup=c_mk)
+
+    elif data.startswith("cwk_"):
+        wk = data.replace("cwk_", "")
+        bot.send_message(chat_id, f"📋 *تقرير الحمل (الأسبوع {wk}):*\n• الثلث: {'الأول' if int(wk)<14 else 'الثاني' if int(wk)<28 else 'الثالث'}\n• فحوصات هامة: فحص السونار التفصيلي، قوة الدم، وسكر الحمل OGTT بين 24-28 أسبوعاً.")
+
+    elif data == "preg_drugs":
+        dr_msg = (
+            "💊 *كاشف أمان الأدوية أثناء الحمل (FDA Categories):*\n\n"
+            "• 🟢 *باراسيتامول / بنادول:* Category B (آمن ومسكن أول للصداع والحرارة).\n"
+            "• 🔴 *بروفين / إيبوبروفين:* محظور بالثلث الثالث (يغلق القناة الشريانية للجنين).\n"
+            "• 🟢 *أموكسيسيلين / أوجمنتين:* Category B (مضاد آمن بإشراف طبي).\n"
+            "• 🚨 *أدوية الضغط (ACEi):* محظورة ومسببة لتشوهات كلى الجنين.\n\n"
+            "✍️ اكتبي اسم أي دواء وسأفحص تصنيفه السريري فوراً!"
+        )
+        bot.send_message(chat_id, dr_msg)
+
+    elif data == "preg_diet":
+        bot.send_message(
+            chat_id,
+            "🥗 *دليل التغذية والممنوعات للحامل:*\n\n"
+            "⛔ *الممنوعات:* الحليب غير المبستر، البيض واللحوم النيئة، الأسماك العالية بالزئبق، الكبدة بكميات كبيرة، والكافيين الزائد (> 200mg).\n"
+            "✨ *المكملات الأساسية:* حمض الفوليك، الحديد، الكالسيوم، وفيتامين د."
+        )
+
+    elif data == "preg_walk":
+        bot.send_message(
+            chat_id,
+            "🚶‍♀️ *برنامج المشي والرياضة الآمن:*\n\n"
+            "• المشي المعتدل 20-30 دقيقة يومياً يحسن الدورة الدموية ويمنع سكر الحمل.\n"
+            "• تمارين كيجل تقوي عضلات الحوض وتسهل الولادة.\n"
+            "🚨 *توقفي فوراً عند:* نزول دم، تقلصات منتظمة، أو دوخة وضيق تنفس."
+        )
+
+    elif data == "preg_visits":
+        bot.send_message(
+            chat_id,
+            "📊 *جدول الزيارات الدورية للحامل:*\n\n"
+            "• حتى الأسبوع 28: زيارة شهرية.\n"
+            "• أسبوع 28-36: زيارة كل أسبوعين.\n"
+            "• أسبوع 36-40: زيارة أسبوعية حتى الولادة."
+        )
 
     # 4. النماذج الجاهزة للأعراض
     elif data.startswith("qsym_"):
@@ -577,7 +788,10 @@ def handle_text_message(message):
     session = user_sessions.get(chat_id, {})
 
     # أزرار لوحة المفاتيح الدائمة
-    if "فاحص الأعراض" in text or "Symptom" in text:
+    if "حامل" in text or "حمل" in text or "أمومة" in text or "Pregnancy" in text or "Maternal" in text:
+        trigger_pregnancy_flow(chat_id, str(message.from_user.id), message.from_user.first_name or "")
+        return
+    elif "فاحص الأعراض" in text or "Symptom" in text:
         trigger_symptoms_flow(chat_id)
         return
     elif "الباقات" in text or "Plans" in text or "باقات" in text:
