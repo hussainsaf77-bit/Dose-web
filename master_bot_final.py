@@ -1,5 +1,11 @@
 
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import json, os, re, logging, asyncio, base64
+from datetime import datetime
+import pytz
+
 async def handle_symptoms_action(update, context):
     query = update.callback_query
     await query.answer()
@@ -14,12 +20,6 @@ async def handle_symptoms_action(update, context):
     kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
     await query.message.reply_text(msg, reply_markup=kb, parse_mode="Markdown")
 
-
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-import json, os, re, logging, asyncio, base64
-from datetime import datetime
-import pytz
 try:
     from supabase import create_client
     SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://finwslipvvasokmuxdla.supabase.co")
@@ -199,7 +199,6 @@ def self_ping():
         except: pass
 threading.Thread(target=self_ping, daemon=True).start()
 
-BOT_TOKEN = "8755290007:AAHD4EJ7VfaoyU3DMKJ4HQBLMpnrs4O1hEk"
 # قراءة .env مبكراً
 _env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 if os.path.exists(_env_file):
@@ -210,15 +209,7 @@ if os.path.exists(_env_file):
                 _k, _v = _line.split("=", 1)
                 os.environ[_k.strip()] = _v.strip()
 
-# قراءة .env قبل تعريف المتغيرات
-_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
-if os.path.exists(_env_path):
-    with open(_env_path) as _ef:
-        for _el in _ef:
-            _el = _el.strip()
-            if "=" in _el and not _el.startswith("#"):
-                _ek, _ev = _el.split("=", 1)
-                os.environ[_ek.strip()] = _ev.strip()
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAHiTqXLptjvpclDOD7wxQUS7PAMAKhb3gc"))
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY)} chars")

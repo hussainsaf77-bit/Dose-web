@@ -1,1292 +1,6008 @@
+
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Dose Medical Telegram Bot (بوت منصة جرعة الطبي الذكي)
-=====================================================
-نظام طبي متكامل يربط بين بوت تليجرام ومنصة الويب السحابية بحساب واشتراك موحد.
+import json, os, re, logging, asyncio, base64
+from datetime import datetime
+import pytz
 
-الميزات المدعومة:
-1. 🩺 فاحص الأعراض والتشخيص التفريقي السريري (Clinical DDx)
-2. 🩻 فحص وتحليل صور الأشعة السينية والتصوير الطبي (X-Ray / CT Radiology)
-3. 🧪 قراءة وتحليل الفحوصات والتحاليل المخبرية (Lab Test Analyzer)
-4. 💊 الصيدلاني الذكي ودليل الأدوية والجرعات والتداخلات
-5. 👶 حاسبة جرعات الأطفال التخصصية حسب الوزن والعمر
-6. 💳 باقات الاشتراك الخمسة المعتمدة وتفعيل أكواد الترقية (PRO2026, VIP2026)
-7. 🌐 الربط والتزامن اللحظي المباشر مع موقع المنصة السحابي
-8. 🚀 خادم HTTP خفيف مدمج لضمان استقرار العمل 24/7 على Render وTermux
-"""
+async def handle_symptoms_action(update, context):
+    query = update.callback_query
+    await query.answer()
+    lang = getattr(context, "user_data", {}).get("lang", "ar")
+    if lang == "en":
+        msg = "🩺 *Clinical Symptom Checker (DDx):*\n\nPlease describe your symptoms in a message, or open our web tool:"
+        btn = "🖥️ Open Symptom Checker Web"
+    else:
+        msg = "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (DDx):*\n\nاكتب الآن أعراضك بالتفصيل في رسالة، أو افتح الفاحص التفاعلي بالموقع:"
+        btn = "🖥️ فتح فاحص الأعراض الشامل بالموقع"
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
+    await query.message.reply_text(msg, reply_markup=kb, parse_mode="Markdown")
 
-import os
-import sys
-import json
-import base64
+try:
+    from supabase import create_client
+    SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://finwslipvvasokmuxdla.supabase.co")
+    SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_7g9H8VEBGrgGcF9CEfLrNg_Bu6xlorY")  # dose_bot key
+    supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except Exception as e:
+    print(f"❌ Supabase init error: {e}")
+    supabase_client = None
+TIMEZONE = pytz.timezone("Asia/Riyadh")
+
+# ══════════════════════════════════════
+# ربط البوت بـ API الموقع
+# ══════════════════════════════════════
+import urllib.request as _ur
+import json as _json
+
+API_BASE = os.environ.get("API_BASE", "https://web-dose.vercel.app")
+BOT_SECRET = os.environ.get("BOT_SECRET", "bot-secret-key-123")
+
+def api_check_sub(telegram_id: str) -> dict:
+    """تحقق من اشتراك المستخدم عبر API الموقع"""
+    try:
+        req = _ur.Request(
+            f"{API_BASE}/bot/verify/{telegram_id}",
+            headers={"x-bot-secret": BOT_SECRET}
+        )
+        with _ur.urlopen(req, timeout=5) as r:
+            return _json.loads(r.read())
+    except:
+        return {"linked": False, "has_sub": False, "plan": "Free",
+                "search_limit": 5, "reminder_limit": 0,
+                "register_url": "https://web-dose.vercel.app/?welcome=1&v=3.8"}
+
+def api_track_usage(telegram_id: str, action: str = "search") -> dict:
+    """يسجّل استخدام ويعيد هل مسموح أم لا"""
+    try:
+        req = _ur.Request(
+            f"{API_BASE}/bot/track/{telegram_id}?action={action}",
+            method="POST",
+            headers={"x-bot-secret": BOT_SECRET, "Content-Length": "0"}
+        )
+        with _ur.urlopen(req, timeout=5) as r:
+            return _json.loads(r.read())
+    except:
+        return {"allowed": True, "used": 0, "limit": -1}
+
+LINK_MSG = {
+    "ar": "🔗 *ربط حساب الموقع*\n\nبربط حسابك ستحصل على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n\n👇 سجّل من هنا:",
+    "en": "🔗 *Link Website Account*\n\nBy linking you get:\n✅ Unified subscription\n✅ Full dashboard\n✅ Saved history\n\n👇 Register here:"
+}
+LINK_URL = "https://web-dose.vercel.app/?welcome=1&v=3.8"
+
+
+# قاموس الدول والمناطق الزمنية
+COUNTRY_TIMEZONES = {
+    # العربية
+    "السعودية":"Asia/Riyadh","سعودية":"Asia/Riyadh","saudi":"Asia/Riyadh","ksa":"Asia/Riyadh",
+    "الإمارات":"Asia/Dubai","امارات":"Asia/Dubai","uae":"Asia/Dubai","dubai":"Asia/Dubai",
+    "الكويت":"Asia/Kuwait","kuwait":"Asia/Kuwait",
+    "قطر":"Asia/Qatar","qatar":"Asia/Qatar",
+    "البحرين":"Asia/Bahrain","bahrain":"Asia/Bahrain",
+    "عمان":"Asia/Muscat","oman":"Asia/Muscat",
+    "اليمن":"Asia/Aden","yemen":"Asia/Aden",
+    "العراق":"Asia/Baghdad","iraq":"Asia/Baghdad",
+    "سوريا":"Asia/Damascus","syria":"Asia/Damascus",
+    "لبنان":"Asia/Beirut","lebanon":"Asia/Beirut",
+    "الأردن":"Asia/Amman","jordan":"Asia/Amman",
+    "فلسطين":"Asia/Gaza","palestine":"Asia/Gaza",
+    "مصر":"Africa/Cairo","egypt":"Africa/Cairo",
+    "السودان":"Africa/Khartoum","sudan":"Africa/Khartoum",
+    "ليبيا":"Africa/Tripoli","libya":"Africa/Tripoli",
+    "تونس":"Africa/Tunis","tunisia":"Africa/Tunis",
+    "الجزائر":"Africa/Algiers","algeria":"Africa/Algiers",
+    "المغرب":"Africa/Casablanca","morocco":"Africa/Casablanca",
+    "موريتانيا":"Africa/Nouakchott","mauritania":"Africa/Nouakchott",
+    "الصومال":"Africa/Mogadishu","somalia":"Africa/Mogadishu",
+    "جيبوتي":"Africa/Djibouti","djibouti":"Africa/Djibouti",
+    "تركيا":"Europe/Istanbul","turkey":"Europe/Istanbul",
+    "إيران":"Asia/Tehran","iran":"Asia/Tehran",
+    "باكستان":"Asia/Karachi","pakistan":"Asia/Karachi",
+    "أفغانستان":"Asia/Kabul","afghanistan":"Asia/Kabul",
+    # أوروبا
+    "بريطانيا":"Europe/London","uk":"Europe/London","england":"Europe/London",
+    "فرنسا":"Europe/Paris","france":"Europe/Paris",
+    "ألمانيا":"Europe/Berlin","germany":"Europe/Berlin",
+    "هولندا":"Europe/Amsterdam","netherlands":"Europe/Amsterdam",
+    "بلجيكا":"Europe/Brussels","belgium":"Europe/Brussels",
+    "السويد":"Europe/Stockholm","sweden":"Europe/Stockholm",
+    "النرويج":"Europe/Oslo","norway":"Europe/Oslo",
+    "الدنمارك":"Europe/Copenhagen","denmark":"Europe/Copenhagen",
+    "سويسرا":"Europe/Zurich","switzerland":"Europe/Zurich",
+    "إسبانيا":"Europe/Madrid","spain":"Europe/Madrid",
+    "إيطاليا":"Europe/Rome","italy":"Europe/Rome",
+    "اليونان":"Europe/Athens","greece":"Europe/Athens",
+    "النمسا":"Europe/Vienna","austria":"Europe/Vienna",
+    "بولندا":"Europe/Warsaw","poland":"Europe/Warsaw",
+    # أمريكا
+    "كندا":"America/Toronto","canada":"America/Toronto",
+    "أمريكا":"America/New_York","usa":"America/New_York","us":"America/New_York",
+    "المكسيك":"America/Mexico_City","mexico":"America/Mexico_City",
+    "البرازيل":"America/Sao_Paulo","brazil":"America/Sao_Paulo",
+    "الأرجنتين":"America/Argentina/Buenos_Aires","argentina":"America/Argentina/Buenos_Aires",
+    # آسيا
+    "الهند":"Asia/Kolkata","india":"Asia/Kolkata",
+    "الصين":"Asia/Shanghai","china":"Asia/Shanghai",
+    "اليابان":"Asia/Tokyo","japan":"Asia/Tokyo",
+    "كوريا":"Asia/Seoul","korea":"Asia/Seoul",
+    "ماليزيا":"Asia/Kuala_Lumpur","malaysia":"Asia/Kuala_Lumpur",
+    "إندونيسيا":"Asia/Jakarta","indonesia":"Asia/Jakarta",
+    "أستراليا":"Australia/Sydney","australia":"Australia/Sydney",
+}
+
+def get_timezone(ctx):
+    tz_str = ctx.user_data.get("timezone", "Asia/Riyadh")
+    try:
+        return pytz.timezone(tz_str)
+    except:
+        return pytz.timezone("Asia/Riyadh")
+
+def detect_country_tz(text):
+    text = text.strip().lower()
+    for key, tz in COUNTRY_TIMEZONES.items():
+        if key in text or text in key:
+            return tz
+    return None
+
+# قراءة .env
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_file):
+    with open(_env_file) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+from telegram import Update, ReplyKeyboardRemove, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
+from telegram.request import HTTPXRequest
+from telegram.ext import PicklePersistence
+from telegram.ext import (Application, CommandHandler, CallbackQueryHandler,
+    MessageHandler, ConversationHandler, ContextTypes, filters, JobQueue,
+    PreCheckoutQueryHandler)
+from telegram.constants import ParseMode
+try:
+    import httpx
+    HTTPX_OK = True
+except ImportError:
+    HTTPX_OK = False
+
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
+logger = logging.getLogger(__name__)
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import TCPServer
 
-# Auto-import / install dependencies
-try:
-    import requests
-    import telebot
-    from telebot import types
-except ImportError:
-    try:
-        import subprocess
-        print("📦 جاري تثبيت الحزم المطلوبة (pyTelegramBotAPI, requests)...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI", "requests"])
-        import requests
-        import telebot
-        from telebot import types
-    except Exception:
-        try:
-            import subprocess
-            subprocess.check_call(["pip", "install", "pyTelegramBotAPI", "requests"])
-            import requests
-            import telebot
-            from telebot import types
-        except Exception:
-            print("❌ يلزم تثبيت المكتبات المطلوبة لتشغيل البوت:")
-            print("👉 نفذ الأمر التالي في سطر الأوامر (Termux أو VPS أو Render):")
-            print("   pip install pyTelegramBotAPI requests")
-            sys.exit(1)
-
-# -------------------------------------------------------------
-# 1. إعدادات الخادم السحابي والتوكن
-# -------------------------------------------------------------
-WEB_APP_URL = os.environ.get("WEB_APP_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8").rstrip("/")
-API_BASE_URL = os.environ.get("API_BASE_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8").rstrip("/")
-
-TOKEN_FILE = ".token.txt"
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
-
-if not BOT_TOKEN and os.path.exists(TOKEN_FILE):
-    try:
-        with open(TOKEN_FILE, "r", encoding="utf-8") as f:
-            BOT_TOKEN = f.read().strip()
-    except Exception:
-        pass
-
-if not BOT_TOKEN and len(sys.argv) > 1 and len(sys.argv[1]) > 20:
-    BOT_TOKEN = sys.argv[1].strip()
-
-# Default token fallback so bot connects immediately without hanging
-if not BOT_TOKEN:
-    BOT_TOKEN = "8755290007:AAHiTqXLptjvpclDOD7wxQUS7PAMAKhb3gc"
-
-# إعداد كائن البوت
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="Markdown")
-
-# حالات الجلسات المؤقتة
-user_sessions = {}
-
-# -------------------------------------------------------------
-# 2. خادم صحة HTTP مدمج لدعم استضافة Render وTermux
-# -------------------------------------------------------------
-class PingHealthHandler(BaseHTTPRequestHandler):
+class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
-        res = json.dumps({"status": "healthy", "service": "dose-telegram-bot", "appUrl": API_BASE_URL})
-        self.wfile.write(res.encode("utf-8"))
-
+        self.wfile.write(b"OK")
     def log_message(self, format, *args):
-        # تعطيل طباعة السجلات غير الضرورية
-        return
+        pass
 
-def start_background_http_server():
+def run_ping_server():
     port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), PingHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_ping_server, daemon=True).start()
+
+# Self-ping كل 10 دقائق لمنع النوم
+import urllib.request
+def self_ping():
+    import time
+    url = os.environ.get("RENDER_EXTERNAL_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8")
+    while True:
+        time.sleep(600)
+        try: urllib.request.urlopen(url, timeout=10)
+        except: pass
+threading.Thread(target=self_ping, daemon=True).start()
+
+# قراءة .env مبكراً
+_env_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.exists(_env_file):
+    with open(_env_file) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                os.environ[_k.strip()] = _v.strip()
+
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAHiTqXLptjvpclDOD7wxQUS7PAMAKhb3gc"))
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
+logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY)} chars")
+DRUGS_FILE = "drugs.json"
+REMINDER_SOUND = "reminder.mp3"
+
+(STATE_LANGUAGE, STATE_MAIN_MENU, STATE_DRUG_SEARCH,
+ STATE_CHILD_DRUG, STATE_CHILD_WEIGHT,
+ STATE_REM_MENU, STATE_REM_ADD_NAME, STATE_REM_ADD_TIME,
+ STATE_REM_ADD_FREQ, STATE_REM_EDIT_SEL,
+ STATE_REM_EDIT_FIELD, STATE_REM_EDIT_VAL,
+ STATE_BMI_WEIGHT, STATE_BMI_HEIGHT,
+ STATE_BMI_AGE, STATE_BMI_DRUG,
+ STATE_CHILD_CONC, STATE_PREMIUM,
+ STATE_COUNTRY, STATE_REM_DURATION, STATE_INFECTION_SITE,
+ STATE_CAL_GENDER, STATE_CAL_AGE, STATE_CAL_WEIGHT, STATE_CAL_HEIGHT, STATE_CAL_ACTIVITY, STATE_CAL_DISEASE,
+ STATE_FOOD_SEARCH, STATE_SUGAR, STATE_DIET, STATE_BP, STATE_BP_AGE,
+ STATE_PAT_MENU, STATE_PAT_NAME, STATE_PAT_AGE, STATE_PAT_WEIGHT,
+ STATE_PAT_GENDER, STATE_PAT_DISEASE, STATE_PAT_MEDS, STATE_PAT_ALLERGY,
+ STATE_INTERACTION, STATE_DRUG_FORM, STATE_PAT_NOTE, STATE_PAT_LOG, STATE_XRAY, STATE_LAB) = range(46)
+
+TEXTS = {
+"ar": {
+"welcome": "🌟 *أهلاً بك في بوت جرعة الطبي!*\n\n━━━━━━━━━━━━━━━━━━━━\n\n⚕️ *إخلاء مسؤولية مهم:*\n\nهذا البوت أداة مرجعية تعليمية فقط ولا يُغني عن الاجتهاد السريري.\n\n• للكادر الصحي: المعلومات للاسترشاد فقط — القرار العلاجي يعود لك وحدك بناءً على تقييمك للمريض\n• للمرضى: لا تعتمد على البوت لتشخيص أو علاج أي حالة دون استشارة طبيبك\n• الجرعات تختلف حسب حالة كل مريض وعوامل أخرى لا يعلمها البوت\n• لا يتحمل القائمون على البوت أي مسؤولية قانونية أو طبية\n\n🚨 في الطوارئ: اتصل بالإسعاف فوراً\n\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *Welcome to Dose Medical Bot!*\n\n⚕️ *Important Disclaimer:*\n\nThis bot is a reference tool only and does not replace clinical judgment.\n\n• Healthcare professionals: Information is for reference only — clinical decisions are solely yours based on patient assessment\n• Patients: Never rely on this bot for diagnosis or treatment without consulting your doctor\n• Doses vary based on individual patient factors unknown to this bot\n• The bot operators bear no legal or medical responsibility\n\n🚨 Emergency: Call ambulance immediately\n\n━━━━━━━━━━━━━━━━━━━━\n\nاختر لغتك | Choose your language:\n\n🌐 [تطبيق الويب | Web App](https://web-dose.vercel.app/?welcome=1&v=3.8)",
+"main_menu": "📋 *القائمة الرئيسية*\n\nاختر:",
+"btn_search": "🔍 استعلام عن دواء",
+"btn_child": "🍼 جرعات الأطفال",
+"btn_remind": "⏰ التذكير بالأدوية",
+"btn_patient": "👤 ملف المريض",
+"btn_interaction": "⚠️ فحص التعارضات والتداخلات الدوائية",
+"btn_settings": "⚙️ الإعدادات",
+"btn_premium": "⭐ الاشتراك المميز",
+"premium_menu": "⭐ *الاشتراك المميز*\n\nاختر خطتك:\n\n🆓 المجاني: 3 استعلامات لكل ميزة\n📅 أسبوعي: $0.99\n📆 شهري: $2.99\n📦 3 أشهر: $6.99 + شهر مجاني\n📦 6 أشهر: $11.99 + شهرين مجاناً\n🏆 سنوي: $19.99 + 6 أشهر مجاناً",
+"btn_month": "🗓️ شهري — 200 ⭐ (~$4)",
+"btn_3month": "📅 3 أشهر — 500 ⭐ (~$10) وفّر 17%",
+"btn_6month": "📆 6 أشهر — 900 ⭐ (~$18) وفّر 25%",
+"btn_year": "🎯 سنوي — 1500 ⭐ (~$30) وفّر 37%",
+"premium_features": (
+    "✨ *مميزات الاشتراك:*\n\n"
+    "🔍 بحث في 500+ دواء\n"
+    "📸 تحليل صور غير محدود\n"
+    "🔔 تذكيرات غير محدودة\n"
+    "📄 تقارير طبية PDF\n"
+    "⚡ أولوية في الدعم\n"
+    "🆕 ميزات جديدة أولاً"
+),
+"already_premium": "✅ أنت مشترك مميز حتى: {date}",
+"payment_sent": "⭐ شكراً! جارٍ تفعيل اشتراكك...",
+"payment_success": "🎉 *تم تفعيل اشتراكك المميز!*\n\nصالح حتى: {date}",
+"not_premium": "⭐ هذه الميزة للمشتركين المميزين فقط.\nاضغط لمعرفة المزيد:",
+"btn_bmi": "📊 الوزن المثالي (BMI)",
+"btn_cal": "🔥 حاسبة السعرات",
+"btn_sugar": "🩸 ⭐ قراءة السكر",
+"btn_bp": "💉 ⭐ قراءة الضغط",
+"bmi_prompt_weight": "⚖️ أدخل وزن الطفل بالكيلوغرام:",
+"bmi_prompt_height": "📏 أدخل طول الطفل بالسنتيمتر:",
+"bmi_prompt_age": "🎂 أدخل عمر الطفل بالسنوات:",
+"bmi_prompt_drug": "💊 أدخل اسم الدواء لحساب جرعته:",
+"bmi_result": "📊 *نتيجة BMI*",
+"bmi_underweight": "نقص وزن",
+"bmi_normal": "وزن طبيعي",
+"bmi_overweight": "زيادة وزن",
+"bmi_obese": "سمنة",
+"btn_back": "🔙 العودة للقائمة",
+"search_prompt": "🔍 اكتب اسم الدواء أو أرسل صورة العلبة 📸:",
+"not_found": "❌ لم يُعثر على دواء. حاول مرة أخرى.",
+"multi_results": "🔍 نتائج متعددة، اختر:",
+"child_prompt": "🍼 اكتب اسم الدواء أو أرسل صورة العبوة\n\n📸 *تعليمات التصوير:*\n• صوّر الوجه الأمامي للعبوة\n• تأكد أن الاسم والتركيز واضحان\n• مثال: 250مغ/5مل أو 100mg/5ml\n• الإضاءة جيدة والصورة واضحة\n• 💡 أفضل نتيجة إذا كان الاسم الإنجليزي ظاهراً",
+"weight_prompt": "⚖️ أدخل وزن الطفل بالكيلوغرام:",
+"bad_weight": "❌ وزن غير صحيح. أدخل رقماً بين 1 و 100.",
+"analyzing": "🔎 جارٍ تحليل الصورة...",
+"img_error": "❌ تعذّر التعرف على الدواء. اكتب الاسم نصاً.",
+"no_api": "⚠️ تحليل الصور غير مفعّل. اكتب الاسم.",
+"rem_menu": "⏰ *خدمة التذكير*\n\nاختر:",
+"btn_add": "➕ إضافة تذكير",
+"btn_list": "📋 تذكيراتي",
+"btn_edit": "✏️ تعديل",
+"btn_del": "🗑️ حذف",
+"rem_name": "💊 اكتب اسم الدواء:",
+"rem_time": "🕐 أدخل وقت التذكير HH:MM مثال 08:00",
+"rem_freq": "🔁 كم مرة يومياً؟ من 1 إلى 6:",
+"no_rems": "📭 لا توجد تذكيرات.",
+"rems_title": "📋 *تذكيراتك:*\n\n",
+"rem_deleted": "🗑️ تم الحذف.",
+"rem_updated": "✅ تم التحديث.",
+"rem_not_found": "❌ التذكير غير موجود.",
+"alert": "🔔 *تذكير!*\n\n💊 حان وقت: *{drug}*",
+"settings": "⚙️ *الإعدادات*",
+"change_country": "🌍 تغيير الدولة",
+"change_lang": "🌐 تغيير اللغة",
+"sel_del": "🗑️ اختر تذكيراً للحذف:",
+"sel_edit": "✏️ اختر تذكيراً للتعديل:",
+"edit_fields": "✏️ ماذا تريد تعديل؟",
+"ef_name": "💊 اسم الدواء",
+"ef_time": "🕐 الوقت",
+"ef_freq": "🔁 التكرار",
+"new_val": "✏️ أدخل القيمة الجديدة:",
+
+"bad_time": "❌ صيغة خاطئة. مثال: 08:30",
+"bad_freq": "❌ أدخل رقماً من 1 إلى 6.",
+},
+"en": {
+"welcome": "🌟 *أهلاً بك في بوت جرعة الطبي!*\n\n━━━━━━━━━━━━━━━━━━━━\n\n⚕️ *إخلاء مسؤولية مهم:*\n\nهذا البوت أداة مرجعية تعليمية فقط ولا يُغني عن الاجتهاد السريري.\n\n• للكادر الصحي: المعلومات للاسترشاد فقط — القرار العلاجي يعود لك وحدك بناءً على تقييمك للمريض\n• للمرضى: لا تعتمد على البوت لتشخيص أو علاج أي حالة دون استشارة طبيبك\n• الجرعات تختلف حسب حالة كل مريض وعوامل أخرى لا يعلمها البوت\n• لا يتحمل القائمون على البوت أي مسؤولية قانونية أو طبية\n\n🚨 في الطوارئ: اتصل بالإسعاف فوراً\n\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *Welcome to Dose Medical Bot!*\n\n⚕️ *Important Disclaimer:*\n\nThis bot is a reference tool only and does not replace clinical judgment.\n\n• Healthcare professionals: Information is for reference only — clinical decisions are solely yours based on patient assessment\n• Patients: Never rely on this bot for diagnosis or treatment without consulting your doctor\n• Doses vary based on individual patient factors unknown to this bot\n• The bot operators bear no legal or medical responsibility\n\n🚨 Emergency: Call ambulance immediately\n\n━━━━━━━━━━━━━━━━━━━━\n\nاختر لغتك | Choose your language:\n\n⚠️ *إخلاء مسؤولية:*\nهذا البوت أداة توعوية تثقيفية فقط \n• لا يُعدّ بديلاً عن استشارة طبيب أو صيدلاني \n• لا يتحمل القائمون على البوت أي مسؤولية عن أي قرار علاجي \n• في حالات الطوارئ، تواصل مع طبيبك فوراً \n\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *Welcome to the Medicine Bot!*\n\n⚠️ *Disclaimer:*\nThis bot is for educational purposes only \n• Not a substitute for medical consultation \n• Operators are not responsible for any medical decision \n• In emergencies, contact your doctor immediately \n\nاختر لغتك | Choose your language:",
+"main_menu": "📋 *Main Menu*\n\nChoose:",
+"btn_search": "🔍 Drug Search",
+"btn_child": "🍼 Child Doses",
+"btn_remind": "⏰ Reminders",
+"btn_patient": "👤 Patient File",
+"btn_interaction": "⚠️ Drug Interactions Checker",
+"btn_settings": "⚙️ Settings",
+"btn_premium": "⭐ Premium Subscription",
+"premium_menu": "⭐ *Premium Subscription*\n\nChoose your plan:\n\n🆓 Free: 3 queries per feature\n📅 Weekly: $0.99\n📆 Monthly: $2.99\n📦 3 Months: $6.99 + 1 month free\n📦 6 Months: $11.99 + 2 months free\n🏆 Annual: $19.99 + 6 months free",
+"btn_month": "🗓️ Monthly — 200 ⭐ (~$4)",
+"btn_3month": "📅 3 Months — 500 ⭐ (~$10) Save 17%",
+"btn_6month": "📆 6 Months — 900 ⭐ (~$18) Save 25%",
+"btn_year": "🎯 Yearly — 1500 ⭐ (~$30) Save 37%",
+"premium_features": (
+    "✨ *Premium Features:*\n\n"
+    "🔍 Search 500+ drugs\n"
+    "📸 Unlimited image analysis\n"
+    "🔔 Unlimited reminders\n"
+    "📄 Medical PDF reports\n"
+    "⚡ Priority support\n"
+    "🆕 New features first"
+),
+"already_premium": "✅ You are subscribed until: {date}",
+"payment_sent": "⭐ Thank you! Activating your subscription...",
+"payment_success": "🎉 *Premium activated!*\n\nValid until: {date}",
+"not_premium": "⭐ This feature is for premium subscribers only.\nTap to learn more:",
+"btn_bmi": "📊 Ideal Weight (BMI)",
+"btn_cal": "🔥 Calorie Calculator",
+"btn_sugar": "🩸 ⭐ Blood Sugar",
+"btn_bp": "💉 ⭐ Blood Pressure",
+"bmi_prompt_weight": "⚖️ Enter child weight in kg:",
+"bmi_prompt_height": "📏 Enter child height in cm:",
+"bmi_prompt_age": "🎂 Enter child age in years:",
+"bmi_prompt_drug": "💊 Enter drug name for dose calculation:",
+"bmi_result": "📊 *BMI Result*",
+"bmi_underweight": "Underweight",
+"bmi_normal": "Normal weight",
+"bmi_overweight": "Overweight",
+"bmi_obese": "Obese",
+"btn_back": "🔙 Back to Menu",
+"search_prompt": "🔍 Type the drug name or part of it:",
+"not_found": "❌ Drug not found. Try again.",
+"multi_results": "🔍 Multiple results, choose:",
+"child_prompt": "🍼 Type drug name or send a photo of the packaging\n\n📸 *Photo Tips:*\n• Take front of the packaging\n• Name and concentration must be clear\n• Example: 250mg/5ml or 120mg/5ml\n• Good lighting, clear image",
+"weight_prompt": "⚖️ Enter child weight in kg:",
+"bad_weight": "❌ Invalid weight. Enter 1 to 100.",
+"analyzing": "🔎 Analyzing image...",
+"img_error": "❌ Could not identify drug. Type the name.",
+"no_api": "⚠️ Image analysis not enabled. Type the name.",
+"rem_menu": "⏰ *Reminder Service*\n\nChoose:",
+"btn_add": "➕ Add Reminder",
+"btn_list": "📋 My Reminders",
+"btn_edit": "✏️ Edit",
+"btn_del": "🗑️ Delete",
+"rem_name": "💊 Enter drug name:",
+"rem_time": "🕐 Enter reminder time HH:MM e.g. 08:00",
+"rem_freq": "🔁 How many times per day? 1 to 6:",
+"no_rems": "📭 No reminders yet.",
+"rems_title": "📋 *Your Reminders:*\n\n",
+"rem_deleted": "🗑️ Deleted.",
+"rem_updated": "✅ Updated.",
+"rem_not_found": "❌ Reminder not found.",
+"alert": "🔔 *Reminder!*\n\n💊 Time to take: *{drug}*",
+"settings": "⚙️ *Settings*",
+"change_country": "🌍 تغيير الدولة",
+"change_country": "🌍 Change Country",
+"change_lang": "🌐 Change Language",
+"sel_del": "🗑️ Select reminder to delete:",
+"sel_edit": "✏️ Select reminder to edit:",
+"edit_fields": "✏️ What to edit?",
+"ef_name": "💊 Drug name",
+"ef_time": "🕐 Time",
+"ef_freq": "🔁 Frequency",
+"new_val": "✏️ Enter new value:",
+"bad_time": "❌ Wrong format. Example: 08:30",
+"bad_freq": "❌ Enter a number from 1 to 6.",
+},
+}
+
+def tx(key, lang): return TEXTS.get(lang, TEXTS["ar"]).get(key, key)
+def get_lang(ctx): return ctx.user_data.get("lang", "ar")
+
+def load_drugs():
     try:
-        TCPServer.allow_reuse_address = True
-        server = HTTPServer(("0.0.0.0", port), PingHealthHandler)
-        thread = threading.Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        print(f"✅ خادم فحص الصحة نشط على المنفذ: {port} (للحفاظ على تشغيل Render 24/7)")
-    except OSError as e:
-        print(f"ℹ️ المنفذ {port} مستخدم بالفعل أو محجوز ({e})، سيستمر البوت في العمل طبيعياً.")
+        with open(DRUGS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, list): return data
+        for k in ("drugs", "data", "medications"):
+            if k in data: return data[k]
+        return []
     except Exception as e:
-        print(f"⚠️ تنبيه خادم الصحة: {e}")
+        logger.error(f"drugs.json error: {e}"); return []
 
-# -------------------------------------------------------------
-# 3. دوال الربط بقاعدة البيانات ومزامنة الاشتراكات
-# -------------------------------------------------------------
-def get_user_subscription(telegram_id):
-    """جلب حالة اشتراك المستخدم والرصيد المتاح من السيرفر السحابي"""
+DRUGS_DB = load_drugs()
+
+def load_syrups():
     try:
-        res = requests.get(f"{API_BASE_URL}/api/user/{telegram_id}/subscription", timeout=5)
-        if res.status_code == 200:
-            return res.json()
+        with open("syrups.json", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+SYRUPS_MAP = load_syrups()
+
+def search_by_syrup_name(q):
+    """البحث باسم الشراب التجاري"""
+    q = q.strip().lower()
+    # بحث مباشر
+    if q in SYRUPS_MAP:
+        return SYRUPS_MAP[q]
+    # بحث جزئي
+    for k, v in SYRUPS_MAP.items():
+        if q in k.lower() or k.lower() in q:
+            return v
+    return None
+
+# ─── إحصائيات البوت ───
+STATS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stats.json")
+
+def load_stats():
+    # نقرأ من Supabase أولاً
+    if supabase_client:
+        try:
+            res = supabase_client.table("stats").select("data").eq("id", "all").execute()
+            if res.data:
+                return json.loads(res.data[0]["data"])
+        except Exception as e:
+            logger.error(f"load_stats supabase: {e}")
+    # fallback للملف المحلي
+    try:
+        with open(STATS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {"users": {}, "searches": 0, "child_doses": 0, "reminders": 0, "total_requests": 0, "image_search": 0, "bmi": 0, "calories": 0, "sugar": 0, "bp": 0}
+
+def save_stats(stats):
+    # نحفظ في Supabase
+    if supabase_client:
+        try:
+            supabase_client.table("stats").upsert({"id": "all", "data": json.dumps(stats, ensure_ascii=False)}).execute()
+        except Exception as e:
+            logger.error(f"save_stats supabase: {e}")
+    # نحفظ محلياً أيضاً
+    try:
+        with open(STATS_FILE, "w", encoding="utf-8") as f:
+            json.dump(stats, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        pass
-    return {
-        "plan": "free",
-        "dailyQuotaRemaining": 15,
-        "dailyQuotaTotal": 15,
-        "status": "active"
-    }
+        logger.error(f"save_stats local: {e}")
 
-def upgrade_user_in_cloud(telegram_id, plan="pro", package_id="monthly", user_name=""):
-    """ترقية اشتراك المستخدم في قاعدة البيانات السحابية"""
+def track(ctx, action="search"):
+    stats = load_stats()
+    uid = str(ctx.effective_user.id) if hasattr(ctx, "effective_user") and ctx.effective_user else "unknown"
+    existing = stats["users"].get(uid, 0); stats["users"][uid] = (existing + 1) if isinstance(existing, int) else 1
+    stats[action] = stats.get(action, 0) + 1
+    stats["total_requests"] = stats.get("total_requests", 0) + 1
+    save_stats(stats)
+    # تسجيل في Supabase
     try:
-        payload = {
-            "telegramId": str(telegram_id),
-            "plan": plan,
-            "packageId": package_id,
-            "username": user_name
-        }
-        res = requests.post(f"{API_BASE_URL}/api/subscription/upgrade", json=payload, timeout=6)
-        if res.status_code == 200:
-            return res.json()
-    except Exception as e:
-        pass
-    return {"success": False}
-
-# -------------------------------------------------------------
-# 4. لوحات المفاتيح والأزرار التفاعلية
-# -------------------------------------------------------------
-def get_main_reply_keyboard(lang="ar"):
-    """إزالة لوحة المفاتيح السفلية تماماً والاعتماد على القائمة الطبية المضمنة بالرسائل"""
-    return types.ReplyKeyboardRemove()
-
-import urllib.parse
-from datetime import datetime, timedelta
-
-def build_web_url(tab="symptoms", telegram_id="", name="", tier="pro", lang="ar"):
-    """إنشاء رابط ويب متزامن يفتح شاشة البدء والترحيب أولاً ثم ينتقل للقسم المطلوب"""
-    params = {}
-    if telegram_id:
-        params["tg_id"] = str(telegram_id)
-    if name:
-        params["name"] = str(name)
-    if tier:
-        params["tier"] = str(tier).lower()
-    if lang:
-        params["lang"] = str(lang)
-    params["start"] = "onboarding"
-    params["target"] = str(tab)
-    q = urllib.parse.urlencode(params)
-    return f"{WEB_APP_URL}/#{tab}?{q}"
-
-import urllib.parse
-import re
-from datetime import datetime, timedelta
-
-def calculate_obstetric_dates_py(lmp_date_obj):
-    """حساب عمر الحمل التوليدي وموعد الولادة التقديري وفق قاعدة نيغلي (ACOG Standard)"""
-    today = datetime.now().date()
-    diff = today - lmp_date_obj
-    total_days = diff.days
-    if total_days < 0 or total_days > 310:
-        return None
-    
-    weeks = total_days // 7
-    days = total_days % 7
-    
-    # Naegele's rule: LMP + 280 days
-    edd = lmp_date_obj + timedelta(days=280)
-    days_left = max(0, (edd - today).days)
-    progress = min(100, max(0, int((total_days / 280) * 100)))
-    
-    if weeks >= 28:
-        trimester = 3
-        trim_name = "الثلث الثالث (الأسبوع 28 - 40+)"
-    elif weeks >= 14:
-        trimester = 2
-        trim_name = "الثلث الثاني (الأسبوع 14 - 27)"
-    else:
-        trimester = 1
-        trim_name = "الثلث الأول (الأسبوع 1 - 13)"
-        
-    if weeks >= 36:
-        month = 9
-    elif weeks >= 32:
-        month = 8
-    elif weeks >= 28:
-        month = 7
-    elif weeks >= 23:
-        month = 6
-    elif weeks >= 18:
-        month = 5
-    elif weeks >= 14:
-        month = 4
-    elif weeks >= 9:
-        month = 3
-    elif weeks >= 5:
-        month = 2
-    else:
-        month = 1
-        
-    fruit_map = {
-        (0, 4): ("حبة سمسم صغيرة (انغراس البويضة المخصبة)", "سمسم"),
-        (5, 7): ("حبة عدس إلى حبة توت (بداية نبض القلب الأولي)", "حبة توت 🫐"),
-        (8, 10): ("حبة فاصوليا إلى كرز (تشكل ملامح الوجه والأطراف)", "حبة كرز 🍒"),
-        (11, 13): ("حبة ليمون أو تين (اكتمال الأعضاء الحيوية الأساسية)", "حبة ليمون 🍋"),
-        (14, 17): ("ثمرة أفوكادو أو تفاحة (استجابة الجنين للأصوات والضوء)", "ثمرة أفوكادو 🥑"),
-        (18, 22): ("موزة أو خرشوف (بدء الشعور بحركة الجنين وركلاته)", "ثمرة موزة 🍌"),
-        (23, 27): ("ثمرة باذنجان أو ذرة (تطور الرئتين وبداية فتح الجفون)", "باذنجانة 🍆"),
-        (28, 32): ("رأس ملفوف أو جوز هند (زيادة سريعة بالوزن وتكون الدهون)", "جوز هند 🥥"),
-        (33, 36): ("ثمرة أناناس أو شمام (استعداد الجنين والنزول للحوض)", "أناناس 🍍"),
-        (37, 42): ("ثمرة بطيخ (اكتمال النضج الرئوي واستعداد تام للولادة)", "بطيخ 🍉"),
-    }
-    
-    summary = "نمو وتطور سليم للجنين"
-    comparison = "جنين في مرحلة نمو نشطة"
-    for (w_min, w_max), (s, c) in fruit_map.items():
-        if w_min <= weeks <= w_max:
-            summary = s
-            comparison = c
-            break
-            
-    if weeks < 14:
-        tests = [
-            "سونار مبكر لتأكيد النبض والتأكد من موقع الحمل وعمر الجنين",
-            "فحص الشفافية القفوية (NT Scan) في الأسبوع 11-13 لاستبعاد متلازمة داون",
-            "تحاليل الدم الأساسية: فصيلة الدم، عامل Rh، قوة الدم CBC، وفحص البول"
-        ]
-    elif weeks < 28:
-        tests = [
-            "سونار التشوهات الهيكلية التفصيلي (Anomaly Scan) بين الأسبوع 18 و 22",
-            "فحص منحنى السكر الفموي لسكر الحمل (OGTT 75g) بين الأسبوع 24 و 28",
-            "فحص نسبة الهيموغلوبين والحديد لاستبعاد أنيميا الحمل"
-        ]
-    else:
-        tests = [
-            "حقنة الأنتي دي (Anti-D) في الأسبوع 28 إذا كانت فصيلة دم الأم سالبة (Rh Negative)",
-            "مراقبة نمو الجنين وحركته ومعدل تدفق الدم عبر المشيمة بالدوبلر",
-            "مسحة البكتيريا العقدية المهبلية (GBS) بين الأسبوع 35 و 37"
-        ]
-        
-    return {
-        "weeks": weeks,
-        "days": days,
-        "total_days": total_days,
-        "trimester": trimester,
-        "trim_name": trim_name,
-        "month": month,
-        "edd": edd.strftime("%Y-%m-%d"),
-        "days_left": days_left,
-        "progress": progress,
-        "summary": summary,
-        "comparison": comparison,
-        "tests": tests
-    }
-
-def get_medical_inline_menu(lang="ar", telegram_id="", name=""):
-    """القائمة الطبية التفاعلية الرئيسية المضمنة داخل الرسالة"""
-    sub = get_user_subscription(telegram_id)
-    plan_name = str(sub.get("plan", "FREE")).upper()
-    quota = sub.get("dailyQuotaRemaining", 15)
-
-    web_preg_url = build_web_url("pregnancy", telegram_id, name, plan_name, lang)
-    web_symptoms_url = build_web_url("symptoms", telegram_id, name, plan_name, lang)
-    web_plans_url = build_web_url("plans", telegram_id, name, plan_name, lang)
-    web_welcome_url = build_web_url("welcome", telegram_id, name, plan_name, lang)
-
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    if lang == "en":
-        btn_preg = types.InlineKeyboardButton("🤰 Maternal & Pregnancy Care (Dates, Vitals, Drugs)", callback_data="act_pregnancy")
-        btn_sym = types.InlineKeyboardButton("🩺 Symptoms Checker (DDx)", url=web_symptoms_url)
-        btn_plans = types.InlineKeyboardButton(f"💳 Plans ({plan_name})", url=web_plans_url)
-        btn_pharma = types.InlineKeyboardButton("💊 Smart Pharmacist", callback_data="act_pharma")
-        btn_pedia = types.InlineKeyboardButton("👶 Pediatric Calculator", callback_data="act_pediatric")
-        btn_xray = types.InlineKeyboardButton("🩻 X-Ray & Radiology AI", callback_data="act_xray")
-        btn_lab = types.InlineKeyboardButton("🧪 Lab Tests Interpreter", callback_data="act_lab")
-        btn_promo = types.InlineKeyboardButton("🎁 Redeem Promo Code", callback_data="act_promo")
-        btn_quota = types.InlineKeyboardButton(f"📊 My Balance ({quota} left)", callback_data="act_myplan")
-        btn_web = types.InlineKeyboardButton("🌐 Open Live Web Platform", url=web_welcome_url)
-    else:
-        btn_preg = types.InlineKeyboardButton("🤰 رعاية ومتابعة الحامل (حساب، سكر، ضغط، وزن)", callback_data="act_pregnancy")
-        btn_sym = types.InlineKeyboardButton("🩺 فاحص الأعراض بالمنصة (DDx)", url=web_symptoms_url)
-        btn_plans = types.InlineKeyboardButton(f"💳 باقات الاشتراك ({plan_name})", url=web_plans_url)
-        btn_pharma = types.InlineKeyboardButton("💊 الصيدلاني ودليل الأدوية", callback_data="act_pharma")
-        btn_pedia = types.InlineKeyboardButton("👶 حاسبة جرعات الأطفال", callback_data="act_pediatric")
-        btn_xray = types.InlineKeyboardButton("🩻 فحص وتحليل صور الأشعة", callback_data="act_xray")
-        btn_lab = types.InlineKeyboardButton("🧪 قراءة التحاليل المخبرية", callback_data="act_lab")
-        btn_promo = types.InlineKeyboardButton("🎁 تفعيل كود الترقية (PRO2026)", callback_data="act_promo")
-        btn_quota = types.InlineKeyboardButton(f"📊 رصيدي ({quota} استشارة متبقية)", callback_data="act_myplan")
-        btn_web = types.InlineKeyboardButton("🌐 فتح موقع المنصة المباشر", url=web_welcome_url)
-
-    markup.add(btn_preg)
-    markup.add(btn_sym, btn_plans)
-    markup.add(btn_pharma, btn_pedia)
-    markup.add(btn_xray, btn_lab)
-    markup.add(btn_promo, btn_quota)
-    markup.add(btn_web)
-    return markup
-
-def get_symptoms_presets_keyboard(telegram_id="", name=""):
-    """أزرار الحالات السريرية الجاهزة لفاحص الأعراض مع توجيه مباشر"""
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🫀 ألم بالصدر وضيق تنفس", callback_data="qsym_chest"),
-        types.InlineKeyboardButton("🍽️ ألم حاد بأسفل البطن", callback_data="qsym_appendix")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🧠 صداع نصفي حاد وغثيان", callback_data="qsym_migraine"),
-        types.InlineKeyboardButton("🫁 سعال مستمر وحمى", callback_data="qsym_cough")
-    )
-    markup.add(
-        types.InlineKeyboardButton("👶 حمى وسعال عند طفل", callback_data="qsym_child_fever"),
-        types.InlineKeyboardButton("🩸 حرقان بول وألم خاصرة", callback_data="qsym_uti")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🖥️ فتح فاحص الأعراض بالموقع (PDF)", url=build_web_url("symptoms", telegram_id, name)),
-        types.InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="act_menu")
-    )
-    return markup
-
-def get_plans_keyboard(telegram_id="", name=""):
-    """أزرار باقات الاشتراك الخمسة المعتمدة مع توجيه مباشر لبوابة الدفع"""
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("📅 أسبوعي ($0.99)", callback_data="buy_weekly"),
-        types.InlineKeyboardButton("📅 شهري ($2.99) ⭐", callback_data="buy_monthly")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🎁 3 أشهر ($6.99)", callback_data="buy_3m"),
-        types.InlineKeyboardButton("🎁 6 أشهر ($11.99)", callback_data="buy_6m")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🏆 باقة VIP سنوية ($19.99)", callback_data="buy_yearly")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🎁 تفعيل كود برومو", callback_data="act_promo"),
-        types.InlineKeyboardButton("🌐 إدارة الاشتراك عبر الموقع", url=build_web_url("plans", telegram_id, name))
-    )
-    markup.add(
-        types.InlineKeyboardButton("🔙 القائمة الرئيسية", callback_data="act_menu")
-    )
-    return markup
-
-def get_pregnancy_keyboard(telegram_id="", name=""):
-    """أزرار جناح رعاية ومتابعة الحامل والقياسات الشهرية"""
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🤰 حاسبة عمر الحمل وموعد الولادة", callback_data="preg_calc"),
-        types.InlineKeyboardButton("🩸 فحص السكر الشهري (GDM)", callback_data="preg_sugar")
-    )
-    markup.add(
-        types.InlineKeyboardButton("💓 قياس ضغط الدم وتسمم الحمل", callback_data="preg_bp"),
-        types.InlineKeyboardButton("⚖️ متابعة الوزن والزيادة الصحية", callback_data="preg_weight")
-    )
-    markup.add(
-        types.InlineKeyboardButton("💊 كاشف أمان الأدوية (FDA)", callback_data="preg_drugs"),
-        types.InlineKeyboardButton("🥗 التغذية والممنوعات بالثلث", callback_data="preg_diet")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🚶‍♀️ برنامج المشي والرياضة الآمن", callback_data="preg_walk"),
-        types.InlineKeyboardButton("📊 جدول الفحوصات والزيارات", callback_data="preg_visits")
-    )
-    markup.add(
-        types.InlineKeyboardButton("🌐 فتح ملف الحامل التفاعلي بالموقع", url=build_web_url("pregnancy", telegram_id, name)),
-        types.InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="act_menu")
-    )
-    return markup
-
-def trigger_pregnancy_flow(chat_id, user_id="", name=""):
-    """إرسال القائمة التوليدية لرعاية ومتابعة الحامل السريرية"""
-    msg = (
-        "🤰 *جناح رعاية ومتابعة الحامل السريري (Dose Maternal Suite) 🌸✨*\n\n"
-        "نظام سريري متكامل لمتابعة صحة الأم ونمو الجنين شهرياً وفق بروتوكولات (ACOG & WHO).\n\n"
-        "🩺 *الميزات والقياسات الشهرية المتاحة:*\n"
-        "• 🤰 *حاسبة عمر الحمل والولادة:* تحديد الأسابيع والثلث وتاريخ الولادة بدقة.\n"
-        "• 🩸 *فحص السكر الشهري (GDM):* متابعة الصائم وبعد الأكل وسكر الحمل.\n"
-        "• 💓 *قياس ضغط الدم والتسمم:* رصد مؤشرات Pre-eclampsia وزلال البول.\n"
-        "• ⚖️ *متابعة زيادة الوزن الصحية:* المعدلات الموصى بها حسب BMI.\n"
-        "• 💊 *أمان الأدوية أثناء الحمل (FDA):* تصنيفات السلامة والبدائل.\n"
-        "• 🥗 *دليل التغذية والممنوعات:* المحاذير والمكملات الأساسية.\n"
-        "• 🚶‍♀️ *النشاط والمشي الآمن:* علامات الطوارئ ومحاذير الحركة.\n\n"
-        "👇 *اضغطي على أي ميزة للبدء فوراً:*"
-    )
-    bot.send_message(chat_id, msg, reply_markup=get_pregnancy_keyboard(user_id, name))
-
-# -------------------------------------------------------------
-# 5. معالجات الأوامر الأساسية (/start, /menu, /help, /symptoms, /plans, /pregnancy)
-# -------------------------------------------------------------
-@bot.message_handler(commands=['start'])
-def cmd_start(message):
-    chat_id = message.chat.id
-    user_id = str(message.from_user.id)
-    first_name = message.from_user.first_name or "دكتور/مستخدم"
-    session = user_sessions.get(chat_id, {})
-    lang = session.get("lang", "ar")
-    sub = get_user_subscription(user_id)
-    plan_name = str(sub.get("plan", "FREE")).upper()
-    quota = sub.get("dailyQuotaRemaining", 15)
-
-    welcome_text = (
-        f"👋 *أهلاً بك يا {first_name} في منصة جرعة (Dose) الطبية الذكية!* 🏥✨\n\n"
-        f"📊 *باقتك الحالية:* *{plan_name}* ({quota} استشارة وفحص متبقية اليوم)\n"
-        "نظام سريري متكامل لمتابعة الحامل وصحة الأم، فاحص الأعراض (DDx)، والجرعات والأشعة.\n\n"
-        "👇 *القائمة الطبية الرئيسية المعتمدة — اختر الخدمة المطلوبة:*"
-    )
-    bot.send_message(chat_id, welcome_text, reply_markup=get_medical_inline_menu(lang, user_id, first_name))
-
-@bot.message_handler(commands=['menu'])
-def cmd_menu(message):
-    chat_id = message.chat.id
-    user_id = str(message.from_user.id)
-    first_name = message.from_user.first_name or "دكتور"
-    session = user_sessions.get(chat_id, {})
-    lang = session.get("lang", "ar")
-    msg = (
-        "🏥 *القائمة الطبية الرئيسية المعتمدة (منصة جرعة):*\n\n"
-        "👇 اختر الميزة السريرية التي تحتاجها للبدء فوراً:"
-    )
-    bot.send_message(chat_id, msg, reply_markup=get_medical_inline_menu(lang, user_id, first_name))
-
-@bot.message_handler(commands=['pregnancy', 'maternal', 'preg'])
-def cmd_pregnancy(message):
-    trigger_pregnancy_flow(message.chat.id, str(message.from_user.id), message.from_user.first_name or "")
-
-@bot.message_handler(commands=['symptoms'])
-def cmd_symptoms(message):
-    trigger_symptoms_flow(message.chat.id, str(message.from_user.id), message.from_user.first_name or "")
-
-@bot.message_handler(commands=['plans', 'upgrade'])
-def cmd_plans(message):
-    trigger_plans_flow(message.chat.id, str(message.from_user.id), message.from_user.first_name or "")
-
-@bot.message_handler(commands=['help'])
-def cmd_help(message):
-    chat_id = message.chat.id
-    help_text = (
-        "ℹ️ *دليل استخدام وأوامر بوت جرعة الطبي:*\n\n"
-        "• /start - فتح القائمة الطبية الرئيسية\n"
-        "• /menu - استعراض كافة الميزات السريرية\n"
-        "• /pregnancy - جناح رعاية ومتابعة الحامل (سكر، ضغط، وزن)\n"
-        "• /symptoms - فاحص الأعراض والتشخيص التفريقي (DDx)\n"
-        "• /plans - باقات الاشتراك والترقية الفورية\n"
-        "• 📸 *إرسال صورة*: لتحليل الأشعة السينية أو قراءة التحاليل المخبرية\n"
-        "• ✍️ *كتابة رسالة نصية*: لفحص الأعراض، حساب الحمل، أو الاستفسار عن الأدوية\n\n"
-        f"🌐 [فتح موقع المنصة عبر الويب]({WEB_APP_URL}/#symptoms)"
-    )
-    bot.send_message(chat_id, help_text)
-
-# -------------------------------------------------------------
-# 6. معالجات الأزرار التفاعلية (Callback Queries)
-# -------------------------------------------------------------
-@bot.callback_query_handler(func=lambda call: True)
-def handle_callbacks(call):
-    chat_id = call.message.chat.id
-    data = call.data
-    user_id = str(call.from_user.id)
-
-    try:
-        bot.answer_callback_query(call.id)
-    except Exception:
-        pass
-
-    user_name = getattr(call.from_user, "first_name", "") or "طبيب جرعة"
-
-    # 1. اختيار اللغة
-    if data == "lang_ar":
-        user_sessions[chat_id] = {"lang": "ar"}
-        msg = (
-            "✅ *تم اختيار اللغة العربية بنجاح!* 🇸🇦\n\n"
-            "🏥 *القائمة الطبية الشاملة لمنصة جرعة:*\n"
-            "جميع الميزات السريرية مفعلة ومتزامنة مع حسابك عبر الموقع:"
-        )
-        bot.send_message(chat_id, msg, reply_markup=get_medical_inline_menu("ar", user_id, user_name))
-        bot.send_message(chat_id, "💡 تم تفعيل لوحة المفاتيح السريعة بأسفل الشاشة.", reply_markup=get_main_reply_keyboard("ar"))
-
-    elif data == "lang_en":
-        user_sessions[chat_id] = {"lang": "en"}
-        msg = (
-            "✅ *English selected successfully!* 🇬🇧\n\n"
-            "🏥 *Dose Medical Clinical Menu:*\n"
-            "All diagnostic and dosing features are active and synchronized with the web platform:"
-        )
-    # 1. اختيار اللغة
-    if data == "lang_ar":
-        user_sessions[chat_id] = {"lang": "ar"}
-        msg = (
-            "✅ *تم اختيار اللغة العربية بنجاح!* 🇸🇦\n\n"
-            "🏥 *القائمة الطبية الرئيسية المعتمدة لمنصة جرعة:*\n"
-            "كافة الميزات السريرية مفعلة ومتزامنة مع حسابك عبر الموقع:"
-        )
-        bot.send_message(chat_id, msg, reply_markup=get_medical_inline_menu("ar", user_id, user_name))
-
-    elif data == "lang_en":
-        user_sessions[chat_id] = {"lang": "en"}
-        msg = (
-            "✅ *English selected successfully!* 🇬🇧\n\n"
-            "🏥 *Dose Medical Clinical Menu:*\n"
-            "All diagnostic and obstetric features are active and synchronized with your web account:"
-        )
-        bot.send_message(chat_id, msg, reply_markup=get_medical_inline_menu("en", user_id, user_name))
-
-    # 2. القائمة الرئيسية
-    elif data == "act_menu":
-        session = user_sessions.get(chat_id, {})
-        lang = session.get("lang", "ar")
-        bot.send_message(chat_id, "🏥 *القائمة الطبية الرئيسية المعتمدة:*", reply_markup=get_medical_inline_menu(lang, user_id, user_name))
-
-    # 3. فاحص الأعراض
-    elif data == "act_symptoms":
-        trigger_symptoms_flow(chat_id, user_id, user_name)
-
-    # 4. باقات الاشتراك
-    elif data == "act_plans":
-        trigger_plans_flow(chat_id, user_id, user_name)
-
-    # 4.5. جناح رعاية ومتابعة الحامل والقياسات الشهرية
-    elif data == "act_pregnancy" or data == "preg_menu":
-        trigger_pregnancy_flow(chat_id, user_id, user_name)
-
-    # --- أ) فحص السكر الشهري وسكر الحمل GDM ---
-    elif data == "preg_sugar":
-        sugar_msg = (
-            "🩸 *متابعة قياس السكر الشهري وسكر الحمل (Gestational Diabetes - GDM):*\n\n"
-            "🎯 *المعدلات المعتمدة سريرياً للحامل (ADA/ACOG):*\n"
-            "• *سكر الصائم:* أقل من `95 mg/dL`\n"
-            "• *بعد الأكل بساعة:* أقل من `140 mg/dL`\n"
-            "• *بعد الأكل بساعتين:* أقل من `120 mg/dL`\n"
-            "• *السكر التراكمي (HbA1c):* أقل من `6.0%`\n"
-            "• *فحص منحنى السكر (OGTT 75g):* يُجرى إجبارياً بين الأسبوع 24 و 28.\n\n"
-            "✍️ *لتسجيل فحصك:* اكتبي مثلاً: `سكر صائم 92` أو `سكر بعد الأكل 125` وسأقوم بتقييمه فوراً!\n\n"
-            "👇 *أو اضغطي على أحد النماذج السريعة للاختبار:*"
-        )
-        s_mk = types.InlineKeyboardMarkup(row_width=2)
-        s_mk.add(
-            types.InlineKeyboardButton("🟢 صائم مثالي (88 mg/dL)", callback_data="sug_88"),
-            types.InlineKeyboardButton("🟡 صائم مرتفع (102 mg/dL)", callback_data="sug_102")
-        )
-        s_mk.add(
-            types.InlineKeyboardButton("🔴 صائم حرج (130 mg/dL)", callback_data="sug_130"),
-            types.InlineKeyboardButton("🟢 بعد الأكل مثالي (110)", callback_data="sug_110")
-        )
-        s_mk.add(
-            types.InlineKeyboardButton("🔴 بعد الأكل مرتفع (155)", callback_data="sug_155"),
-            types.InlineKeyboardButton("🧪 بروتوكول اختبار OGTT", callback_data="sug_ogtt")
-        )
-        s_mk.add(
-            types.InlineKeyboardButton("💓 قياس ضغط الدم", callback_data="preg_bp"),
-            types.InlineKeyboardButton("⚖️ متابعة الوزن", callback_data="preg_weight")
-        )
-        s_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
-        bot.send_message(chat_id, sugar_msg, reply_markup=s_mk)
-
-    elif data.startswith("sug_"):
-        val_code = data.replace("sug_", "")
-        if val_code == "ogtt":
-            bot.send_message(
-                chat_id,
-                "🧪 *بروتوكول فحص منحنى تحمل الجلوكوز (OGTT 75g):*\n\n"
-                "• *الموعد المعتمد:* بين الأسبوع 24 و 28 لجميع الحوامل.\n"
-                "• *طريقة الفحص:* صيام 8-10 ساعات، قياس الصائم، شرب محلول 75 غم جلوكوز، ثم القياس بعد ساعة وساعتين.\n"
-                "• *القيم التشخيصية لسكر الحمل (يكفي تجاوز قراءة واحدة):*\n"
-                "  1. الصائم: `>= 92 mg/dL`\n"
-                "  2. بعد ساعة: `>= 180 mg/dL`\n"
-                "  3. بعد ساعتين: `>= 153 mg/dL`\n"
-                "💡 *الهدف:* حماية الجنين من تضخم الحجم (Macrosomia) وهبوط السكر بعد الولادة."
-            )
-        else:
-            val = int(val_code)
-            if val < 95:
-                res_text = f"🟢 *تقييم سكر الصائم ({val} mg/dL):*\n✅ قراءة طبيعية وممتازة! تحمي الجنين من العملقة وتضمن سلامة وظائف المشيمة."
-            elif val <= 125:
-                res_text = f"🟡 *تقييم سكر الصائم ({val} mg/dL):*\n⚠️ قراءة مرتفعة حدودياً (اشتباه سكر حمل GDM). يرجى تقليل الكربوهيدرات البسيطة والمشي الخفيف بعد الوجبات وعمل فحص OGTT 75g."
-            elif val == 110:
-                res_text = f"🟢 *تقييم سكر بعد الأكل بساعتين ({val} mg/dL):*\n✅ قراءة مثالية وضمن الحدود الطبيعية الموصى بها (< 120 mg/dL)."
-            elif val == 155:
-                res_text = f"🔴 *تقييم سكر بعد الوجبة ({val} mg/dL):*\n🚨 قراءة مرتفعة (> 140 mg/dL). تشير لمقاومة أنسولين هرمونية مشيمية وتستدعي مراجعة طبيب التوليد لضبط الحمية وتحديد العلاج."
+        if supabase_client and uid != "unknown":
+            tid = int(uid)
+            # تحديث أو إنشاء مستخدم
+            existing_user = supabase_client.table("users").select("id,usage_count").eq("telegram_id", tid).execute()
+            if existing_user.data:
+                new_count = existing_user.data[0]["usage_count"] + 1
+                supabase_client.table("users").update({"usage_count": new_count}).eq("telegram_id", tid).execute()
             else:
-                res_text = f"🔴 *تقييم سكر الصائم ({val} mg/dL):*\n🚨 قراءة صائم مرتفعة جداً! تستدعي تدخلاً علاجياً عاجلاً وفحص السائل الأمنيوسي بالسونار."
-            bot.send_message(chat_id, res_text)
-
-    # --- ب) فحص ضغط الدم وتسمم الحمل Pre-eclampsia ---
-    elif data == "preg_bp":
-        bp_msg = (
-            "💓 *متابعة قياس ضغط الدم ومراقبة تسمم الحمل (Pre-eclampsia Monitoring):*\n\n"
-            "🎯 *تصنيفات الضغط للحامل (ACOG Guidelines):*\n"
-            "• *الضغط المثالي:* أقل من `120/80 mmHg`\n"
-            "• *الضغط المرتفع الحذر:* بين `120-139 / 80-89 mmHg`\n"
-            "• *ضغط الحمل الحرج:* `140/90 mmHg` فما فوق (خطر تسمم الحمل)\n\n"
-            "🚨 *أعراض الخطر لتسمم الحمل:* صداع نابض شديد، زغللة عيون وميضية، ألم حاد فم المعدة والجانب الأيمن، تورم سريع بالوجه واليدين، وزلال البول.\n\n"
-            "✍️ *لتسجيل قياسك:* اكتبي مثلاً: `ضغط 115/75` أو `140/90` للتقييم الفوري!"
-        )
-        bp_mk = types.InlineKeyboardMarkup(row_width=2)
-        bp_mk.add(
-            types.InlineKeyboardButton("🟢 ضغط مثالي (115/75)", callback_data="bpp_norm"),
-            types.InlineKeyboardButton("🟡 ضغط حدودي (135/85)", callback_data="bpp_bord")
-        )
-        bp_mk.add(
-            types.InlineKeyboardButton("🚨 ضغط حرج (150/95)", callback_data="bpp_crit"),
-            types.InlineKeyboardButton("⚠️ علامات خطر التسمم", callback_data="bpp_signs")
-        )
-        bp_mk.add(
-            types.InlineKeyboardButton("💊 وقاية الأسبرين (Aspirin)", callback_data="bpp_aspirin"),
-            types.InlineKeyboardButton("🩸 فحص السكر الشهري", callback_data="preg_sugar")
-        )
-        bp_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
-        bot.send_message(chat_id, bp_msg, reply_markup=bp_mk)
-
-    elif data.startswith("bpp_"):
-        if data == "bpp_norm":
-            bot.send_message(chat_id, "🟢 *تقييم ضغط الدم (115/75 mmHg):*\n✅ ضغط دم مثالي يضمن تدفق الدم الكافي والمغذي للجنين عبر الحبل السري.")
-        elif data == "bpp_bord":
-            bot.send_message(chat_id, "🟡 *تقييم ضغط الدم (135/85 mmHg):*\n⚠️ ضغط دم حدودي مرتفع طفيفاً. يوصى بالراحة والاستلقاء على الجانب الأيسر، تقليل الملح، ومراقبة القياس مرتين أسبوعياً.")
-        elif data == "bpp_crit":
-            bot.send_message(chat_id, "🚨 *تقييم ضغط الدم (150/95 mmHg):*\n🔴 ضغط دم مرتفع حرج! يجب مراجعة طوارئ الولادة فوراً لفحص زلال البول ومراقبة نبض الجنين واستبعاد تسمم الحمل (Pre-eclampsia).")
-        elif data == "bpp_signs":
-            bot.send_message(
-                chat_id,
-                "⚠️ *قائمة أعراض الخطر لتسمم الحمل (Pre-eclampsia Red Flags):*\n\n"
-                "1. صداع نابض مستمر لا يستجيب للمسكنات.\n"
-                "2. تشوش بالرؤية أو رؤية نقاط وميضية أو حساسية من الضوء.\n"
-                "3. ألم حاد أسفل الأضلاع بالجانب الأيمن (منطقة الكبد) أو فم المعدة.\n"
-                "4. تورم مفاجئ وسريع في الوجه والجفون وحول العينين وأصابع اليدين.\n"
-                "5. غثيان وقيء مفاجئ بالثلث الثاني أو الثالث.\n\n"
-                "🚨 *ظهور أي من هذه الأعراض يستدعي التوجه للمستشفى فوراً!*"
-            )
-        elif data == "bpp_aspirin":
-            bot.send_message(
-                chat_id,
-                "💊 *بروتوكول أسبرين الوقاية (Low-dose Aspirin Prophylaxis):*\n\n"
-                "• *الجرعة:* 75 إلى 150 ملغ يومياً قبل النوم.\n"
-                "• *التوقيت:* يبدأ من الأسبوع 12 إلى 16 ويستمر حتى الأسبوع 36.\n"
-                "• *المستفيدات:* الحوامل ذوات الخطورة العالية (تاريخ تسمم حمل سابق، حمل التوائم، الضغط المزمن، السكري، أمراض الكلى والمناعة الذاتية).\n"
-                "💡 يقلل خطر تسمم الحمل وتأخر نمو الجنين بنسبة تصل إلى 60%."
-            )
-
-    # --- ج) متابعة الوزن ومؤشر كتلة الجسم ---
-    elif data == "preg_weight":
-        w_msg = (
-            "⚖️ *متابعة الوزن والزيادة الصحية للحامل (Gestational Weight Gain):*\n\n"
-            "🎯 *معدلات الزيادة الإجمالية الموصى بها حسب BMI قبل الحمل:*\n"
-            "• *النحافة (BMI < 18.5):* زيادة 12.5 - 18 كغ.\n"
-            "• *الوزن الطبيعي (BMI 18.5 - 24.9):* زيادة 11.5 - 16 كغ.\n"
-            "• *الوزن الزائد (BMI 25 - 29.9):* زيادة 7 - 11.5 كغ.\n"
-            "• *السمنة (BMI >= 30):* زيادة 5 - 9 كغ فقط.\n\n"
-            "📅 *توزيع الزيادة عبر الشهور:*\n"
-            "• الثلث الأول (1-3): 1 إلى 2 كغ فقط إجمالياً.\n"
-            "• الثلثين الثاني والثالث (4-9): نصف كغ أسبوعياً (1.5 - 2 كغ شهرياً).\n\n"
-            "🚨 *تنبيه:* الزيادة السريعة (> 1 كغ بالأسبوع) مؤشر لاحتباس سوائل مفاجئ (Edema) وقد تشير لتسمم الحمل."
-        )
-        w_mk = types.InlineKeyboardMarkup(row_width=2)
-        w_mk.add(
-            types.InlineKeyboardButton("🟢 زيادة طبيعية (0.5 كغ/أسبوع)", callback_data="pw_norm"),
-            types.InlineKeyboardButton("🔴 زيادة سريعة مفاجئة (> 1 كغ)", callback_data="pw_fluid")
-        )
-        w_mk.add(
-            types.InlineKeyboardButton("🩸 فحص السكر الشهري", callback_data="preg_sugar"),
-            types.InlineKeyboardButton("💓 قياس ضغط الدم", callback_data="preg_bp")
-        )
-        w_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
-        bot.send_message(chat_id, w_msg, reply_markup=w_mk)
-
-    elif data == "pw_norm":
-        bot.send_message(chat_id, "🟢 *معدل زيادة الوزن سليم ومثالي:*\n✅ الزيادة بمعدل 0.4 إلى 0.5 كغ أسبوعياً بالثلثين الثاني والثالث تعكس نمو الجنين والمشيمة وحجم الدم بشكل صحي دون تراكم دهون ضارة.")
-
-    elif data == "pw_fluid":
-        bot.send_message(chat_id, "🚨 *تنبيه الزيادة السريعة المفاجئة:*\n⚠️ الزيادة بأكثر من 1 كيلوغرام خلال أسبوع واحد لا تنتج عن السعرات الحرارية بل عن احتباس حاد للسوائل (Edema). يرجى قياس ضغط الدم وفحص زلال البول واستبعاد تسمم الحمل فوراً.")
-
-    # --- د) حاسبة عمر الحمل والولادة التقديري ---
-    elif data == "preg_calc":
-        c_msg = (
-            "🤰 *حاسبة عمر الحمل التوليدية وتاريخ الولادة المتوقع (Obstetric Calculator):*\n\n"
-            "✍️ *لحساب عمر الحمل بدقة:* اكتبي في رسالة تاريخ أول يوم لآخر دورة شهرية (مثلاً: `آخر دورة 2026-05-15` أو `15-05-2026` أو `2026/05/15`) وسأحسب لك الأسابيع والثلث وموعد الولادة وحجم الجنين فوراً!\n\n"
-            "👇 *أو اختاري أحد النماذج السريرية المباشرة:*"
-        )
-        c_mk = types.InlineKeyboardMarkup(row_width=2)
-        c_mk.add(
-            types.InlineKeyboardButton("👶 الأسبوع 8 (حبة كرز 🍒)", callback_data="cwk_8"),
-            types.InlineKeyboardButton("👶 الأسبوع 12 (حبة ليمون 🍋)", callback_data="cwk_12")
-        )
-        c_mk.add(
-            types.InlineKeyboardButton("👶 الأسبوع 20 (ثمرة موزة 🍌)", callback_data="cwk_20"),
-            types.InlineKeyboardButton("👶 الأسبوع 28 (باذنجانة 🍆)", callback_data="cwk_28")
-        )
-        c_mk.add(
-            types.InlineKeyboardButton("👶 الأسبوع 36 (بطيخة 🍉)", callback_data="cwk_36"),
-            types.InlineKeyboardButton("🌐 فتح حاسبة الحمل بالموقع", url=build_web_url("pregnancy", user_id, user_name))
-        )
-        c_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
-        bot.send_message(chat_id, c_msg, reply_markup=c_mk)
-
-    elif data.startswith("cwk_"):
-        wk = int(data.replace("cwk_", ""))
-        if wk <= 13:
-            t_name = "الثلث الأول (الأسبوع 1 - 13)"
-            fruit = "حبة كرز 🍒 إلى ليمونة 🍋"
-            stage_tests = "• سونار مبكر لتأكيد النبض واستبعاد الحمل خارج الرحم\n• فحص الشفافية القفوية (NT Scan) لاستبعاد متلازمة داون في الأسبوع 11-13\n• فحص فصيلة الدم وRh وقوة الدم CBC"
-        elif wk <= 27:
-            t_name = "الثلث الثاني (الأسبوع 14 - 27)"
-            fruit = "ثمرة أفوكادو 🥑 إلى موزة 🍌"
-            stage_tests = "• سونار التشوهات التفصيلي الشامل (Anomaly Scan) في الأسبوع 18-22\n• فحص منحنى السكر OGTT 75g في الأسبوع 24-28 لسكر الحمل\n• متابعة حركة الجنين ونبضه بالعيادة"
-        else:
-            t_name = "الثلث الثالث (الأسبوع 28 - 40+)"
-            fruit = "جوز هند 🥥 إلى بطيخة 🍉"
-            stage_tests = "• حقنة الأنتي دي (Anti-D) في الأسبوع 28 إذا كان Rh سالب\n• دوبلر لتقييم تدفق الدم المشيمي ووزن الجنين\n• مسحة البكتيريا العقدية GBS في الأسبوع 35-37"
-
-        report_txt = (
-            f"📋 *تقرير الحمل السريري (الأسبوع {wk}):*\n\n"
-            f"• *المرحلة:* {t_name}\n"
-            f"• *حجم الجنين التقريبي:* بحجم {fruit}\n"
-            f"• *الفحوصات الطبية الموصى بها في هذه المرحلة:*\n{stage_tests}\n\n"
-            f"💡 *نصيحة الطبيب:* شرب 2.5 لتر ماء يومياً، وتناول حمض الفوليك والحديد والكالسيوم بانتظام."
-        )
-        bot.send_message(chat_id, report_txt)
-
-    # --- هـ) كاشف أمان الأدوية أثناء الحمل FDA ---
-    elif data == "preg_drugs":
-        dr_msg = (
-            "💊 *كاشف أمان الأدوية أثناء الحمل (FDA Pregnancy Categories):*\n\n"
-            "🎯 *تصنيفات هيئة الغذاء والدواء الأمريكية (FDA):*\n"
-            "• 🟢 *Category A:* دراسات مؤكدة على البشر أثبتت أمانه التام.\n"
-            "• 🟢 *Category B:* آمن في دراسات الحيوانات والبشر (مثل: البنادول والأموكسيسيلين).\n"
-            "• 🟡 *Category C:* يستخدم بحذر شديد وفقط عند الضرورة الطبية.\n"
-            "• 🔴 *Category D:* محظور إلا في حالات إنقاذ الحياة (مثل: مضادات الصرع والإيبوبروفين بالثلث 3).\n"
-            "• 🚨 *Category X:* محظور قطعياً ومسبب لتشوهات خطيرة للأجنة (مثل: الرتينويدات وعلاجات الضغط ACEi والوارفارين).\n\n"
-            "✍️ *اكتبي اسم أي دواء تجاري أو علمي في رسالة وسأفحص تصنيفه السريري فوراً!*\n\n"
-            "👇 *أو استعرضي أشهر الأدوية سريرياً:*"
-        )
-        dr_mk = types.InlineKeyboardMarkup(row_width=2)
-        dr_mk.add(
-            types.InlineKeyboardButton("🟢 باراسيتامول / بنادول", callback_data="drg_para"),
-            types.InlineKeyboardButton("🔴 إيبوبروفين / بروفين", callback_data="drg_ibup")
-        )
-        dr_mk.add(
-            types.InlineKeyboardButton("🟢 أموكسيسيلين / أوجمنتين", callback_data="drg_amox"),
-            types.InlineKeyboardButton("🚨 أدوية الضغط (ACEi)", callback_data="drg_htn")
-        )
-        dr_mk.add(
-            types.InlineKeyboardButton("🟢 أدوية السكري والأنسولين", callback_data="drg_diab"),
-            types.InlineKeyboardButton("💉 مميعات الدم (كليكسان vs وارفارين)", callback_data="drg_blood")
-        )
-        dr_mk.add(types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy"))
-        bot.send_message(chat_id, dr_msg, reply_markup=dr_mk)
-
-    elif data == "drg_para":
-        bot.send_message(chat_id, "🟢 *باراسيتامول / بنادول (Paracetamol):*\n• *التصنيف:* Category B\n• *الأمان:* المسكن وخافض الحرارة الأول المعتمد والآمن في جميع مراحل الحمل والرضاعة.\n• *الجرعة:* 500-1000 ملغ عند الحاجة (أقصى حد 3000-4000 ملغ يومياً).")
-
-    elif data == "drg_ibup":
-        bot.send_message(chat_id, "🔴 *إيبوبروفين / بروفين / فولتارين (NSAIDs):*\n• *التصنيف:* Category D في الثلث الثالث\n• *التحذير السريري:* محظور تماماً بعد الأسبوع 20-28! يسبب إغلاقاً مبكراً للقناة الشريانية للجنين (Ductus Arteriosus)، ونقص السائل الأمنيوسي، ومشاكل كلوية جنينية.\n• *البديل الآمن:* باراسيتامول (بنادول).")
-
-    elif data == "drg_amox":
-        bot.send_message(chat_id, "🟢 *أموكسيسيلين / أوجمنتين / سيفالوسبورين:*\n• *التصنيف:* Category B\n• *الأمان:* مضاد حيوي واسع الطيف آمن لعلاج التهابات المسالك البولية والجيوب والتهاب الحلق أثناء الحمل تحت إشراف الطبيب.")
-
-    elif data == "drg_htn":
-        bot.send_message(chat_id, "🚨 *أدوية الضغط المحظورة (ACEi & ARBs مثل ليزينوبريل وكابتوبريل ولوسارتان):*\n• *التصنيف:* Category X / D\n• *الخطر:* تسبب تشوهات خطيرة بعظام الجمجمة، فشل كلوي جنيني، وموت الجنين.\n• *البدائل الآمنة لضغط الحامل:* لابيترول (Labetalol) أو ميثيل دوبا (Aldomet) أو نيفيديبين (Nifedipine).")
-
-    elif data == "drg_diab":
-        bot.send_message(chat_id, "🟢 *أدوية السكري وسكر الحمل:*\n• *الأنسولين:* الخيار الذهبي الأول والآمن 100% لأنه لا يعبر المشيمة إطلاقاً.\n• *ميتفورمين (غلوكوفاج):* Category B، آمن ومستخدم بفعالية في سكر الحمل وتكيس المبايض.\n• *حبوب السلفونيل يوريا (دايميكرون/أماريل):* محظورة لأنها تسبب هبوط سكر شديد للجنين.")
-
-    elif data == "drg_blood":
-        bot.send_message(chat_id, "💉 *مميعات الدم والوقاية من الجلطات:*\n• 🟢 *كليكسان / إينوكسبارين (Clexane / LMWH):* آمن تماماً ولا يعبر المشيمة.\n• 🔴 *وارفارين (Coumadin):* Category X ومحظور بالثلث الأول ومرحلة المخاض لتسببه بتشوهات جنينية ونزيف دماغي.")
-
-    # --- و) التغذية السريرية والممنوعات ---
-    elif data == "preg_diet":
-        bot.send_message(
-            chat_id,
-            "🥗 *دليل التغذية السريرية والممنوعات الصارمة للحامل:*\n\n"
-            "🚫 *الممنوعات الستة الصارمة لحماية الجنين:*\n"
-            "1. *الأجبان غير المبسترة والحليب الخام:* خطر بكتيريا الليستيريا المسببة للإجهاض.\n"
-            "2. *اللحوم والبيض النيئ والمايونيز المنزلي والسوشي:* خطر السالمونيلا والتوكسوبلازما.\n"
-            "3. *اللحوم الباردة والمصنعة (لانشون، بسطرمة، سوسيس):* لا تؤكل إلا بعد تسخينها لدرجة الغليان.\n"
-            "4. *الأسماك العالية بالزئبق (سمك القرش، الماكريل الملكي، التونة البيضاء بكثرة).*\n"
-            "5. *الكبدة الحيوانية بكميات كبيرة:* فرط فيتامين A المسبب لتشوهات الأجنة.\n"
-            "6. *الكافيين الزائد:* لا يتجاوز 200 ملغ يومياً (فنجان قهوة واحد).\n\n"
-            "✨ *المكملات الأساسية اليومية:*\n"
-            "• حمض الفوليك (400-800 mcg) من قبل الحمل وحتى الأسبوع 12.\n"
-            "• الحديد والكالسيوم وفيتامين د من الثلث الثاني حتى نهاية الرضاعة.",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🚶‍♀️ برنامج المشي والرياضة", callback_data="preg_walk"),
-                types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy")
-            )
-        )
-
-    # --- ز) المشي والنشاط البدني ---
-    elif data == "preg_walk":
-        bot.send_message(
-            chat_id,
-            "🚶‍♀️ *برنامج المشي والنشاط البدني الآمن للحامل (ACOG Guidelines):*\n\n"
-            "✅ *الأنشطة الموصى بها:*\n"
-            "• المشي المعتدل 20 إلى 30 دقيقة يومياً ينشط الدورة الدموية ويمنع سكر الحمل وتورم الساقين.\n"
-            "• تمارين قاع الحوض (كيجل Kegel): تقوي عضلات الحوض وتسهل الولادة الطبيعية وتمنع سلس البول.\n"
-            "• السباحة وتمارين التمدد الخفيفة: تخفف آلام أسفل الظهر.\n\n"
-            "🚨 *علامات التوقف الفوري ومراجعة الطوارئ (Red Flags):*\n"
-            "• نزول أي نزيف مهبلي أو تدفق سوائل.\n"
-            "• تقلصات رحمية منتظمة ومؤلمة قبل الأوان.\n"
-            "• دوخة حادة، إغماء، أو ضيق تنفس قبل بدء المجهود.\n"
-            "• انخفاض ملحوظ في حركة الجنين بعد الأسبوع 28.",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("📊 جدول الفحوصات والزيارات", callback_data="preg_visits"),
-                types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy")
-            )
-        )
-
-    # --- ح) جدول الزيارات والفحوصات ---
-    elif data == "preg_visits":
-        bot.send_message(
-            chat_id,
-            "📊 *جدول الزيارات الدورية والفحوصات المخبرية للحامل:*\n\n"
-            "📅 *مواعيد الزيارات الدورية للطبيب:*\n"
-            "• من البداية حتى الأسبوع 28: زيارة شهرية روتينية.\n"
-            "• من الأسبوع 28 إلى 36: زيارة كل أسبوعين.\n"
-            "• من الأسبوع 36 حتى الولادة: زيارة أسبوعية.\n\n"
-            "🔬 *خريطة الفحوصات الأساسية:*\n"
-            "• *أسبوع 6-8:* سونار تأكيد النبض واستبعاد الحمل المنتبذ.\n"
-            "• *أسبوع 11-13:* فحص الشفافية القفوية (NT Scan).\n"
-            "• *أسبوع 18-22:* سونار التشوهات التفصيلي الشامل (Anomaly Scan).\n"
-            "• *أسبوع 24-28:* فحص سكر الحمل (OGTT 75g) وفحص قوة الدم.\n"
-            "• *أسبوع 28:* حقنة الأنتي دي (Anti-D) لذوات فصيلة دم Rh السالبة.\n"
-            "• *أسبوع 35-37:* مسحة البكتيريا العقدية المهبلية (GBS Screen).",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🤰 حاسبة عمر الحمل", callback_data="preg_calc"),
-                types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy")
-            )
-        )
-
-    # 4. النماذج الجاهزة للأعراض
-    elif data.startswith("qsym_"):
-        preset_queries = {
-            "qsym_chest": "ألم ضاغط في منتصف الصدر مع ضيق في التنفس وتعرق بارد",
-            "qsym_appendix": "ألم حاد ومفاجئ بأسفل البطن جهة اليمين مع غثيان وارتفاع بالحرارة",
-            "qsym_migraine": "صداع نصفي نابض شديد مع غثيان وتحسس شديد من الضوء",
-            "qsym_cough": "سعال مستمر مصحوب ببلغم وحمى وضيق بالتنفس منذ 3 أيام",
-            "qsym_child_fever": "طفل عمره سنتين يعاني من حرارة 39 مع سعال وخمول",
-            "qsym_uti": "حرقان حاد بالبول مع ألم بالخاصرة وتكرار التبول",
-        }
-        query_text = preset_queries.get(data, "أعراض عامة")
-        process_symptoms_ai(chat_id, query_text)
-
-    # 5. باقات الاشتراك
-    elif data == "act_plans":
-        trigger_plans_flow(chat_id)
-
-    # 6. شراء / اختيار باقة
-    elif data.startswith("buy_"):
-        pkg_map = {
-            "buy_weekly": ("أسبوعي ($0.99)", "weekly", "pro"),
-            "buy_monthly": ("شهري ($2.99)", "monthly", "pro"),
-            "buy_3m": ("3 أشهر ($6.99)", "3months", "pro"),
-            "buy_6m": ("6 أشهر ($11.99)", "6months", "pro"),
-            "buy_yearly": ("سنوي VIP ($19.99)", "yearly", "vip"),
-        }
-        pkg_info = pkg_map.get(data, ("شهري ($2.99)", "monthly", "pro"))
-        pkg_label, pkg_id, target_plan = pkg_info
-
-        # ترقية فورية في قاعدة البيانات السحابية
-        user_name = call.from_user.username or call.from_user.first_name or ""
-        upgrade_user_in_cloud(chat_id, plan=target_plan, package_id=pkg_id, user_name=user_name)
-
-        bot.send_message(
-            chat_id,
-            f"🎉 *مبروك! تم تفعيل باقة {pkg_label} بنجاح!* ✨\n\n"
-            f"• ⚡ *الحساب السحابي:* متزامن بالكامل مع الموقع والبوت\n"
-            f"• 🩺 *فاحص الأعراض (DDx):* مفعل بكامل طاقته التشخيصية\n"
-            f"• 🩻 *فحص الأشعة والتحاليل:* غير محدود\n"
-            f"• 💳 *لإتمام الدفع الآمن عبر Paddle إن رغبت:* [اضغط هنا لفتح بوابة الويب]({WEB_APP_URL}/#plans)\n\n"
-            "ابدأ الآن بتجربة فاحص الأعراض أو أرسل صورة أشعة مباشرة!",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🩺 فحص الأعراض الآن", callback_data="act_symptoms"),
-                types.InlineKeyboardButton("🌐 فتح موقع المنصة", url=f"{WEB_APP_URL}/#symptoms")
-            )
-        )
-
-    # 7. الأشعة السينية
-    elif data == "act_xray":
-        bot.send_message(
-            chat_id,
-            "🩻 *فحص وتحليل صور الأشعة السينية (X-Ray / CT Radiology):*\n\n"
-            "📸 *أرسل الآن صورة الأشعة مباشرة في هذه المحادثة!* \n"
-            "سيقوم الذكاء الاصطناعي السريري بتحليلها ومطابقة المعالم العظمية والرئوية فوراً.\n\n"
-            f"👇 أو تفضل بفتح [لوحة الفحص الإشعاعي بالموقع]({WEB_APP_URL}/#lab_imaging)"
-        )
-
-    # 8. التحاليل المخبرية
-    elif data == "act_lab":
-        bot.send_message(
-            chat_id,
-            "🧪 *قراءة وتحليل نتائج الفحوصات المخبرية (Lab Analyzer):*\n\n"
-            "📸 *أرسل صورة ورقة التحليل المخبري* (مثل: CBC، وظائف كبد، كلى، سكر تراكمي).\n"
-            "سأقوم بقراءة القيم ومقارنتها بالنسب الطبيعية واستخراج التوصيات.\n\n"
-            f"👇 أو تفضل بفتح [محلل التحاليل بالموقع]({WEB_APP_URL}/#lab_imaging)"
-        )
-
-    # 9. الصيدلاني الذكي
-    elif data == "act_pharma":
-        bot.send_message(
-            chat_id,
-            "💊 *استشارة الصيدلاني الذكي ودليل الأدوية:*\n\n"
-            "✍️ اكتب اسم أي دواء تجاري أو علمي في رسالة (مثلاً: *بنادول أدفانس* أو *Amoxicillin*).\n"
-            "سأعرض لك دواعي الاستعمال، الجرعات الموصى بها، والتحذيرات.\n\n"
-            f"🌐 [دليل الأدوية الكامل بالموقع]({WEB_APP_URL}/#drugs)"
-        )
-
-    # 10. جرعات الأطفال
-    elif data == "act_pediatric":
-        bot.send_message(
-            chat_id,
-            "👶 *حاسبة جرعات الأطفال التخصصية:*\n\n"
-            "✍️ اكتب اسم شراب الدواء مع وزن الطفل (مثلاً: *شراب بروفين لطفل وزنه 12 كجم*).\n"
-            "سأحسب لك الجرعة الدقيقة بالميلي لتر (ml) ومعدل التكرار.\n\n"
-            f"🌐 [حاسبة الأطفال المتقدمة بالموقع]({WEB_APP_URL}/#pediatric)"
-        )
-
-    # 11. كود الخصم والترقية
-    elif data == "act_promo":
-        user_sessions[chat_id] = {"mode": "waiting_promo"}
-        bot.send_message(
-            chat_id,
-            "🎁 *تفعيل كود الخصم أو الترقية:* \n\n"
-            "✍️ اكتب الآن كود الترقية في رسالة (مثلاً: `PRO2026` أو `VIP2026`).\n"
-            "سيتم ترقية حسابك وتفعيل كافة الميزات السريرية فوراً!"
-        )
-
-    # 12. حالة حسابي والرصيد
-    elif data == "act_myplan":
-        sub = get_user_subscription(chat_id)
-        plan_name = str(sub.get("plan", "FREE")).upper()
-        quota_remaining = sub.get("dailyQuotaRemaining", 15)
-        quota_total = sub.get("dailyQuotaTotal", 15)
-        bot.send_message(
-            chat_id,
-            f"📊 *بيانات اشتراكك وحسابك الموحد:* \n\n"
-            f"• نوع الباقة: *{plan_name}*\n"
-            f"• الرصيد المتبقي اليوم: `{quota_remaining}` من أصل `{quota_total}` استشارة\n"
-            f"• التزامن السحابي: *متصل ونشط مع الموقع* ✅\n\n"
-            f"لترقية باقتك وزيادة الرصيد أرسل /plans أو تفضل بفتح [صفحة الاشتراكات بالموقع]({WEB_APP_URL}/#plans)",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("💳 باقات الاشتراك", callback_data="act_plans"),
-                types.InlineKeyboardButton("🎁 تفعيل كود خصم", callback_data="act_promo")
-            )
-        )
-
-def trigger_symptoms_flow(chat_id, user_id=None, name=""):
-    """فتح تدفق فحص الأعراض السريري مع الربط المباشر"""
-    user_sessions[chat_id] = {"mode": "waiting_symptoms"}
-    uid = user_id or str(chat_id)
-    msg = (
-        "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (Clinical DDx):*\n\n"
-        "✍️ *اكتب الآن في رسالة شكواك أو الأعراض التي تشعر بها بتفصيل*\n"
-        "(مثلاً: *ألم في الصدر مع ضيق تنفس* أو *ألم حاد أسفل البطن جهة اليمين مع غثيان*)...\n\n"
-        "👇 *أو اضغط على أحد النماذج السريرية الجاهزة للفحص المباشر:*"
-    )
-    bot.send_message(chat_id, msg, reply_markup=get_symptoms_presets_keyboard(uid, name))
-
-def trigger_plans_flow(chat_id, user_id=None, name=""):
-    """عرض باقات الاشتراك المعتمدة مع الربط المباشر"""
-    uid = user_id or str(chat_id)
-    sub = get_user_subscription(uid)
-    current_plan = str(sub.get("plan", "FREE")).upper()
-    plans_msg = (
-        f"💳 *باقات واشتراكات منصة جرعة الطبية الشاملة:*\n"
-        f"باقتك الحالية: *{current_plan}*\n\n"
-        "📅 *1. الباقة الأسبوعية:* `$0.99` (تجربة سريعة لكافة الميزات)\n"
-        "📅 *2. الباقة الشهرية (الأكثر طلباً):* `$2.99` (250 فحص واستشارة يومياً)\n"
-        "🎁 *3. باقة 3 أشهر:* `$6.99` (توفير 25% مع أولوية المعالجة)\n"
-        "🎁 *4. باقة 6 أشهر:* `$11.99` (توفير 35% مع تصدير تقارير PDF)\n"
-        "🏆 *5. باقة VIP السنوية:* `$19.99` (استخدام غير محدود + دعم أولوية)\n\n"
-        "👇 *اضغط على الباقة لتفعيلها فوراً أو استخدام كود الترقية:*"
-    )
-    bot.send_message(chat_id, plans_msg, reply_markup=get_plans_keyboard(uid, name))
-
-# -------------------------------------------------------------
-# 7. معالجة الصور (أشعة سينية وتحاليل مخبرية)
-# -------------------------------------------------------------
-@bot.message_handler(content_types=['photo'])
-def handle_photo_message(message):
-    chat_id = message.chat.id
-    bot.send_message(chat_id, "⏳ *جاري استقبال وفحص الصورة بالذكاء الاصطناعي الطبي السريري المتقدم...*")
-
-    try:
-        # تحميل الصورة بأعلى جودة متوفرة
-        photo_info = message.photo[-1]
-        file_path_info = bot.get_file(photo_info.file_id)
-        downloaded_file = bot.download_file(file_path_info.file_path)
-
-        # تحويل الصورة إلى base64
-        base64_img = base64.b64encode(downloaded_file).decode('utf-8')
-
-        # إرسال الصورة لخادم الذكاء الاصطناعي
-        endpoint = f"{API_BASE_URL}/api/medical/analyze-imaging"
-        payload = {
-            "imageBase64": base64_img,
-            "mimeType": "image/jpeg",
-            "analysisType": "imaging",
-            "telegramId": str(chat_id)
-        }
-        res = requests.post(endpoint, json=payload, timeout=25)
-
-        if res.status_code == 200:
-            data = res.json()
-            findings = data.get("findingsSummary") or data.get("description") or "تم فحص المعالم التشريحية بنجاح."
-            urgency = data.get("urgencyLevel", "normal")
-            recs = data.get("recommendations", [])
-
-            urgency_ar = {
-                "critical": "🚨 طوارئ حرجة",
-                "high": "⚠️ أولوية عالية",
-                "medium": "🟡 حالة متوسطة",
-                "normal": "🟢 حالة روتينية/طبيعية"
-            }.get(urgency, "🟡 حالة متوسطة")
-
-            report_msg = (
-                f"🩻 *تقرير الفحص والتحليل الإشعاعي السريري:* \n\n"
-                f"• *مستوى الأولوية والاستعجال:* {urgency_ar}\n\n"
-                f"• *الانطباع والنتائج السريرية:* \n{findings}\n\n"
-            )
-            if recs:
-                report_msg += "• *التوصيات السريرية:* \n• " + "\n• ".join(recs[:3]) + "\n\n"
-
-            report_msg += f"🌐 [فتح التقرير الإشعاعي التفاعلي والمقارنة بالموقع]({WEB_APP_URL}/#lab_imaging)"
-
-            bot.send_message(chat_id, report_msg)
-            return
-
+                user_obj = ctx.effective_user if hasattr(ctx, "effective_user") and ctx.effective_user else None
+                name = user_obj.full_name if user_obj else "Unknown"
+                supabase_client.table("users").insert({"telegram_id": tid, "name": name, "usage_count": 1}).execute()
+            # تسجيل العملية
+            supabase_client.table("usage_logs").insert({"telegram_id": tid, "action": action}).execute()
     except Exception as e:
         pass
 
-    # تقرير احتياطي سريع في حال تعذر الاتصال
-    fallback_report = (
-        "📋 *تقرير الفحص الإشعاعي والمخبري الأولي:*\n\n"
-        "✅ تم استلام الصورة وتوثيقها في سجلك الطبي بنجاح.\n"
-        "💡 الصورة تظهر معالم نسيجية واضحة، ولا تظهر مؤشرات حرجة فورية تهدد الحياة.\n\n"
-        f"🌐 [افتح لوحة الفحص الشاملة بالموقع لعرض التحليل الكامل بنماذج Gemini]({WEB_APP_URL}/#lab_imaging)"
-    )
-    bot.send_message(chat_id, fallback_report)
+def get_user_plan(telegram_id):
+    """الحصول على خطة المستخدم من Supabase"""
+    try:
+        if supabase_client:
+            result = supabase_client.table("users").select("plan,usage_count,plan_expires_at").eq("telegram_id", telegram_id).execute()
+            if result.data:
+                return result.data[0]
+    except:
+        pass
+    return {"plan": "free", "usage_count": 0, "plan_expires_at": None}
 
-# -------------------------------------------------------------
-# 8. معالجة الرسائل النصية
-# -------------------------------------------------------------
-@bot.message_handler(content_types=['text'])
-def handle_text_message(message):
-    chat_id = message.chat.id
-    text = message.text.strip()
-    session = user_sessions.get(chat_id, {})
-    user_id = str(message.from_user.id)
-    user_name = message.from_user.first_name or ""
+FREE_LIMIT = 3  # حد الاستخدام المجاني لكل ميزة
 
-    # 1. أوامر التحويل السريعة
-    if text in ["/pregnancy", "/maternal", "🤰 رعاية ومتابعة الحامل", "رعاية الحامل", "حمل", "حامل"]:
-        trigger_pregnancy_flow(chat_id, user_id, user_name)
-        return
-    elif text in ["/symptoms", "🩺 فاحص الأعراض"]:
-        trigger_symptoms_flow(chat_id, user_id, user_name)
-        return
-    elif text in ["/plans", "💳 الباقات"]:
-        trigger_plans_flow(chat_id, user_id, user_name)
-        return
+# حدود كل ميزة
 
-    # 2. فحص مدخلات الحامل: تاريخ آخر دورة شهرية (LMP Date Calculation)
-    date_match = re.search(r'(\d{4}[-/]\d{1,2}[-/]\d{1,2})|(\d{1,2}[-/]\d{1,2}[-/]\d{4})', text)
-    if date_match and ("دورة" in text or "lmp" in text.lower() or "حمل" in text or len(text) <= 12):
-        raw_date = date_match.group(0).replace("/", "-")
-        parsed_d = None
-        for fmt in ("%Y-%m-%d", "%d-%m-%Y"):
-            try:
-                parsed_d = datetime.strptime(raw_date, fmt).date()
+async def check_limit(update, ctx, action="default"):
+    """التحقق من حد الاستخدام المجاني"""
+    try:
+        if not supabase_client:
+            return True
+        tid = update.effective_user.id
+        lang = get_lang(ctx)
+        result = supabase_client.table("users").select("plan,usage_count,plan_expires_at").eq("telegram_id", tid).execute()
+        if result.data:
+            user = result.data[0]
+            plan = user.get("plan", "free")
+            # لو مشترك يمر
+            if plan != "free":
+                from datetime import datetime, timezone
+                expires = user.get("plan_expires_at")
+                if expires:
+                    exp_dt = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+                    if exp_dt > datetime.now(timezone.utc):
+                        return True
+            # فحص العدد حسب الميزة
+            limit = FREE_LIMITS.get(action, FREE_LIMITS["default"])
+            # نحسب استخدامات هذه الميزة تحديداً
+            logs = supabase_client.table("usage_logs").select("id").eq("telegram_id", tid).eq("action", action).execute()
+            count = len(logs.data) if logs.data else 0
+            if count >= limit:
+                msg = f"⭐ *{'وصلت للحد المجاني' if lang=='ar' else 'Free limit reached'}*\n\n{'لقد استخدمت هذه الميزة' if lang=='ar' else 'You have used this feature'} {count} {'مرات' if lang=='ar' else 'times'}.\n\n{'اشترك للاستمرار بدون حدود!' if lang=='ar' else 'Subscribe to continue without limits!'}"
+                kb = InlineKeyboardMarkup([[InlineKeyboardButton("🩺 " + ("فاحص الأعراض (DDx)" if lang=="ar" else "Symptom Checker"), callback_data="symptoms")], [InlineKeyboardButton("⭐ " + ("اشترك الآن" if lang=="ar" else "Subscribe Now"), callback_data="m_premium")]])
+                await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN, reply_markup=kb)
+                return False
+        return True
+    except Exception as e:
+        logger.error(f"check_limit error: {e}")
+        return True  # في حال الخطأ نسمح بالمرور
+
+FREE_LIMITS = {
+    "search": 3,
+    "child": 3,
+    "interaction": 3,
+    "diet": 3,
+    "image": 2,
+    "default": 3
+}
+
+def search_drugs(q):
+    q = q.strip().lower()
+    if not q: return []
+    # البحث في قاموس الشرابات أولاً
+    syrup_generic = search_by_syrup_name(q)
+    if syrup_generic:
+        q_mapped = syrup_generic.lower()
+    else:
+        q_mapped = q
+    # قاموس الأسماء التجارية الشهيرة
+    TRADE_MAP = {
+        "panadol":"paracetamol","بنادول":"paracetamol","calpol":"paracetamol",
+        "tylenol":"paracetamol","adol":"paracetamol","كالبول":"paracetamol",
+        "nurofen":"ibuprofen","نوروفين":"ibuprofen","advil":"ibuprofen",
+        "brufen":"ibuprofen","بروفين":"ibuprofen","motrin":"ibuprofen",
+        "augmentin":"amoxicillin_clavulanate","أوجمنتين":"amoxicillin_clavulanate","كلافوكس":"amoxicillin_clavulanate","clavox":"amoxicillin_clavulanate","كلافاموكس":"amoxicillin_clavulanate","clavamox":"amoxicillin_clavulanate","كو-أموكسيكلاف":"amoxicillin_clavulanate","co-amoxiclav":"amoxicillin_clavulanate","كلافولانيك":"amoxicillin_clavulanate",
+        "amoxil":"amoxicillin","أموكسيل":"amoxicillin",
+        "zithromax":"azithromycin","زيثروماكس":"azithromycin",
+        "glucophage":"metformin","جلوكوفاج":"metformin",
+        "ventolin":"salbutamol","فنتولين":"salbutamol",
+        "flagyl":"metronidazole","فلاجيل":"metronidazole",
+        "voltaren":"diclofenac","فولتارين":"diclofenac",
+        "nexium":"esomeprazole","نيكسيوم":"esomeprazole",
+        "losec":"omeprazole","لوسك":"omeprazole",
+        "klacid":"clarithromycin","كلاسيد":"clarithromycin",
+        "diflucan":"fluconazole","ديفلوكان":"fluconazole",
+        "cipro":"ciprofloxacin","سيبرو":"ciprofloxacin",
+        "crestor":"rosuvastatin","كريستور":"rosuvastatin",
+        "lipitor":"atorvastatin","ليبيتور":"atorvastatin",
+        "concor":"bisoprolol","كونكور":"bisoprolol",
+        "norvasc":"amlodipine","نورفاسك":"amlodipine",
+        "lasix":"furosemide","لاسيكس":"furosemide",
+        "aldactone":"spironolactone","ألداكتون":"spironolactone",
+        "coversyl":"perindopril","كوفرسيل":"perindopril",
+        "xarelto":"rivaroxaban","زاريلتو":"rivaroxaban",
+        "plavix":"clopidogrel","بلافيكس":"clopidogrel",
+        "lantus":"insulin_glargine","لانتوس":"insulin_glargine",
+                        "zantac":"ranitidine","زانتاك":"ranitidine",
+                "scobinal":"hyoscine_butylbromide","scobinal analysis":"hyoscine_butylbromide","scobinal syrup":"hyoscine_butylbromide","سكوبينال":"hyoscine_butylbromide",
+                "buscopan":"hyoscine_butylbromide","بوسكوبان":"hyoscine_butylbromide",
+                "claritine":"loratadine","claritin":"loratadine","كلاريتين":"loratadine",
+                "zyrtec":"cetirizine","زيرتيك":"cetirizine",
+                "aerius":"desloratadine","إيريوس":"desloratadine",
+                "xyzal":"levocetirizine","زيزال":"levocetirizine",
+                "bilaxten":"bilastine","بيلاكستن":"bilastine",
+                "tavanic":"levofloxacin","تافانيك":"levofloxacin",
+                "avelox":"moxifloxacin","أفيلوكس":"moxifloxacin",
+                "zinnat":"cefuroxime","زينات":"cefuroxime",
+                "rocephin":"ceftriaxone","روسيفين":"ceftriaxone",
+                "dalacin":"clindamycin","دالاسين":"clindamycin",
+                "vancocin":"vancomycin","فانكوسين":"vancomycin",
+                "meronem":"meropenem","ميرونيم":"meropenem",
+                "zovirax":"acyclovir","زوفيراكس":"acyclovir",
+                "synthroid":"levothyroxine","سينثرويد":"levothyroxine",
+                "eltroxin":"levothyroxine","إلتروكسين":"levothyroxine",
+                "tapazole":"methimazole","تابازول":"methimazole",
+                "deltacortril":"prednisolone","ديلتاكورتريل":"prednisolone",
+                "decadron":"dexamethasone","ديكادرون":"dexamethasone",
+                "betnovate":"betamethasone_cream","بيتنوفيت":"betamethasone_cream",
+                "nasonex":"mometasone_nasal","ناسونيكس":"mometasone_nasal",
+                "pulmicort":"budesonide_inhaler","بولميكورت":"budesonide_inhaler",
+                "seretide":"fluticasone_salmeterol","سيريتيد":"fluticasone_salmeterol",
+                "symbicort":"budesonide_formoterol","سيمبيكورت":"budesonide_formoterol",
+                "spiriva":"tiotropium","سبيريفا":"tiotropium",
+                "singulair":"montelukast","سينجولير":"montelukast",
+                "keppra":"levetiracetam","كيبرا":"levetiracetam",
+                "topamax":"topiramate","توباماكس":"topiramate",
+                "lamictal":"lamotrigine","لاميكتال":"lamotrigine",
+                "lyrica":"pregabalin","ليريكا":"pregabalin",
+                "neurontin":"gabapentin","نيورونتين":"gabapentin",
+                "depakine":"valproate","ديباكين":"valproate",
+                "tegretol":"carbamazepine","تيجريتول":"carbamazepine",
+                "risperdal":"risperidone","ريسبردال":"risperidone",
+                "zyprexa":"olanzapine","زيبريكسا":"olanzapine",
+                "seroquel":"quetiapine","سيروكويل":"quetiapine",
+                "abilify":"aripiprazole","أبيليفاي":"aripiprazole",
+                "haldol":"haloperidol","هالدول":"haloperidol",
+                "stilnox":"zolpidem","ستيلنوكس":"zolpidem",
+                "prozac":"fluoxetine","بروزاك":"fluoxetine",
+                "zoloft":"sertraline","زولوفت":"sertraline",
+                "lexapro":"escitalopram","ليكسابرو":"escitalopram",
+                "effexor":"venlafaxine","إيفيكسور":"venlafaxine",
+                "aricept":"donepezil","أريسيبت":"donepezil",
+                "plaquenil":"hydroxychloroquine","بلاكينيل":"hydroxychloroquine",
+                "imuran":"azathioprine","إيموران":"azathioprine",
+                "cellcept":"mycophenolate","سيلسبت":"mycophenolate",
+                "sandimmun":"cyclosporine","سانديمون":"cyclosporine",
+                "humira":"adalimumab","هيوميرا":"adalimumab",
+                "remicade":"infliximab","ريميكيد":"infliximab",
+                "duphalac":"lactulose","دوفالاك":"lactulose",
+                "imodium":"loperamide","إيموديوم":"loperamide",
+                "maxolon":"metoclopramide","ماكسولون":"metoclopramide",
+                "zofran":"ondansetron","زوفران":"ondansetron",
+                "pantoloc":"pantoprazole","بانتولوك":"pantoprazole",
+                "zyloric":"allopurinol","زيلوريك":"allopurinol",
+                "mobic":"meloxicam","موبيك":"meloxicam",
+                "ponstan":"mefenamic_acid","بونستان":"mefenamic_acid",
+                "tramal":"tramadol","ترامال":"tramadol",
+                "clomid":"clomiphene","كلوميد":"clomiphene",
+                "clexane":"enoxaparin","كليكسان":"enoxaparin",
+                "eliquis":"apixaban","إليكويس":"apixaban",
+                "pradaxa":"dabigatran","برادكسا":"dabigatran",
+                "jardiance":"empagliflozin","جارديانس":"empagliflozin",
+                "forxiga":"dapagliflozin","فوركسيجا":"dapagliflozin",
+                "ozempic":"semaglutide","أوزمبيك":"semaglutide",
+                "procoralan":"ivabradine","بروكورالان":"ivabradine",
+                "roaccutane":"isotretinoin","رواكيوتان":"isotretinoin",
+                "betadine":"povidone_iodine","بيتادين":"povidone_iodine",
+                "phenergan":"promethazine","فينيرغان":"promethazine",
+                "stugeron":"cinnarizine","ستوجيرون":"cinnarizine",
+                "serc":"betahistine","سيرك":"betahistine",
+                "flomax":"tamsulosin","فلوماكس":"tamsulosin",
+                "viagra":"sildenafil","فياغرا":"sildenafil",
+                "cialis":"tadalafil","سياليس":"tadalafil",
+                "macrobid":"nitrofurantoin","ماكروبيد":"nitrofurantoin",
+                "narcan":"naloxone","ناركان":"naloxone",
+                "diprivan":"propofol","ديبريفان":"propofol",
+                "ketalar":"ketamine","كيتالار":"ketamine",
+                "dormicum":"midazolam","دورميكم":"midazolam",
+                "triprolidine_pseudoephedrine":"triprolidine_pseudoephedrine","bronchikam":"bronchikam","برونشيكام":"bronchikam","bronchicum":"bronchikam","برونكام":"bronchikam","actifed":"triprolidine_pseudoephedrine","أكتيفيد":"triprolidine_pseudoephedrine","اكتيفيد":"triprolidine_pseudoephedrine","actifed":"triprolidine_pseudoephedrine","dextromethorphan":"dextromethorphan","guaifenesin":"guaifenesin","chlorpheniramine_pseudoephedrine":"chlorpheniramine_pseudoephedrine","coldact":"chlorpheniramine_pseudoephedrine","diphenhydramine":"diphenhydramine","promethazine":"promethazine","chlorpheniramine":"chlorpheniramine","aspirin":"acetylsalicylic_acid","أسبرين":"acetylsalicylic_acid",
+                "باراسيتامول":"paracetamol","بنادول":"paracetamol","بانادول":"paracetamol",
+                "إيبوبروفين":"ibuprofen","ايبوبروفين":"ibuprofen","نيوروفين":"ibuprofen","نيورفين":"ibuprofen",
+                "أموكسيسيلين":"amoxicillin","اموكسيسيلين":"amoxicillin",
+                "ميترونيدازول":"metronidazole","ميتفورمين":"metformin",
+                "سيتيريزين":"cetirizine","لوراتادين":"loratadine",
+                "أزيثروميسين":"azithromycin","كلاريثروميسين":"clarithromycin",
+                "سالبيوتامول":"salbutamol","فنتولين":"salbutamol",
+                "هيوسين":"hyoscine_butylbromide","هيوسين بيوتيلبروميد":"hyoscine_butylbromide",
+                "analysis of panadol":"paracetamol","panadol baby":"paracetamol",
+                "panadol baby &":"paracetamol","scobinal analysis":"hyoscine_butylbromide",
+                "looking at the":"unknown","analysis of":"unknown",
+            }
+    # تحويل الاسم التجاري للعلمي
+    mapped = TRADE_MAP.get(q, q_mapped)
+    # تطبيع النص - استبدال المسافات بشرطة سفلية والعكس
+    q_normalized = q.replace(" ", "_").replace("-", "_")
+    mapped_normalized = mapped.replace(" ", "_").replace("-", "_")
+    out = []
+    seen = set()
+    for d in DRUGS_DB:
+        ar = str(d.get("name_ar", "")).lower()
+        en = str(d.get("name_en", "")).lower()
+        aliases_raw = d.get("aliases", [])
+        aliases = " ".join(aliases_raw).lower() if isinstance(aliases_raw, list) else str(aliases_raw).lower()
+        key = en or ar
+        if key in seen: continue
+        if (q in ar or q in en or q in aliases or
+            mapped in en or mapped in aliases or
+            q_mapped in en or q_mapped in aliases or
+            ar.startswith(q) or en.startswith(q) or
+            en.startswith(mapped) or en.startswith(q_mapped)):
+            out.append(d)
+            seen.add(key)
+    return out[:12]
+
+def clean_val(v):
+    """تنظيف القيمة من الأقواس والمسافات الزائدة"""
+    if not v: return "—"
+    if isinstance(v, dict):
+        s = v.get("details", v.get("detailsen", v.get("status", "")))
+        return str(s).strip() or "—"
+    if isinstance(v, list):
+        cleaned = []
+        for i in v:
+            s = str(i).strip().strip("'").strip('"')
+            if s: cleaned.append(s)
+        return ", ".join(cleaned) if cleaned else "—"
+    s = str(v).strip().strip("'").strip('"')
+    return s if s and s != "nan" else "—"
+
+
+AR_TO_EN = {
+    "مرة يوميًا":"once daily", "مرتين يوميًا":"twice daily",
+    "3 مرات يوميًا":"3 times daily", "4 مرات يوميًا":"4 times daily",
+    "يمنع إذا GFR < 30":"Avoid if GFR < 30",
+    "لا حاجة لتعديل الجرعة":"No dose adjustment needed",
+    "لا تعديل":"No adjustment", "لا تعديل الجرعة":"No dose adjustment",
+    "مسموح":"Allowed", "ممنوع":"Contraindicated", "بحذر":"Use with caution",
+    "مسموح بحذر":"Allowed with caution",
+    "تعديل الجرعة":"Dose adjustment needed",
+    "2 مرات يوميًا":"twice daily", "1 مرة يوميًا":"once daily",
+    "غير محدد":"Not specified",
+}
+
+def ar_to_en(text):
+    if not text or text == "—": return text
+    return AR_TO_EN.get(str(text).strip(), str(text))
+
+def fmt_drug(drug, lang):
+    def g(*keys, fb="—"):
+        for k in keys:
+            v = drug.get(k, "")
+            if v and str(v).strip() and str(v).strip() != "nan":
+                return clean_val(v)
+        return fb
+    def dose_child():
+        mn = drug.get("pediatric_min_mg_per_kg","")
+        mx = drug.get("pediatric_max_mg_per_kg","")
+        mpk = drug.get("pediatric_mg_per_kg","")
+        if mn and mx: return f"{mn}–{mx} mg/kg"
+        if mpk: return f"{mpk} mg/kg"
+        return "—"
+    def dose_adult():
+        mn = drug.get("adult_dose_min","")
+        mx = drug.get("adult_dose_max","")
+        if mn and mx: return f"{mn}–{mx} mg"
+        if mn: return f"{mn} mg"
+        return "—"
+    drug_link = f"https://www.drugs.com/{drug.get('name_en','').lower().replace(' ','_')}.html"
+    if lang == "ar":
+        n = g("name_ar","name_en")
+        return (f"💊 *{n}*\n\n"
+            f"🔬 *التصنيف الدوائي:* {g('drug_class','drug_class_en')}\n"
+            f"🏷️ *الأسماء التجارية:* {g('aliases','drug_class')}\n"
+            f"👶 *جرعة الأطفال:* {dose_child()}\n"
+            f"🔁 *تكرار الأطفال:* {g('pediatric_frequency','pediatric_frequency_en')}\n"
+            f"🧑 *جرعة الكبار:* {dose_adult()}\n"
+            f"🔁 *تكرار الكبار:* {g('adult_frequency','adult_frequency_en')}\n"
+            f"⚠️ *الحد الأقصى:* {g('max_daily','max_daily_pediatric')}\n\n"
+            f"🚫 *موانع:* {g('contraindications','contraindications_en')}\n"
+            f"⚡ *آثار جانبية:* {g('side_effects','side_effects_en')}\n"
+            f"💊 *التفاعلات:* {g('interactions','interactions_en')}\n\n"
+            f"🤰 *الحمل:* {g('pregnancy','pregnancy_en')}\n"
+            f"🍼 *الرضاعة:* {g('lactation','lactation_en')}\n"
+            f"🫘 *الكلى:* {g('renal','renal_dose')}\n\n"
+            f"🔗 [مزيد من المعلومات]({drug_link})")
+    else:
+        n = g("name_en","name_ar")
+        def get_list_en(key, fb="—"):
+            v = drug.get(key, "")
+            def is_arabic(s): return any('؀' <= c <= 'ۿ' for c in str(s))
+            if isinstance(v, list):
+                en_items = [str(x) for x in v if x and not is_arabic(str(x))]
+                return ", ".join(en_items) if en_items else ", ".join(str(x) for x in v if x)
+            if isinstance(v, dict):
+                return v.get("status_en", v.get("details", fb))[:100]
+            val = str(v) if v else fb
+            return val
+        renal_raw = drug.get("renal", "")
+        if isinstance(renal_raw, dict):
+            renal_en = renal_raw.get("status_en", renal_raw.get("status","—"))
+        elif renal_raw:
+            renal_en = str(renal_raw)
+        else:
+            renal_en = get_list_en("renal_dose")
+        return (
+            f"💊 *{n}*\n\n"
+            f"🔬 *Drug Class:* {g('drug_class_en') if drug.get('drug_class_en') and not any(chr(c) in g('drug_class_en') for c in range(0x0600,0x06ff)) else g('drug_class_en','drug_class')}\n"
+            f"🏷️ *Brand Names:* {g('aliases')}\n"
+            f"👶 *Child Dose:* {dose_child()}\n"
+            f"🔁 *Child Frequency:* {g('pediatric_frequency_en','pediatric_frequency')}\n"
+            f"🧑 *Adult Dose:* {dose_adult()}\n"
+            f"🔁 *Adult Frequency:* {g('adult_frequency_en','adult_frequency')}\n"
+            f"⚠️ *Max Daily:* {g('max_daily')} mg\n\n"
+            f"🚫 *Contraindications:* {get_list_en('contraindications_en') if drug.get('contraindications_en') else get_list_en('contraindications')}\n"
+            f"⚡ *Side Effects:* {get_list_en('side_effects_en', get_list_en('side_effects'))}\n"
+            f"💊 *Interactions:* {get_list_en('interactions_en', get_list_en('interactions'))}\n\n"
+            f"🤰 *Pregnancy:* {g('pregnancy_en','pregnancy')}\n"
+            f"🍼 *Lactation:* {g('lactation_en','lactation')}\n"
+            f"🫘 *Renal Dose:* {get_list_en('renal_dose') if drug.get('renal_dose') else renal_en}\n\n"
+            f"🔗 [More Information]({drug_link})")
+
+def calc_child(drug, w, lang):
+    name_ar = drug.get("name_ar", drug.get("name_en", "—"))
+    name_en = drug.get("name_en", drug.get("name_ar", "—"))
+    n = name_ar if lang == "ar" else name_en
+    mn = drug.get("pediatric_min_mg_per_kg", "")
+    mx = drug.get("pediatric_max_mg_per_kg", "")
+    mpk_val = drug.get("pediatric_mg_per_kg", "")
+    freq = drug.get("pediatric_frequency" if lang=="ar" else "pediatric_frequency_en",
+                    drug.get("pediatric_frequency","—"))
+    max_d = drug.get("max_daily_pediatric", drug.get("max_daily","—"))
+    lines = []
+    if lang == "ar":
+        lines += ["🍼 جرعة الطفل - " + n, "⚖️ الوزن: " + str(w) + " كغ", ""]
+    else:
+        lines += ["🍼 Child Dose - " + n, "⚖️ الوزن: " + str(w) + " kg", ""]
+
+    # معالجة فيتامين د بالقطرات
+    if drug.get("name_en") == "vitamin_d_drops":
+        try:
+            conc_str = str(drug.get("concentration","400IU/drop"))
+            conc_iu = int(conc_str.replace("IU/drop","").replace("IU/قطرة","").strip())
+        except:
+            conc_iu = 400
+        d0 = round(400 / conc_iu, 1)
+        d1 = round(600 / conc_iu, 1)
+        d2 = round(800 / conc_iu, 1)
+        if lang == "ar":
+            lines2 = ["💊 فيتامين د — " + str(conc_iu) + " IU/قطرة", ""]
+            lines2.append("📋 الجرعة اليومية بالقطرات:")
+            lines2.append("  • 0-12 شهر: " + str(d0) + " قطرة (400 IU)")
+            lines2.append("  • 1-5 سنوات: " + str(d1) + " قطرة (600 IU)")
+            lines2.append("  • 5-12 سنة: " + str(d2) + " قطرة (800 IU)")
+        else:
+            lines2 = ["💊 Vitamin D — " + str(conc_iu) + " IU/drop", ""]
+            lines2.append("📋 Daily dose in drops:")
+            lines2.append("  • 0-12 months: " + str(d0) + " drops (400 IU)")
+            lines2.append("  • 1-5 years: " + str(d1) + " drops (600 IU)")
+            lines2.append("  • 5-12 years: " + str(d2) + " drops (800 IU)")
+        lines2.append("")
+        lines2.append("⚠️ " + ("استشر الطبيب أو الصيدلاني." if lang=="ar" else "Consult doctor or pharmacist."))
+        return "\n".join(lines2)
+
+    # معالجة الأدوية ذات الجرعة الثابتة حسب العمر
+    if drug.get("fixed_dose") and drug.get("age_doses"):
+        age_doses = drug.get("age_doses_en", drug["age_doses"]) if lang=="en" else drug["age_doses"]
+        dose_lines = ["📋 " + ("جرعة الأطفال:" if lang=="ar" else "Pediatric Doses:")]
+        for age_range, dose in age_doses.items():
+            dose_lines.append("  • " + age_range + ": " + dose if lang=="ar" else "  • " + age_range + ": " + dose)
+        dose_lines.append("")
+        dose_lines.append("🔁 " + freq)
+        dose_lines.append("⚠️ " + ("استشر الطبيب أو الصيدلاني." if lang=="ar" else "Consult doctor or pharmacist."))
+        return chr(10).join(dose_lines)
+
+    try:
+        # تركيزات الشراب الشائعة لحساب المل
+        CONCENTRATIONS = {
+            # مسكنات الألم والحرارة
+            "paracetamol": 120, "acetaminophen": 120,
+            "panadol": 120, "calpol": 120, "adol": 120,
+            "ibuprofen": 100, "nurofen": 100, "brufen": 100,
+            # مضادات حيوية
+            "amoxicillin": 125, "amoxil": 125,
+            "amoxicillin_clavulanate": 125, "augmentin": 125,
+            "azithromycin": 200, "zithromax": 200,
+            "clarithromycin": 125, "klacid": 125,
+            "cephalexin": 125, "cefalexin": 125,
+            "metronidazole": 200, "flagyl": 200,
+            "trimethoprim_sulfa": 200, "cotrimoxazole": 200,
+            "erythromycin": 125,
+            # مضادات الحساسية
+            "cetirizine": 5, "loratadine": 5,
+            "fexofenadine": 30, "desloratadine": 2.5,
+            "chlorphenamine": 2, "diphenhydramine": 12.5,
+            # أدوية الجهاز الهضمي
+            "omeprazole": 20, "domperidone": 5,
+            "metoclopramide": 5, "ondansetron": 4,
+            # أدوية الجهاز التنفسي
+            "salbutamol": 2, "ventolin": 2,
+            "prednisolone": 15, "dexamethasone": 0.5,
+            "montelukast": 4,
+            # أدوية أخرى
+            "fluconazole": 50, "diflucan": 50,
+            "acyclovir": 200, "valacyclovir": 500,
+            "vitamin_c": 100, "zinc": 10,
+        }
+        name_key = drug.get("name_en", "").lower()
+        conc = CONCENTRATIONS.get(name_key, 0)
+        # الصورة أولاً (أولوية أدنى)
+        import builtins
+        img_conc = getattr(builtins, "_last_concentration", None)
+        if img_conc:
+            mg_val, ml_val = img_conc
+            conc = (mg_val / ml_val) * 5
+            builtins._last_concentration = None
+        # اختيار المستخدم يتجاوز الصورة (أولوية عليا)
+        _user_conc = drug.get("concentration", "")
+        if _user_conc and _user_conc != "unknown":
+            import re as _re3
+            _mc = _re3.search(r"([\d.]+)\s*mg\s*/\s*([\d.]+)\s*ml", _user_conc, _re3.IGNORECASE)
+            if _mc: conc = float(_mc.group(1)) / float(_mc.group(2)) * 5
+
+        if mn and mx:
+            mpk_min = float(str(mn)); mpk_max = float(str(mx))
+            t_min = mpk_min * w; t_max = mpk_max * w
+            if lang == "ar":
+                lines.append(f"📊 {mpk_min}–{mpk_max} مغ/كغ × {w} كغ")
+                lines.append(f"💉 *الجرعة: {t_min:.1f}–{t_max:.1f} مغ*")
+                if conc:
+                    ml_min = (t_min/conc)*5; ml_max = (t_max/conc)*5
+                    lines.append(f"🥄 *بالمل ({conc}مغ/5مل): {ml_min:.1f}–{ml_max:.1f} مل*")
+            else:
+                lines.append(f"📊 {mpk_min}–{mpk_max} mg/kg × {w} kg")
+                lines.append(f"💉 *Dose: {t_min:.1f}–{t_max:.1f} mg*")
+                if conc:
+                    ml_min = (t_min/conc)*5; ml_max = (t_max/conc)*5
+                    lines.append(f"🥄 *In mL ({conc}mg/5mL): {ml_min:.1f}–{ml_max:.1f} mL*")
+        elif mpk_val:
+            mpk = float(str(mpk_val)); total = mpk * w
+            if lang == "ar":
+                lines.append(f"📊 {mpk} مغ/كغ × {w} كغ = *{total:.1f} مغ*")
+                if conc:
+                    ml = (total/conc)*5
+                    lines.append(f"🥄 *بالمل ({conc}مغ/5مل): {ml:.1f} مل*")
+            else:
+                lines.append(f"📊 {mpk} mg/kg × {w} kg = *{total:.1f} mg*")
+                if conc:
+                    ml = (total/conc)*5
+                    lines.append(f"🥄 *In mL ({conc}mg/5mL): {ml:.1f} mL*")
+        else:
+            raise ValueError
+        lines.append("")
+        if lang == "ar":
+            lines.append(f"🔁 *التكرار:* {freq}")
+            lines.append(f"⚠️ *الحد الأقصى:* {max_d}")
+        else:
+            lines.append(f"🔁 *Frequency:* {freq}")
+            lines.append(f"⚠️ *Max Daily:* {max_d}")
+    except:
+        cd = drug.get("pediatric_frequency" if lang=="ar" else "pediatric_frequency_en","—")
+        lines.append(f"📋 *جرعة الأطفال:* {cd}" if lang=="ar" else f"📋 *Child Dose:* {cd}")
+    lines += ["", "⚠️ استشر الطبيب أو الصيدلاني." if lang=="ar" else "⚠️ Consult a doctor or pharmacist."]
+    return "\n".join(lines)
+
+
+# قاعدة بيانات الأطعمة (سعرات لكل 100 غرام)
+FOODS_DB = {
+    # خبز وحبوب
+    "خبز":"bread","bread":{"cal":265,"protein":9,"carbs":49,"fat":3.2},
+    "أرز":"rice","rice":{"cal":130,"protein":2.7,"carbs":28,"fat":0.3},
+    "معكرونة":"pasta","pasta":{"cal":131,"protein":5,"carbs":25,"fat":1.1},
+    "شوفان":"oats","oats":{"cal":389,"protein":17,"carbs":66,"fat":7},
+    # بروتين
+    "دجاج":"chicken","chicken":{"cal":165,"protein":31,"carbs":0,"fat":3.6},
+    "لحم بقر":"beef","beef":{"cal":250,"protein":26,"carbs":0,"fat":15},
+    "سمك":"fish","fish":{"cal":136,"protein":23,"carbs":0,"fat":4.8},
+    "بيض":"egg","egg":{"cal":155,"protein":13,"carbs":1.1,"fat":11},
+    "تونة":"tuna","tuna":{"cal":144,"protein":30,"carbs":0,"fat":2.5},
+    # ألبان
+    "حليب":"milk","milk":{"cal":61,"protein":3.2,"carbs":4.8,"fat":3.3},
+    "جبنة":"cheese","cheese":{"cal":402,"protein":25,"carbs":1.3,"fat":33},
+    "زبادي":"yogurt","yogurt":{"cal":59,"protein":10,"carbs":3.6,"fat":0.4},
+    # خضروات
+    "طماطم":"tomato","tomato":{"cal":18,"protein":0.9,"carbs":3.9,"fat":0.2},
+    "خيار":"cucumber","cucumber":{"cal":16,"protein":0.7,"carbs":3.6,"fat":0.1},
+    "بطاطا":"potato","potato":{"cal":77,"protein":2,"carbs":17,"fat":0.1},
+    "جزر":"carrot","carrot":{"cal":41,"protein":0.9,"carbs":10,"fat":0.2},
+    # فواكه
+    "تفاح":"apple","apple":{"cal":52,"protein":0.3,"carbs":14,"fat":0.2},
+    "موز":"banana","banana":{"cal":89,"protein":1.1,"carbs":23,"fat":0.3},
+    "برتقال":"orange","orange":{"cal":47,"protein":0.9,"carbs":12,"fat":0.1},
+    # زيوت ومكسرات
+    "زيت زيتون":"olive oil","olive oil":{"cal":884,"protein":0,"carbs":0,"fat":100},
+    "لوز":"almonds","almonds":{"cal":579,"protein":21,"carbs":22,"fat":50},
+    "عسل":"honey","honey":{"cal":304,"protein":0.3,"carbs":82,"fat":0},
+    # وجبات سريعة
+    "برغر":"burger","burger":{"cal":295,"protein":17,"carbs":24,"fat":14},
+    "بيتزا":"pizza","pizza":{"cal":266,"protein":11,"carbs":33,"fat":10},
+    "بطاطس مقلية":"fries","fries":{"cal":312,"protein":3.4,"carbs":41,"fat":15},
+    # بقوليات
+    "عدس":"lentils","lentils":{"cal":116,"protein":9,"carbs":20,"fat":0.4},
+    "حمص":"chickpeas","chickpeas":{"cal":164,"protein":9,"carbs":27,"fat":2.6},
+    "فول":"fava beans","fava beans":{"cal":110,"protein":8,"carbs":20,"fat":0.4},
+    "فاصولياء":"beans","beans":{"cal":127,"protein":9,"carbs":23,"fat":0.5},
+    "بازلاء":"peas","peas":{"cal":81,"protein":5,"carbs":14,"fat":0.4},
+    # لحوم
+    "لحم غنم":"lamb","lamb":{"cal":294,"protein":25,"carbs":0,"fat":21},
+    "لحم مفروم":"ground beef","ground beef":{"cal":332,"protein":26,"carbs":0,"fat":25},
+    "كبدة":"liver","liver":{"cal":175,"protein":27,"carbs":4,"fat":5},
+    "دجاج مقلي":"fried chicken","fried chicken":{"cal":260,"protein":25,"carbs":11,"fat":14},
+    "دجاج مشوي":"grilled chicken","grilled chicken":{"cal":165,"protein":31,"carbs":0,"fat":3.6},
+    # أسماك
+    "سمك مقلي":"fried fish","fried fish":{"cal":232,"protein":18,"carbs":8,"fat":14},
+    "سمك مشوي":"grilled fish","grilled fish":{"cal":136,"protein":23,"carbs":0,"fat":4.8},
+    "سلمون":"salmon","salmon":{"cal":208,"protein":20,"carbs":0,"fat":13},
+    "جمبري":"shrimp","shrimp":{"cal":99,"protein":24,"carbs":0,"fat":0.3},
+    # حلويات
+    "كيك":"cake","cake":{"cal":347,"protein":5,"carbs":51,"fat":15},
+    "شوكولاته":"chocolate","chocolate":{"cal":546,"protein":5,"carbs":60,"fat":31},
+    "شوكولاتة":"chocolate","بسكويت":"biscuit","biscuit":{"cal":418,"protein":6,"carbs":70,"fat":13},
+    "حلوى":"candy","candy":{"cal":380,"protein":0,"carbs":95,"fat":0},
+    "آيس كريم":"ice cream","ice cream":{"cal":207,"protein":4,"carbs":24,"fat":11},
+    "ايس كريم":"ice cream",
+    "تمر":"dates","dates":{"cal":282,"protein":2.5,"carbs":75,"fat":0.4},
+    "تمور":"dates",
+    # مشروبات
+    "قهوة":"coffee","coffee":{"cal":2,"protein":0.3,"carbs":0,"fat":0},
+    "شاي":"tea","tea":{"cal":1,"protein":0,"carbs":0.2,"fat":0},
+    "عصير برتقال":"orange juice","orange juice":{"cal":45,"protein":0.7,"carbs":10,"fat":0.2},
+    "عصير تفاح":"apple juice","apple juice":{"cal":46,"protein":0.1,"carbs":11,"fat":0.1},
+    "كولا":"cola","cola":{"cal":42,"protein":0,"carbs":11,"fat":0},
+    "مياه":"water","water":{"cal":0,"protein":0,"carbs":0,"fat":0},
+    "حليب كامل":"whole milk","whole milk":{"cal":61,"protein":3.2,"carbs":4.8,"fat":3.3},
+    # وجبات عربية
+    "شاورما":"shawarma","shawarma":{"cal":245,"protein":18,"carbs":20,"fat":10},
+    "فلافل":"falafel","falafel":{"cal":333,"protein":13,"carbs":32,"fat":18},
+    "كبة":"kibbeh","kibbeh":{"cal":268,"protein":15,"carbs":22,"fat":13},
+    "منسف":"mansaf","mansaf":{"cal":320,"protein":22,"carbs":25,"fat":15},
+    "كبسة":"kabsa","kabsa":{"cal":280,"protein":20,"carbs":30,"fat":8},
+    "مجبوس":"majboos","majboos":{"cal":275,"protein":19,"carbs":29,"fat":8},
+    "هريسة":"harees","harees":{"cal":180,"protein":12,"carbs":25,"fat":4},
+}
+
+def search_food(query):
+    q = query.strip().lower()
+    # نبحث في كل مفاتيح FOODS_DB مباشرة
+    for key, val in FOODS_DB.items():
+        if isinstance(val, dict):
+            if q in key.lower() or key.lower() in q:
+                return key, val
+        elif isinstance(val, str):
+            # هذا alias - نبحث عن القيمة
+            if q in key.lower() or key.lower() in q:
+                if val in FOODS_DB and isinstance(FOODS_DB[val], dict):
+                    return val, FOODS_DB[val]
+    return None, None
+
+def calc_bmr(weight, height, age, gender):
+    if gender == "m":
+        return 10*weight + 6.25*height - 5*age + 5
+    else:
+        return 10*weight + 6.25*height - 5*age - 161
+
+ACTIVITY_FACTORS = {
+    "1": 1.2,   # خامل
+    "2": 1.375, # خفيف
+    "3": 1.55,  # متوسط
+    "4": 1.725, # نشيط
+    "5": 1.9,   # رياضي
+}
+
+
+# جرعات المضادات الحيوية حسب موقع الالتهاب (مغ/كغ/يوم)
+ANTIBIOTIC_DOSES = {
+    "amoxicillin": {
+        "ear": (40, 45, 3, "التهاب الأذن والحلق"),
+        "lung": (45, 90, 3, "التهاب الرئة"),
+        "urinary": (20, 40, 3, "التهاب المسالك البولية"),
+        "skin": (25, 50, 3, "التهاب الجلد"),
+        "general": (20, 40, 3, "عام"),
+    },
+    "amoxicillin_clavulanate": {
+        "ear": (40, 45, 2, "التهاب الأذن والحلق"),
+        "lung": (45, 90, 2, "التهاب الرئة"),
+        "urinary": (25, 45, 2, "التهاب المسالك البولية"),
+        "skin": (25, 45, 2, "التهاب الجلد"),
+        "general": (25, 45, 2, "عام"),
+    },
+    "azithromycin": {
+        "ear": (10, 10, 1, "التهاب الأذن والحلق"),
+        "lung": (10, 10, 1, "التهاب الرئة"),
+        "skin": (10, 10, 1, "التهاب الجلد"),
+        "general": (10, 10, 1, "عام"),
+    },
+    "clarithromycin": {
+        "ear": (7.5, 15, 2, "التهاب الأذن والحلق"),
+        "lung": (7.5, 15, 2, "التهاب الرئة"),
+        "skin": (7.5, 15, 2, "التهاب الجلد"),
+        "general": (7.5, 15, 2, "عام"),
+    },
+    "cephalexin": {
+        "ear": (12.5, 25, 4, "التهاب الأذن والحلق"),
+        "urinary": (12.5, 25, 4, "التهاب المسالك البولية"),
+        "skin": (12.5, 25, 4, "التهاب الجلد"),
+        "general": (12.5, 25, 4, "عام"),
+    },
+}
+
+INFECTION_SITES = {
+    "ar": [
+        ("ear", "👂 أذن / حلق / جيوب"),
+        ("lung", "🫁 رئة / صدر"),
+        ("urinary", "🫘 مسالك بولية"),
+        ("skin", "🩹 جلد / جروح"),
+        ("general", "🔵 عام"),
+    ],
+    "en": [
+        ("ear", "👂 Ear / Throat / Sinus"),
+        ("lung", "🫁 Lung / Chest"),
+        ("urinary", "🫘 Urinary Tract"),
+        ("skin", "🩹 Skin / Wound"),
+        ("general", "🔵 General"),
+    ]
+}
+
+async def analyze_image(img_bytes, lang):
+    try:
+        import telegram as _tg
+        bot = _tg.Bot(token=BOT_TOKEN)
+    except: pass
+    if not HTTPX_OK or not ANTHROPIC_API_KEY:
+        logger.warning("No API key")
+        return ""
+    b64 = base64.b64encode(img_bytes).decode()
+    concentration = None
+    try:
+        key = ANTHROPIC_API_KEY.encode("ascii", errors="ignore").decode("ascii").strip()
+        async with httpx.AsyncClient(timeout=30, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": key,
+                         "anthropic-version": "2023-06-01",
+                         "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "base64",
+                            "media_type": "image/jpeg", "data": b64}},
+                            {"type": "text", "text": "You are an expert pharmacist. Look at this medicine image carefully. Read ALL text visible: brand name, generic name, concentration, manufacturer. Return ONLY one line: generic_name|concentration. Examples: paracetamol|500mg, amoxicillin|250mg/5ml, ibuprofen|100mg/5ml. Common brands: Panadol/Calpol/Adol/Tylenol=paracetamol, Nurofen/Brufen/Advil/Profen=ibuprofen, Augmentin/Clavox=amoxicillin_clavulanate, Amoxil/Flumox=amoxicillin, Zithromax/Azithrocin=azithromycin, Klacid/Klaricid=clarithromycin, Ventolin=salbutamol, Flagyl=metronidazole, Losec/Omez=omeprazole, Nexium=esomeprazole, Glucophage=metformin, Aerius=desloratadine, Xyzal=levocetirizine, Zyrtec=cetirizine, Claritin=loratadine, Piriton=chlorpheniramine, Phenergan=promethazine, Actifed=triprolidine_pseudoephedrine, Prospan/Ezyban=hedera_helix, Fucidin=fusidic_acid, Otrivin=xylometazoline, Buscopan=hyoscine_butylbromide, Voltaren=diclofenac, Brufen=ibuprofen, Ferose/Maltofer=iron_syrup, Devit=vitamin_d_drops, Infacol=simethicone, Motilium=domperidone, Zofran=ondansetron, Maxolon=metoclopramide, Diflucan=fluconazole, Cipro=ciprofloxacin, Keflex=cephalexin. If completely unclear: UNKNOWN|unknown. ONE LINE ONLY, no explanation."}
+                    ]}]})
+        logger.info(f"Image API status: {r.status_code}")
+        logger.info(f"Image API status: {r.status_code}")
+        logger.info(f"Image API response: {r.text[:200]}")
+        txt = r.json().get("content", [{}])[0].get("text", "").strip()
+        import re as _re
+        txt = txt.split("\n")[0].strip()
+        logger.info(f"Raw image response: {txt}")
+        await asyncio.sleep(0)
+        if not txt or txt == "UNKNOWN":
+            return ""
+        # بحث في القاموس
+        ARABIC_MAP = {"bronchikam":"guaifenesin","برونشيكام":"guaifenesin","bronchikam syrup":"guaifenesin","bronchikam syrup analysis":"guaifenesin","bronchicum":"guaifenesin","برونكام":"guaifenesin","برونشيكام":"guaifenesin","برونكيكام":"guaifenesin","bronchicum":"guaifenesin","كلورفينيرامين":"chlorpheniramine","chlorphenamine":"chlorpheniramine","كلور فينيرامين":"chlorpheniramine","جوايفينيزين":"guaifenesin","غوايفينيزين":"guaifenesin","guaifenisine":"guaifenesin","فينيلايفرين":"phenylephrine","فينيل ايفرين":"phenylephrine","فينيلفرين":"phenylephrine","phenylephrine":"phenylephrine","برونكيكام":"guaifenesin","bronchicum":"guaifenesin","phenylephrine":"phenylephrine","فينيلفرين":"phenylephrine","nasofed":"phenylephrine","ناسوفيد":"phenylephrine","xylometazoline hydrochloride":"xylometazoline","rovfenac":"diclofenac_suppository","diclogesic":"diclofenac_suppository","ديكلوجيزيك":"diclofenac_suppository","diclofenac suppository":"diclofenac_suppository","voltaren supp":"diclofenac_suppository","روفيناك":"diclofenac_suppository","voltaren suppository":"diclofenac_suppository","paracetamol suppository":"paracetamol_suppository","panadol suppository":"paracetamol_suppository","تحميلة باراسيتامول":"paracetamol_suppository","paracetamol supp":"paracetamol_suppository","fucidicacid":"fusidic_acid","fucidic acid":"fusidic_acid","fucidin":"fusidic_acid","فيوسيدين":"fusidic_acid","fusidic":"fusidic_acid","xylometazoline hcl":"xylometazoline","oxymetazoline":"xylometazoline","otrivin":"xylometazoline","أوتريفين":"xylometazoline","سبيرونولاكتون شراب":"spironolactone_syrup","سبيرنولاكتون":"spironolactone_syrup","سبيرونولاكتون":"spironolactone_syrup","spironolactone":"spironolactone_syrup","aldactone":"spironolactone_syrup","gentamicin":"gentamicin","جنتاميسين":"gentamicin","توبراديكس":"tobradex","tobradex":"tobradex","توبراميسين":"tobramycin","tobramycin":"tobramycin","سيبروفلوكساسين قطرة":"ciprofloxacin_drops","كلورامفينيكول قطرة":"chloramphenicol_drops","سوفراديكس":"sofradex","أوتوسبورين":"otosporin","جينتاميسين":"gentamicin","جنتامايسين":"gentamicin","garamycin":"gentamicin","غاراميسين":"gentamicin","غارامايسين":"gentamicin","ألداكتون":"spironolactone_syrup","aldactone syrup":"spironolactone_syrup","spironolactone syrup":"spironolactone_syrup","infacol":"simethicone","simeticone":"simethicone","dimethicone":"simethicone","zinc origin":"zinc_syrup","zinc sulfate":"zinc_syrup","ferric hydroxide":"iron_syrup","ferrous sulphate":"iron_syrup","ferose":"iron_syrup","فيرومين":"iron_syrup","feromin":"iron_syrup","فيروز":"iron_syrup","feroz":"iron_syrup","ferrum":"iron_syrup","فيرم":"iron_syrup","ferroussyrup":"iron_syrup","label analysis":"unknown","medicine label reading":"unknown","medicine label":"unknown","label reading":"unknown","i can see a":"unknown","this is a":"unknown","the image shows":"unknown","medicine bottle":"unknown","drug label":"unknown","® label":"iron_syrup","ferose® label analysis":"iron_syrup","ferrous syrup":"iron_syrup","ferrous sulfate":"iron_syrup","ferrous gluconate":"iron_syrup","iron sulphate":"iron_syrup","iron sulfate":"iron_syrup","zinc gluconate":"zinc_syrup","zinc acetate":"zinc_syrup","zinc chloride":"zinc_syrup","multivitamin":"multivitamin","multi vitamin":"multivitamin","فيتامينات متعددة":"multivitamin","ferrous sulfate":"iron_syrup","iron drops":"iron_syrup","iron supplement":"iron_syrup","vitamin d drops":"vitamin_d_drops","vitamin d3":"vitamin_d_drops","cholecalciferol":"vitamin_d_drops","colecalciferol":"vitamin_d_drops","vit d":"vitamin_d_drops","vit d3":"vitamin_d_drops","bronchikam":"guaifenesin","برونشيكام":"guaifenesin","bronchikam syrup":"guaifenesin","bronchikam syrup analysis":"guaifenesin","bronchicum":"guaifenesin","برونكام":"guaifenesin","برونشيكام":"guaifenesin","برونكيكام":"guaifenesin","bronchicum":"guaifenesin","كلورفينيرامين":"chlorpheniramine","chlorphenamine":"chlorpheniramine","كلور فينيرامين":"chlorpheniramine","جوايفينيزين":"guaifenesin","غوايفينيزين":"guaifenesin","guaifenisine":"guaifenesin","فينيلايفرين":"phenylephrine","فينيل ايفرين":"phenylephrine","فينيلفرين":"phenylephrine","phenylephrine":"phenylephrine","برونكيكام":"guaifenesin","bronchicum":"guaifenesin","phenylephrine":"phenylephrine","فينيلفرين":"phenylephrine","nasofed":"phenylephrine","ناسوفيد":"phenylephrine","xylometazoline hydrochloride":"xylometazoline","rovfenac":"diclofenac_suppository","diclogesic":"diclofenac_suppository","ديكلوجيزيك":"diclofenac_suppository","diclofenac suppository":"diclofenac_suppository","voltaren supp":"diclofenac_suppository","روفيناك":"diclofenac_suppository","voltaren suppository":"diclofenac_suppository","paracetamol suppository":"paracetamol_suppository","panadol suppository":"paracetamol_suppository","تحميلة باراسيتامول":"paracetamol_suppository","paracetamol supp":"paracetamol_suppository","fucidicacid":"fusidic_acid","fucidic acid":"fusidic_acid","fucidin":"fusidic_acid","فيوسيدين":"fusidic_acid","fusidic":"fusidic_acid","xylometazoline hcl":"xylometazoline","oxymetazoline":"xylometazoline","otrivin":"xylometazoline","أوتريفين":"xylometazoline","سبيرونولاكتون شراب":"spironolactone_syrup","سبيرنولاكتون":"spironolactone_syrup","سبيرونولاكتون":"spironolactone_syrup","spironolactone":"spironolactone_syrup","aldactone":"spironolactone_syrup","gentamicin":"gentamicin","جنتاميسين":"gentamicin","توبراديكس":"tobradex","tobradex":"tobradex","توبراميسين":"tobramycin","tobramycin":"tobramycin","سيبروفلوكساسين قطرة":"ciprofloxacin_drops","كلورامفينيكول قطرة":"chloramphenicol_drops","سوفراديكس":"sofradex","أوتوسبورين":"otosporin","جينتاميسين":"gentamicin","جنتامايسين":"gentamicin","garamycin":"gentamicin","غاراميسين":"gentamicin","غارامايسين":"gentamicin","ألداكتون":"spironolactone_syrup","aldactone syrup":"spironolactone_syrup","spironolactone syrup":"spironolactone_syrup","infacol":"simethicone","انفاكول":"simethicone","simethicone":"simethicone","سيميثيكون":"simethicone","mylicon":"simethicone","zincomed":"zinc_syrup","زنكوميد":"zinc_syrup","zinc_syrup":"zinc_syrup","زنك شراب":"zinc_syrup","iron_syrup":"iron_syrup","maltofer":"iron_syrup","حديد شراب":"iron_syrup","فيروجلوبين":"iron_syrup","feroglobin":"iron_syrup","devit":"vitamin_d_drops","دي فيت":"vitamin_d_drops","vitamin_d_drops":"vitamin_d_drops","فيتامين د قطرات":"vitamin_d_drops","prospan":"hedera_helix","ezyban":"hedera_helix","ايزيبان":"hedera_helix","إيزيبان":"hedera_helix","bronchokor":"hedera_helix","برونشيكور":"hedera_helix","bronchocor":"hedera_helix","بروسبان":"hedera_helix","hedelix":"hedera_helix","hedera helix":"hedera_helix","hedera_helix":"hedera_helix","ivy leaf":"hedera_helix","piriton":"chlorpheniramine","بيريتون":"chlorpheniramine","chlorpheniramine":"chlorpheniramine","phenergan":"promethazine","فينيرغان":"promethazine","promethazine":"promethazine","robitussin":"guaifenesin","روبيتوسين":"guaifenesin","mucinex":"guaifenesin","guaifenesin":"guaifenesin","delsym":"dextromethorphan","dextromethorphan":"dextromethorphan","benylin":"dextromethorphan","coldact":"chlorpheniramine_pseudoephedrine","كولداكت":"chlorpheniramine_pseudoephedrine","triaminic":"chlorpheniramine_pseudoephedrine","تريامينيك":"chlorpheniramine_pseudoephedrine","diphenhydramine":"diphenhydramine","exylin":"diphenhydramine","إكسيلين":"diphenhydramine","exilin":"diphenhydramine","benylin":"diphenhydramine","بينيلين":"diphenhydramine","benadryl":"diphenhydramine","بينادريل":"diphenhydramine","ديفينهيدرامين":"diphenhydramine","actifed":"triprolidine_pseudoephedrine","أكتيفيد":"triprolidine_pseudoephedrine","triominic":"triprolidine_pseudoephedrine","exillin":"amoxicillin","إكسيلين":"amoxicillin","exacillin":"amoxicillin","ampicillin":"ampicillin","أمبيسيلين":"ampicillin","ampiclox":"ampicillin","أمبيكلوكس":"ampicillin","coldact":"chlorpheniramine","كولداكت":"chlorpheniramine","piriton":"chlorpheniramine","بيريتون":"chlorpheniramine","phenergan":"promethazine","فينيرغان":"promethazine","robitussin":"dextromethorphan","روبيتوسين":"dextromethorphan","actifed":"triprolidine_pseudoephedrine","أكتيفيد":"triprolidine_pseudoephedrine","broncholisin":"salbutamol_bromhexine","برونكوليتين":"salbutamol_bromhexine","sudafed":"pseudoephedrine","سودافيد":"pseudoephedrine","mucinex":"guaifenesin","موسينكس":"guaifenesin","aerius":"desloratadine","neoclarityn":"desloratadine","إيريوس":"desloratadine","xyzal":"levocetirizine","زيزال":"levocetirizine","ليفوسيتيريزين":"levocetirizine","ديسلوراتادين":"desloratadine","دولوبي":"domperidone","موتيلين":"domperidone","motilene":"domperidone","موتيليوم":"domperidone","motilium":"domperidone","بروكينين":"domperidone","prokineen":"domperidone","دومبيريدون":"domperidone","domperidone":"domperidone","دوميبيريدون":"domperidone","دوم بي":"domperidone","dolopi":"domperidone","dolopy":"domperidone","دومبي":"domperidone","dompy":"domperidone","motilium":"domperidone","موتيليوم":"domperidone","دوميريدون":"domperidone",
+                # أموكسيسيلين
+                "amoxicillin":"amoxicillin","أموكسيسيلين":"amoxicillin","اموكسيسيلين":"amoxicillin",
+                "amoxil":"amoxicillin","أموكسيل":"amoxicillin","flumox":"amoxicillin","فلوموكس":"amoxicillin",
+                "trimox":"amoxicillin","ospamox":"amoxicillin","أوسباموكس":"amoxicillin",
+                # أوجمنتين
+                "augmentin":"amoxicillin_clavulanate","أوجمنتين":"amoxicillin_clavulanate",
+                "amoxiclav":"amoxicillin_clavulanate","كلافوموكس":"amoxicillin_clavulanate",
+                "clavamox":"amoxicillin_clavulanate","أموكسيكلاف":"amoxicillin_clavulanate",
+                # أزيثروميسين
+                "azithromycin":"azithromycin","أزيثروميسين":"azithromycin","ازيثروميسين":"azithromycin",
+                "zithromax":"azithromycin","زيثروماكس":"azithromycin","azithral":"azithromycin",
+                "أزيثرال":"azithromycin","zmax":"azithromycin","sumamed":"azithromycin",
+                # كلاريثروميسين
+                "clarithromycin":"clarithromycin","كلاريثروميسين":"clarithromycin",
+                "klacid":"clarithromycin","كلاسيد":"clarithromycin","klaricid":"clarithromycin",
+                "biaxin":"clarithromycin","بياكسين":"clarithromycin",
+                # سيفالكسين
+                "cephalexin":"cephalexin","سيفالكسين":"cephalexin","كيفلكس":"cephalexin",
+                "keflex":"cephalexin","cefalexin":"cephalexin","ospexin":"cephalexin",
+                # سيتيريزين
+                "cetirizine":"cetirizine","سيتيريزين":"cetirizine","زيرتيك":"cetirizine",
+                "zyrtec":"cetirizine","citriz":"cetirizine","سيتريكس":"cetirizine",
+                "reactine":"cetirizine","alerid":"cetirizine",
+                # لوراتادين
+                "loratadine":"loratadine","لوراتادين":"loratadine","كلاريتين":"loratadine",
+                "claritin":"loratadine","claritine":"loratadine","loratin":"loratadine",
+                "لوراتا":"loratadine","clarityn":"loratadine",
+                # ديسلوراتادين
+                "desloratadine":"desloratadine","ديسلوراتادين":"desloratadine",
+                "aerius":"desloratadine","إيريوس":"desloratadine","neoclarityn":"desloratadine",
+                # ليفوسيتيريزين
+                "levocetirizine":"levocetirizine","ليفوسيتيريزين":"levocetirizine",
+                "xyzal":"levocetirizine","زيزال":"levocetirizine",
+                # أوندانسيترون
+                "ondansetron":"ondansetron","أوندانسيترون":"ondansetron","زوفران":"ondansetron",
+                "zofran":"ondansetron","onseran":"ondansetron","ونسيران":"ondansetron",
+                # ميتوكلوبراميد
+                "metoclopramide":"metoclopramide","ميتوكلوبراميد":"metoclopramide",
+                "maxolon":"metoclopramide","ماكسولون":"metoclopramide","primperan":"metoclopramide",
+                # بريدنيزولون
+                "prednisolone":"prednisolone","بريدنيزولون":"prednisolone","بريدنزلون":"prednisolone","prednisolone":"prednisolone","سولوبريد":"prednisolone","solupred":"prednisolone","prednisone":"prednisolone","بريدنيزولون":"prednisolone",
+                "solupred":"prednisolone","سولوبريد":"prednisolone","deltacortril":"prednisolone",
+                "ديلتاكورتريل":"prednisolone","prednisolone syrup":"prednisolone",
+                # سالبيوتامول
+                "salbutamol":"salbutamol","سالبيوتامول":"salbutamol",
+                "ventolin":"salbutamol","فنتولين":"salbutamol","albuterol":"salbutamol",
+                "ventolin syrup":"salbutamol","salbutamol syrup":"salbutamol",
+                # فلوكونازول
+                "fluconazole":"fluconazole","فلوكونازول":"fluconazole",
+                "diflucan":"fluconazole","ديفلوكان":"fluconazole","flucoral":"fluconazole",
+                # برومهيكسين
+                "bromhexine":"bromhexine","برومهيكسين":"bromhexine","bisolvon":"bromhexine",
+                "بيسولفون":"bromhexine","bromhexine syrup":"bromhexine",
+                # أمبروكسول
+                "ambroxol":"ambroxol","أمبروكسول":"ambroxol","mucosolvan":"ambroxol",
+                "ميوكوسولفان":"ambroxol","ambroxol syrup":"ambroxol","medicine label analysis":"unknown","i can see":"unknown","i can read":"unknown","looking at":"unknown","this appears":"unknown","the label":"unknown","ibuprofen suspension":"ibuprofen","ibuprofen oral suspension":"ibuprofen","ibuprofen syrup":"ibuprofen","ibuprofen 100mg":"ibuprofen","ibuprofen 200mg":"ibuprofen","ibuprofen ds":"ibuprofen","brufen suspension":"ibuprofen","brufen syrup":"ibuprofen","nurofen suspension":"ibuprofen","أيبوبروفين معلق":"ibuprofen","إيبوبروفين معلق":"ibuprofen","أيبوبروفين شراب":"ibuprofen","ايبوبروفين للاطفال":"ibuprofen","ايبوبروفين للأطفال":"ibuprofen","ibuprofen for children":"ibuprofen","children ibuprofen":"ibuprofen","prof syrup":"ibuprofen","prof suspension":"ibuprofen","prof oral":"ibuprofen","prof":"ibuprofen","Prof":"ibuprofen","بروف":"ibuprofen","ibuprofen":"ibuprofen","ibuprofen ds":"ibuprofen","ibuprofen oral":"ibuprofen","nurofen":"ibuprofen","Nurofen":"ibuprofen","نيوروفين":"ibuprofen","نيورفين":"ibuprofen","brufen":"ibuprofen","Brufen":"ibuprofen","advil":"ibuprofen","sabfen":"ibuprofen","سابوفين":"ibuprofen","أيبوبروفين":"ibuprofen","ايبوبروفين":"ibuprofen","إيبوبروفين":"ibuprofen","باراسيتامول":"paracetamol","بنادول":"paracetamol","بانادول":"paracetamol","panadol":"paracetamol","إيبوبروفين":"ibuprofen","نيوروفين":"ibuprofen","نيورفين":"ibuprofen","nurofen":"ibuprofen","نيوروفين للأطفال":"ibuprofen","بروف":"ibuprofen","brufen":"ibuprofen","برووف":"ibuprofen","سابوفين":"ibuprofen","sabfen":"ibuprofen","advil":"ibuprofen","أدفيل":"ibuprofen","ibufen":"ibuprofen","أيبوفين":"ibuprofen","calprofen":"ibuprofen","junifen":"ibuprofen","أيبوبروفين":"ibuprofen","ايبوبروفين":"ibuprofen","إيبوبروفين":"ibuprofen","ibuprofen":"ibuprofen","nurofen":"ibuprofen","brufen":"ibuprofen","أموكسيسيلين":"amoxicillin","amoxil":"amoxicillin","ميترونيدازول":"metronidazole","فلاجيل":"metronidazole","أزيثروميسين":"azithromycin","زيثروماكس":"azithromycin","سيتيريزين":"cetirizine","زيرتيك":"cetirizine","لوراتادين":"loratadine","كلاريتين":"loratadine","هيوسين":"hyoscine_butylbromide","سكوبينال":"hyoscine_butylbromide","buscopan":"hyoscine_butylbromide","سالبيوتامول":"salbutamol","فنتولين":"salbutamol","ميتفورمين":"metformin","جلوكوفاج":"metformin","كلاريثروميسين":"clarithromycin","كلاسيد":"clarithromycin","بريدنيزولون":"prednisolone","أوندانسيترون":"ondansetron","زوفران":"ondansetron","فيفادول":"paracetamol","فيفا دول":"paracetamol","vifadol":"paracetamol","adol":"paracetamol","أدول":"paracetamol","calpol":"paracetamol","كالبول":"paracetamol","tylenol":"paracetamol","تايلينول":"paracetamol","tempra":"paracetamol","تمبرا":"paracetamol","febricol":"paracetamol","فيبريكول":"paracetamol","dymadon":"paracetamol","فارفيكس":"paracetamol","farfex":"paracetamol","فيفا دول":"paracetamol","vifadol":"paracetamol","دومبي":"domperidone","dompy":"domperidone","dompé":"domperidone","سكوبينال":"hyoscine_butylbromide","scobinal":"hyoscine_butylbromide","hyoscine butylbromide":"hyoscine_butylbromide","نيوروفين":"ibuprofen","نيورفين":"ibuprofen","nurofen":"ibuprofen","نيوروفين للأطفال":"ibuprofen","بروف":"ibuprofen","brufen":"ibuprofen","برووف":"ibuprofen","سابوفين":"ibuprofen","sabfen":"ibuprofen","advil":"ibuprofen","أدفيل":"ibuprofen","ibufen":"ibuprofen","أيبوفين":"ibuprofen","calprofen":"ibuprofen","junifen":"ibuprofen","أيبوبروفين":"ibuprofen","ايبوبروفين":"ibuprofen","إيبوبروفين":"ibuprofen","ibuprofen":"ibuprofen","nurofen for children":"ibuprofen","فنتولين":"salbutamol","ventolin syrup":"salbutamol","salbutamol syrup":"salbutamol","أوجمنتين":"amoxicillin_clavulanate","augmentin":"amoxicillin_clavulanate","كلافوموكس":"amoxicillin_clavulanate","زيناتا":"cefuroxime","زينات":"cefuroxime","بروف":"ibuprofen","brufen":"ibuprofen","برووف":"ibuprofen","دومبي":"domperidone","دوم بي":"domperidone","domperidone":"domperidone","دومبيريدون":"domperidone"}
+        for _k, _v in ARABIC_MAP.items():
+            if _k in txt or _k.lower() in txt.lower():
+                txt = _v
                 break
-            except Exception:
-                pass
+                # بحث ذكي في الكلمات المُرجعة
 
-        if parsed_d:
-            calc = calculate_obstetric_dates_py(parsed_d)
-            if calc:
-                res_calc = (
-                    f"🌸 *تقرير حساب عمر الحمل وموعد الولادة السريري (Dose Obstetric Care):*\n\n"
-                    f"• 📅 *تاريخ آخر دورة (LMP):* `{parsed_d.strftime('%Y-%m-%d')}`\n"
-                    f"• 👶 *عمر الحمل الحالي:* *{calc['weeks']} أسبوعاً و {calc['days']} يوماً*\n"
-                    f"• ⏳ *المرحلة الحالية:* *{calc['trim_name']}* (الشهر {calc['month']})\n"
-                    f"• 🎯 *موعد الولادة المتوقع (EDD):* `{calc['edd']}` (متبقي {calc['days_left']} يوماً)\n"
-                    f"• 📊 *نسبة اكتمال الحمل:* `{calc['progress']}%`\n"
-                    f"• 🍉 *حجم الجنين التقديري:* بحجم *{calc['comparison']}*\n"
-                    f"• 🌱 *مرحلة التطور:* {calc['summary']}\n\n"
-                    f"🔬 *أهم الفحوصات والتحاليل في هذه المرحلة:*\n• " + "\n• ".join(calc['tests']) + "\n\n"
-                    f"🌐 [فتح ملف الحامل التفاعلي الشامل وتصدير التقرير بالموقع]({build_web_url('pregnancy', user_id, user_name)})"
-                )
-                bot.send_message(chat_id, res_calc, reply_markup=get_pregnancy_keyboard(user_id, user_name))
-                return
+        # تصحيح خاص للأدوية المتشابهة
+        BRAND_OVERRIDE = {}
+        raw_lower = txt.lower()
+        if "aerius" in raw_lower or "neoclarityn" in raw_lower:
+            txt = "desloratadine|0.5mg/ml"
+        elif "xyzal" in raw_lower:
+            txt = "levocetirizine|0.5mg/ml"
+            # تحويل خاص لفيتامين د
+        if "vitamin_d" in txt.lower() or "cholecalciferol" in txt.lower():
+            txt = "vitamin_d_drops|400IU/drop"
+        drug_name = txt.split("|")[0].strip().lower()
+        if "|" in txt:
+            parts = txt.split("|", 1)
+            drug_name = parts[0].strip()
+            conc_raw = parts[1].strip().lower()
+            if conc_raw != "unknown":
+                # استخراج الرقم من التركيز مثل 250mg/5ml
+                m = _re.search(r"([\d.]+)\s*mg/\s*([\d.]+)\s*ml", conc_raw)
+                if m:
+                    concentration = (float(m.group(1)), float(m.group(2)))
+                    logger.info(f"Concentration found: {concentration}")
 
-    # 3. فحص مدخلات الحامل: قراءة السكر (Blood Glucose)
-    if "سكر" in text or "glucose" in text.lower() or "gdm" in text.lower():
-        num_match = re.search(r'\d+(\.\d+)?', text)
-        if num_match:
-            sug_val = float(num_match.group(0))
-            is_fasting = "صائم" in text or "صيام" in text or "fasting" in text.lower() or sug_val < 100
-            
-            if is_fasting:
-                if sug_val < 95:
-                    status_text = f"🟢 *سكر الصائم ({sug_val} mg/dL):* طبيعي وممتاز! ضمن الهدف العلاجي المعتمد (< 95 mg/dL)."
-                elif sug_val <= 125:
-                    status_text = f"🟡 *سكر الصائم ({sug_val} mg/dL):* مرتفع حدودياً! اشتباه سكر حمل (GDM). يجب إجراء اختبار OGTT 75g في الأسبوع 24-28."
-                else:
-                    status_text = f"🔴 *سكر الصائم ({sug_val} mg/dL):* مرتفع حرج! يستدعي مراجعة طبيب التوليد لضبط النشويات وتقييم العلاج الدوائي."
-            else:
-                if sug_val < 120:
-                    status_text = f"🟢 *سكر بعد الأكل ({sug_val} mg/dL):* طبيعي وممتاز! أقل من 120 mg/dL بعد الأكل بساعتين."
-                elif sug_val <= 140:
-                    status_text = f"🟡 *سكر بعد الأكل ({sug_val} mg/dL):* على الحد الأعلى المقبول. يفضل المشي الخفيف 15 دقيقة بعد الوجبة."
-                else:
-                    status_text = f"🔴 *سكر بعد الأكل ({sug_val} mg/dL):* مرتفع (> 140 mg/dL). يشير لمقاومة أنسولين مشيمية تستدعي المتابعة الطبية."
+        # تنظيف اسم الدواء
+        if "|" in drug_name:
+            drug_name = drug_name.split("|")[0]
+        drug_name = _re.sub(r"[#* ,:;|]", "", drug_name).strip().lower()
 
-            bot.send_message(
-                chat_id,
-                f"🩸 *التقييم السريري لقياس السكر للحامل:*\n\n{status_text}\n\n"
-                f"🎯 *المستهدف الطبي للحامل (ACOG/ADA):*\n• الصائم: < 95 mg/dL\n• بعد الأكل بساعتين: < 120 mg/dL\n• التراكمي HbA1c: < 6.0%",
-                reply_markup=types.InlineKeyboardMarkup().add(
-                    types.InlineKeyboardButton("💓 قياس ضغط الدم", callback_data="preg_bp"),
-                    types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy")
-                )
-            )
-            return
+        if not drug_name or drug_name == "unknown":
+            return ""
 
-    # 4. فحص مدخلات الحامل: قراءة ضغط الدم (Blood Pressure & Pre-eclampsia)
-    bp_match = re.search(r'(\d{2,3})\s*[/]\s*(\d{2,3})', text)
-    if bp_match or ("ضغط" in text and re.search(r'\d{2,3}', text)):
-        if bp_match:
-            sys_val = int(bp_match.group(1))
-            dia_val = int(bp_match.group(2))
-        else:
-            nums = re.findall(r'\d{2,3}', text)
-            sys_val = int(nums[0]) if len(nums) > 0 else 120
-            dia_val = int(nums[1]) if len(nums) > 1 else 80
+        # حفظ التركيز في متغير عام مؤقت
+        if concentration:
+            import builtins
+            builtins._last_concentration = concentration
 
-        if sys_val < 120 and dia_val < 80:
-            bp_eval = f"🟢 *ضغط الدم ({sys_val}/{dia_val} mmHg):* طبيعي ومثالي جداً! يضمن سلامة تروية المشيمة وتغذية الجنين."
-        elif sys_val < 140 and dia_val < 90:
-            bp_eval = f"🟡 *ضغط الدم ({sys_val}/{dia_val} mmHg):* حدودي مرتفع طفيفاً. يوصى بالراحة وتقليل الملح وإعادة القياس مرتين أسبوعياً."
-        else:
-            bp_eval = (
-                f"🚨 *ضغط الدم ({sys_val}/{dia_val} mmHg):* مرتفع حرج! إنذار تسمم الحمل (Pre-eclampsia)!\n\n"
-                f"⚠️ *يجب التوجه فوراً لطوارئ الولادة في حال وجود أي من الأعراض التالية:*\n"
-                f"• صداع شديد نابض\n• زغللة وتشوش بالرؤية\n• ألم فم المعدة والجانب الأيمن\n• تورم الوجه واليدين\n• زلال البول"
-            )
-
-        bot.send_message(
-            chat_id,
-            f"💓 *التقييم السريري لضغط الدم للحامل:*\n\n{bp_eval}\n\n"
-            f"🎯 *الحد الطبيعي:* أقل من 120/80 mmHg | الخطر الحرج: >= 140/90 mmHg",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🩸 فحص السكر الشهري", callback_data="preg_sugar"),
-                types.InlineKeyboardButton("🔙 قائمة الحامل", callback_data="act_pregnancy")
-            )
-        )
-        return
-
-    # 5. استفسارات أمان الأدوية للحامل (FDA Categories)
-    if ("دواء" in text or "أمان" in text or "آمن" in text or "حامل" in text) and len(text) < 40:
-        if any(w in text for w in ["باراسيتامول", "بنادول", "أدول", "panadol", "paracetamol"]):
-            bot.send_message(chat_id, "🟢 *باراسيتامول / بنادول:* Category B (آمن تماماً في جميع شهور الحمل والرضاعة بجرعة 500-1000 ملغ عند اللزوم).")
-            return
-        elif any(w in text for w in ["بروفين", "إيبوبروفين", "فولتارين", "brufen", "ibuprofen"]):
-            bot.send_message(chat_id, "🔴 *بروفين / إيبوبروفين:* Category D ومحظور بالثلث الثالث! يسبب إغلاقاً مبكراً للقناة الشريانية للجنين وقصور كلى الجنين. البديل الآمن: باراسيتامول.")
-            return
-        elif any(w in text for w in ["أموكسيسيلين", "أوجمنتين", "amoxicillin", "augmentin"]):
-            bot.send_message(chat_id, "🟢 *أموكسيسيلين / أوجمنتين:* Category B (مضاد حيوي آمن للالتهابات التنفسية والبولية أثناء الحمل تحت إشراف الطبيب).")
-            return
-
-    # 6. التحقق من كود البرومو
-    if session.get("mode") == "waiting_promo" or text.upper() in ["PRO2026", "VIP2026", "DOSE2026"]:
-        user_sessions[chat_id] = {}
-        code = text.upper()
-        target_plan = "vip" if "VIP" in code else "pro"
-        user_name = message.from_user.username or message.from_user.first_name or ""
-
-        upgrade_user_in_cloud(chat_id, plan=target_plan, package_id="yearly", user_name=user_name)
-
-        bot.send_message(
-            chat_id,
-            f"🎉 *مبروك! تم قبول الكود `{code}` بنجاح!* ✨\n\n"
-            f"• تم ترقية باقتك إلى: *{target_plan.upper()} السريرية الكاملة*\n"
-            f"• الرصيد اليومي: `250` فحص واستشارة\n"
-            f"• جناح رعاية الحامل، فاحص الأعراض (DDx)، والأشعة والتحاليل مفعلة فورياً في البوت والموقع!",
-            reply_markup=types.InlineKeyboardMarkup().add(
-                types.InlineKeyboardButton("🤰 رعاية ومتابعة الحامل", callback_data="act_pregnancy"),
-                types.InlineKeyboardButton("🩺 فحص الأعراض الآن", callback_data="act_symptoms")
-            )
-        )
-        return
-
-    # 7. فحص الأعراض الطبي السريري الافتراضي
-    process_symptoms_ai(chat_id, text)
-
-def process_symptoms_ai(chat_id, symptoms_text):
-    """إرسال الأعراض إلى محرك الذكاء الاصطناعي السريري واستخراج التقرير"""
-    bot.send_message(chat_id, "⏳ *جاري الفحص السريري للأعراض والفرز التشخيصي (Clinical DDx)...*")
-
-    try:
-        res = requests.post(
-            f"{API_BASE_URL}/api/medical/symptom-check",
-            json={"symptoms": symptoms_text, "lang": "ar", "telegramId": str(chat_id)},
-            timeout=15
-        )
-        if res.status_code == 200:
-            data = res.json()
-            imp = data.get("primaryCondition") or data.get("primaryImpressionAr") or data.get("impression") or "اشتباه بحالة سريرية تتطلب تقييماً دقيقاً"
-            urgency = data.get("urgencyText") or data.get("urgencyLevel") or "حالة متوسطة (Routine / Urgent)"
-            tests = data.get("recommendedTestsAr") or ["تحليل دم كامل (CBC)", "فحص سريري لدى طبيب مختص"]
-            guidance = data.get("initialGuidanceAr") or "الراحة، شرب سوائل كافية، ومراجعة الطوارئ إذا ساءت الأعراض."
-
-            result_msg = (
-                f"📋 *تقرير التشخيص التفريقي السريري (Clinical DDx):* \n\n"
-                f"🩺 *الانطباع السريري الأولي:* \n{imp}\n\n"
-                f"🚨 *مستوى الاستعجال والفرز:* \n{urgency}\n\n"
-                f"🔬 *الفحوصات المقترحة:* \n• " + "\n• ".join(tests[:3]) + f"\n\n"
-                f"💡 *التوجيه الأولي:* \n{guidance}\n\n"
-                f"🌐 [فتح تقرير فحص الأعراض التفاعلي وتصدير PDF بالموقع]({WEB_APP_URL}/#symptoms)"
-            )
-            bot.send_message(chat_id, result_msg)
-            return
-
+        words = drug_name.split()
+        result = " ".join(words[:3])
+        logger.info(f"Image identified: {result}, concentration: {concentration}")
+        return result
     except Exception as e:
-        pass
+        logger.error(f"Image API error: {e}")
+        try:
+            import httpx as _h2
+        except: pass
+        await asyncio.sleep(0)  # dummy
+        return ""
+        return ""
 
-    fallback_msg = (
-        f"📋 *تقرير الفحص السريري للأعراض:* \n\n"
-        f"🩺 *الأعراض المسجلة:* {symptoms_text}\n"
-        f"🚨 *التصنيف السريري:* استشارة طبيب عام/أسرة لفحص العلامات الحيوية\n"
-        f"💡 *إرشادات عامة:* شرب سوائل معتدلة، تجنب المجهود الشديد، والتوجه فوراً للطوارئ في حال ظهور ألم صدري حاد أو ضيق تنفس شديد.\n\n"
-        f"🌐 [فتح فاحص الأعراض الشامل وتصدير التقرير بالموقع]({WEB_APP_URL}/#symptoms)"
+
+async def analyze_xray_ai(img_bytes, lang):
+    if not HTTPX_OK or not ANTHROPIC_API_KEY:
+        return "❌ الخدمة غير متاحة حالياً" if lang=="ar" else "❌ Service unavailable"
+    b64 = base64.b64encode(img_bytes).decode()
+    prompt_ar = (
+        "أنت طبيب استشاري أشعة تشخيصية خبير. قم بفحص وقراءة صورة الأشعة المرفقة بدقة سريرية عالية:\n"
+        "1. نوع الفحص والمنطقة (مثال: أشعة سينية للصدر Chest X-Ray، ركبة، حوض...)\n"
+        "2. المشاهدات والملاحظات السريرية (العظام، الأنسجة، الكسور، الالتهابات أو الارتشاح)\n"
+        "3. الانطباع التشخيصي الأولي (Impression)\n"
+        "4. التوصيات الطبية والخطوات التالية (مراجعة الطبيب، فحوصات تأكيدية)\n\n"
+        "قدم الإجابة بتنسيق Markdown أنيق، واختم بتذكير سريري: (هذا التحليل للاسترشاد الطبي فقط)."
     )
-    bot.send_message(chat_id, fallback_msg)
-
-# -------------------------------------------------------------
-# 9. نقطة الدخول والتشغيل الرئيسية
-# -------------------------------------------------------------
-if __name__ == "__main__":
-    print("=" * 60)
-    print("🚀 بدء تشغيل بوت منصة جرعة الطبي...")
-    print(f"🔗 المنصة السحابية المرتبطة: {API_BASE_URL}")
-    print("=" * 60)
-
-    # تشغيل خادم فحص الصحة لدعم Render في الخلفية
-    start_background_http_server()
-
+    prompt_en = (
+        "You are an expert diagnostic radiologist. Analyze this medical imaging (X-Ray/CT/MRI) with clinical precision:\n"
+        "1. Modality & Region (e.g. Chest X-Ray, Knee, Spine)\n"
+        "2. Key Findings (Bones, soft tissues, fractures, infiltrates)\n"
+        "3. Diagnostic Impression\n"
+        "4. Recommendations & Next Clinical Steps\n\n"
+        "Format in clean Markdown with clinical disclaimer at the end."
+    )
+    prompt = prompt_ar if lang=="ar" else prompt_en
     try:
-        # تسجيل قائمة الأوامر التلقائية في تليجرام
-        bot.set_my_commands([
-            types.BotCommand("start", "🏥 القائمة الطبية الشاملة وأزرار الفحص"),
-            types.BotCommand("pregnancy", "🤰 رعاية ومتابعة الحامل (سكر، ضغط، وزن)"),
-            types.BotCommand("symptoms", "🩺 فاحص الأعراض السريري (DDx)"),
-            types.BotCommand("plans", "💳 باقات الاشتراك والترقية"),
-            types.BotCommand("menu", "📋 قائمة الخدمات والميزات"),
-            types.BotCommand("help", "ℹ️ المساعدة والاستخدام"),
-        ])
+        key = ANTHROPIC_API_KEY.encode("ascii", errors="ignore").decode("ascii").strip()
+        async with httpx.AsyncClient(timeout=45, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1000,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                        {"type": "text", "text": prompt}
+                    ]}]})
+            return r.json().get("content", [{}])[0].get("text", "").strip()
     except Exception as e:
-        print(f"تنبيه أثناء تسجيل الأوامر: {e}")
+        return f"❌ حدث خطأ أثناء الفحص: {str(e)[:60]}"
+
+async def analyze_lab_ai(img_bytes, lang):
+    if not HTTPX_OK or not ANTHROPIC_API_KEY:
+        return "❌ الخدمة غير متاحة حالياً" if lang=="ar" else "❌ Service unavailable"
+    b64 = base64.b64encode(img_bytes).decode()
+    prompt_ar = (
+        "أنت استشاري طب مخبري وتحاليل طبية خبير. اقرأ نتائج ورقة التحليل المرفقة بعناية:\n"
+        "1. اسم الفحص ونوعه (مثال: صورة دم كاملة CBC، وظائف كلى KFT، دهون...)\n"
+        "2. جدول أو قائمة بالنتائج مع تحديد القيم الطبيعية والقيم غير الطبيعية (مرتفعة ⬆️ أو منخفضة ⬇️)\n"
+        "3. التفسير السريري للأرقام غير الطبيعية والأسباب المحتملة\n"
+        "4. نصائح وإرشادات طبية والخطوة القادمة\n\n"
+        "قدم الإجابة بتنسيق Markdown واضح وأنيق، واختم بتذكير سريري: (النتائج للاسترشاد ويجب عرضها على الطبيب المعالج)."
+    )
+    prompt_en = (
+        "You are an expert clinical pathologist. Read and interpret this laboratory blood test report:\n"
+        "1. Test Type (e.g., CBC, Kidney function, Lipid profile)\n"
+        "2. Extracted Results highlighting normal vs abnormal (High ⬆️ / Low ⬇️)\n"
+        "3. Clinical interpretation of abnormalities\n"
+        "4. Recommendations & next steps\n\n"
+        "Format cleanly in Markdown with clinical disclaimer."
+    )
+    prompt = prompt_ar if lang=="ar" else prompt_en
+    try:
+        key = ANTHROPIC_API_KEY.encode("ascii", errors="ignore").decode("ascii").strip()
+        async with httpx.AsyncClient(timeout=45, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1000,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": b64}},
+                        {"type": "text", "text": prompt}
+                    ]}]})
+            return r.json().get("content", [{}])[0].get("text", "").strip()
+    except Exception as e:
+        return f"❌ حدث خطأ أثناء قراءة التحليل: {str(e)[:60]}"
+
+async def xray_photo_handler(u, ctx):
+    lang = get_lang(ctx)
+    msg = await u.message.reply_text("🩻 " + ("جارٍ فحص صورة الأشعة بالذكاء الاصطناعي..." if lang=="ar" else "Analyzing X-Ray image..."))
+    try:
+        photo = u.message.photo[-1]
+        f = await photo.get_file()
+        img = await f.download_as_bytearray()
+        result = await analyze_xray_ai(bytes(img), lang)
+        await msg.delete()
+        await u.message.reply_text(result, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await msg.delete()
+        await u.message.reply_text("❌ " + str(e)[:60], reply_markup=kb_back(lang))
+    return STATE_XRAY
+
+async def lab_photo_handler(u, ctx):
+    lang = get_lang(ctx)
+    msg = await u.message.reply_text("🧪 " + ("جارٍ قراءة وتحليل الفحص المخبري..." if lang=="ar" else "Analyzing lab results..."))
+    try:
+        photo = u.message.photo[-1]
+        f = await photo.get_file()
+        img = await f.download_as_bytearray()
+        result = await analyze_lab_ai(bytes(img), lang)
+        await msg.delete()
+        await u.message.reply_text(result, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await msg.delete()
+        await u.message.reply_text("❌ " + str(e)[:60], reply_markup=kb_back(lang))
+    return STATE_LAB
+
+def kb_lang():
+    return InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"),
+            InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
+        ],
+        [
+            InlineKeyboardButton("🌐 فتح تطبيق وموقع جرعة الطبي | Web App", url="https://web-dose.vercel.app/?welcome=1&v=3.8")
+        ]
+    ])
+
+def kb_main(lang):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🤰 " + ("رعاية ومتابعة الحامل (حساب، سكر، ضغط، وزن)" if lang=="ar" else "Maternal & Pregnancy Care"), callback_data="m_pregnancy")],
+        [InlineKeyboardButton("🩺 " + ("فاحص الأعراض والتشخيص السريري (DDx)" if lang=="ar" else "Symptom Checker (DDx)"), callback_data="m_symptoms")],
+        [InlineKeyboardButton("🩻 " + ("فحص وقراءة الأشعة (X-Ray)" if lang=="ar" else "X-Ray Analysis"), callback_data="m_xray")],
+        [InlineKeyboardButton("🧪 " + ("تحليل الفحوصات المخبرية" if lang=="ar" else "Lab Tests Analysis"), callback_data="m_lab")],
+        [InlineKeyboardButton(tx("btn_search", lang), callback_data="m_search")],
+        [InlineKeyboardButton(tx("btn_child", lang), callback_data="m_child")],
+        [InlineKeyboardButton(tx("btn_bmi", lang), callback_data="m_bmi")],
+        [InlineKeyboardButton(tx("btn_cal", lang), callback_data="m_cal")],
+        [InlineKeyboardButton(tx("btn_patient", lang), callback_data="m_patient")],
+        [InlineKeyboardButton(tx("btn_interaction", lang), callback_data="m_interaction")],
+        [InlineKeyboardButton(tx("btn_sugar", lang), callback_data="m_sugar")],
+        [InlineKeyboardButton(tx("btn_bp", lang), callback_data="m_bp")],
+        [InlineKeyboardButton(tx("btn_remind", lang), callback_data="m_remind")],
+        [InlineKeyboardButton(tx("btn_premium", lang), callback_data="m_premium")],
+        [InlineKeyboardButton(tx("btn_settings", lang), callback_data="m_settings")],
+        [InlineKeyboardButton("📖 " + ("دليل المستخدم" if lang=="ar" else "User Guide"), callback_data="m_guide")],
+        [InlineKeyboardButton("🥗 " + ("التغذية العلاجية" if lang=="ar" else "Therapeutic Diet"), callback_data="m_diet")],
+        [InlineKeyboardButton("🌐 " + ("فتح تطبيق الويب" if lang=="ar" else "Open Web App"), url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
+
+
+def kb_back(lang):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+
+def kb_remind(lang):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton(tx("btn_add", lang), callback_data="r_add")],
+        [InlineKeyboardButton(tx("btn_list", lang), callback_data="r_list")],
+        [InlineKeyboardButton(tx("btn_edit", lang), callback_data="r_edit")],
+        [InlineKeyboardButton(tx("btn_del", lang), callback_data="r_del")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]])
+
+REMINDERS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reminders.json")
+
+# نحفظ في ملف JSON محلي
+def load_all_reminders():
+    # نحاول من Supabase أولاً
+    if supabase_client:
+        try:
+            res = supabase_client.table("reminders").select("data").eq("id", "all").execute()
+            if res.data:
+                return json.loads(res.data[0]["data"])
+        except Exception as e:
+            logger.error(f"Supabase load error: {e}")
+    # نقرأ من الملف المحلي
+    try:
+        with open(REMINDERS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_all_reminders(data):
+    try:
+        with open(REMINDERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.error(f"reminders save error: {e}")
+    # نحفظ في Supabase
+    if supabase_client:
+        try:
+            supabase_client.table("reminders").upsert({"id": "all", "data": json.dumps(data, ensure_ascii=False)}).execute()
+            logger.warning("✅ Supabase reminders saved")
+        except Exception as e:
+            logger.warning(f"❌ Supabase save failed: {e}")
+    else:
+        logger.warning("❌ supabase_client is None")
+
+def get_rems(ctx):
+    try:
+        if hasattr(ctx, "effective_user") and ctx.effective_user:
+            uid = str(ctx.effective_user.id)
+        elif hasattr(ctx, "_user_id"):
+            uid = str(ctx._user_id)
+        else:
+            uid = str(ctx.user_data.get("uid", "0"))
+    except:
+        uid = "0"
+    ctx.user_data["uid"] = uid
+    # نقرأ دائماً من Supabase
+    all_rems = load_all_reminders()
+    rems = all_rems.get(uid, [])
+    ctx.user_data["reminders"] = rems
+    return rems
+
+def save_rems(ctx):
+    try:
+        if hasattr(ctx, "effective_user") and ctx.effective_user:
+            uid = str(ctx.effective_user.id)
+        elif hasattr(ctx, "_user_id"):
+            uid = str(ctx._user_id)
+        else:
+            uid = ctx.user_data.get("uid", "0")
+        all_rems = load_all_reminders()
+        all_rems[uid] = ctx.user_data.get("reminders", [])
+        save_all_reminders(all_rems)
+        logger.info(f"save_rems: uid={uid}, count={len(all_rems[uid])}")
+    except Exception as e:
+        logger.error(f"save_rems error: {e}")
+
+def fmt_rems(rems, lang):
+    if not rems: return tx("no_rems", lang)
+    lines = [tx("rems_title", lang)]
+    for r in rems:
+        suf = "x/يوم" if lang == "ar" else "x/day"
+        days = r.get("days", 0)
+        dur = ""
+        if days > 0:
+            dur = " — 📅 " + str(days) + (" يوم" if lang=="ar" else " days")
+        pat_tag = " 👤 " + r["patient"] if r.get("patient") else ""
+        lines.append("🔸 " + str(r['id']) + " 💊 " + str(r['drug']) + pat_tag + " — 🕐 " + str(r['time']) + " — 🔁 " + str(r['freq']) + suf + dur)
+    return "\n".join(lines)
+
+async def send_alert(ctx):
+    d = ctx.job.data
+    lang = d.get("lang", "ar")
+    drug = d.get("drug", "")
+    chat_id = d.get("chat_id")
+    attempt = d.get("attempt", 1)
+    
+    if lang == "ar":
+        msg = "⏰ تذكير الدواء\n\n💊 حان وقت دواء: " + drug
+        if attempt > 1: msg += "\n\n🔔 تذكير رقم " + str(attempt)
+        btn_done = "✅ تم إعطاء الدواء"
+        btn_later = "⏳ لاحقاً (15 دقيقة)"
+    else:
+        msg = "⏰ Medication Reminder\n\n💊 Time for: " + drug
+        if attempt > 1: msg += "\n\n🔔 Reminder #" + str(attempt)
+        btn_done = "✅ Done"
+        btn_later = "⏳ Remind in 15 min"
+    job_id = str(chat_id)
+    btn_rows = [
+        [InlineKeyboardButton(btn_done, callback_data="rem_done_" + job_id)],
+        [InlineKeyboardButton(btn_later, callback_data="rem_snooze_" + job_id + "_" + str(drug))],
+        [InlineKeyboardButton("🏠 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="main_menu_now")],
+    ]
+    photo_id = d.get("photo")
+    if photo_id:
+        btn_rows.insert(1, [InlineKeyboardButton("📸 " + ("عرض الدواء" if lang=="ar" else "Show Medication"), callback_data="rem_showphoto_" + job_id)])
+    btns = InlineKeyboardMarkup(btn_rows)
 
     try:
-        # حذف أي ويب هوك قديم لتمكين الـ Polling الفوري
-        bot.delete_webhook(drop_pending_updates=False)
+        photo_id = d.get("photo")
+        if photo_id:
+            await ctx.bot.send_photo(chat_id, photo=photo_id)
+            await ctx.bot.send_message(chat_id, msg, reply_markup=btns)
+        else:
+            await ctx.bot.send_message(chat_id, msg, reply_markup=btns)
+    except Exception as e:
+        logger.error(f"send_alert error: {e}")
+    
+    # إذا لم يُستجب وعدد المحاولات أقل من 3 — نجدول تذكيراً بعد 15 دقيقة
+    if attempt < 3:
+        from datetime import timedelta
+        next_time = datetime.now(TIMEZONE) + timedelta(minutes=15)
+        new_data = dict(d)
+        new_data["attempt"] = attempt + 1
+        ctx.job.application.job_queue.run_once(
+            send_alert,
+            when=next_time,
+            data=new_data,
+            name="alert_" + str(chat_id) + "_" + str(drug) + "_retry" + str(attempt)        )
+
+
+async def rem_show_photo(update, ctx):
+    q = update.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    # نبحث عن الصورة في التذكيرات المحفوظة
+    rems = ctx.user_data.get("reminders", [])
+    photo_id = None
+    for r in rems:
+        if r.get("photo"):
+            photo_id = r["photo"]
+            break
+    if photo_id:
+        await ctx.bot.send_photo(q.message.chat_id, photo=photo_id, 
+            caption="💊 " + ("صورة الدواء" if lang=="ar" else "Medication Photo"))
+    else:
+        await q.answer("❌ " + ("لا توجد صورة محفوظة" if lang=="ar" else "No photo saved"), show_alert=True)
+
+async def rem_done(update, ctx):
+    """المستخدم ضغط تم"""
+    q = update.callback_query
+    await q.answer("✅ تم تسجيل الجرعة", show_alert=True)
+    lang = "ar" if "ar" in str(q.data) else "en"
+    msg = "✅ تم! الجرعة التالية ستُذكّرك في وقتها." if lang=="ar" else "✅ Done! Next dose reminder is set."
+    await q.message.edit_text(msg)
+    # نلغي التذكيرات الإضافية
+    job_id = q.data.replace("rem_done_", "")
+    for job in ctx.job_queue.jobs():
+        if "retry" in job.name and job_id.split("_")[0] in job.name:
+            job.schedule_removal()
+
+async def rem_later(update, ctx):
+    """المستخدم ضغط لاحقاً - يجدول تذكيراً بعد 15 دقيقة"""
+    q = update.callback_query
+    await q.answer("⏳ سيتم تذكيرك بعد 15 دقيقة", show_alert=True)
+    raw = q.data.replace("rem_snooze_", "")
+    parts = raw.split("_", 1)
+    chat_id = int(parts[0]) if parts[0].isdigit() else q.message.chat_id
+    drug = parts[1] if len(parts) > 1 else "دواء"
+    lang = "ar"
+    msg = "⏳ سيُذكّرك البوت بعد 15 دقيقة." if lang=="ar" else "⏳ Reminder set for 15 minutes."
+    btns_later = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🏠 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="main_menu_now")]
+    ])
+    await q.message.edit_text(msg, reply_markup=btns_later)
+    # نبحث عن صورة الدواء من Supabase
+    photo_id = None
+    try:
+        all_data = load_all_reminders()
+        uid = str(chat_id)
+        rems = all_data.get(uid, [])
+        for r in rems:
+            if r.get("drug") == drug and r.get("photo"):
+                photo_id = r["photo"]
+                break
+    except: pass
+    # نجدول تذكيراً بعد 15 دقيقة مع الصورة
+    from datetime import timedelta
+    next_time = datetime.now(TIMEZONE) + timedelta(minutes=15)
+    job = ctx.application.job_queue.run_once(
+        send_alert,
+        when=next_time,
+        data={"chat_id": chat_id, "drug": drug, "lang": lang, "attempt": 1, "is_retry": True, "photo": photo_id},
+        name="snooze_" + str(chat_id) + "_" + str(drug)
+    )
+    logger.warning(f"✅ Snooze scheduled: {drug} at {next_time} job={job}")
+
+def sched(app, chat_id, drug, time_str, freq, lang, tz_str="Asia/Riyadh", photo=None):
+    try:
+        h, m = map(int, time_str.split(":"))
+        try:
+            user_tz = pytz.timezone(tz_str)
+        except:
+            user_tz = TIMEZONE
+        from datetime import time as dtime, timedelta
+        # نحسب الأوقات حسب التكرار
+        interval_hours = 24 // max(freq, 1)
+        times = []
+        for i in range(freq):
+            total_minutes = (h * 60 + m) + (i * interval_hours * 60)
+            new_h = (total_minutes // 60) % 24
+            new_m = total_minutes % 60
+            times.append(dtime(new_h, new_m, tzinfo=user_tz))
+        # نجدول run_daily لكل وقت
+        for i, t in enumerate(times):
+            job_name = "rem_" + str(chat_id) + "_" + str(drug) + "_" + str(i)
+            # نتحقق أن الـ job غير موجود مسبقاً
+            existing = [j for j in app.job_queue.jobs() if j.name == job_name]
+            for j in existing:
+                j.schedule_removal()
+            app.job_queue.run_daily(
+                send_alert,
+                time=t,
+                data={"chat_id": chat_id, "drug": drug, "lang": lang, "photo": photo},
+                name=job_name)
+        logger.info("sched: " + str(drug) + " x" + str(freq) + " times=" + str([str(t) for t in times]))
+    except Exception as e:
+        logger.error(f"sched error: {e}")
+
+async def show_main(msg, lang, edit=False):
+    t = tx("main_menu", lang)
+    k = kb_main(lang)
+    if edit:
+        await msg.edit_text(t, reply_markup=k, parse_mode=ParseMode.MARKDOWN)
+    else:
+        await msg.reply_text(t, reply_markup=k, parse_mode=ParseMode.MARKDOWN)
+
+def calc_bmi(weight, height_cm):
+    """حساب BMI"""
+    h = height_cm / 100
+    bmi = weight / (h * h)
+    return round(bmi, 1)
+
+def bmi_category(bmi, lang):
+    """تصنيف BMI"""
+    if bmi < 18.5:
+        return tx("bmi_underweight", lang)
+    elif bmi < 25:
+        return tx("bmi_normal", lang)
+    elif bmi < 30:
+        return tx("bmi_overweight", lang)
+    else:
+        return tx("bmi_obese", lang)
+
+def ideal_weight(height_cm, age):
+    """الوزن المثالي للطفل"""
+    if age <= 10:
+        return round(2 * age + 8, 1)
+    else:
+        return round((age * 4 - 2.5) / 2, 1)
+
+async def auto_welcome(u, ctx):
+    """ترحيب تلقائي عند أي رسالة بدون حالة محادثة"""
+    if not ctx.user_data.get("lang"):
+        _tz = ctx.user_data.get("timezone"); ctx.user_data.clear(); ctx.user_data["timezone"] = _tz if _tz else ctx.user_data.get("timezone")
+        await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+        return STATE_LANGUAGE
+    lang = get_lang(ctx)
+    await show_main(u.message, lang)
+    return STATE_MAIN_MENU
+
+
+DRUG_CONCS = {
+    "paracetamol": ["120mg/5ml", "125mg/5ml", "160mg/5ml", "250mg/5ml"],
+    "ibuprofen": ["100mg/5ml", "200mg/5ml"],
+    "amoxicillin": ["125mg/5ml", "156mg/5ml", "250mg/5ml", "312mg/5ml"],
+    "amoxicillin_clavulanate": ["156mg/5ml", "228mg/5ml", "312mg/5ml", "457mg/5ml"],
+    "azithromycin": ["100mg/5ml", "200mg/5ml"],
+    "metronidazole": ["125mg/5ml", "200mg/5ml"],
+    "cetirizine": ["5mg/5ml"],
+    "loratadine": ["5mg/5ml"],
+    "prednisolone": ["5mg/5ml", "15mg/5ml"],
+    "clarithromycin": ["125mg/5ml", "250mg/5ml"],
+    "cephalexin": ["125mg/5ml", "250mg/5ml"],
+    "salbutamol": ["2mg/5ml"],
+    "domperidone": ["5mg/5ml"],
+    "ondansetron": ["4mg/5ml"],
+    "fluconazole": ["50mg/5ml", "100mg/5ml"],
+    "nitazoxanide": ["100mg/5ml", "200mg/5ml"],
+    "zinc_syrup": ["10mg/5ml", "20mg/5ml"],
+    "iron_syrup": ["25mg/ml", "15mg/ml"],
+    "erythromycin": ["125mg/5ml", "250mg/5ml"],
+    "cotrimoxazole": ["240mg/5ml", "480mg/5ml"],
+    "ampicillin": ["125mg/5ml", "250mg/5ml"],
+}
+
+async def start(u, ctx):
+    try:
+        await u.message.reply_text("✨ مرحباً بك في منصة جرعة الطبية", reply_markup=ReplyKeyboardRemove())
+    except Exception:
+        pass
+    _tz = ctx.user_data.get("timezone"); ctx.user_data.clear(); ctx.user_data["timezone"] = _tz if _tz else ctx.user_data.get("timezone")
+    await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+    return STATE_LANGUAGE
+
+async def reg_name_country(u, ctx):
+    """يحفظ الاسم والدولة بعد التسجيل"""
+    lang = "ar"
+    text = u.message.text.strip()
+    uid = str(u.effective_user.id)
+    
+    # نفصل الاسم والدولة
+    parts = text.replace("—","–").replace("-","–").split("–")
+    name = parts[0].strip() if parts else text
+    country = parts[1].strip() if len(parts) > 1 else ""
+    
+    # نكتشف المنطقة الزمنية
+    if country:
+        tz = detect_country_tz(country)
+        if tz:
+            ctx.user_data["timezone"] = tz
+    
+    # نحفظ في الإحصائيات
+    stats = load_stats()
+    if "users" not in stats: stats["users"] = {}
+    stats["users"][uid] = {
+        "count": 1,
+        "registered": True,
+        "role": ctx.user_data.get("reg_role", "عام"),
+        "name": name,
+        "country": country
+    }
+    save_stats(stats)
+    
+    await u.message.reply_text("✅ مرحباً " + name + "! 🎉\n\nاختر لغتك:", reply_markup=kb_lang())
+    return STATE_LANGUAGE
+
+async def pick_lang(u, ctx):
+    q = u.callback_query
+    try:
+        await q.answer()
+    except:
+        pass
+    logger.warning(f"MAIN_CB: {q.data}")
+    ctx.user_data["lang"] = "ar" if q.data == "lang_ar" else "en"
+    lang = get_lang(ctx)
+    
+    await show_main(q.message, lang, edit=True)
+    print("PICK_LANG_OK")
+    logger.info("PICK_LANG_OK")
+    # شهر مجاني للمستخدمين الجدد
+    uid = str(u.effective_user.id)
+    if supabase_client:
+        try:
+            from datetime import datetime, timedelta
+            ex = supabase_client.table("users").select("uid").eq("uid", uid).execute()
+            if not ex.data:
+                expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                supabase_client.table("users").upsert({"uid": uid, "name": u.effective_user.first_name or "", "lang": lang, "level": "registered", "trial_expiry": expiry}).execute()
+                trial_msg = ("🎉 تم تفعيل شهر مجاني كامل!\n✅ جميع الميزات متاحة حتى: " + expiry) if lang=="ar" else ("🎉 Free month activated!\n✅ All features until: " + expiry)
+                await q.message.reply_text(trial_msg)
+        except Exception as e:
+            logger.warning(f"trial error: {e}")
+            await q.message.reply_text("debug: " + str(e)[:80])
+    return STATE_MAIN_MENU
+
+async def set_country(u, ctx):
+    lang = get_lang(ctx)
+    txt = u.message.text.strip()
+    tz = detect_country_tz(txt)
+    if tz:
+        ctx.user_data["timezone"] = tz
+        country_name = txt
+        msg = f"✅ تم ضبط التوقيت: {tz}" if lang == "ar" else f"✅ Timezone set: {tz}"
+        await u.message.reply_text(msg)
+    else:
+        msg = "⚠️ لم أتعرف على الدولة، سيتم استخدام توقيت الرياض افتراضياً" if lang == "ar" else "⚠️ Country not found, using Riyadh timezone as default"
+        await u.message.reply_text(msg)
+        ctx.user_data["timezone"] = "Asia/Riyadh"
+    await show_main(u.message, lang)
+    return STATE_MAIN_MENU
+
+
+async def go_main_menu(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    await show_main(q.message, lang, edit=False)
+    return STATE_MAIN_MENU
+
+
+async def show_subscription(u, ctx, lang):
+    """يعرض خيارات الاشتراك"""
+    if lang == "ar":
+        msg = (
+            "⏰ انتهت تجربتك المجانية!" + chr(10)*2 +
+            "💎 اشترك الآن للاستمرار بكل الميزات:" + chr(10)*2 +
+            "🥉 شهر واحد: $2.99" + chr(10) +
+            "🥈 3 أشهر: $6.99 (وفر 22%)" + chr(10) +
+            "🥇 6 أشهر: $11.99 (وفر 58%)" + chr(10) +
+            "👑 سنة كاملة: $17.99 (وفر 67%)" + chr(10)*2 +
+            "للاشتراك تواصل مع المطور @DrHusseinBot"
+        )
+    else:
+        msg = (
+            "⏰ Your free trial has ended!" + chr(10)*2 +
+            "💎 Subscribe now to continue:" + chr(10)*2 +
+            "🥉 1 Month: $2.99" + chr(10) +
+            "🥈 3 Months: $6.99 (save 22%)" + chr(10) +
+            "🥇 6 Months: $11.99 (save 58%)" + chr(10) +
+            "👑 1 Year: $17.99 (save 67%)" + chr(10)*2 +
+            "To subscribe contact @DrHusseinBot"
+        )
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🥉 $2.99 " + ("شهر" if lang=="ar" else "Month"), callback_data="sub_1m")],
+        [InlineKeyboardButton("🥈 $6.99 " + ("3 أشهر" if lang=="ar" else "3 Months"), callback_data="sub_3m")],
+        [InlineKeyboardButton("🥇 $11.99 " + ("6 أشهر" if lang=="ar" else "6 Months"), callback_data="sub_6m")],
+        [InlineKeyboardButton("👑 $17.99 " + ("سنة" if lang=="ar" else "Year"), callback_data="sub_1y")],
+    ])
+    if hasattr(u, 'message') and u.message:
+        await u.message.reply_text(msg, reply_markup=btns)
+    elif hasattr(u, 'callback_query') and u.callback_query:
+        await u.callback_query.message.edit_text(msg, reply_markup=btns)
+
+
+async def sub_select(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    uid = str(u.effective_user.id)
+    
+    plans = {
+        "sub_1m": ("$2.99", "شهر واحد", "1 Month"),
+        "sub_3m": ("$6.99", "3 أشهر", "3 Months"),
+        "sub_6m": ("$11.99", "6 أشهر", "6 Months"),
+        "sub_1y": ("$17.99", "سنة كاملة", "1 Year"),
+    }
+    
+    plan = plans.get(q.data, ("$6.99", "شهر", "Month"))
+    price = plan[0]
+    period = plan[1] if lang=="ar" else plan[2]
+    
+    if lang == "ar":
+        msg = (
+            "💳 لتفعيل باقة " + period + " - " + price + chr(10)*2 +
+            "1️⃣ اضغط رابط PayPal أدناه" + chr(10) +
+            "2️⃣ أرسل " + price + " كـ Friends & Family" + chr(10) +
+            "3️⃣ أرسل screenshot التأكيد مع رقمك: " + uid + chr(10)*2 +
+            "سيتم تفعيل اشتراكك خلال ساعة ✅"
+        )
+    else:
+        msg = (
+            "💳 To activate " + period + " plan - " + price + chr(10)*2 +
+            "1️⃣ Click PayPal link below" + chr(10) +
+            "2️⃣ Send " + price + " as Friends & Family" + chr(10) +
+            "3️⃣ Send screenshot with your ID: " + uid + chr(10)*2 +
+            "Your subscription will be activated within 1 hour ✅"
+        )
+    
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💳 PayPal - " + price, url="https://www.paypal.me/HusainAlsaffouri/" + price.replace("$",""))],
+        [InlineKeyboardButton("🔙 " + ("رجوع" if lang=="ar" else "Back"), callback_data="m_premium")]
+    ])
+    await q.message.edit_text(msg, reply_markup=btns)
+    return STATE_MAIN_MENU
+
+
+async def diet_search(u, ctx):
+    lang = get_lang(ctx)
+    query = u.message.text.strip()
+    thinking = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+    try:
+        if lang == "ar":
+            prompt = f"""أنت أخصائي تغذية علاجية. أعطني خطة غذائية لمريض: {query}
+أجب بالعربية فقط بهذا التنسيق:
+
+✅ الأطعمة المسموحة:
+[قائمة مفصلة]
+
+❌ الأطعمة الممنوعة:
+[قائمة مفصلة]
+
+⭐ الأطعمة المفيدة جداً:
+[قائمة مع السبب]
+
+💡 نصائح غذائية مهمة:
+[نصائح مختصرة]
+
+⚠️ تحذيرات:
+[تحذيرات مهمة]"""
+        else:
+            prompt = f"""You are a clinical nutritionist. Give dietary plan for: {query}
+Reply in English ONLY with this format:
+
+✅ Allowed Foods:
+[detailed list]
+
+❌ Forbidden Foods:
+[detailed list]
+
+⭐ Most Beneficial Foods:
+[list with reasons]
+
+💡 Important Dietary Tips:
+[brief tips]
+
+⚠️ Warnings:
+[important warnings]"""
+
+        async with httpx.AsyncClient(timeout=30, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]})
+            result = r.json().get("content", [{}])[0].get("text", "").strip()
+        await thinking.delete()
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🥗 " + ("بحث آخر" if lang=="ar" else "Another Search"), callback_data="m_diet")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await u.message.reply_text(result[:4000], reply_markup=btns)
+        return STATE_DIET
+    except Exception as e:
+        try: await thinking.delete()
+        except: pass
+        await u.message.reply_text(tx("not_found", lang), reply_markup=kb_back(lang))
+        return STATE_DIET
+
+async def go_back(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    for k in ("results", "child_drug", "edit_id", "edit_field"):
+        ctx.user_data.pop(k, None)
+    await show_main(q.message, lang, edit=False)
+    return STATE_MAIN_MENU
+
+async def main_cb(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "m_xray":
+        msg = ("🩻 *فحص وقراءة الأشعة السينية (X-Ray / MRI / CT)*\n\n"
+               "📸 *أرسل صورة الأشعة الآن كصورة عادية في الشات.*\n"
+               "سأقوم بفحصها بالذكاء الاصطناعي الطبي وإظهار التقرير السريري فوراً!") if lang=="ar" else (
+               "🩻 *X-Ray & Medical Imaging Scan*\n\n"
+               "📸 *Please send the X-Ray image now directly in this chat.*\n"
+               "I will analyze it and generate the clinical report instantly!")
+        await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_XRAY
+    elif q.data == "m_lab":
+        msg = ("🧪 *تحليل الفحوصات والتحاليل المخبرية*\n\n"
+               "📸 *التقط صورة لورقة التحليل (دم، كلى، كبد، سكر) وأرسلها هنا.*\n"
+               "سأقرأ النتائج وأوضح الشاذ منها والتوصيات السريرية فوراً!") if lang=="ar" else (
+               "🧪 *Lab Blood Test Analysis*\n\n"
+               "📸 *Please send a photo of the lab test report here.*\n"
+               "I will interpret the abnormal values and clinical insights instantly!")
+        await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_LAB
+    elif q.data == "m_pregnancy":
+        await q.answer()
+        txt = (
+            "🤰 *جناح رعاية ومتابعة صحة الحامل السريري (Dose Maternal Care)*\n\n"
+            "مرحباً بكِ في القسم المتخصص لطب التوليد ورعاية الأم والجنين المبني على المعايير السريرية العالمية (ACOG / ADA / WHO).\n\n"
+            "👇 *اختر الأداة السريرية المطلوبة:*"
+        ) if lang == "ar" else (
+            "🤰 *Clinical Maternal & Obstetric Care Suite*\n\n"
+            "Evidence-based prenatal care and maternal guidance based on ACOG / ADA standards.\n\n"
+            "👇 *Select a clinical module:*"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📅 " + ("حاسبة الحمل وموعد الولادة (EDD)" if lang=="ar" else "Gestational Age & EDD Calculator"), callback_data="preg_calc")],
+            [InlineKeyboardButton("🩸 " + ("سكر الحمل السريري (GDM Target)" if lang=="ar" else "Gestational Diabetes Targets"), callback_data="preg_sugar"),
+             InlineKeyboardButton("🩺 " + ("ضغط الدم وتسمم الحمل" if lang=="ar" else "Blood Pressure & Pre-eclampsia"), callback_data="preg_bp")],
+            [InlineKeyboardButton("⚖️ " + ("الوزن المثالي والزيادة الآمنة" if lang=="ar" else "Gestational Weight Gain"), callback_data="preg_weight"),
+             InlineKeyboardButton("💊 " + ("أمان الأدوية للحامل (FDA)" if lang=="ar" else "FDA Drug Safety"), callback_data="preg_drugs")],
+            [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
+             InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
+            [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
+            [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_calc":
+        await q.answer()
+        txt = (
+            "📅 *حاسبة عمر الحمل وموعد الولادة المتوقع (EDD Calculator):*\n\n"
+            "تعتمد الحاسبة قاعدة ناغل (Naegele’s Rule) ومعايير الكلية الأمريكية لأطباء النساء والتوليد (ACOG).\n\n"
+            "✨ *اختر أحد الأسابيع السريرية لمعاينة التقرير الفوري، أو اكتب في رسالة تاريخ أول يوم لآخر دورة شهرية (مثال: دورة 2026-05-15):*"
+        ) if lang == "ar" else (
+            "📅 *Gestational Age & EDD Calculator (ACOG Standards):*\n\n"
+            "Choose a quick week stage or send your Last Menstrual Period date (e.g. cycle 2026-05-15):"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌱 الأسبوع 8 (شهر 2)", callback_data="pweek_8"),
+             InlineKeyboardButton("🍋 الأسبوع 12 (نهاية الثلث 1)", callback_data="pweek_12")],
+            [InlineKeyboardButton("🍌 الأسبوع 20 (منتصف الحمل)", callback_data="pweek_20"),
+             InlineKeyboardButton("🍆 الأسبوع 28 (بداية الثلث 3)", callback_data="pweek_28")],
+            [InlineKeyboardButton("🍉 الأسبوع 36 (استعداد للولادة)", callback_data="pweek_36")],
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data.startswith("pweek_"):
+        await q.answer()
+        w_map = {
+            "pweek_8": ("الأسبوع الثامن (8)", "الثلث الأول (First Trimester)", "الشهر الثاني", "حبة توت بري (Blueberry)", "224 يوماً", "20%", "سونار التأكد من نبض الجنين، فحص فصيلة الدم وعامل الريزوس (Rh)، وتحليل بول شامل."),
+            "pweek_12": ("الأسبوع الثاني عشر (12)", "نهاية الثلث الأول", "الشهر الثالث", "ليمونة صغيرة (Lime)", "196 يوماً", "30%", "سونار الشفافية القفوية (NT Scan)، فحص مسحي للكرموسومات، قياس ضغط الدم الأساسي."),
+            "pweek_20": ("الأسبوع العشرون (20)", "الثلث الثاني (Second Trimester)", "الشهر الخامس", "حبة موز (Banana)", "140 يوماً", "50%", "سونار التفاصيل والتشوهات الجنينية (Detailed Anomaly Ultrasound)، فحص طول عنق الرحم وموقع المشيمة."),
+            "pweek_28": ("الأسبوع الثامن والعشرون (28)", "بداية الثلث الثالث (Third Trimester)", "الشهر السابع", "باذنجانة كبيرة (Eggplant)", "84 يوماً", "70%", "فحص سكر الحمل (75g OGTT)، إعادة فحص خضاب الدم والحديد، إبرة Anti-D للحوامل ذات Rh سالب."),
+            "pweek_36": ("الأسبوع السادس والثلاثون (36)", "الثلث الثالث (Third Trimester)", "الشهر التاسع", "بطيخة صيفية (Watermelon)", "28 يوماً", "90%", "مسحة بكتيريا المكورات العقدية (GBS Swab)، فحص وضعية الجنين ونزول الرأس بالحوض، مراقبة ضغط الدم وحركة الجنين.")
+        }
+        item = w_map.get(q.data, w_map["pweek_20"])
+        txt = (
+            f"📋 *التقرير السريري لمتابعة الحمل ({item[0]}):*\n\n"
+            f"• 🤰 *المرحلة:* {item[1]} — {item[2]}\n"
+            f"• 👶 *حجم ووزن الجنين التقديري:* بحجم {item[3]}\n"
+            f"• ⏳ *الأيام المتبقية التقريبية للولادة:* {item[4]} (اكتمل {item[5]} من رحلة الحمل)\n\n"
+            f"🔬 *أهم الفحوصات الطبية المطلوبة في هذه المرحلة:*\n"
+            f"{item[6]}\n\n"
+            f"⚠️ *ملاحظة:* يرجى دائماً مراجعة طبيب التوليد المختص لإجراء التقييم السريري الدقيق."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📅 اختيار أسبوع آخر", callback_data="preg_calc")],
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_sugar":
+        await q.answer()
+        txt = (
+            "🩸 *المعايير السريرية لسكر الحمل (GDM Clinical Targets):*\n\n"
+            "توصيات الجمعية الأمريكية للسكري (ADA) والكلية الأمريكية لأطباء النساء والتوليد (ACOG):\n\n"
+            "• 🟢 *سكر الصائم:* أقل من **95 mg/dL** (5.3 mmol/L)\n"
+            "• 🟢 *بعد الأكل بساعة:* أقل من **140 mg/dL** (7.8 mmol/L)\n"
+            "• 🟢 *بعد الأكل بساعتين:* أقل من **120 mg/dL** (6.7 mmol/L)\n"
+            "• 🟢 *مخزون السكر التراكمي (HbA1c):* المستهدف **أقل من 6.0%**\n\n"
+            "🔍 *بروتوكول التشخيص المخبري:*\n"
+            "إجراء فحص تحمل الجلوكوز 75g Oral Glucose Tolerance Test بين الأسبوعين 24 و 28 لجميع الحوامل.\n\n"
+            "💊 *خطة العلاج:*\n"
+            "1. حمية غذائية منخفضة المؤشر الجلايسيمي وموزعة على 3 وجبات رئيسية ووجبتين خفيفتين.\n"
+            "2. إذا لم تتحقق الأرقام خلال أسبوع إلى أسبوعين، يُبدأ العلاج الدوائي بالإنسولين تحت إشراف الطبيب."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_bp":
+        await q.answer()
+        txt = (
+            "🩺 *ضغط الدم السريري ومخاطر تسمم الحمل (Pre-eclampsia Protocol):*\n\n"
+            "معايير وضوابط الكلية الأمريكية ACOG لمراقبة ضغط دم الحامل:\n\n"
+            "• 🟢 *طبيعي:* أقل من **120/80 mmHg**\n"
+            "• 🟡 *مرتفع خفيف:* من **120/80** إلى **139/89 mmHg** (مراقبة أسبوعية وتكرار القياس)\n"
+            "• 🔴 *حرج / اشتباه تسمم حمل:* **140/90 mmHg فما فوق** في قراءتين بفارق 4 ساعات!\n\n"
+            "🚨 *علامات الخطر التحذيرية الحمراء (Red Flags) - تستوجب الطوارئ فوراً:*\n"
+            "1. صداع شديد نابض ومستمر لا يستجيب للمسكنات.\n"
+            "2. اضطراب الرؤية أو رؤية بقع مضيئة (Aura / Blurry vision).\n"
+            "3. ألم حاد ومفاجئ في أعلى يمين البطن تحت القفص الصدري.\n"
+            "4. تورم مفاجئ وسريع في الوجه أو حول العينين أو اليدين.\n\n"
+            "🛡️ *الوقاية بالأسبرين:*\n"
+            "يوصى بجرعة منخفضة من الأسبرين (75 - 150 mg يومياً) بدءاً من الأسبوع 12 إلى 16 للحوامل ذوات الخطورة العالية."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_weight":
+        await q.answer()
+        txt = (
+            "⚖️ *الزيادة الموصى بها في وزن الحامل (IOM / ACOG Guidelines):*\n\n"
+            "تُحدد الزيادة الصحية طوال فترة الحمل بحسب مؤشر كتلة الجسم (BMI) قبل الحمل:\n\n"
+            "• 🔹 *النحافة (BMI أقل من 18.5):* الزيادة الصحية **12.5 - 18 كجم**\n"
+            "• 🔹 *الوزن الطبيعي (BMI من 18.5 إلى 24.9):* الزيادة الصحية **11.5 - 16 كجم**\n"
+            "• 🔹 *زيادة الوزن (BMI من 25.0 إلى 29.9):* الزيادة الصحية **7 - 11.5 كجم**\n"
+            "• 🔹 *السمنة (BMI من 30.0 فما فوق):* الزيادة الصحية **5 - 9 كجم**\n\n"
+            "⚠️ *تنبيه سريري هام:* الزيادة السريعة المفاجئة في الوزن (أكثر من 1 كجم في الأسبوع خلال الثلثين الثاني أو الثالث) غالباً ما تكون احتباس سوائل مرضي وتستدعي فحص ضغط الدم وزلال البول فوراً."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_drugs":
+        await q.answer()
+        txt = (
+            "💊 *دليل أمان الأدوية أثناء الحمل (FDA Pregnancy Risk Categories):*\n\n"
+            "• ✅ *فئة A (آمنة تماماً):* دراسات محكمة أثبتت عدم وجود خطر (مثل: حمض الفوليك، فيتامين B6 بجرعاته المحددة).\n"
+            "• 🟢 *فئة B (آمنة وتستخدم عند الحاجة):* دراسات الحيوانات آمنة ولا توجد أدلة خطر على البشر:\n"
+            "  - مسكنات: باراسيتامول (Paracetamol) هو الخيار الأول الآمن.\n"
+            "  - مضادات حيوية: أموكسيسيلين (Amoxicillin)، أوجمينتين، سيفالكسين، أزيثروميسين.\n"
+            "• 🟡 *فئة C (تستخدم بحذر شديد):* تُعطى فقط إذا كانت الفائدة ترجح الخطر تحت إشراف الطبيب.\n"
+            "• 🚫 *فئة D و X (ممنوعة قطعياً وتسبب تشوهات):*\n"
+            "  - أدوية الضغط من عائلة ACE inhibitors (مثل Lisinopril، Enalapril، Losartan).\n"
+            "  - مشتقات فيتامين A (مثل Roaccutane / Isotretinoin).\n"
+            "  - مضادات التخثر الفموية مثل Warfarin (يُستبدل بالإينوكسابارين / Clexane).\n"
+            "  - البروفين والمسكنات غير الستيرويدية (NSAIDs) ممنوعة قطعياً في الثلث الثالث لإغلاقها القناة الشريانية مبكراً."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_diet":
+        await q.answer()
+        txt = (
+            "🥗 *التغذية العلاجية والممنوعات الغذائية للحامل:*\n\n"
+            "🚫 *أطعمة ومشروبات يجب تجنبها تماماً:*\n"
+            "1. الألبان والأجبان غير المبسترة مثل الجبن الأزرق والفيتا التقليدية (خطر بكتيريا الليستيريا Listeria).\n"
+            "2. اللحوم المصنعة، السوشي، والبيض غير المطهو جيداً (خطر طفيل التوكسوبلازما والسالمونيلا).\n"
+            "3. الأسماك عالية الزئبق (سمك القرش، أبو سيف، الماكريل الملكي، والحد من التونة المعلبة).\n"
+            "4. التقليل الشديد من الكافيين (بحد أقصى كوب واحد يومياً < 200 ملغ).\n\n"
+            "🌿 *المكملات الغذائية الضرورية:*\n"
+            "• حمض الفوليك (Folic Acid): 400 - 800 مكغ يومياً لمنع تشوهات الأنبوب العصبي.\n"
+            "• الحديد: 27 - 30 ملغ يومياً بعد الثلث الأول لمنع فقر الدم.\n"
+            "• الكالسيوم وفيتامين D: لبناء عظام الجنين والحفاظ على كثافة عظام الأم."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_walk":
+        await q.answer()
+        txt = (
+            "🚶‍♀️ *النشاط البدني والمشي الآمن وتمارين كيجل للحامل:*\n\n"
+            "• 🏃‍♀️ *المشي الهوائي المعتدل:* 20 إلى 30 دقيقة يومياً لمدة 4-5 أيام أسبوعياً، يساعد في ضبط السكر وتسهيل الولادة وتخفيف آلام الظهر.\n"
+            "• 🧘‍♀️ *تمارين كيجل (Kegel Exercises):* تقوية عضلات قاع الحوض لمنع سلس البول بعد الولادة وتسريع التعافي.\n\n"
+            "🚨 *موانع الاستمرار - توقفي عن الحركة وتوجهي للطوارئ فوراً إذا شعرتِ بـ:*\n"
+            "1. نزيف مهبلي أو نزول بقع دم.\n"
+            "2. تدفق أو تسرب سوائل مهبلية (ماء الجنين).\n"
+            "3. انقباضات رحمية مؤلمة ومنتظمة قبل الأسبوع 37.\n"
+            "4. دوخة حادة، إغماء، أو ضيق تنفس شديد أثناء الراحة."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    elif q.data == "preg_visits":
+        await q.answer()
+        txt = (
+            "🗓️ *جدول الزيارات والفحوصات الدورية أثناء الحمل:*\n\n"
+            "• 🩺 *الزيارات الروتينية لعيادة التوليد:*\n"
+            "  - حتى الأسبوع 28: زيارة واحدة كل 4 أسابيع.\n"
+            "  - من الأسبوع 28 إلى 36: زيارة واحدة كل أسبوعين.\n"
+            "  - من الأسبوع 36 حتى موعد الولادة: زيارة أسبوعية.\n\n"
+            "📡 *محطات السونار (Ultrasound Milestones):*\n"
+            "1. الأسبوع 6 - 8: سونار التأكد من وجود الحمل داخل الرحم وسماع نبض الجنين.\n"
+            "2. الأسبوع 11 - 13: سونار قياس الشفافية القفوية وفحص عظم الأنف.\n"
+            "3. الأسبوع 18 - 22: سونار التشوهات الشامل (Anomaly Scan) لفحص أعضاء الجنين بالتفصيل.\n"
+            "4. الثلث الثالث: سونار متابعة نمو الجنين وحجم السائل الأمنيوسي ووضعية المشيمة."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+    elif q.data == "m_symptoms":
+        await q.answer()
+        txt = (
+            "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (DDx):*\n\n"
+            "✍️ *اكتب الآن في رسالة شكواك أو الأعراض بالتفصيل*\n"
+            "(مثال: ألم في الصدر مع ضيق تنفس، أو ألم حاد أسفل البطن جهة اليمين)...\n\n"
+            "👇 أو اختر أحد النماذج السريرية الجاهزة للفحص المباشر:"
+        ) if lang == "ar" else (
+            "🩺 *Clinical Symptom Checker (DDx):*\n\n"
+            "✍️ *Describe your symptoms in detail* in a message...\n\n"
+            "👇 Or choose a preset case below:"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🫀 ألم بالصدر وضيق تنفس", callback_data="sym_chest"),
+             InlineKeyboardButton("🍽️ ألم حاد بأسفل البطن", callback_data="sym_appendix")],
+            [InlineKeyboardButton("🧠 صداع نصفي وغثيان", callback_data="sym_migraine"),
+             InlineKeyboardButton("🫁 سعال مستمر وحمى", callback_data="sym_cough")],
+            [InlineKeyboardButton("👶 حرارة وسعال عند طفل", callback_data="sym_child"),
+             InlineKeyboardButton("🩸 حرقان بول وألم خاصرة", callback_data="sym_uti")],
+            [InlineKeyboardButton("🌐 فتح فاحص الأعراض بالموقع وتصدير PDF", url="https://web-dose.vercel.app/?welcome=1&v=3.8")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_DRUG_SEARCH
+    elif q.data.startswith("sym_"):
+        await q.answer()
+        sym_cases = {
+            "sym_chest": ("ألم صدري حاد (Acute Chest Pain / Angina vs GERD)", "🚨 طوارئ عالية: يتطلب تخطيط قلب (ECG) وإنزيمات قلب فوراً.", ["تخطيط قلب (ECG)", "إنزيمات قلب (Troponin)", "أشعة سينية للصدر"]),
+            "sym_appendix": ("اشتباه التهاب الزائدة الدودية (Acute Appendicitis)", "⚠️ أولوية جراحية: مراجعة الطوارئ الجراحية وتجنب المسكنات القوية.", ["سونار بطن وحوض", "تحليل دم شامل (CBC)", "تحليل بول"]),
+            "sym_migraine": ("نوبة صداع نصفي حاد (Acute Migraine with Aura)", "🟡 حالة متوسطة: الراحة في غرفة مظلمة، والتوجه للطوارئ إذا حدث تيبس بالرقبة.", ["قياس ضغط الدم وقاع العين", "رنين مغناطيسي (MRI)"]),
+            "sym_cough": ("التهاب مجاري تنفسية حاد (Acute Bronchitis vs Pneumonia)", "🟡 حالة متوسطة: استشارة طبيب صدرية لفحص الصدر بالسماعة.", ["أشعة صدر (CXR)", "مؤشر الالتهاب (CRP)", "تحليل دم (CBC)"]),
+            "sym_child": ("حمى وسعال عند طفل (Pediatric Febrile Illness)", "⚠️ أولوية أطفال: مراقبة درجة الحرارة وإعطاء خافض حرارة حسب الوزن.", ["فحص سريري للأذن والحلق", "تحليل دم وبول"]),
+            "sym_uti": ("التهاب مسالك بولية (UTI / Renal Colic)", "🟡 حالة روتينية/عاجلة: شرب كميات وافرة من الماء وعمل تحليل بول.", ["تحليل وزراعة بول", "وظائف كلى", "سونار للمسالك"]),
+        }
+        item = sym_cases.get(q.data, ("تقييم سريري", "حالة متوسطة", ["تحليل دم", "فحص سريري"]))
+        rep = (
+            f"📋 *تقرير التشخيص التفريقي السريري (Clinical DDx):*\n\n"
+            f"🩺 *الانطباع الأولي:* {item[0]}\n\n"
+            f"🚨 *مستوى الفرز:* {item[1]}\n\n"
+            f"🔬 *الفحوصات المقترحة:*\n• " + "\n• ".join(item[2]) + "\n\n"
+            "🌐 [فتح الفاحص بالموقع وتصدير PDF](https://web-dose.vercel.app/?welcome=1&v=3.8)"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔙 العودة لفاحص الأعراض", callback_data="m_symptoms")],
+            [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="back")]
+        ])
+        await q.message.edit_text(rep, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_DRUG_SEARCH
+    elif q.data == "m_search":
+        await q.message.edit_text(tx("search_prompt", lang), reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_DRUG_SEARCH
+    elif q.data == "m_child":
+        return await ask_drug_form(u, ctx)
+    elif q.data == "m_child_skip":
+        await q.message.edit_text(tx("child_prompt", lang), reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_CHILD_DRUG
+    elif q.data == "m_premium":
+        return await premium_menu(u, ctx)
+    elif q.data in ("pay_month","pay_3month","pay_6month","pay_year"):
+        return await process_payment(u, ctx)
+    elif q.data == "m_bmi":
+        ctx.user_data.pop("bmi_step", None)
+        ctx.user_data.pop("bmi_w", None)
+        ctx.user_data.pop("bmi_h", None)
+        text = "📊 *BMI Calculator*" + chr(10) + chr(10) + ("اختر نوع الحساب:" if lang=="ar" else "Choose type:")
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👶 " + ("طفل (مع جرعة الدواء)" if lang=="ar" else "Child (with drug dose)"), callback_data="bmi_child")],
+            [InlineKeyboardButton("🧑 " + ("بالغ" if lang=="ar" else "Adult"), callback_data="bmi_adult")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")],
+        ])
+        await q.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_BMI_WEIGHT
+    elif q.data == "m_remind":
+        await q.message.edit_text(tx("rem_menu", lang), reply_markup=kb_remind(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_REM_MENU
+    elif q.data == "m_cal":
+        lang = get_lang(ctx)
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👨 ذكر" if lang=="ar" else "👨 Male", callback_data="cal_m"),
+             InlineKeyboardButton("👩 أنثى" if lang=="ar" else "👩 Female", callback_data="cal_f")],
+            [InlineKeyboardButton("🍎 سعرات طعام" if lang=="ar" else "🍎 Food Calories", callback_data="cal_food")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]])
+        await q.message.edit_text("🔥 حاسبة السعرات" if lang=="ar" else "🔥 Calorie Calculator", reply_markup=btns, parse_mode=ParseMode.MARKDOWN)
+
+
+        return STATE_CAL_GENDER
+    elif q.data == "m_interaction":
+        return await interaction_start(u, ctx)
+    elif q.data == "m_patient":
+        load_patients(ctx)
+        await q.message.edit_text("👤 " + ("ملف المريض" if lang=="ar" else "Patient File"), reply_markup=kb_patient_menu(lang))
+        return STATE_PAT_MENU
+    elif q.data == "m_sugar":
+        await q.message.edit_text(
+            "🩸 " + ("أدخل قراءة السكر بالـ mg/dL:" if lang=="ar" else "Enter sugar value mg/dL:"),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+        return STATE_SUGAR
+    elif q.data == "m_bp_skip":  # معطل
+        uid = u.effective_user.id
+        if not is_premium(uid):
+            await show_subscription(u, ctx, lang)
+            return STATE_MAIN_MENU
+        await q.message.edit_text("👤 كم عمرك؟" if lang=="ar" else "👤 How old are you?", reply_markup=kb_back(lang))
+        return STATE_BP_AGE
+    elif q.data == "m_food":
+        await q.message.edit_text("🍎 " + ("أدخل اسم الطعام والكمية بالغرام:" if lang=="ar" else "Enter food name and grams:"), reply_markup=kb_back(lang))
+        return STATE_FOOD_SEARCH
+    elif q.data == "m_diet":
+        await q.message.edit_text("🥗 " + ("اكتب اسم المرض للحصول على خطة غذائية:" if lang=="ar" else "Enter disease name for dietary plan:") + chr(10) + ("مثال: سكري، ضغط، كوليسترول، قلب، كلى..." if lang=="ar" else "Example: diabetes, hypertension, cholesterol..."), reply_markup=kb_back(lang))
+        return STATE_DIET
+    elif q.data == "m_guide":
+        if lang == "ar":
+            g_txt = "📖 دليل مساعد الطبيب" + chr(10)*2 + "💊 استعلام دواء: اكتب اسم الدواء" + chr(10) + "👶 جرعات الأطفال: اختر الشكل وأدخل الوزن" + chr(10) + "📋 ملف المريض: احفظ بيانات مرضاك" + chr(10) + "💉 الضغط: أدخل القراءة مع الفئة العمرية" + chr(10) + "🩸 السكر: أدخل الرقم واختر النوع" + chr(10) + "⏰ التذكيرات: لا تنسى دواءك" + chr(10) + "📸 الصور: أرسل صورة العبوة"
+        else:
+            g_txt = "📖 Doctor Assistant Guide" + chr(10)*2 + "💊 Drug Info: Enter drug name" + chr(10) + "👶 Child Doses: Select form and weight" + chr(10) + "📋 Patient File: Save patient data" + chr(10) + "💉 BP: Enter reading with age group" + chr(10) + "🩸 Sugar: Enter value and select type" + chr(10) + "⏰ Reminders: Never miss a dose" + chr(10) + "📸 Photos: Send medication photo"
+        await q.message.edit_text(g_txt, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+        return STATE_MAIN_MENU
+    elif q.data == "m_settings":
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(tx("change_lang", lang), callback_data="do_lang")],
+            [InlineKeyboardButton("🌍 " + ("تغيير الدولة" if lang=="ar" else "Change Country"), callback_data="do_country")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]])
+        await q.message.edit_text(tx("settings", lang), reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+    elif q.data == "do_country":
+        msg = "🌍 اكتب اسم دولتك الجديدة:" if lang == "ar" else "🌍 Type your new country:"
+        await q.message.edit_text(msg)
+        return STATE_COUNTRY
+    elif q.data == "do_lang":
+        await q.message.edit_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+        return STATE_LANGUAGE
+    return STATE_MAIN_MENU
+
+async def drug_search_image(u, ctx):
+    """البحث عن دواء عبر الصورة"""
+    lang = get_lang(ctx)
+    if not ANTHROPIC_API_KEY:
+        await u.message.reply_text(tx("no_api", lang), reply_markup=kb_back(lang))
+        return STATE_DRUG_SEARCH
+    msg = await u.message.reply_text(tx("analyzing", lang))
+    photo = u.message.photo[-1]
+    f = await photo.get_file()
+    img = await f.download_as_bytearray()
+    try:
+        name = await analyze_image(bytes(img), lang)
+    except Exception as e:
+        await u.message.reply_text("❌ خطأ: " + str(e)[:50])
+        return STATE_DRUG_SEARCH
+    await msg.delete()
+    if not name:
+        await u.message.reply_text("❌ لم يتعرف")
+        return STATE_DRUG_SEARCH
+    if not name:
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ " + ("أدخل الاسم يدوياً" if lang=="ar" else "Type name manually"), callback_data="manual_input")],
+            [InlineKeyboardButton("📸 " + ("أرسل صورة أخرى" if lang=="ar" else "Send another photo"), callback_data="retry_photo")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        msg = "❌ لم أتعرف على الدواء\n\n💡 جرّب صورة أوضح أو أدخل الاسم يدوياً" if lang=="ar" else "❌ Could not identify drug\n\n💡 Try a clearer photo or type the name"
+        await u.message.reply_text(msg, reply_markup=kb_image_result(lang))
+        return STATE_DRUG_SEARCH
+    track(u, "searches")
+    ctx.user_data["img_drug"] = name
+        # نستخدم Claude للمعلومات الكاملة
+    thinking2 = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+    try:
+        if lang == "ar":
+            prompt = f"""أنت صيدلاني خبير. أعطني معلومات شاملة ودقيقة عن: {name}
+أجب بالعربية فقط بهذا التنسيق الدقيق ولا تترك أي حقل فارغاً:
+💊 الاسم العلمي: 
+🏷️ الأسماء التجارية: 
+🏥 التصنيف الدوائي: 
+📋 الاستخدامات: 
+💉 جرعة البالغين: 
+👶 جرعة الأطفال: 
+⚠️ الآثار الجانبية الشائعة: 
+🚨 الآثار الجانبية الخطيرة: 
+🚫 موانع الاستخدام: 
+💊 التفاعلات الدوائية: 
+🤰 الحمل: 
+🍼 الرضاعة: 
+🫘 القصور الكلوي: 
+❗ تحذيرات خاصة:"""
+        else:
+            prompt = f"""You are an expert pharmacist. Give complete accurate information about: {name}
+Reply in English ONLY with this exact format:
+💊 Generic Name: 
+🏷️ Brand Names: 
+🏥 Drug Class: 
+📋 Indications: 
+💉 Adult Dose: 
+👶 Pediatric Dose: 
+⚠️ Common Side Effects: 
+🚨 Serious Side Effects: 
+🚫 Contraindications: 
+💊 Drug Interactions: 
+🤰 Pregnancy: 
+🍼 Lactation: 
+🫘 Renal Impairment: 
+❗ Special Warnings:"""
+        async with httpx.AsyncClient(timeout=60, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]})
+            result = r.json().get("content", [{}])[0].get("text", "").strip()
+        await thinking2.delete()
+        en_name = name if not any(ord(c) > 127 for c in name) else (result.split("Generic Name:")[-1].split("\n")[0].strip() if "Generic Name:" in result else name)
+        ref = chr(10)*2 + ("⚠️ للاسترشاد فقط — استشر طبيبك أو صيدلانيك" if lang=="ar" else "⚠️ For reference only — consult your doctor")
+        
+        final = "📸 " + name + chr(10)*2 + result + ref
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 " + ("استعلام آخر" if lang=="ar" else "Another Search"), callback_data="m_search")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await u.message.reply_text(final[:4000], reply_markup=btns)
+        return STATE_DRUG_SEARCH
+    except Exception as e:
+        try: await thinking2.delete()
+        except: pass
+        await u.message.reply_text("❌ خطأ: " + str(e)[:80])
+        logger.error(f"drug_search_image claude: {e}")
+    return STATE_DRUG_SEARCH
+
+async def drug_search(u, ctx):
+    lang = get_lang(ctx)
+    try: track(u, "searches")
+    except: pass
+    query = u.message.text.strip()
+
+    # Local search first
+    res = search_drugs(query)
+    if res:
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 " + ("استعلام آخر" if lang=="ar" else "Another Search"), callback_data="m_search")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        await u.message.reply_text(
+            fmt_drug(res[0], lang),
+            reply_markup=btns,
+            parse_mode=ParseMode.MARKDOWN
+        )
+        return STATE_DRUG_SEARCH
+
+    thinking = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+
+    try:
+        if lang == "ar":
+            prompt = f"""أنت صيدلاني خبير. أعطني معلومات شاملة ودقيقة عن: {query}
+أجب بالعربية فقط بهذا التنسيق الدقيق ولا تترك أي حقل فارغاً:
+
+💊 الاسم العلمي: 
+🏷️ الأسماء التجارية: 
+🏥 التصنيف الدوائي: 
+📋 الاستخدامات: 
+💉 جرعة البالغين: 
+👶 جرعة الأطفال: 
+⚠️ الآثار الجانبية الشائعة: 
+🚨 الآثار الجانبية الخطيرة: 
+🚫 موانع الاستخدام: 
+💊 التفاعلات الدوائية: 
+🤰 الحمل: 
+🍼 الرضاعة: 
+🫘 القصور الكلوي: 
+🏥 القصور الكبدي: 
+❗ تحذيرات خاصة: 
+
+إذا لم تعرف اكتب: غير متاح. لا تترك أي حقل فارغاً.\n🔤 English Name: [اكتب الاسم الإنجليزي للدواء فقط بدون أي إضافة]"""
+        else:
+            prompt = f"""You are an expert pharmacist. Give complete accurate information about: {query}
+Reply in English ONLY with this exact format, never leave any field empty:
+
+💊 Generic Name: 
+🏷️ Brand Names: 
+🏥 Drug Class: 
+📋 Indications: 
+💉 Adult Dose: 
+👶 Pediatric Dose: 
+⚠️ Common Side Effects: 
+🚨 Serious Side Effects: 
+🚫 Contraindications: 
+💊 Drug Interactions: 
+🤰 Pregnancy: 
+🍼 Lactation: 
+🫘 Renal Impairment: 
+🏥 Hepatic Impairment: 
+❗ Special Warnings: 
+
+Write N/A if unknown. Never leave any field empty.
+🔤 English Name: [write the English drug name only]
+🔤 English Name: [write the English drug name only]"""
+
+        async with httpx.AsyncClient(timeout=30, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500,
+                      "messages": [{"role": "user", "content": prompt}]})
+            result = r.json().get("content", [{}])[0].get("text", "").strip()
+
+        await thinking.delete()
+
+        if result:
+            en_name = query if not any(ord(c) > 127 for c in query) else (result.split("English Name:")[-1].split("\n")[0].strip().strip("[]") if "English Name:" in result else query)
+            drug_link = f"https://www.drugs.com/search.php?searchterm={en_name.lower().replace(' ','+')}"
+            ref = chr(10)*2 + ("⚠️ للاسترشاد فقط — استشر طبيبك أو صيدلانيك\n\n🔗 مرجع طبي: " if lang=="ar" else "⚠️ For reference only — consult your doctor\n\n🔗 Reference: ") + drug_link
+            final = result + ref
+
+            btns = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 " + ("استعلام آخر" if lang=="ar" else "Another Search"), callback_data="m_search")],
+                [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+            ])
+            await u.message.reply_text(final[:4000], reply_markup=btns)
+            return STATE_DRUG_SEARCH
+
+    except Exception as e:
+        logger.error(f"drug_search: {e}")
+        try: await thinking.delete()
+        except: pass
+
+    await u.message.reply_text(tx("not_found", lang), reply_markup=kb_back(lang))
+    return STATE_DRUG_SEARCH
+
+async def drug_sel(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    i = int(q.data.replace("ds_", ""))
+    d = ctx.user_data.get("results", [])[i]
+    await q.message.edit_text(fmt_drug(d, lang), reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+    return STATE_DRUG_SEARCH
+
+async def child_input(u, ctx):
+    lang = get_lang(ctx)
+    drug_form = ctx.user_data.get("drug_form", "syrup")
+    if u.message.photo:
+        if not ANTHROPIC_API_KEY:
+            await u.message.reply_text(tx("no_api", lang), reply_markup=kb_back(lang))
+            return STATE_CHILD_DRUG
+        msg = await u.message.reply_text(tx("analyzing", lang))
+        photo = u.message.photo[-1]
+        f = await photo.get_file()
+        img = await f.download_as_bytearray()
+        name = await analyze_image(bytes(img), lang)
+        if not name:
+            btns = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✏️ " + ("أدخل الاسم يدوياً" if lang=="ar" else "Type name manually"), callback_data="manual_input")],
+                [InlineKeyboardButton("📸 " + ("أرسل صورة أخرى" if lang=="ar" else "Send another photo"), callback_data="retry_photo")],
+                [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+            ])
+            msg = "❌ لم أتعرف على الدواء\n\n💡 جرّب صورة أوضح أو أدخل الاسم يدوياً" if lang=="ar" else "❌ Could not identify drug\n\n💡 Try a clearer photo or type the name"
+            await u.message.reply_text(msg, reply_markup=kb_image_result(lang))
+            return STATE_CHILD_DRUG
+        res = search_drugs(name)
+        if not res:
+            # نستخدم Claude API مباشرة
+            thinking2 = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+            try:
+                drug_form = ctx.user_data.get("drug_form", "syrup")
+                form_ar = {"syrup":"شراب","cream":"كريم","drops":"قطرة","suppository":"تحميلة"}.get(drug_form,"شراب")
+                form_en = {"syrup":"syrup","cream":"cream","drops":"drops","suppository":"suppository"}.get(drug_form,"syrup")
+                if lang == "ar":
+                    p = f"أنت صيدلاني. الدواء: {name} ({form_ar}). أعطني جرعة الأطفال بهذا الشكل فقط:\n💊 الدواء: {name}\n📋 النوع: {form_ar}\n💉 الجرعة حسب العمر:\n• 0-2 سنة: ...\n• 2-6 سنة: ...\n• 6-12 سنة: ...\n🔁 التكرار:\n⚠️ تحذير:"
+                else:
+                    p = f"You are a pharmacist. Drug: {name} ({form_en}). Give pediatric dose only:\n💊 Drug: {name}\n📋 Form: {form_en}\n💉 Dose by age:\n• 0-2 years: ...\n• 2-6 years: ...\n• 6-12 years: ...\n🔁 Frequency:\n⚠️ Warning:"
+                async with httpx.AsyncClient(timeout=30, http2=False) as hc:
+                    r2 = await hc.post("https://api.anthropic.com/v1/messages",
+                        headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                        json={"model": "claude-haiku-4-5-20251001", "max_tokens": 300,
+                            "messages": [{"role": "user", "content": p}]})
+                    ai_dose = r2.json().get("content", [{}])[0].get("text", "").strip()
+                await thinking2.delete()
+                if ai_dose:
+                    await u.message.reply_text("📸 " + name + "\n\n" + ai_dose, reply_markup=kb_image_result(lang))
+                else:
+                    await u.message.reply_text("📸 " + name + "\n\n" + ("❌ لم يُعثر على الدواء\n\n💡 جرّب صورة أخرى أو أدخل الاسم يدوياً" if lang=="ar" else "❌ Drug not found\n\n💡 Try another photo or type name manually"), reply_markup=kb_image_result(lang))
+            except Exception as e:
+                logger.error(f"Image drug API: {e}")
+                try: await thinking2.delete()
+                except: pass
+                await u.message.reply_text("📸 " + name + "\n\n" + ("❌ لم يُعثر على الدواء\n\n💡 جرّب صورة أخرى أو أدخل الاسم يدوياً" if lang=="ar" else "❌ Drug not found\n\n💡 Try another photo or type name manually"), reply_markup=kb_image_result(lang))
+            return STATE_CHILD_DRUG
+        ctx.user_data["child_drug"] = res[0]
+        ctx.user_data["img_drug"] = name
+        drug_form_img = ctx.user_data.get("drug_form","syrup")
+        if drug_form_img in ["cream","drops"]:
+            # نسأل عن العمر للقطرات والكريمات
+            ctx.user_data["child_drug"] = res[0]
+            await u.message.reply_text("📸 *" + name + "*\n\n📅 " + ("كم عمر الطفل بالسنوات؟" if lang=="ar" else "Child age in years?"),
+                reply_markup=kb_back(lang), parse_mode="Markdown")
+            return STATE_CHILD_WEIGHT
+        msg2 = "📸 *" + name + "*\n\n" + tx("weight_prompt", lang)
+        await u.message.reply_text(msg2, reply_markup=kb_image_result(lang, name), parse_mode=ParseMode.MARKDOWN)
+        return STATE_CHILD_WEIGHT
+    res = search_drugs(u.message.text)
+    if not res:
+        await u.message.reply_text(tx("not_found", lang), reply_markup=kb_back(lang))
+        return STATE_CHILD_DRUG
+    if len(res) == 1:
+        ctx.user_data["child_drug"] = res[0]
+        drug_form_txt = ctx.user_data.get("drug_form","syrup")
+        if drug_form_txt in ["cream","drops"]:
+            # نسأل عن العمر
+            await u.message.reply_text("📅 " + ("كم عمر الطفل بالسنوات؟" if lang=="ar" else "Child age in years?"),
+                reply_markup=kb_back(lang))
+            return STATE_CHILD_WEIGHT
+        await u.message.reply_text(tx("weight_prompt", lang), reply_markup=kb_back(lang))
+        return STATE_CHILD_WEIGHT
+    ctx.user_data["results"] = res
+    btns = [[InlineKeyboardButton(
+        str(d.get("name_ar" if lang=="ar" else "name_en", "?")),
+        callback_data=f"cs_{i}")] for i, d in enumerate(res)]
+    btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+    await u.message.reply_text(tx("multi_results", lang), reply_markup=InlineKeyboardMarkup(btns))
+    return STATE_CHILD_DRUG
+
+async def child_sel(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    i = int(q.data.replace("cs_", ""))
+    ctx.user_data["child_drug"] = ctx.user_data.get("results", [])[i]
+    await q.message.edit_text(tx("weight_prompt", lang), reply_markup=kb_back(lang))
+    return STATE_CHILD_WEIGHT
+
+async def child_weight(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        track(u, "child_doses")
+    except: pass
+    try:
+        w = float(u.message.text.strip().replace(",", "."))
+        if not 0.5 <= w <= 150: raise ValueError
+        ctx.user_data["child_weight"] = w
+    except:
+        await u.message.reply_text(tx("bad_weight", lang), reply_markup=kb_back(lang))
+        return STATE_CHILD_WEIGHT
+    d = ctx.user_data.get("child_drug")
+    if not d:
+        await show_main(u.message, lang)
+        return STATE_MAIN_MENU
+    drug_form = ctx.user_data.get("drug_form", "syrup")
+    if drug_form in ["cream", "drops"]:
+        drug_name = d.get("name_ar","") if lang=="ar" else d.get("name_en","")
+        if not drug_name: drug_name = d.get("name_en","") or d.get("name_ar","")
+        if d.get("fixed_dose") and d.get("age_doses"):
+            lines_d = ["💊 " + drug_name, ""]
+            for age_range, dose in d["age_doses"].items():
+                lines_d.append("  • " + age_range + ": " + dose)
+            lines_d.append("")
+            lines_d.append("⚠️ " + ("استشر الطبيب دائماً" if lang=="ar" else "Always consult doctor"))
+            btns = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+                [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+            ])
+            await u.message.reply_text("\n".join(lines_d), reply_markup=btns)
+            return STATE_MAIN_MENU
+        thinking_f = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+        try:
+            result_f = await calc_special_form(drug_name, w, drug_form, lang)
+            await thinking_f.delete()
+            if result_f:
+                btns = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+                    [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+                ])
+                await u.message.reply_text(result_f, reply_markup=btns)
+                return STATE_MAIN_MENU
+        except Exception as e:
+            try: await thinking_f.delete()
+            except: pass
+    if drug_form == "suppository":
+        drug_name = d.get("name_ar","") if lang=="ar" else d.get("name_en","")
+        if not drug_name: drug_name = d.get("name_en","") or d.get("name_ar","")
+        thinking_s = await u.message.reply_text("🔍 " + ("جارٍ البحث..." if lang=="ar" else "Searching..."))
+        try:
+            result_s = await calc_special_form(drug_name, w, drug_form, lang)
+            await thinking_s.delete()
+            if result_s:
+                btns = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+                    [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+                ])
+                await u.message.reply_text(result_s, reply_markup=btns)
+                return STATE_MAIN_MENU
+        except Exception as e:
+            try: await thinking_s.delete()
+            except: pass
+    # مضادات حيوية
+    name_key = d.get("name_en","").lower()
+    if name_key in ANTIBIOTIC_DOSES:
+        sites = INFECTION_SITES.get(lang, INFECTION_SITES["ar"])
+        available = [(k,v) for k,v in sites if k in ANTIBIOTIC_DOSES[name_key]]
+        if available:
+            btns = [[InlineKeyboardButton(v, callback_data=f"site_{k}")] for k,v in available]
+            btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+            await u.message.reply_text("🦠 " + ("مكان الالتهاب؟" if lang=="ar" else "Infection site?"), reply_markup=InlineKeyboardMarkup(btns))
+            return STATE_INFECTION_SITE
+
+    result = calc_child(d, w, lang)
+    
+    # أزرار التراكيز
+    change_btns = []
+    concs = DRUG_CONCS.get(name_key, [])
+    for c in concs[:4]:
+        change_btns.append([InlineKeyboardButton(c, callback_data="conc_" + c)])
+    change_btns.append([InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")])
+    change_btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+    # نضيف زر جرعة أخرى دائماً
+    if not change_btns or not any("m_child" in str(b) for row in change_btns for b in row):
+        change_btns.append([InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")])
+    if not any("back" in str(b) for row in change_btns for b in row):
+        change_btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+    try:
+        await u.message.reply_text(result, reply_markup=InlineKeyboardMarkup(change_btns), parse_mode=ParseMode.MARKDOWN)
+    except:
+        clean = result.replace("*","").replace("_","").replace("`","")
+        await u.message.reply_text(clean, reply_markup=InlineKeyboardMarkup(change_btns))
+    return STATE_CHILD_CONC
+
+
+async def child_conc(u, ctx):
+    """معالجة اختيار التركيز"""
+    lang = get_lang(ctx)
+    q = u.callback_query
+    if q:
+        await q.answer()
+        data = q.data
+        if data == "back":
+            return await go_back(u, ctx)
+        if data == "conc_custom":
+            btns = [[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]
+            await q.message.edit_text("ادخل التركيز. مثال: 250mg/5ml", reply_markup=InlineKeyboardMarkup(btns))
+            return STATE_CHILD_CONC
+        if data.startswith("conc_"):
+            conc_str = data.replace("conc_", "")
+            d = ctx.user_data.get("child_drug")
+            w = ctx.user_data.get("child_weight", 0)
+            # نضع التركيز مؤقتاً في الدواء
+            d_copy = dict(d)
+            d_copy["concentration"] = conc_str
+            result = calc_child(d_copy, w, lang)
+            btns = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+                [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+            ])
+            try:
+                await q.message.edit_text(result, reply_markup=btns)
+            except:
+                await q.message.edit_text(result.replace("*","").replace("_",""), reply_markup=btns)
+            return STATE_CHILD_CONC
+    else:
+        txt = u.message.text.strip()
+        d = ctx.user_data.get("child_drug")
+        w = ctx.user_data.get("child_weight", 0)
+        d_copy = dict(d)
+        d_copy["concentration"] = txt
+        result = calc_child(d_copy, w, lang)
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        try:
+            await u.message.reply_text(result, reply_markup=btns)
+        except:
+            await u.message.reply_text(result.replace("*","").replace("_",""), reply_markup=btns)
+        return STATE_CHILD_CONC
+
+
+async def cal_gender(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    if q.data == "cal_food":
+        await q.message.edit_text("🍎 اكتب اسم الطعام والكمية" if lang=="ar" else "🍎 Type food name and grams")
+        return STATE_FOOD_SEARCH
+    ctx.user_data["cal_gender"] = "m" if q.data == "cal_m" else "f"
+    await q.message.edit_text("📅 كم عمرك؟" if lang=="ar" else "📅 How old are you?")
+    return STATE_CAL_AGE
+
+async def cal_age(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        age = int(u.message.text.strip())
+        if not 5 <= age <= 100: raise ValueError
+    except:
+        await u.message.reply_text("❌ أدخل عمراً صحيحاً" if lang=="ar" else "❌ Enter valid age")
+        return STATE_CAL_AGE
+    ctx.user_data["cal_age"] = age
+    await u.message.reply_text("⚖️ كم وزنك بالكيلو؟" if lang=="ar" else "⚖️ Weight in kg?")
+    return STATE_CAL_WEIGHT
+
+async def cal_weight(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        w = float(u.message.text.strip())
+        if not 20 <= w <= 300: raise ValueError
+    except:
+        await u.message.reply_text("❌ أدخل وزناً صحيحاً" if lang=="ar" else "❌ Enter valid weight")
+        return STATE_CAL_WEIGHT
+    ctx.user_data["cal_weight"] = w
+    await u.message.reply_text("📏 كم طولك بالسنتيمتر؟" if lang=="ar" else "📏 Height in cm?")
+    return STATE_CAL_HEIGHT
+
+async def cal_height(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        h = float(u.message.text.strip())
+        if not 100 <= h <= 250: raise ValueError
+    except:
+        await u.message.reply_text("❌ أدخل طولاً صحيحاً" if lang=="ar" else "❌ Enter valid height")
+        return STATE_CAL_HEIGHT
+    ctx.user_data["cal_height"] = h
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🛋️ خامل" if lang=="ar" else "🛋️ Sedentary", callback_data="act_1")],
+        [InlineKeyboardButton("🚶 خفيف" if lang=="ar" else "🚶 Light", callback_data="act_2")],
+        [InlineKeyboardButton("🏃 متوسط" if lang=="ar" else "🏃 Moderate", callback_data="act_3")],
+        [InlineKeyboardButton("💪 نشيط" if lang=="ar" else "💪 Active", callback_data="act_4")],
+        [InlineKeyboardButton("🏋️ رياضي" if lang=="ar" else "🏋️ Athlete", callback_data="act_5")]])
+    await u.message.reply_text("🏃 مستوى النشاط؟" if lang=="ar" else "🏃 Activity level?", reply_markup=btns)
+    return STATE_CAL_ACTIVITY
+
+async def cal_activity(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    act = q.data.replace("act_", "")
+    ctx.user_data["cal_act"] = act
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ لا يوجد" if lang=="ar" else "✅ None", callback_data="dis_none")],
+        [InlineKeyboardButton("🩺 سكري" if lang=="ar" else "🩺 Diabetes", callback_data="dis_diabetes")],
+        [InlineKeyboardButton("❤️ قلب" if lang=="ar" else "❤️ Heart", callback_data="dis_heart")],
+        [InlineKeyboardButton("🫘 كلى" if lang=="ar" else "🫘 Kidney", callback_data="dis_kidney")],
+        [InlineKeyboardButton("⚖️ سمنة" if lang=="ar" else "⚖️ Obesity", callback_data="dis_obesity")]])
+    await q.message.edit_text("🏥 هل لديك مرض مزمن؟" if lang=="ar" else "🏥 Any chronic disease?", reply_markup=btns)
+    return STATE_CAL_DISEASE
+
+async def cal_disease(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    disease = q.data.replace("dis_", "")
+    w = ctx.user_data.get("cal_weight", 70)
+    h = ctx.user_data.get("cal_height", 170)
+    age = ctx.user_data.get("cal_age", 30)
+    gender = ctx.user_data.get("cal_gender", "m")
+    act = ctx.user_data.get("cal_act", "2")
+    bmr = calc_bmr(w, h, age, gender)
+    tdee = bmr * ACTIVITY_FACTORS.get(act, 1.375)
+    # تعديل حسب المرض
+    note = ""
+    if disease == "diabetes":
+        tdee = tdee * 0.9
+        note = "⚠️ تقليل الكربوهيدرات" if lang=="ar" else "⚠️ Reduce carbs"
+    elif disease == "heart":
+        note = "⚠️ تقليل الدهون المشبعة" if lang=="ar" else "⚠️ Reduce saturated fat"
+    elif disease == "kidney":
+        tdee = tdee * 0.85
+        note = "⚠️ تقليل البروتين والبوتاسيوم" if lang=="ar" else "⚠️ Reduce protein & potassium"
+    elif disease == "obesity":
+        tdee = tdee * 0.8
+        note = "⚠️ عجز 500 سعرة للتخسيس" if lang=="ar" else "⚠️ 500 cal deficit for weight loss"
+    protein = w * 1.2
+    carbs = (tdee * 0.5) / 4
+    fat = (tdee * 0.3) / 9
+    if lang == "ar":
+        msg = "🔥 نتيجة حاسبة السعرات\n\n"
+        msg += "⚖️ الوزن: " + str(w) + " كغ | الطول: " + str(h) + " سم\n"
+        msg += "📅 العمر: " + str(age) + "\n"
+        msg += "🔥 الاحتياج اليومي: " + str(int(tdee)) + " سعرة\n"
+        msg += "💪 بروتين: " + str(int(protein)) + " غ\n"
+        msg += "🍞 كربوهيدرات: " + str(int(carbs)) + " غ\n"
+        msg += "🫙 دهون: " + str(int(fat)) + " غ\n"
+        if note: msg += "\n" + note
+    else:
+        msg = "🔥 Calorie Calculator Result\n\n"
+        msg += "Weight: " + str(w) + "kg | Height: " + str(h) + "cm\n"
+        msg += "Age: " + str(age) + "\n"
+        msg += "Daily Needs: " + str(int(tdee)) + " cal\n"
+        msg += "Protein: " + str(int(protein)) + "g\n"
+        msg += "Carbs: " + str(int(carbs)) + "g\n"
+        msg += "Fat: " + str(int(fat)) + "g\n"
+        if note: msg += "\n" + note
+
+
+        if note: msg += note
+    await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+    return STATE_MAIN_MENU
+
+async def food_search(u, ctx):
+    lang = get_lang(ctx)
+    txt = u.message.text.strip()
+    parts = txt.split()
+    grams = 100
+    query = txt
+    for p in parts:
+        try:
+            grams = float(p)
+            query = txt.replace(p, "").strip()
+            break
+        except: pass
+    food_en, food_data = search_food(query)
+    if not food_data:
+        await u.message.reply_text("❌ لم أجد هذا الطعام. جرّب: دجاج، أرز، بيض..." if lang=="ar" else "❌ Food not found. Try: chicken, rice, egg...")
+        return STATE_FOOD_SEARCH
+    factor = grams / 100
+    cal = food_data["cal"] * factor
+    prot = food_data["protein"] * factor
+    carbs = food_data["carbs"] * factor
+    fat = food_data["fat"] * factor
+    if lang == "ar":
+        msg = "🍎 " + str(query) + " - " + str(int(grams)) + " غرام\n\n"
+        msg += "🔥 السعرات: " + str(int(cal)) + "\n"
+        msg += "💪 بروتين: " + str(round(prot,1)) + " غ\n"
+        msg += "🍞 كربوهيدرات: " + str(round(carbs,1)) + " غ\n"
+        msg += "🫙 دهون: " + str(round(fat,1)) + " غ\n"
+    else:
+        msg = "🍎 " + str(query) + " - " + str(int(grams)) + "g\n\n"
+        msg += "Calories: " + str(int(cal)) + "\n"
+        msg += "Protein: " + str(round(prot,1)) + "g\n"
+        msg += "Carbs: " + str(round(carbs,1)) + "g\n"
+        msg += "Fat: " + str(round(fat,1)) + "g\n"
+    food_btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🍎 " + ("طعام آخر" if lang=="ar" else "Another Food"), callback_data="m_food")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await u.message.reply_text(msg, reply_markup=food_btns)
+    return STATE_FOOD_SEARCH
+
+async def infection_site(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    site = q.data.replace("site_", "")
+    d = ctx.user_data.get("child_drug")
+    w = ctx.user_data.get("child_weight", 0)
+    name_key = d.get("name_en","").lower()
+    doses = ANTIBIOTIC_DOSES.get(name_key, {}).get(site, ANTIBIOTIC_DOSES.get(name_key, {}).get("general"))
+    if doses:
+        min_mpk, max_mpk, freq, site_name = doses
+        t_min = min_mpk * w / freq
+        t_max = max_mpk * w / freq
+        conc_str = d.get("concentration", "250mg/5ml")
+        import re as _re4
+        _mc = _re4.search(r"([\d.]+)mg/([\d.]+)ml", conc_str)
+        conc = float(_mc.group(1)) / float(_mc.group(2)) * 5 if _mc else 50
+        ml_min = (t_min / conc) * 5
+        ml_max = (t_max / conc) * 5
+        name_ar = d.get("name_ar", d.get("name_en", ""))
+        if lang == "ar":
+            msg = "🍼 جرعة الطفل - " + str(name_ar) + "\n"
+            msg += "⚖️ الوزن: " + str(w) + " كغ\n"
+            msg += "🦠 " + str(site_name) + "\n\n"
+
+            msg += "📊 " + str(min_mpk) + "-" + str(max_mpk) + " مغ/كغ/يوم ÷ " + str(freq) + "\n"
+            msg += "💉 الجرعة: " + str(int(t_min)) + "-" + str(int(t_max)) + " مغ\n"
+            msg += "🥄 بالمل (" + conc_str + "): " + str(round(ml_min,1)) + "-" + str(round(ml_max,1)) + " مل\n\n"
+
+            msg += "🔁 التكرار: " + str(freq) + " مرات يومياً\n"
+            msg += "⚠️ استشر الطبيب أو الصيدلاني."
+        else:
+            msg = "🍼 Child Dose - " + str(name_key) + "\n"
+            msg += "Weight: " + str(w) + "kg | " + str(site_name) + "\n\n"
+
+            msg += str(min_mpk) + "-" + str(max_mpk) + " mg/kg/day\n"
+            msg += "Dose: " + str(int(t_min)) + "-" + str(int(t_max)) + " mg\n"
+            msg += "In ml (" + conc_str + "): " + str(round(ml_min,1)) + "-" + str(round(ml_max,1)) + " ml\n\n"
+
+            msg += "Frequency: " + str(freq) + " times/day\n"
+            msg += "⚠️ Consult doctor or pharmacist."
+        # نسأل عن التركيز
+        DRUG_CONCS_LOCAL = {
+            "amoxicillin": ["125mg/5ml", "156mg/5ml", "250mg/5ml", "312mg/5ml"],
+            "amoxicillin_clavulanate": ["156mg/5ml", "228mg/5ml", "312mg/5ml", "457mg/5ml", "600mg/5ml"],
+            "azithromycin": ["100mg/5ml", "200mg/5ml"],
+            "clarithromycin": ["125mg/5ml", "250mg/5ml"],
+            "cephalexin": ["125mg/5ml", "250mg/5ml"],
+        }
+        concs = DRUG_CONCS_LOCAL.get(name_key, [])
+        ctx.user_data["infection_msg"] = msg
+        if concs:
+            btns = [[InlineKeyboardButton(c, callback_data="conc_" + c)] for c in concs]
+            btns.append([InlineKeyboardButton("🔢 تركيز آخر" if lang=="ar" else "🔢 Other", callback_data="conc_custom")])
+            btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+            cmsg = "💊 اختر التركيز:" if lang=="ar" else "💊 Select concentration:"
+            await q.message.edit_text(cmsg, reply_markup=InlineKeyboardMarkup(btns))
+            return STATE_CHILD_CONC
+        ab_btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💊 " + ("جرعة دواء آخر" if lang=="ar" else "Another Drug"), callback_data="m_child")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+        ])
+        try:
+            await q.message.edit_text(msg, reply_markup=ab_btns, parse_mode=ParseMode.MARKDOWN)
+        except:
+            await q.message.edit_text(msg.replace("*","").replace("_",""), reply_markup=ab_btns)
+    return STATE_CHILD_WEIGHT
+
+
+def kb_image_result(lang, drug_name=""):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("✏️ " + ("الدواء خطأ — أدخل الاسم" if lang=="ar" else "Wrong drug — Type name"), callback_data="manual_input")],
+        [InlineKeyboardButton("📸 " + ("جرّب صورة أخرى" if lang=="ar" else "Try another photo"), callback_data="retry_photo")],
+        [InlineKeyboardButton("🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="back")],
+    ])
+
+async def img_ok(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    await q.message.edit_text(tx("weight_prompt", lang))
+    return STATE_CHILD_WEIGHT
+
+async def retry_photo(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    msg = "📸 أرسل صورة العبوة:" if lang=="ar" else "📸 Send the medicine photo:"
+    await q.message.edit_text(msg)
+    return STATE_CHILD_DRUG
+
+async def manual_drug_input(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    msg = "✏️ اكتب اسم الدواء:" if lang=="ar" else "✏️ Type the drug name:"
+    await q.message.edit_text(msg)
+    return STATE_CHILD_DRUG
+    return STATE_CHILD_DRUG
+
+
+async def sugar_handler(u, ctx):
+    track(u, "sugar")
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    ctx.user_data["sugar_type"] = q.data
+    msgs = {
+        "sugar_fasting": "🌅 أدخل قراءة سكر الصيام (mg/dL):" if lang=="ar" else "🌅 Enter fasting sugar (mg/dL):",
+        "sugar_postmeal": "🍽️ أدخل قراءة السكر بعد الأكل بساعتين على الأقل (mg/dL):" if lang=="ar" else "🍽️ Enter post-meal sugar (2hrs after eating) (mg/dL):",
+        "sugar_hba1c": "📊 أدخل قيمة HbA1c (%):" if lang=="ar" else "📊 Enter HbA1c (%):",
+    }
+    await q.message.edit_text(msgs.get(q.data, "أدخل القراءة:"))
+    return STATE_SUGAR
+
+async def sugar_result(u, ctx):
+    lang = get_lang(ctx)
+    sugar_type = ctx.user_data.get("sugar_type", "sugar_fasting")
+    try:
+        val = float(u.message.text.strip())
+    except:
+        await u.message.reply_text("❌ أدخل رقماً صحيحاً" if lang=="ar" else "❌ Enter valid number")
+        return STATE_SUGAR
+
+    if sugar_type == "sugar_fasting":
+        if val < 70:
+            status = "⚠️ منخفض - Hypoglycemia" if lang=="ar" else "⚠️ Low - Hypoglycemia"
+            color = "🔴"
+        elif val <= 100:
+            status = "✅ طبيعي" if lang=="ar" else "✅ Normal"
+            color = "🟢"
+        elif val <= 125:
+            status = "🟡 ما قبل السكري" if lang=="ar" else "🟡 Pre-diabetes"
+            color = "🟡"
+        else:
+            status = "🔴 مرتفع - سكري" if lang=="ar" else "🔴 High - Diabetes"
+            color = "🔴"
+        msg = color + " سكر الصيام: " + str(val) + " mg/dL\n" + status
+
+    elif sugar_type == "sugar_postmeal":
+        if val < 140:
+            status = "✅ طبيعي" if lang=="ar" else "✅ Normal"
+            color = "🟢"
+        elif val <= 199:
+            status = "🟡 ما قبل السكري" if lang=="ar" else "🟡 Pre-diabetes"
+            color = "🟡"
+        else:
+            status = "🔴 مرتفع - سكري" if lang=="ar" else "🔴 High - Diabetes"
+            color = "🔴"
+        msg = color + " سكر ما بعد الأكل: " + str(val) + " mg/dL\n" + status
+
+    else:  # hba1c
+        avg = round((val * 28.7) - 46.7, 1)
+        if val < 5.7:
+            status = "✅ طبيعي" if lang=="ar" else "✅ Normal"
+        elif val < 6.5:
+            status = "🟡 ما قبل السكري" if lang=="ar" else "🟡 Pre-diabetes"
+        else:
+            status = "🔴 سكري" if lang=="ar" else "🔴 Diabetes"
+        msg = "📊 HbA1c: " + str(val) + "%\n" + status + "\n" + ("متوسط السكر: " if lang=="ar" else "Avg Sugar: ") + str(avg) + " mg/dL"
+
+    await u.message.reply_text(msg, reply_markup=kb_back(lang))
+    return STATE_MAIN_MENU
+
+
+
+async def handle_m_search(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    await q.message.edit_text(
+        "🔍 " + ("اكتب اسم الدواء:" if lang=="ar" else "Enter drug name:"),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+    return STATE_DRUG_SEARCH
+
+async def handle_m_search_new(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    await q.message.edit_text(
+        "🔍 " + ("اكتب اسم الدواء:" if lang=="ar" else "Enter drug name:"),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+    return STATE_DRUG_SEARCH
+
+async def handle_m_bp(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("👶 " + ("أقل من 18" if lang=="ar" else "Under 18"), callback_data="bp_age_child"),
+         InlineKeyboardButton("👨 " + ("18-60" if lang=="ar" else "18-60"), callback_data="bp_age_adult"),
+         InlineKeyboardButton("👴 " + ("فوق 60" if lang=="ar" else "Over 60"), callback_data="bp_age_senior")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await q.message.edit_text("👤 " + ("اختر الفئة العمرية:" if lang=="ar" else "Select age group:"), reply_markup=btns)
+    return STATE_BP_AGE
+
+
+async def bp_age_btn(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    age_map = {"bp_age_child": 10, "bp_age_adult": 40, "bp_age_senior": 65}
+    ctx.user_data["bp_age"] = age_map.get(q.data, 40)
+    await q.message.edit_text(
+        "💉 " + ("ادخل قراءة الضغط - مثال 120/80" if lang=="ar" else "Enter BP - Example 120/80"),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+    return STATE_BP
+
+
+ADMIN_ID = 6298206492
+
+async def dbg(ctx, msg):
+    """يرسل رسالة debug للأدمن"""
+    try:
+        await ctx.bot.send_message(ADMIN_ID, "🔍 " + str(msg)[:200])
+    except: pass
+
+
+async def sugar_get_value(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        val = float(u.message.text.strip().replace(",","."))
+    except:
+        await u.message.reply_text("❌ " + ("أدخل رقماً" if lang=="ar" else "Enter number"))
+        return STATE_SUGAR
+    ctx.user_data["sugar_val"] = val
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🌅 " + ("صيام" if lang=="ar" else "Fasting"), callback_data="sug_fasting"),
+         InlineKeyboardButton("🍽️ " + ("بعد الأكل" if lang=="ar" else "Post-meal"), callback_data="sug_postmeal")],
+        [InlineKeyboardButton("📊 HbA1c", callback_data="sug_hba1c"),
+         InlineKeyboardButton("🎲 " + ("عشوائي" if lang=="ar" else "Random"), callback_data="sug_random")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await u.message.reply_text(str(val) + " - " + ("اختر النوع:" if lang=="ar" else "Select type:"), reply_markup=btns)
+    return STATE_SUGAR
+
+async def sugar_get_type(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    val = ctx.user_data.get("sugar_val", 0)
+    stype = q.data.replace("sug_", "")
+    if stype == "hba1c":
+        unit = "%"
+        if val < 5.7: color, st = "🟢", ("طبيعي" if lang=="ar" else "Normal")
+        elif val < 6.5: color, st = "🟡", ("ما قبل السكري" if lang=="ar" else "Pre-diabetic")
+        elif val < 8: color, st = "🔴", ("سكري مضبوط" if lang=="ar" else "Controlled")
+        else: color, st = "🚨", ("غير مضبوط" if lang=="ar" else "Uncontrolled")
+    elif stype == "fasting":
+        unit = "mg/dL"
+        if val <= 70: color, st = "⚠️", ("انخفاض" if lang=="ar" else "Low")
+        elif val <= 100: color, st = "🟢", ("طبيعي" if lang=="ar" else "Normal")
+        elif val <= 125: color, st = "🟡", ("ما قبل السكري" if lang=="ar" else "Pre-diabetic")
+        else: color, st = "🔴", ("سكري" if lang=="ar" else "Diabetic")
+    elif stype == "postmeal":
+        unit = "mg/dL"
+        if val < 70: color, st = "⚠️", ("انخفاض" if lang=="ar" else "Low")
+        elif val <= 140: color, st = "🟢", ("طبيعي" if lang=="ar" else "Normal")
+        elif val <= 199: color, st = "🟡", ("ما قبل السكري" if lang=="ar" else "Pre-diabetic")
+        else: color, st = "🔴", ("سكري" if lang=="ar" else "Diabetic")
+    else:
+        unit = "mg/dL"
+        if val < 70: color, st = "⚠️", ("انخفاض" if lang=="ar" else "Low")
+        elif val <= 140: color, st = "🟢", ("طبيعي" if lang=="ar" else "Normal")
+        elif val <= 199: color, st = "🟡", ("مرتفع" if lang=="ar" else "High")
+        else: color, st = "🔴", ("مرتفع جداً" if lang=="ar" else "Very High")
+    names = {"fasting":"🌅 صيام","postmeal":"🍽️ بعد الأكل","hba1c":"📊 تراكمي","random":"🎲 عشوائي"}
+    msg = color + " " + str(val) + " " + unit + chr(10) + names.get(stype,stype) + " - " + st
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🩸 " + ("قراءة أخرى" if lang=="ar" else "Another"), callback_data="m_sugar")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await q.message.edit_text(msg, reply_markup=btns)
+    return STATE_MAIN_MENU
+
+async def bp_age(u, ctx):
+    track(u, "bp")
+    lang = get_lang(ctx)
+    try:
+        age = int(u.message.text.strip())
+        if not 1 <= age <= 120: raise ValueError
+    except:
+        await u.message.reply_text("❌ أدخل عمراً صحيحاً")
+        return STATE_BP_AGE
+        return STATE_BP_AGE
+    ctx.user_data["bp_age"] = age
+    await u.message.reply_text("💉 أدخل قراءة الضغط مثال: 120/80" if lang=="ar" else "💉 Enter BP example: 120/80")
+    return STATE_BP
+
+async def bp_result(u, ctx):
+    lang = get_lang(ctx)
+    age = ctx.user_data.get("bp_age", 40)
+    try:
+        parts = u.message.text.strip().replace(" ", "").split("/")
+        sys = int(parts[0])
+        dia = int(parts[1])
+    except:
+        await u.message.reply_text("❌ صيغة خاطئة. مثال: 120/80" if lang=="ar" else "❌ Wrong format. Example: 120/80")
+        return STATE_BP
+    # تعديل حدود الضغط حسب العمر
+    normal_sys = 110 + (age // 10) if age > 40 else 120
+    age_note = " (عمر: " + str(age) + " سنة)" if lang=="ar" else " (Age: " + str(age) + " yr)"
+
+    # معايير الأطفال حسب العمر
+    if age < 18:
+        if age < 6:
+            norm_sys, norm_dia = 100, 65
+        elif age < 10:
+            norm_sys, norm_dia = 110, 70
+        elif age < 13:
+            norm_sys, norm_dia = 115, 75
+        else:
+            norm_sys, norm_dia = 120, 80
+
+        if sys < norm_sys - 20 or dia < norm_dia - 10:
+            status = "⚠️ انخفاض الضغط" if lang=="ar" else "⚠️ Low BP"
+            advice = "راجع الطبيب." if lang=="ar" else "See doctor."
+            color = "🔵"
+        elif sys <= norm_sys and dia <= norm_dia:
+            status = "✅ طبيعي للعمر" if lang=="ar" else "✅ Normal for age"
+            advice = "ممتاز!" if lang=="ar" else "Excellent!"
+            color = "🟢"
+        elif sys <= norm_sys + 10:
+            status = "🟡 مرتفع قليلاً" if lang=="ar" else "🟡 Slightly High"
+            advice = "راقب الضغط وراجع الطبيب." if lang=="ar" else "Monitor and see doctor."
+            color = "🟡"
+        else:
+            status = "🔴 مرتفع - راجع الطبيب" if lang=="ar" else "🔴 High - See doctor"
+            advice = "راجع الطبيب فوراً." if lang=="ar" else "See doctor immediately."
+            color = "🔴"
+
+        msg = color + " الضغط: " + str(sys) + "/" + str(dia) + " mmHg" + age_note + "\n" + status + "\n\n💡 " + advice
+        await u.message.reply_text(msg, reply_markup=kb_back(lang))
+        return STATE_MAIN_MENU
+
+    # تصنيف حسب معايير AHA 2023
+    # للمسنين فوق 60: الحد الطبيعي أعلى قليلاً
+    if age >= 60:
+        normal_limit = 140
+    else:
+        normal_limit = 130
+
+    if sys < 90 or dia < 60:
+        status = "⚠️ انخفاض الضغط" if lang=="ar" else "⚠️ Low BP"
+        advice = "اشرب ماء واستلقِ، راجع الطبيب." if lang=="ar" else "Drink water, lie down. See doctor."
+        color = "🔵"
+    elif sys < 120 and dia < 80:
+        status = "✅ ضغط طبيعي ممتاز" if lang=="ar" else "✅ Optimal BP"
+        advice = "ممتاز! حافظ على نمط حياة صحي." if lang=="ar" else "Excellent! Maintain healthy lifestyle."
+        color = "🟢"
+    elif sys < normal_limit and dia < 90:
+        status = "✅ ضغط طبيعي" if lang=="ar" else "✅ Normal BP"
+        advice = "جيد. استمر على النظام الصحي." if lang=="ar" else "Good. Continue healthy habits."
+        color = "🟢"
+    elif sys < 140 and dia < 90:
+        status = "🟡 ارتفاع خفيف (مرحلة 1)" if lang=="ar" else "🟡 Mild Hypertension (Stage 1)"
+        advice = "قلل الملح والدهون، مارس الرياضة، راقب الضغط يومياً وراجع الطبيب." if lang=="ar" else "Reduce salt and fat, exercise regularly, monitor daily and see doctor."
+        color = "🟡"
+    elif sys < 160 or dia < 100:
+        status = "🔴 ارتفاع متوسط (مرحلة 2)" if lang=="ar" else "🔴 Moderate Hypertension (Stage 2)"
+        advice = "راجع الطبيب فوراً. قد تحتاج دواءً لضبط الضغط." if lang=="ar" else "See doctor soon. Medication may be required."
+        color = "🔴"
+    elif sys < 180 or dia < 120:
+        status = "🚨 ارتفاع شديد (مرحلة 3)" if lang=="ar" else "🚨 Severe Hypertension (Stage 3)"
+        advice = "راجع الطبيب اليوم! خطر على القلب والكلى." if lang=="ar" else "See doctor today! Risk of heart and kidney damage."
+        color = "🚨"
+    else:
+        status = "🆘 أزمة ضغط خبيثة" if lang=="ar" else "🆘 Hypertensive Crisis"
+        advice = "اذهب للطوارئ فوراً!" if lang=="ar" else "Go to emergency immediately!"
+        color = "🆘"
+
+    msg = color + " الضغط: " + str(sys) + "/" + str(dia) + " mmHg\n" + status + "\n\n💡 " + advice
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("💉 " + ("قراءة أخرى" if lang=="ar" else "Another Reading"), callback_data="m_bp")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await u.message.reply_text(msg, reply_markup=btns)
+    return STATE_MAIN_MENU
+
+
+# ═══════════════ ملف المريض ═══════════════
+
+def get_patients(ctx):
+    uid = ctx.user_data.get("uid", "0")
+    return ctx.user_data.setdefault("patients", {})
+
+def get_uid(ctx):
+    uid = ctx.user_data.get("uid", "")
+    if not uid:
+        try:
+            uid = str(ctx._user_id)
+        except:
+            uid = "0"
+    return uid
+
+def get_uid_from_update(u, ctx):
+    uid = str(u.effective_user.id) if u.effective_user else get_uid(ctx)
+    ctx.user_data["uid"] = uid
+    return uid
+
+def save_patients(ctx):
+    uid = ctx.user_data.get("uid", get_uid(ctx))
+    all_rems = load_all_reminders()
+    patients = ctx.user_data.get("patients", {})
+    all_rems[uid + "_patients"] = patients
+    save_all_reminders(all_rems)
+
+def load_patients(ctx):
+    uid = ctx.user_data.get("uid", get_uid(ctx))
+    all_data = load_all_reminders()
+    patients = all_data.get(uid + "_patients", {})
+    ctx.user_data["patients"] = patients
+    return patients
+
+def kb_patient_menu(lang):
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ " + ("إضافة مريض" if lang=="ar" else "Add Patient"), callback_data="pat_add")],
+        [InlineKeyboardButton("📋 " + ("قائمة المرضى" if lang=="ar" else "Patient List"), callback_data="pat_list")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+
+async def patient_menu(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients", {})
+    
+    if q.data == "pat_add":
+        await q.message.edit_text("👤 " + ("أدخل اسم المريض:" if lang=="ar" else "Enter patient name:"))
+        return STATE_PAT_NAME
+    
+    if q.data == "pat_list":
+        patients = ctx.user_data.get("patients", {})
+        if not patients:
+            await q.message.edit_text("📭 " + ("لا يوجد مرضى" if lang=="ar" else "No patients"), reply_markup=kb_patient_menu(lang))
+            return STATE_PAT_MENU
+        btns = [[InlineKeyboardButton("👤 " + name, callback_data="pat_view_" + pid)] for pid, name in [(p, patients[p]["name"]) for p in patients]]
+        btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+        await q.message.edit_text("📋 " + ("المرضى:" if lang=="ar" else "Patients:"), reply_markup=InlineKeyboardMarkup(btns))
+        return STATE_PAT_MENU
+    
+    if q.data.startswith("pat_view_"):
+        pid = q.data.replace("pat_view_", "")
+        patients = ctx.user_data.get("patients", {})
+        p = patients.get(pid, {})
+        if not p:
+            await q.message.edit_text("❌ " + ("لم يوجد" if lang=="ar" else "Not found"), reply_markup=kb_patient_menu(lang))
+            return STATE_PAT_MENU
+        lines = ["👤 *" + p.get("name","") + "*", ""]
+        lines.append(("📅 العمر: " if lang=="ar" else "📅 Age: ") + str(p.get("age","-")))
+        lines.append(("⚖️ الوزن: " if lang=="ar" else "⚖️ Weight: ") + str(p.get("weight","-")) + " kg")
+        gender_val = p.get("gender","-")
+        if lang == "en":
+            gender_val = {"ذكر":"Male","أنثى":"Female"}.get(gender_val, gender_val)
+        lines.append(("👤 الجنس: " if lang=="ar" else "👤 Gender: ") + str(gender_val))
+        if p.get("diseases"):
+            lines.append(("🏥 الأمراض: " if lang=="ar" else "🏥 Diseases: ") + p["diseases"])
+        if p.get("meds"):
+            lines.append(("💊 الأدوية: " if lang=="ar" else "💊 Medications: ") + p["meds"])
+        if p.get("allergy"):
+            lines.append(("⚠️ حساسية: " if lang=="ar" else "⚠️ Allergy: ") + p["allergy"])
+        meds_btns = []
+        if p.get("meds"):
+            meds_list = [m.strip() for m in p["meds"].replace("،",",").split(",") if m.strip()]
+            pat_name = p.get("name","")
+            for med in meds_list[:3]:
+                safe_med = med.replace("|","").replace("__","")[:10]
+                cb = ("pr__" + pid + "__" + safe_med)[:64]
+                meds_btns.append([InlineKeyboardButton("⏰ " + med[:15], callback_data=cb)])
+        
+        btns = meds_btns + [
+            [InlineKeyboardButton("📊 " + ("سجل السكر/الضغط" if lang=="ar" else "Sugar/BP Log"), callback_data="pat_log_" + pid)],
+            [InlineKeyboardButton("🖨️ " + ("تصدير PDF" if lang=="ar" else "Export PDF"), callback_data="pat_pdf_" + pid)],
+            [InlineKeyboardButton("📝 " + ("إضافة ملاحظة" if lang=="ar" else "Add Note"), callback_data="pat_note_" + pid)],
+            [InlineKeyboardButton("📊 " + ("سجل السكر والضغط" if lang=="ar" else "Sugar & BP Log"), callback_data="pat_log_" + pid)],
+            [InlineKeyboardButton("✏️ " + ("تعديل البيانات" if lang=="ar" else "Edit Data"), callback_data="pat_edit_" + pid)],
+            [InlineKeyboardButton("➕ " + ("إضافة مريض آخر" if lang=="ar" else "Add Another Patient"), callback_data="pat_add")],
+            [InlineKeyboardButton("🗑️ " + ("حذف" if lang=="ar" else "Delete"), callback_data="pat_del_" + pid)],
+            [InlineKeyboardButton("🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="back")]
+        ]
+        await q.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(btns), parse_mode=ParseMode.MARKDOWN)
+        return STATE_PAT_MENU
+    
+    if q.data.startswith("pr__"):
+        parts = q.data.split("__")
+        if len(parts) >= 3:
+            pid2 = parts[1]
+            med2 = parts[2]
+            pat_name2 = patients.get(pid2,{}).get("name","")
+            ctx.user_data["nr_drug"] = med2
+            ctx.user_data["nr_patient"] = pat_name2
+            await q.message.edit_text("🕐 " + ("أدخل وقت التذكير مثال 08:00:" if lang=="ar" else "Enter time e.g. 08:00:"))
+            return STATE_REM_ADD_TIME
+    
+    if q.data.startswith("pat_pdf_"):
+        pid = q.data.replace("pat_pdf_","")
+        p = patients.get(pid,{})
+        await q.answer("🔄 " + ("جارٍ إنشاء PDF..." if lang=="ar" else "Creating PDF..."), show_alert=True)
+        
+        # نبني محتوى التقرير
+        from datetime import datetime
+        lines = []
+        lines.append("=" * 40)
+        lines.append("ملف المريض الطبي" if lang=="ar" else "Patient Medical File")
+        lines.append("=" * 40)
+        lines.append("")
+        lines.append(("الاسم: " if lang=="ar" else "Name: ") + p.get("name",""))
+        lines.append(("العمر: " if lang=="ar" else "Age: ") + str(p.get("age","")))
+        lines.append(("الوزن: " if lang=="ar" else "Weight: ") + str(p.get("weight","")) + " kg")
+        lines.append(("الجنس: " if lang=="ar" else "Gender: ") + str(p.get("gender","")))
+        if p.get("diseases"):
+            lines.append(("الأمراض: " if lang=="ar" else "Diseases: ") + p["diseases"])
+        if p.get("meds"):
+            lines.append(("الأدوية: " if lang=="ar" else "Medications: ") + p["meds"])
+        if p.get("allergy"):
+            lines.append(("الحساسية: " if lang=="ar" else "Allergies: ") + p["allergy"])
+        
+        # القراءات
+        readings = p.get("readings",[])
+        if readings:
+            lines.append("")
+            lines.append("=" * 40)
+            lines.append("سجل القراءات:" if lang=="ar" else "Readings Log:")
+            
+            bp_r = [r for r in readings if r.get("bp")]
+            fasting_r = [r for r in readings if r.get("sugar") and r.get("stype") == "fasting"]
+            postmeal_r = [r for r in readings if r.get("sugar") and r.get("stype") == "postmeal"]
+            hba1c_r = [r for r in readings if r.get("sugar") and r.get("stype") == "hba1c"]
+            random_r = [r for r in readings if r.get("sugar") and r.get("stype","random") not in ["fasting","postmeal","hba1c"]]
+            
+            if bp_r:
+                lines.append("💉 قراءات الضغط:")
+                for r in bp_r: lines.append("  " + r["date"] + ": " + str(r["bp"]))
+            if fasting_r:
+                lines.append("🌅 سكر الصيام:")
+                for r in fasting_r: lines.append("  " + r["date"] + ": " + str(r["sugar"]) + " mg/dL")
+            if postmeal_r:
+                lines.append("🍽️ سكر بعد الأكل:")
+                for r in postmeal_r: lines.append("  " + r["date"] + ": " + str(r["sugar"]) + " mg/dL")
+            if hba1c_r:
+                lines.append("📊 HbA1c التراكمي:")
+                for r in hba1c_r: lines.append("  " + r["date"] + ": " + str(r["sugar"]) + "%")
+            if random_r:
+                lines.append("🎲 قراءات عشوائية:")
+                for r in random_r: lines.append("  " + r["date"] + ": " + str(r["sugar"]) + " mg/dL")
+        
+        # الملاحظات
+        notes = p.get("notes",[])
+        if notes:
+            lines.append("")
+            lines.append("=" * 40)
+            lines.append("الملاحظات:" if lang=="ar" else "Notes:")
+            for n in notes:
+                if n.get("type") == "text":
+                    lines.append("📝 " + n["date"] + ": " + n["content"])
+                elif n.get("type") == "photo":
+                    lines.append("📸 " + n["date"] + ": " + ("صورة - سيتم إرسالها منفصلة" if lang=="ar" else "Photo - will be sent separately"))
+                elif n.get("type") == "file":
+                    lines.append("📄 " + n["date"] + ": " + n.get("name","ملف"))
+        
+        lines.append("")
+        lines.append("تاريخ التصدير: " + datetime.now().strftime("%Y-%m-%d %H:%M"))
+        
+        report = "\n".join(lines)
+        await u.effective_chat.send_message("```\n" + report + "\n```", parse_mode="Markdown")
+        
+        # نرسل الصور منفصلة
+        photos = [n for n in p.get("notes",[]) if n.get("type") == "photo"]
+        if photos:
+            await u.effective_chat.send_message("📸 " + ("صور الملف:" if lang=="ar" else "File Photos:"))
+            for ph in photos:
+                try:
+                    caption = ph.get("caption","") or ph.get("date","")
+                    await u.effective_chat.send_photo(ph["file_id"], caption=caption)
+                except: pass
+        
+        return STATE_PAT_MENU
+    
+    if q.data.startswith("pat_log_"):
+        pid = q.data.replace("pat_log_","")
+        p = patients.get(pid,{})
+        readings = p.get("readings",[])
+        lines = ["📊 *" + ("سجل " if lang=="ar" else "Log: ") + p.get("name","") + "*",""]
+        if readings:
+            sugar_readings = [r for r in readings if r.get("sugar")]
+            bp_readings = [r for r in readings if r.get("bp")]
+            if bp_readings:
+                lines.append("💉 " + ("آخر قراءات الضغط:" if lang=="ar" else "Latest BP:"))
+                for r in bp_readings[-3:]:
+                    sys_val = r.get("sys",0)
+                    if sys_val < 120: status = "✅"
+                    elif sys_val < 130: status = "🟡"
+                    elif sys_val < 140: status = "🟠"
+                    else: status = "🔴"
+                    lines.append("  " + status + " " + r["date"] + ": " + str(r["bp"]))
+            if sugar_readings:
+                lines.append("")
+                lines.append("🩸 " + ("آخر قراءات السكر:" if lang=="ar" else "Latest Sugar:"))
+                for r in sugar_readings[-3:]:
+                    val = r["sugar"]
+                    if val < 70: status = "⚠️"
+                    elif val <= 100: status = "✅"
+                    elif val <= 125: status = "🟡"
+                    else: status = "🔴"
+                    stype = r.get("stype","")
+                    stype_ar = r.get("stype_ar","")
+                    if stype == "hba1c":
+                        if val < 5.7: status = "✅"
+                        elif val <= 6.4: status = "🟡"
+                        elif val <= 7.0: status = "🟠"
+                        else: status = "🔴"
+                        lines.append("  " + status + " " + r["date"] + ": " + str(val) + "% (HbA1c تراكمي)")
+                    else:
+                        if val < 70: status = "⚠️"
+                        elif val <= 100: status = "✅"
+                        elif val <= 125: status = "🟡"
+                        else: status = "🔴"
+                        label = " (" + stype_ar + ")" if stype_ar else ""
+                        lines.append("  " + status + " " + r["date"] + ": " + str(val) + " mg/dL" + label)
+        else:
+            lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"))
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✏️ " + ("أضف قراءة" if lang=="ar" else "Add Reading"), callback_data="pat_addreading_" + pid)],
+            [InlineKeyboardButton("📈 " + ("سجل السكر" if lang=="ar" else "Sugar Log"), callback_data="pat_viewsugar_" + pid),
+             InlineKeyboardButton("📉 " + ("سجل الضغط" if lang=="ar" else "BP Log"), callback_data="pat_viewbp_" + pid)],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_view_" + pid)]
+        ])
+        await q.message.edit_text("\n".join(lines), reply_markup=btns, parse_mode="Markdown")
+        return STATE_PAT_MENU
+    
+    if q.data.startswith("pat_viewfasting_") or q.data.startswith("pat_viewpostmeal_") or q.data.startswith("pat_viewhba1c_") or q.data.startswith("pat_viewrandom_"):
+        for prefix in ["pat_viewfasting_","pat_viewpostmeal_","pat_viewhba1c_","pat_viewrandom_"]:
+            if q.data.startswith(prefix):
+                pid = q.data.replace(prefix,"")
+                stype = prefix.replace("pat_view","").replace("_","")
+                break
+        p = patients.get(pid,{})
+        readings = p.get("readings",[])
+        
+        stype_map = {"fasting":"🌅 سكر الصيام","postmeal":"🍽️ سكر بعد الأكل","hba1c":"📊 HbA1c التراكمي","random":"🎲 عشوائي"}
+        unit_map = {"hba1c":"%","fasting":"mg/dL","postmeal":"mg/dL","random":"mg/dL"}
+        
+        filtered = [r for r in readings if r.get("sugar") and r.get("stype","random") == stype]
+        lines = [stype_map.get(stype,"📊") + " *" + p.get("name","") + "*",""]
+        
+        if filtered:
+            for i, r in enumerate(filtered[-10:]):
+                unit = unit_map.get(stype,"mg/dL")
+                lines.append(f"  {i+1}. {r['date'][:16]}: {r['sugar']} {unit}")
+        else:
+            lines.append("📭 لا توجد قراءات")
+        
+        # أزرار حذف
+        del_btns = []
+        for i, r in enumerate(filtered[-5:]):
+            del_btns.append([InlineKeyboardButton(f"🗑️ {r['date'][:10]}: {r['sugar']}", callback_data=f"pat_delreading_{pid}_{r['date']}")])
+        del_btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)])
+        
+        await q.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(del_btns), parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_delreading_"):
+        parts = q.data.replace("pat_delreading_","").split("_",1)
+        pid = parts[0]
+        date_key = parts[1] if len(parts)>1 else ""
+        p = patients.get(pid,{})
+        before = len(p.get("readings",[]))
+        p["readings"] = [r for r in p.get("readings",[]) if r.get("date","") != date_key]
+        after = len(p.get("readings",[]))
+        save_patients(ctx)
+        await q.answer("✅ " + (f"تم حذف {before-after} قراءة" if lang=="ar" else f"Deleted {before-after} reading"))
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_viewsugar_"):
+        pid = q.data.replace("pat_viewsugar_","")
+        p = patients.get(pid,{})
+        readings = [r for r in p.get("readings",[]) if r.get("sugar")]
+        lines = ["🩸 *" + ("سجل السكر - " if lang=="ar" else "Sugar Log - ") + p.get("name","") + "*",""]
+        if readings:
+            for r in readings[-15:]:
+                val = r["sugar"]
+                if val < 70: status = "⚠️"
+                elif val <= 100: status = "✅"
+                elif val <= 125: status = "🟡"
+                else: status = "🔴"
+                lines.append(status + " " + r["date"] + ": " + str(val) + " mg/dL")
+        else:
+            lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"))
+        await q.message.edit_text("\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]),
+            parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_viewbp_"):
+        pid = q.data.replace("pat_viewbp_","")
+        p = patients.get(pid,{})
+        readings = [r for r in p.get("readings",[]) if r.get("bp")]
+        lines = ["💉 *" + ("سجل الضغط - " if lang=="ar" else "BP Log - ") + p.get("name","") + "*",""]
+        if readings:
+            for r in readings[-15:]:
+                sys_val = r.get("sys",0)
+                if sys_val < 120: status = "✅"
+                elif sys_val < 130: status = "🟡"
+                elif sys_val < 140: status = "🟠"
+                else: status = "🔴"
+                lines.append(status + " " + r["date"] + ": " + str(r["bp"]))
+        else:
+            lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"))
+        await q.message.edit_text("\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]),
+            parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_addreading_"):
+        pid = q.data.replace("pat_addreading_","")
+        ctx.user_data["log_pid"] = pid
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💉 " + ("قراءة ضغط" if lang=="ar" else "Blood Pressure"), callback_data="sugtype_bp_" + pid)],
+            [InlineKeyboardButton("🌅 " + ("سكر صيام" if lang=="ar" else "Fasting Sugar"), callback_data="sugtype_fasting_" + pid)],
+            [InlineKeyboardButton("🍽️ " + ("سكر بعد الأكل بساعتين" if lang=="ar" else "Post-meal 2hrs"), callback_data="sugtype_postmeal_" + pid)],
+            [InlineKeyboardButton("📊 " + ("سكر تراكمي HbA1c" if lang=="ar" else "HbA1c"), callback_data="sugtype_hba1c_" + pid)],
+            [InlineKeyboardButton("🎲 " + ("سكر عشوائي" if lang=="ar" else "Random Sugar"), callback_data="sugtype_random_" + pid)],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]
+        ])
+        await q.message.edit_text("📝 " + ("اختر نوع القراءة:" if lang=="ar" else "Select reading type:"), reply_markup=btns)
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_addsugar_"):
+        pid = q.data.replace("pat_addsugar_","")
+        ctx.user_data["log_pid"] = pid
+        ctx.user_data["log_type"] = "sugar"
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌅 " + ("صيام" if lang=="ar" else "Fasting"), callback_data="sugtype_fasting_" + pid),
+             InlineKeyboardButton("🍽️ " + ("بعد الأكل" if lang=="ar" else "Post-meal"), callback_data="sugtype_postmeal_" + pid)],
+            [InlineKeyboardButton("🎲 " + ("عشوائي" if lang=="ar" else "Random"), callback_data="sugtype_random_" + pid),
+             InlineKeyboardButton("📊 " + ("تراكمي HbA1c" if lang=="ar" else "HbA1c"), callback_data="sugtype_hba1c_" + pid)],
+        ])
+        await q.message.edit_text("🩸 " + ("نوع قراءة السكر؟" if lang=="ar" else "Sugar reading type?"), reply_markup=btns)
+        return STATE_PAT_MENU
+    
+    if q.data.startswith("sugtype_"):
+        parts = q.data.split("_")
+        stype = parts[1]
+        pid = parts[2]
+        ctx.user_data["log_pid"] = pid
+        ctx.user_data[f"stype_{pid}"] = stype
+        
+        if stype == "bp":
+            ctx.user_data["log_type"] = "bp"
+            await q.message.edit_text("💉 " + ("أدخل قراءة الضغط (مثال: 120/80):" if lang=="ar" else "Enter BP (e.g. 120/80):"),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_addreading_" + pid)]]))
+            return STATE_PAT_LOG
+        else:
+            ctx.user_data["log_type"] = "sugar"
+            ctx.user_data["sugar_type"] = stype
+        type_names = {"fasting":"صيام","postmeal":"بعد الأكل","random":"عشوائي","hba1c":"تراكمي"}
+        type_name = type_names.get(stype, stype)
+        type_emoji = {"hba1c":"📊","fasting":"🌅","postmeal":"🍽️","random":"🎲"}.get(stype,"🩸")
+        type_unit = "%" if stype == "hba1c" else "mg/dL"
+        # نحفظ النوع في اسم المفتاح الثابت
+        ctx.user_data[f"stype_{pid}"] = stype
+        if stype == "hba1c":
+            msg = "📊 اكتب مثال: تراكمي 7.5"
+        elif stype == "fasting":
+            msg = "🌅 اكتب مثال: صيام 95"
+        elif stype == "postmeal":
+            msg = "🍽️ اكتب مثال: بعداكل 140"
+        else:
+            msg = "🎲 اكتب مثال: عشوائي 110"
+        await q.message.edit_text(msg)
+        return STATE_PAT_LOG
+    
+    if q.data.startswith("pat_addbp_"):
+        pid = q.data.replace("pat_addbp_","")
+        ctx.user_data["log_pid"] = pid
+        ctx.user_data["log_type"] = "bp"
+        await q.message.edit_text("💉 اكتب مثال: ضغط 120/80")
+        return STATE_PAT_LOG
+    
+    if q.data.startswith("pat_edit_"):
+        pid = q.data.replace("pat_edit_","")
+        p = patients.get(pid,{})
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👤 " + ("الاسم: " if lang=="ar" else "Name: ") + str(p.get("name","")), callback_data="patedit_name_" + pid)],
+            [InlineKeyboardButton("📅 " + ("العمر: " if lang=="ar" else "Age: ") + str(p.get("age","")), callback_data="patedit_age_" + pid)],
+            [InlineKeyboardButton("⚖️ " + ("الوزن: " if lang=="ar" else "Weight: ") + str(p.get("weight","")), callback_data="patedit_weight_" + pid)],
+            [InlineKeyboardButton("💊 " + ("الأدوية" if lang=="ar" else "Medications"), callback_data="patedit_meds_" + pid)],
+            [InlineKeyboardButton("🏥 " + ("الأمراض" if lang=="ar" else "Diseases"), callback_data="patedit_diseases_" + pid)],
+            [InlineKeyboardButton("⚠️ " + ("الحساسية" if lang=="ar" else "Allergies"), callback_data="patedit_allergy_" + pid)],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_view_" + pid)]
+        ])
+        await q.message.edit_text("✏️ " + ("اختر ما تريد تعديله:" if lang=="ar" else "Select what to edit:"), reply_markup=btns)
+        return STATE_PAT_MENU
+
+    if q.data.startswith("patedit_"):
+        parts = q.data.split("_")
+        field = parts[1]
+        pid = parts[2]
+        ctx.user_data["edit_pid"] = pid
+        ctx.user_data["edit_field"] = field
+        p = patients.get(pid,{})
+        
+        if field in ["meds","diseases"]:
+            current = p.get(field,"")
+            selected = [x.strip() for x in current.replace("،",",").split(",") if x.strip()] if current else []
+            
+            if field == "diseases":
+                options = ["ضغط","سكري","قلب","كلى","كبد","غدة","ربو","سرطان","روماتيزم","أنيميا","كولسترول","جلطة","قرحة","حساسية"] if lang=="ar" else ["Hypertension","Diabetes","Heart disease","Kidney disease","Liver disease","Thyroid","Asthma","Cancer","Arthritis","Anemia","Cholesterol","Stroke","Ulcer","Allergy"]
+            else:
+                options = ["ميتفورمين","أملودبين","ليزينوبريل","أتورفاستاتين","أسبرين","ميتوبرولول","ليفوثيروكسين","أوميبرازول","وارفارين","لوساتران","إنسولين","كونكور"] if lang=="ar" else ["Metformin","Amlodipine","Lisinopril","Atorvastatin","Aspirin","Metoprolol","Levothyroxine","Omeprazole","Warfarin","Losartan","Insulin","Bisoprolol"]
+            
+            lines = ["✏️ " + ("اختر الأمراض:" if field=="diseases" else "اختر الأدوية:"), ""]
+            lines.append("✅ " + ("المختار: " if lang=="ar" else "Selected: ") + ("، ".join(selected) if selected else "لا يوجد"))
+            
+            btns = []
+            row = []
+            for opt in options:
+                icon = "☑️" if opt in selected else "⬜"
+                row.append(InlineKeyboardButton(icon + " " + opt, callback_data=f"pattoggle_{field}_{pid}_{opt[:12]}"))
+                if len(row) == 2:
+                    btns.append(row)
+                    row = []
+            if row: btns.append(row)
+            btns.append([InlineKeyboardButton("➕ " + ("إضافة يدوي" if lang=="ar" else "Add manually"), callback_data=f"patadd_{field}_{pid}")])
+            btns.append([InlineKeyboardButton("✅ " + ("حفظ" if lang=="ar" else "Save"), callback_data=f"pat_edit_{pid}")])
+            btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_edit_" + pid)])
+            await q.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(btns))
+            return STATE_PAT_MENU
+        else:
+            field_names = {
+                "name": "الاسم" if lang=="ar" else "Name",
+                "age": "العمر" if lang=="ar" else "Age",
+                "weight": "الوزن (كغ)" if lang=="ar" else "Weight (kg)",
+                "allergy": "الحساسية" if lang=="ar" else "Allergies"
+            }
+            current_val = str(p.get(field,""))
+            await q.message.edit_text(
+                "✏️ " + ("القيمة الحالية: " if lang=="ar" else "Current: ") + current_val + "\n" +
+                ("أدخل القيمة الجديدة:" if lang=="ar" else "Enter new value:"),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_edit_" + pid)]]))
+            return STATE_PAT_NOTE
+
+    if q.data.startswith("pattoggle_"):
+        parts = q.data.split("_",4)
+        field = parts[1]
+        pid = parts[2]
+        item = parts[3]
+        p = patients.get(pid,{})
+        current = p.get(field,"")
+        items = [x.strip() for x in current.replace("،",",").split(",") if x.strip()] if current else []
+        if item in items:
+            items.remove(item)
+        else:
+            items.append(item)
+        p[field] = "، ".join(items)
+        save_patients(ctx)
+        
+        # نعرض الصفحة مرة أخرى حسب اللغة
+        if field == "diseases":
+            options = ["ضغط","سكري","قلب","كلى","كبد","غدة","ربو","سرطان","روماتيزم","أنيميا","كولسترول","جلطة","قرحة","حساسية"] if lang=="ar" else ["Hypertension","Diabetes","Heart disease","Kidney disease","Liver disease","Thyroid","Asthma","Cancer","Arthritis","Anemia","Cholesterol","Stroke","Ulcer","Allergy"]
+        else:
+            options = ["ميتفورمين","أملودبين","ليزينوبريل","أتورفاستاتين","أسبرين","ميتوبرولول","ليفوثيروكسين","أوميبرازول","وارفارين","لوساتران","إنسولين","كونكور"] if lang=="ar" else ["Metformin","Amlodipine","Lisinopril","Atorvastatin","Aspirin","Metoprolol","Levothyroxine","Omeprazole","Warfarin","Losartan","Insulin","Bisoprolol"]
+        
+        selected = items
+        lines = ["✏️ " + ("اختر الأمراض:" if field=="diseases" else "اختر الأدوية:"), ""]
+        lines.append("✅ " + ("المختار: " if lang=="ar" else "Selected: ") + ("، ".join(selected) if selected else "لا يوجد"))
+        btns = []
+        row = []
+        for opt in options:
+            icon = "☑️" if opt in selected else "⬜"
+            row.append(InlineKeyboardButton(icon + " " + opt, callback_data=f"pattoggle_{field}_{pid}_{opt[:12]}"))
+            if len(row) == 2:
+                btns.append(row)
+                row = []
+        if row: btns.append(row)
+        btns.append([InlineKeyboardButton("➕ " + ("إضافة يدوي" if lang=="ar" else "Add manually"), callback_data=f"patadd_{field}_{pid}")])
+        btns.append([InlineKeyboardButton("✅ " + ("حفظ" if lang=="ar" else "Save"), callback_data=f"pat_edit_{pid}")])
+        btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_edit_" + pid)])
+        await q.answer("✅ " + ("تم التحديث" if lang=="ar" else "Updated"))
+        await q.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(btns))
+        return STATE_PAT_MENU
+
+    if q.data.startswith("patdel_"):
+        # حذف عنصر من قائمة
+        parts = q.data.split("_",4)
+        field = parts[1]
+        pid = parts[2]
+        item = parts[3] if len(parts) > 3 else ""
+        p = patients.get(pid,{})
+        current = p.get(field,"")
+        items = [x.strip() for x in current.replace("،",",").split(",") if x.strip()]
+        items = [x for x in items if not x.startswith(item)]
+        p[field] = "، ".join(items)
+        save_patients(ctx)
+        await q.answer("✅ " + ("تم الحذف" if lang=="ar" else "Deleted"))
+        # نعيد عرض القائمة
+        btns = []
+        for i in items:
+            btns.append([InlineKeyboardButton("🗑️ " + i, callback_data=f"patdel_{field}_{pid}_{i[:15]}")])
+        btns.append([InlineKeyboardButton("➕ " + ("إضافة" if lang=="ar" else "Add"), callback_data=f"patadd_{field}_{pid}")])
+        btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_edit_" + pid)])
+        await q.message.edit_text("✅ " + ("تم الحذف\n" if lang=="ar" else "Deleted\n") + "\n".join(["• " + i for i in items]) if items else "📭", reply_markup=InlineKeyboardMarkup(btns))
+        return STATE_PAT_MENU
+
+    if q.data.startswith("patadd_"):
+        parts = q.data.split("_",3)
+        field = parts[1]
+        pid = parts[2]
+        ctx.user_data["edit_pid"] = pid
+        ctx.user_data["edit_field"] = field
+        ctx.user_data["edit_append"] = True
+        await q.message.edit_text("➕ " + ("أدخل الإضافة:" if lang=="ar" else "Enter to add:"),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data=f"patedit_{field}_{pid}")]]))
+        return STATE_PAT_NOTE
+
+    if q.data.startswith("pat_del_"):
+        pid = q.data.replace("pat_del_", "")
+        patients = ctx.user_data.get("patients", {})
+        if pid in patients:
+            del patients[pid]
+            save_patients(ctx)
+        await q.message.edit_text("✅ " + ("تم الحذف" if lang=="ar" else "Deleted"), reply_markup=kb_patient_menu(lang))
+        return STATE_PAT_MENU
+    
+    await q.message.edit_text("👤 " + ("ملف المريض" if lang=="ar" else "Patient File"), reply_markup=kb_patient_menu(lang))
+    return STATE_PAT_MENU
+
+async def pat_name(u, ctx):
+    lang = get_lang(ctx)
+    name = u.message.text.strip()
+    if not name:
+        await u.message.reply_text("❌ " + ("أدخل اسماً صحيحاً" if lang=="ar" else "Enter valid name"))
+        return STATE_PAT_NAME
+    ctx.user_data["new_patient"] = {"name": name}
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("👦 " + ("ذكر" if lang=="ar" else "Male"), callback_data="pat_gender_m"),
+         InlineKeyboardButton("👧 " + ("أنثى" if lang=="ar" else "Female"), callback_data="pat_gender_f")]
+    ])
+    await u.message.reply_text("👤 " + ("الجنس؟" if lang=="ar" else "Gender?"), reply_markup=btns)
+    return STATE_PAT_GENDER
+
+async def pat_gender(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    ctx.user_data["new_patient"]["gender"] = "ذكر" if q.data == "pat_gender_m" else "أنثى"
+    await q.message.edit_text("📅 " + ("كم عمره؟" if lang=="ar" else "Age?"))
+    return STATE_PAT_AGE
+
+async def pat_age(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        age = int(u.message.text.strip())
+    except:
+        await u.message.reply_text("❌ " + ("أدخل رقماً" if lang=="ar" else "Enter number"))
+        return STATE_PAT_AGE
+    ctx.user_data["new_patient"]["age"] = age
+    await u.message.reply_text("⚖️ " + ("الوزن بالكيلو؟" if lang=="ar" else "Weight in kg?"))
+    return STATE_PAT_WEIGHT
+
+async def pat_weight(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        w = float(u.message.text.strip())
+    except:
+        await u.message.reply_text("❌ " + ("أدخل رقماً" if lang=="ar" else "Enter number"))
+        return STATE_PAT_WEIGHT
+    ctx.user_data["new_patient"]["weight"] = w
+    ctx.user_data["new_patient"]["diseases_list"] = []
+    await show_disease_btns(u.message, ctx, lang)
+    return STATE_PAT_DISEASE
+
+def get_disease_kb(selected, lang):
+    diseases = [
+        ("سكري","🩺","Diabetes"), ("ضغط","💉","BP"), ("قلب","❤️","Heart"),
+        ("كلى","🫘","Kidney"), ("ربو","🫁","Asthma"), ("غدة","🦋","Thyroid"),
+        ("كبد","🟡","Liver"), ("سمنة","⚖️","Obesity"),
+    ]
+    btns = []
+    row = []
+    for ar, icon, en in diseases:
+        name = ar if lang=="ar" else en
+        tick = "✅ " if ar in selected else ""
+        row.append(InlineKeyboardButton(tick + icon + name, callback_data="pat_dis_" + ar))
+        if len(row) == 2:
+            btns.append(row)
+            row = []
+    if row: btns.append(row)
+    btns.append([InlineKeyboardButton("✅ " + ("انتهيت" if lang=="ar" else "Done"), callback_data="pat_dis_done")])
+    return InlineKeyboardMarkup(btns)
+
+async def show_disease_btns(msg, ctx, lang):
+    selected = ctx.user_data["new_patient"].get("diseases_list", [])
+    title = "🏥 اختر الأمراض المزمنة (يمكن تعدد الاختيار):" if lang=="ar" else "🏥 Select chronic diseases (multiple):"
+    await msg.reply_text(title, reply_markup=get_disease_kb(selected, lang))
+
+async def pat_disease(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    data = q.data.replace("pat_dis_", "")
+    
+    if data == "done":
+        diseases = ctx.user_data["new_patient"].get("diseases_list", [])
+        ctx.user_data["new_patient"]["diseases"] = "، ".join(diseases) if diseases else ""
+        ctx.user_data["new_patient"]["meds_list"] = []
+        await show_meds_btns(q.message, ctx, lang, edit=True)
+        return STATE_PAT_MEDS
+    
+    selected = ctx.user_data["new_patient"].setdefault("diseases_list", [])
+    if data in selected:
+        selected.remove(data)
+    else:
+        selected.append(data)
+    await q.message.edit_reply_markup(reply_markup=get_disease_kb(selected, lang))
+    return STATE_PAT_DISEASE
+
+def get_meds_kb(selected, lang):
+    meds = [
+        ("ميتفورمين","💊","Metformin"), ("أملودبين","💊","Amlodipine"),
+        ("أتورفاستاتين","💊","Atorvastatin"), ("ليزينوبريل","💊","Lisinopril"),
+        ("أسبرين","💊","Aspirin"), ("ميتوبرولول","💊","Metoprolol"),
+        ("أوميبرازول","💊","Omeprazole"), ("ليفوثيروكسين","💊","Levothyroxine"),
+    ]
+    btns = []
+    row = []
+    for ar, icon, en in meds:
+        name = ar if lang=="ar" else en
+        tick = "✅ " if ar in selected else ""
+        row.append(InlineKeyboardButton(tick + name, callback_data="pat_med_" + ar))
+        if len(row) == 2:
+            btns.append(row)
+            row = []
+    if row: btns.append(row)
+    btns.append([InlineKeyboardButton("➕ " + ("أضف دواء آخر" if lang=="ar" else "Add other"), callback_data="pat_med_other")])
+    btns.append([InlineKeyboardButton("✅ " + ("انتهيت" if lang=="ar" else "Done"), callback_data="pat_med_done")])
+    return InlineKeyboardMarkup(btns)
+
+async def show_meds_btns(msg, ctx, lang, edit=False):
+    selected = ctx.user_data["new_patient"].get("meds_list", [])
+    title = "💊 اختر الأدوية الثابتة:" if lang=="ar" else "💊 Select regular medications:"
+    if edit:
+        await msg.edit_text(title, reply_markup=get_meds_kb(selected, lang))
+    else:
+        await msg.reply_text(title, reply_markup=get_meds_kb(selected, lang))
+
+async def pat_meds(u, ctx):
+    lang = get_lang(ctx)
+    # إذا كان نص (دواء مخصص)
+    if u.message:
+        med = u.message.text.strip()
+        if med and med.lower() not in ["لا","no","none","-"]:
+            ctx.user_data["new_patient"].setdefault("meds_list", []).append(med)
+        await show_meds_btns(u.message, ctx, lang)
+        return STATE_PAT_MEDS
+    return STATE_PAT_MEDS
+
+async def pat_meds_cb(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    data = q.data.replace("pat_med_", "")
+
+    if data == "done":
+        meds = ctx.user_data["new_patient"].get("meds_list", [])
+        ctx.user_data["new_patient"]["meds"] = "، ".join(meds) if meds else ""
+        await q.message.edit_text("⚠️ " + ("حساسية من أدوية؟ (اكتب اسمها أو لا):" if lang=="ar" else "Drug allergies? (type name or none):"))
+        return STATE_PAT_ALLERGY
+
+    if data == "other":
+        await q.message.edit_text("💊 " + ("اكتب اسم الدواء:" if lang=="ar" else "Type medication name:"))
+        return STATE_PAT_MEDS
+
+    selected = ctx.user_data["new_patient"].setdefault("meds_list", [])
+    if data in selected:
+        selected.remove(data)
+    else:
+        selected.append(data)
+    await q.message.edit_reply_markup(reply_markup=get_meds_kb(selected, lang))
+    return STATE_PAT_MEDS
+
+async def pat_allergy(u, ctx):
+    lang = get_lang(ctx)
+    text = u.message.text.strip()
+    
+    # إذا كنا في وضع تسجيل القراءات
+    log_type = ctx.user_data.get("log_type","")
+    if log_type == "reading":
+        pid = ctx.user_data.get("log_pid","")
+        load_patients(ctx)
+        patients = ctx.user_data.get("patients",{})
+        p = patients.get(pid,{})
+        if p:
+            from datetime import datetime
+            date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            readings = p.setdefault("readings",[])
+            txt_lower = text.lower().strip()
+            
+            # نحدد النوع والقيمة
+            if txt_lower.startswith("صيام") or txt_lower.startswith("fasting"):
+                val = txt_lower.replace("صيام","").replace("fasting","").strip()
+                readings.append({"date":date,"sugar":float(val),"stype":"fasting","stype_ar":"صيام"})
+                msg = "✅ سكر صيام: " + val + " mg/dL"
+            elif txt_lower.startswith("بعد_اكل") or txt_lower.startswith("postmeal"):
+                val = txt_lower.replace("بعد_اكل","").replace("postmeal","").strip()
+                readings.append({"date":date,"sugar":float(val),"stype":"postmeal","stype_ar":"بعد الأكل"})
+                msg = "✅ سكر بعد الأكل: " + val + " mg/dL"
+            elif txt_lower.startswith("hba1c"):
+                val = txt_lower.replace("hba1c","").strip()
+                readings.append({"date":date,"sugar":float(val),"stype":"hba1c","stype_ar":"تراكمي HbA1c","unit":"%"})
+                msg = "✅ HbA1c: " + val + "%"
+            elif txt_lower.startswith("ضغط") or txt_lower.startswith("bp"):
+                val = txt_lower.replace("ضغط","").replace("bp","").strip()
+                parts = val.split("/")
+                readings.append({"date":date,"bp":val,"sys":int(parts[0]),"dia":int(parts[1])})
+                msg = "✅ ضغط: " + val
+            else:
+                try:
+                    val = float(txt_lower)
+                    readings.append({"date":date,"sugar":val,"stype":"random","stype_ar":"عشوائي"})
+                    msg = "✅ قراءة عشوائية: " + str(val) + " mg/dL"
+                except:
+                    await u.message.reply_text("❌ صيغة خاطئة — جرّب: صيام 95")
+                    return STATE_PAT_ALLERGY
+            
+            save_patients(ctx)
+            ctx.user_data.pop("log_type","")
+            await u.message.reply_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📊 " + ("عرض السجل" if lang=="ar" else "View Log"), callback_data="pat_log_" + pid)]]))
+            return STATE_PAT_MENU
+    
+    if log_type in ["sugar","bp"]:
+        pid = ctx.user_data.get("log_pid","")
+        load_patients(ctx)
+        patients = ctx.user_data.get("patients",{})
+        p = patients.get(pid,{})
+        if p:
+            from datetime import datetime
+            date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            readings = p.setdefault("readings",[])
+            if log_type == "sugar":
+                try:
+                    val = float(text)
+                    stype = ctx.user_data.pop("sugar_type","random")
+                    type_names = {"fasting":"صيام","postmeal":"بعد الأكل","random":"عشوائي","hba1c":"تراكمي HbA1c"}
+                    readings.append({"date":date,"sugar":val,"stype":stype,"stype_ar":type_names.get(stype,stype)})
+                    if stype_clean == "hba1c":
+                        if val < 5.7: status = "✅ طبيعي"
+                        elif val <= 6.4: status = "🟡 ما قبل السكري"
+                        elif val <= 7.0: status = "🟠 مضبوط"
+                        else: status = "🔴 مرتفع"
+                    else:
+                        if val < 70: status = "⚠️ منخفض"
+                        elif val <= 100: status = "✅ طبيعي"
+                        elif val <= 125: status = "🟡 ما قبل السكري"
+                        else: status = "🔴 مرتفع"
+                    msg = "✅ تم الحفظ\n🩸 " + str(val) + " mg/dL " + status
+                except:
+                    await u.message.reply_text("❌ أدخل رقماً")
+                    return STATE_PAT_ALLERGY
+            else:
+                try:
+                    parts = text.replace(" ","").split("/")
+                    readings.append({"date":date,"bp":text,"sys":int(parts[0]),"dia":int(parts[1])})
+                    msg = "✅ تم الحفظ\n💉 " + text
+                except:
+                    await u.message.reply_text("❌ صيغة خاطئة مثال: 120/80")
+                    return STATE_PAT_ALLERGY
+            save_patients(ctx)
+            ctx.user_data.pop("log_type","")
+            await u.message.reply_text(msg, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("📊 " + ("عرض السجل" if lang=="ar" else "View Log"), callback_data="pat_log_" + pid)]]))
+            return STATE_PAT_MENU
+    
+    allergy = text
+    ctx.user_data["new_patient"]["allergy"] = "" if allergy.lower() in ["لا","no","none","-"] else allergy
+    # نحفظ المريض
+    import time
+    pid = str(int(time.time()))
+    patients = ctx.user_data.setdefault("patients", {})
+    patients[pid] = ctx.user_data["new_patient"]
+    save_patients(ctx)
+    name = ctx.user_data["new_patient"]["name"]
+    await u.message.reply_text("✅ " + ("تم حفظ ملف " + name if lang=="ar" else "Patient " + name + " saved!"), reply_markup=kb_patient_menu(lang))
+    return STATE_PAT_MENU
+
+
+# ═══════════════ التفاعلات الدوائية ═══════════════
+DRUG_INTERACTIONS = {
+    # مضادات التخثر
+    ("warfarin","aspirin"): ("🔴 خطير", "زيادة خطر النزيف الشديد", "تجنب الجمع — استشر الطبيب فوراً"),
+    ("warfarin","ibuprofen"): ("🔴 خطير", "زيادة خطر النزيف", "تجنب — استخدم باراسيتامول بديلاً"),
+    ("warfarin","metronidazole"): ("🔴 خطير", "يرفع مستوى الوارفارين بشكل كبير", "راقب INR بشكل مكثف"),
+    ("warfarin","clarithromycin"): ("🔴 خطير", "يزيد تأثير الوارفارين", "راقب INR"),
+    ("warfarin","fluconazole"): ("🔴 خطير", "يرفع مستوى الوارفارين", "قلل الجرعة وراقب INR"),
+    # القلب
+    ("digoxin","amiodarone"): ("🔴 خطير", "يرفع مستوى الديجوكسين للضعف", "قلل جرعة الديجوكسين 50%"),
+    ("digoxin","clarithromycin"): ("🔴 خطير", "يرفع مستوى الديجوكسين", "راقب مستوى الديجوكسين"),
+    ("metoprolol","verapamil"): ("🔴 خطير", "خطر بطء القلب الشديد والانهيار", "تجنب الجمع"),
+    ("amiodarone","simvastatin"): ("🔴 خطير", "خطر تلف العضلات الشديد", "لا تتجاوز 20mg سيمفاستاتين"),
+    # الصرف
+    ("carbamazepine","warfarin"): ("🔴 خطير", "يقلل تأثير الوارفارين", "راقب INR وعدّل الجرعة"),
+    ("valproate","aspirin"): ("🟠 متوسط", "يرفع مستوى الفالبروات", "راقب الأعراض"),
+    ("phenytoin","fluconazole"): ("🔴 خطير", "يرفع مستوى الفينيتوين لمستويات سامة", "راقب مستوى الدم"),
+    # المضادات الحيوية
+    ("metronidazole","alcohol"): ("🔴 خطير", "تفاعل ديسولفيرام — غثيان وقيء شديد", "تجنب الكحول تماماً أثناء العلاج وبعده بيومين"),
+    ("ciprofloxacin","antacids"): ("🟠 متوسط", "يقلل امتصاص السيبروفلوكساسين", "خذ السيبرو قبل المضاد بساعتين"),
+    ("azithromycin","amiodarone"): ("🔴 خطير", "إطالة فترة QT وخطر اضطراب النظم", "تجنب الجمع"),
+    ("clarithromycin","simvastatin"): ("🔴 خطير", "خطر تلف العضلات الشديد", "أوقف السيمفاستاتين أثناء العلاج"),
+    ("rifampicin","warfarin"): ("🔴 خطير", "يقلل تأثير الوارفارين بشكل كبير", "رفع جرعة الوارفارين ومراقبة INR"),
+    ("rifampicin","oral_contraceptives"): ("🔴 خطير", "يقلل فاعلية حبوب منع الحمل", "استخدم وسيلة منع حمل إضافية"),
+    # مسكنات الألم
+    ("ibuprofen","aspirin"): ("🟠 متوسط", "يقلل تأثير الأسبرين الوقائي للقلب", "خذ الأسبرين قبل الإيبوبروفين بساعتين"),
+    ("ibuprofen","lisinopril"): ("🟠 متوسط", "يقلل فاعلية خافضات الضغط", "راقب ضغط الدم"),
+    ("ibuprofen","methotrexate"): ("🔴 خطير", "يرفع سمية الميثوتريكسات", "تجنب الجمع"),
+    ("tramadol","ssri"): ("🔴 خطير", "خطر متلازمة السيروتونين", "تجنب الجمع"),
+    ("tramadol","mao_inhibitors"): ("🔴 خطير", "تفاعل خطير جداً", "تجنب تماماً"),
+    # أدوية السكري
+    ("metformin","alcohol"): ("🟠 متوسط", "خطر حماض اللاكتات", "تجنب الكحول الزائد"),
+    ("glibenclamide","fluconazole"): ("🔴 خطير", "هبوط سكر حاد", "راقب السكر بشكل مكثف"),
+    ("insulin","alcohol"): ("🟠 متوسط", "يزيد خطر هبوط السكر", "راقب مستوى السكر"),
+    # ضغط الدم
+    ("lisinopril","potassium"): ("🟠 متوسط", "ارتفاع البوتاسيوم في الدم", "راقب مستوى البوتاسيوم"),
+    ("amlodipine","simvastatin"): ("🟠 متوسط", "يرفع مستوى السيمفاستاتين", "لا تتجاوز 20mg سيمفاستاتين"),
+    ("verapamil","simvastatin"): ("🔴 خطير", "خطر تلف العضلات", "تجنب أو قلل جرعة السيمفاستاتين"),
+    # مضادات الاكتئاب
+    ("fluoxetine","tramadol"): ("🔴 خطير", "متلازمة السيروتونين", "تجنب الجمع"),
+    ("sertraline","warfarin"): ("🟠 متوسط", "يزيد خطر النزيف", "راقب INR"),
+    ("mao_inhibitors","tyramine"): ("🔴 خطير", "أزمة ارتفاع ضغط", "تجنب الأطعمة الغنية بالتيرامين"),
+    # أدوية أخرى
+    ("sildenafil","nitrates"): ("🔴 خطير جداً", "انهيار ضغط الدم الحاد", "ممنوع منعاً باتاً"),
+    ("simvastatin","grapefruit"): ("🟠 متوسط", "يرفع مستوى السيمفاستاتين", "تجنب عصير الجريب فروت"),
+    ("levothyroxine","calcium"): ("🟠 متوسط", "يقلل امتصاص الليفوثيروكسين", "خذ الليفوثيروكسين قبل الكالسيوم بأربع ساعات"),
+    ("methotrexate","folic_acid"): ("🟢 مفيد", "يقلل آثار الميثوتريكسات الجانبية", "خذ حمض الفوليك في أيام مختلفة"),
+    ("omeprazole","clopidogrel"): ("🟠 متوسط", "يقلل فاعلية الكلوبيدوجريل", "استخدم بانتوبرازول بديلاً"),
+    ("ssri","nsaids"): ("🟠 متوسط", "يزيد خطر النزيف الهضمي", "استخدم واقي المعدة"),
+    ("lithium","ibuprofen"): ("🔴 خطير", "يرفع مستوى الليثيوم لمستويات سامة", "استخدم باراسيتامول بديلاً"),
+    ("theophylline","ciprofloxacin"): ("🔴 خطير", "يرفع مستوى الثيوفيلين", "قلل جرعة الثيوفيلين وراقبه"),
+    ("tacrolimus","clarithromycin"): ("🔴 خطير", "يرفع مستوى التاكروليموس", "راقب المستوى وعدّل الجرعة"),
+}
+
+def normalize_drug_name(name):
+    name = name.strip().lower()
+    aliases = {
+        "وارفارين":"warfarin","warfarin":"warfarin",
+        "أسبرين":"aspirin","aspirin":"aspirin","asprin":"aspirin",
+        "إيبوبروفين":"ibuprofen","ibuprofen":"ibuprofen","بروفين":"ibuprofen","نيوروفين":"ibuprofen",
+        "باراسيتامول":"paracetamol","paracetamol":"paracetamol","بنادول":"paracetamol",
+        "ميترونيدازول":"metronidazole","metronidazole":"metronidazole","فلاجيل":"metronidazole",
+        "أموكسيسيلين":"amoxicillin","amoxicillin":"amoxicillin",
+        "أزيثروميسين":"azithromycin","azithromycin":"azithromycin","زيثروماكس":"azithromycin",
+        "كلاريثروميسين":"clarithromycin","clarithromycin":"clarithromycin","كلاسيد":"clarithromycin",
+        "سيبروفلوكساسين":"ciprofloxacin","ciprofloxacin":"ciprofloxacin","سيبرو":"ciprofloxacin",
+        "ميتفورمين":"metformin","metformin":"metformin","جلوكوفاج":"metformin",
+        "أملودبين":"amlodipine","amlodipine":"amlodipine","نورفاسك":"amlodipine",
+        "ليزينوبريل":"lisinopril","lisinopril":"lisinopril",
+        "سيمفاستاتين":"simvastatin","simvastatin":"simvastatin","زوكور":"simvastatin",
+        "أتورفاستاتين":"atorvastatin","atorvastatin":"atorvastatin","ليبيتور":"atorvastatin",
+        "ديجوكسين":"digoxin","digoxin":"digoxin",
+        "أميودارون":"amiodarone","amiodarone":"amiodarone",
+        "فلوكونازول":"fluconazole","fluconazole":"fluconazole","ديفلوكان":"fluconazole",
+        "فينيتوين":"phenytoin","phenytoin":"phenytoin",
+        "كاربامازيبين":"carbamazepine","carbamazepine":"carbamazepine","تيجريتول":"carbamazepine",
+        "فالبروات":"valproate","valproate":"valproate","ديباكين":"valproate",
+        "ترامادول":"tramadol","tramadol":"tramadol","ترامال":"tramadol",
+        "فلوكستين":"fluoxetine","fluoxetine":"fluoxetine","بروزاك":"fluoxetine",
+        "سيرترالين":"sertraline","sertraline":"sertraline","زولوفت":"sertraline",
+        "سيلدينافيل":"sildenafil","sildenafil":"sildenafil","فياغرا":"sildenafil",
+        "نيترات":"nitrates","nitrates":"nitrates","نيتروجلسرين":"nitrates",
+        "كلوبيدوجريل":"clopidogrel","clopidogrel":"clopidogrel","بلافيكس":"clopidogrel",
+        "أوميبرازول":"omeprazole","omeprazole":"omeprazole","لوسك":"omeprazole",
+        "ليفوثيروكسين":"levothyroxine","levothyroxine":"levothyroxine","إلتروكسين":"levothyroxine",
+        "ميثوتريكسات":"methotrexate","methotrexate":"methotrexate",
+        "ريفامبيسين":"rifampicin","rifampicin":"rifampicin",
+        "ليثيوم":"lithium","lithium":"lithium",
+        "ثيوفيلين":"theophylline","theophylline":"theophylline",
+        "إنسولين":"insulin","insulin":"insulin",
+        "فيراباميل":"verapamil","verapamil":"verapamil",
+        "ميتوبرولول":"metoprolol","metoprolol":"metoprolol",
+        "ريفامبسين":"rifampicin",
+        "بوتاسيوم":"potassium","potassium":"potassium",
+        "كالسيوم":"calcium","calcium":"calcium",
+        "كحول":"alcohol","alcohol":"alcohol",
+        "جريب فروت":"grapefruit",
+        "وارفارين":"warfarin","اسبرين":"aspirin","أسبرين":"aspirin","جوسبرين":"aspirin","كومادين":"warfarin",
+        "باراسيتامول":"paracetamol","بنادول":"paracetamol","بندول":"paracetamol","أدول":"paracetamol","ادول":"paracetamol",
+        "ايبوبروفين":"ibuprofen","إيبوبروفين":"ibuprofen","بروفين":"ibuprofen","نوروفين":"ibuprofen",
+        "فولتارين":"diclofenac","ديكلوفيناك":"diclofenac","روفيناك":"diclofenac","كتفلام":"diclofenac",
+"grapefruit":"grapefruit",
+    }
+    return aliases.get(name, name)
+
+def check_interaction(drug1, drug2):
+    d1 = normalize_drug_name(drug1)
+    d2 = normalize_drug_name(drug2)
+    result = DRUG_INTERACTIONS.get((d1, d2)) or DRUG_INTERACTIONS.get((d2, d1))
+    return result
+
+async def interaction_start(u, ctx):
+    q = u.callback_query
+    await q.answer()
+    lang = get_lang(ctx)
+    if lang == "ar":
+        msg = (
+            "⚠️ *فاحص التعارضات والتداخلات الدوائية السريري* 💊\n\n"
+            "يمكنك كتابة الدواءين معاً في رسالة واحدة مثل:\n"
+            "▫️ `وارفارين + أسبرين`\n"
+            "▫️ `بنادول و بروفين`\n"
+            "▫️ `Metformin and Glimepiride`\n\n"
+            "أو اكتب الآن **اسم الدواء الأول**:"
+        )
+    else:
+        msg = (
+            "⚠️ *Clinical Drug Interactions Checker* 💊\n\n"
+            "You can enter both drugs in one message, e.g.:\n"
+            "▫️ `Warfarin + Aspirin`\n"
+            "▫️ `Panadol and Brufen`\n\n"
+            "Or enter the **first medicine name**:"
+        )
+    await q.message.edit_text(msg, parse_mode=ParseMode.MARKDOWN)
+    ctx.user_data["interaction_step"] = 1
+    return STATE_INTERACTION
+
+
+async def interaction_input(u, ctx):
+    lang = get_lang(ctx)
+    step = ctx.user_data.get("interaction_step", 1)
+    text = u.message.text.strip()
+
+    drug1, drug2 = None, None
+
+    # Support entering both drugs in one line separated by (+, and, و, مع, comma)
+    if step == 1:
+        delimiters = [" + ", "+", " and ", " AND ", " مع ", " و ", ", ", ","]
+        found_split = False
+        for d in delimiters:
+            if d in text:
+                parts = [p.strip() for p in text.split(d, 1) if p.strip()]
+                if len(parts) == 2:
+                    drug1, drug2 = parts[0], parts[1]
+                    found_split = True
+                    break
+        if not found_split:
+            ctx.user_data["drug1"] = text
+            ctx.user_data["interaction_step"] = 2
+            prompt_next = "💊 *اكتب الآن اسم الدواء الثاني المراد فحصه:*" if lang == "ar" else "💊 *Now enter the second medicine name:*"
+            await u.message.reply_text(prompt_next, parse_mode=ParseMode.MARKDOWN)
+            return STATE_INTERACTION
+    elif step == 2:
+        drug1 = ctx.user_data.get("drug1", "")
+        drug2 = text
+
+    thinking_msg = await u.message.reply_text(
+        "🔍 جارٍ فحص التداخلات والتعارضات سريرياً..." if lang == "ar" else "🔍 Analyzing clinical drug interactions..."
+    )
+
+    # 1. Quick Local Database Check
+    local_res = check_interaction(drug1, drug2)
+    if local_res:
+        severity, effect, advice = local_res
+        if lang == "ar":
+            msg = (
+                f"{severity} *تعارض وتداخل دوائي*\n\n"
+                f"💊 *الأدوية المفحوصة:* `{drug1}` + `{drug2}`\n\n"
+                f"⚡ *التأثير والمخاطر:* {effect}\n\n"
+                f"💡 *التوصية السريرية:* {advice}\n\n"
+                f"⚠️ _ملاحظة: استشر الطبيب أو الصيدلي دائماً قبل تعديل الجرعات._"
+            )
+        else:
+            msg = (
+                f"{severity} *Drug Interaction*\n\n"
+                f"💊 *Analyzed Drugs:* `{drug1}` + `{drug2}`\n\n"
+                f"⚡ *Clinical Effect:* {effect}\n\n"
+                f"💡 *Recommendation:* {advice}\n\n"
+                f"⚠️ _Always consult your doctor or pharmacist before changing medications._"
+            )
+    else:
+        # 2. Advanced Clinical AI Check
+        try:
+            if lang == "ar":
+                prompt = (
+                    f"أنت صيدلاني سريري واستشاري في علم الأدوية (Clinical Pharmacist).\n"
+                    f"قم بفحص وتقييم التداخل والتعارض الدوائي بدقة بالغة بين هذين الدوائين:\n"
+                    f"الدواء الأول: {drug1}\n"
+                    f"الدواء الثاني: {drug2}\n\n"
+                    f"قم بتحليل المواد الفعالة سواء كانت الأسماء المدخلة تجارية أو علمية.\n\n"
+                    f"أجب بدقة بالغة بالتنسيق التالي المحدد:\n"
+                    f"🔴 درجة الخطورة: [اختر بدقة: 🔴 خطير جداً (يحظر الجمع) / 🟠 متوسط الخطورة (يتطلب حذر ومراقبة) / 🟡 خفيف / 🟢 آمن (لا يوجد تعارض معروف)]\n\n"
+                    f"⚡ آلية التأثير والمخاطر: [اشرح بدقة ومباشرة ما يحدث عند تناولهما معاً مثل: زيادة خطر النزيف، هبوط الضغط، إطالة QT، انخفاض الفاعلية، إلخ]\n\n"
+                    f"💡 التوصية السريرية والبدائل: [توصية واضحة للطبيب أو المريض: هل يوقف أحدهما، هل يباعد بينهما بساعتين، ما هو البديل الآمن؟]\n\n"
+                    f"كن موجزاً، مباشراً، وطبياً موثوقاً دون مقدمات أو ختاميات إنشائية."
+                )
+            else:
+                prompt = (
+                    f"You are an expert Clinical Pharmacist.\n"
+                    f"Analyze the drug-drug interaction between:\n"
+                    f"Drug 1: {drug1}\n"
+                    f"Drug 2: {drug2}\n\n"
+                    f"Identify the active ingredients and evaluate both generic and brand names.\n\n"
+                    f"Respond strictly in this format:\n"
+                    f"🔴 Severity: [Choose one: 🔴 Severe / Contraindicated / 🟠 Moderate / Monitor Closely / 🟡 Minor / 🟢 Safe / No Known Interaction]\n\n"
+                    f"⚡ Clinical Mechanism & Risks: [Explain what happens physiologically]\n\n"
+                    f"💡 Clinical Recommendation & Safe Alternatives: [Actionable clinical guidance, timing separation, or safe substitutes]\n\n"
+                    f"Keep it concise, direct, and evidence-based."
+                )
+
+            key = ANTHROPIC_API_KEY.encode("ascii", errors="ignore").decode("ascii").strip() if ANTHROPIC_API_KEY else ""
+            async with httpx.AsyncClient(timeout=35, http2=False) as c:
+                r = await c.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": key,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json"
+                    },
+                    json={
+                        "model": "claude-haiku-4-5-20251001",
+                        "max_tokens": 800,
+                        "messages": [{"role": "user", "content": prompt}]
+                    }
+                )
+                if r.status_code == 200:
+                    ai_content = r.json().get("content", [{}])[0].get("text", "").strip()
+                    header = "⚠️ *تقرير التداخلات الدوائية السريري*" if lang == "ar" else "⚠️ *Clinical Interaction Report*"
+                    msg = f"{header}\n\n💊 `{drug1}` + `{drug2}`\n\n{ai_content}\n\n_⚠️ إخلاء مسؤولية: هذا الفحص للأغراض التثقيفية الطبية ولا يغني عن تقييم الطبيب المعالج._"
+                else:
+                    raise Exception(f"API status {r.status_code}")
+        except Exception as e:
+            logger.error(f"Interaction check error: {e}")
+            if lang == "ar":
+                msg = (
+                    f"⚠️ *تنبيه أمان:* تعذر فحص التداخل بين `{drug1}` و `{drug2}` في هذه اللحظة.\n\n"
+                    f"يرجى إعادة المحاولة أو استشارة الصيدلي مباشرة، وتجنب الجمع بين أدوية جديدة دون استشارة مختصة."
+                )
+            else:
+                msg = (
+                    f"⚠️ *Safety Alert:* Unable to verify interaction between `{drug1}` and `{drug2}` right now.\n\n"
+                    f"Please try again or consult a pharmacist before combining these medications."
+                )
+
+    try:
+        await thinking_msg.delete()
     except Exception:
         pass
 
-    print("✅ البوت متصل بتليجرام وجاهز لاستقبال الرسائل...")
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 " + ("فحص أدوية أخرى" if lang == "ar" else "Check Another"), callback_data="m_interaction")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    await u.message.reply_text(msg, reply_markup=btns, parse_mode=ParseMode.MARKDOWN)
+    ctx.user_data["interaction_step"] = 1
+    return STATE_MAIN_MENU
+
+
+
+async def ask_drug_form(u, ctx):
+    lang = get_lang(ctx)
+    if hasattr(u, "callback_query") and u.callback_query:
+        q = u.callback_query; await q.answer()
+        edit = q.message.edit_text
+    else:
+        edit = u.message.reply_text
+    
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🥄 " + ("شراب" if lang=="ar" else "Syrup"), callback_data="form_syrup"),
+         InlineKeyboardButton("💉 " + ("حقنة" if lang=="ar" else "Injection"), callback_data="form_injection")],
+        [InlineKeyboardButton("🧴 " + ("كريم/مرهم" if lang=="ar" else "Cream/Ointment"), callback_data="form_cream"),
+         InlineKeyboardButton("💧 " + ("قطرة" if lang=="ar" else "Drops"), callback_data="form_drops")],
+        [InlineKeyboardButton("🕯️ " + ("تحميلة" if lang=="ar" else "Suppository"), callback_data="form_suppository"),
+         InlineKeyboardButton("💊 " + ("أخرى" if lang=="ar" else "Other"), callback_data="form_other")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
+    ])
+    msg = "💊 اختر نوع الدواء:" if lang=="ar" else "💊 Select drug form:"
+    await edit(msg, reply_markup=btns)
+    return STATE_DRUG_FORM
+
+async def drug_form_selected(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    form = q.data.replace("form_", "")
+    ctx.user_data["drug_form"] = form
+    
+    form_names = {
+        "syrup": "شراب" if lang=="ar" else "Syrup",
+        "injection": "حقنة" if lang=="ar" else "Injection",
+        "cream": "كريم/مرهم" if lang=="ar" else "Cream/Ointment",
+        "drops": "قطرة" if lang=="ar" else "Drops",
+        "suppository": "تحميلة" if lang=="ar" else "Suppository",
+        "other": "أخرى" if lang=="ar" else "Other",
+    }
+    
+    if form == "injection":
+        msg = "💉 " + ("الحقن تستلزم وصفة طبية ومتابعة طبيب متخصص.\n\nلا يمكن إعطاء جرعات الحقن عبر البوت لأسباب سلامة المريض.\n\n🏥 يرجى مراجعة الطبيب أو الصيدلاني." if lang=="ar" else "Injections require a prescription and medical supervision.\n\nFor patient safety, injection doses cannot be provided via the bot.\n\n🏥 Please consult your doctor or pharmacist.")
+        await q.message.edit_text(msg, reply_markup=kb_back(lang))
+        return STATE_MAIN_MENU
+    elif form == "cream":
+        msg = "🧴 " + ("اكتب اسم الكريم أو أرسل صورة العبوة:" if lang=="ar" else "Enter cream name or send photo:")
+    elif form == "drops":
+        msg = "💧 " + ("اكتب اسم القطرة أو أرسل صورة العبوة:" if lang=="ar" else "Enter drops name or send photo:")
+    elif form == "suppository":
+        msg = "🕯️ " + ("اكتب اسم التحميلة أو أرسل صورة العبوة:" if lang=="ar" else "Enter suppository name or send photo:")
+    else:
+        msg = "💊 " + ("اكتب اسم الدواء أو أرسل صورة العبوة 📸" if lang=="ar" else "Enter drug name or send photo 📸")
+    
+    await q.message.edit_text(msg)
+    return STATE_CHILD_DRUG
+
+
+async def calc_special_form(drug_name, weight, drug_form, lang):
+    """يستخدم Claude API لحساب جرعة الحقن والكريم والقطرات والتحاميل"""
+    form_names = {
+        "injection": "حقنة IV/IM" if lang=="ar" else "IV/IM Injection",
+        "cream": "كريم/مرهم موضعي" if lang=="ar" else "Topical Cream/Ointment",
+        "drops": "قطرة عين/أنف/أذن" if lang=="ar" else "Eye/Nose/Ear Drops",
+        "suppository": "تحميلة شرجية" if lang=="ar" else "Rectal Suppository",
+    }
+    form_name = form_names.get(drug_form, drug_form)
+    
+    if lang == "ar":
+        prompt = f"""أنت صيدلاني خبير. احسب جرعة {form_name} لـ {drug_name} لطفل وزنه {weight} كغ.
+الجرعات المرجعية الصحيحة:
+- باراسيتامول: 15 مغ/كغ (تحميلة أو شراب)
+- إيبوبروفين: 10 مغ/كغ
+- ديكلوفيناك: 1 مغ/كغ
+- ديازيبام: 0.5 مغ/كغ
+لأي دواء آخر استخدم المرجع الطبي الصحيح.
+
+أجب بهذا التنسيق فقط:
+💊 الدواء: {drug_name}
+📋 النوع: {form_name}
+👶 العمر: {int(weight)} سنوات
+💉 الجرعة: [احسب بدقة حسب الوزن]
+🔁 التكرار: 
+⏱️ مدة العلاج: 
+⚠️ تحذير مهم: 
+
+مهم: احسب الجرعة حسب وزن {weight} كغ فقط. لا تذكر جرعة الشراب."""
+    else:
+        prompt = f"""You are an expert pharmacist. Calculate {form_name} dose for {drug_name} for a child weighing {weight} kg.
+Calculate accurately based on standard medical references (BNF, Pediatric Dosing). Use the standard therapeutic dose.
+
+Reply in this format only:
+💊 Drug: {drug_name}
+📋 Form: {form_name}
+⚖️ Weight: {weight} kg
+💉 Calculated dose: [calculate accurately based on weight]
+🔁 Frequency: 
+⏱️ Duration: 
+⚠️ Important warning: 
+
+Important: Calculate dose for {weight} kg only. Do not mention syrup dose."""
+
     try:
-        bot.infinity_polling(skip_pending=True)
+        async with httpx.AsyncClient(timeout=30, http2=False) as c:
+            r = await c.post("https://api.anthropic.com/v1/messages",
+                headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400,
+                    "messages": [{"role": "user", "content": prompt}]})
+            result = r.json().get("content", [{}])[0].get("text", "").strip()
+            if "غير معروف" in result or "unknown" in result.lower():
+                return None
+            return result
     except Exception as e:
-        if "409" in str(e) or "Conflict" in str(e):
-            print("\n" + "=" * 60)
-            print("ℹ️ تنبيه: هناك نسخة أخرى من البوت تعمل بالفعل على السيرفر السحابي (مثل Render).")
-            print("🚀 البوت يعمل 24/7 ويستقبل الرسائل على تليجرام بنجاح!")
-            print("💡 لتحديث النسخة على Render تلقائياً: نفذ git push origin main")
-            print("=" * 60 + "\n")
-            import time
-            while True:
-                time.sleep(60)
+        logger.error(f"Special form API error: {e}")
+        return None
+
+
+async def check_registration(u, ctx):
+    """يتحقق إذا المستخدم مسجل"""
+    uid = str(u.effective_user.id)
+    stats = load_stats()
+    users = stats.get("users", {})
+    return uid in users and users[uid].get("registered", False)
+
+async def show_registration(u, ctx, lang):
+    """يعرض شاشة التسجيل السريع"""
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("👨‍⚕️ " + ("طبيب" if lang=="ar" else "Doctor"), callback_data="reg_doctor"),
+         InlineKeyboardButton("💊 " + ("صيدلاني" if lang=="ar" else "Pharmacist"), callback_data="reg_pharmacist")],
+        [InlineKeyboardButton("👩 " + ("أم/أب" if lang=="ar" else "Parent"), callback_data="reg_parent"),
+         InlineKeyboardButton("🎓 " + ("طالب طب" if lang=="ar" else "Med Student"), callback_data="reg_student")],
+        [InlineKeyboardButton("👤 " + ("مستخدم عام" if lang=="ar" else "General User"), callback_data="reg_general")],
+    ])
+    msg = "👋 " + ("مرحباً! اختر نوع مستخدمك للبدء:" if lang=="ar" else "Welcome! Select your user type to start:")
+    if hasattr(u, "message") and u.message:
+        await u.message.reply_text(msg, reply_markup=btns)
+    else:
+        await u.callback_query.message.edit_text(msg, reply_markup=btns)
+
+async def reg_handler(u, ctx):
+    """يحفظ التسجيل ويكمل للقائمة الرئيسية"""
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    user = u.effective_user
+    uid = str(user.id)
+    
+    role_map = {
+        "reg_doctor": "طبيب" if lang=="ar" else "Doctor",
+        "reg_pharmacist": "صيدلاني" if lang=="ar" else "Pharmacist", 
+        "reg_parent": "أم/أب" if lang=="ar" else "Parent",
+        "reg_student": "طالب طب" if lang=="ar" else "Med Student",
+        "reg_general": "مستخدم عام" if lang=="ar" else "General User",
+    }
+    role = role_map.get(q.data, "عام")
+    
+    # نحفظ في الإحصائيات
+    stats = load_stats()
+    if "users" not in stats:
+        stats["users"] = {}
+    if uid not in stats["users"]:
+        stats["users"][uid] = 0
+    if isinstance(stats["users"][uid], int):
+        stats["users"][uid] = {"count": stats["users"][uid], "registered": True, "role": role, "name": user.first_name or ""}
+    else:
+        stats["users"][uid]["registered"] = True
+        stats["users"][uid]["role"] = role
+    save_stats(stats)
+    
+    ctx.user_data["reg_role"] = role
+    ctx.user_data["lang"] = "ar"
+    await q.message.edit_text("✅ ممتاز!\n\n📝 اكتب اسمك ودولتك في رسالة واحدة\nمثال: أحمد — السعودية")
+    return STATE_LANGUAGE
+
+
+async def pat_note_start(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    pid = q.data.replace("pat_note_", "")
+    ctx.user_data["note_pid"] = pid
+    await q.message.edit_text(
+        "📝 " + ("اكتب ملاحظتك أو أرسل صورة/ملف:" if lang=="ar" else "Write your note or send a photo/file:"),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+    return STATE_PAT_NOTE
+
+async def pat_note_save(u, ctx):
+    lang = get_lang(ctx)
+    
+    # تعديل بيانات المريض
+    edit_pid = ctx.user_data.get("edit_pid","")
+    edit_field = ctx.user_data.get("edit_field","")
+    if edit_pid and edit_field:
+        load_patients(ctx)
+        patients = ctx.user_data.get("patients",{})
+        p = patients.get(edit_pid,{})
+        if p:
+            val = u.message.text.strip()
+            if edit_field == "weight":
+                try: p["weight"] = float(val)
+                except: pass
+            elif edit_field == "age":
+                try: p["age"] = int(val)
+                except: p["age"] = val
+            elif ctx.user_data.get("edit_append") and edit_field in ["meds","diseases"]:
+                current = p.get(edit_field,"")
+                p[edit_field] = current + "، " + val if current else val
+                ctx.user_data.pop("edit_append","")
+            else:
+                p[edit_field] = val
+            save_patients(ctx)
+            ctx.user_data.pop("edit_pid","")
+            ctx.user_data.pop("edit_field","")
+            await u.message.reply_text("✅ " + ("تم التعديل!" if lang=="ar" else "Updated!"),
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("👤 " + ("عرض الملف" if lang=="ar" else "View File"), callback_data="pat_view_" + edit_pid)]]))
+            return STATE_PAT_MENU
+    
+    pid = ctx.user_data.get("note_pid", "")
+    if not pid:
+        return STATE_PAT_MENU
+    
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients", {})
+    p = patients.get(pid, {})
+    if not p:
+        return STATE_PAT_MENU
+    
+    notes = p.setdefault("notes", [])
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    
+    if u.message.photo:
+        # حفظ صورة
+        photo = u.message.photo[-1]
+        file_id = photo.file_id
+        caption = u.message.caption or ""
+        notes.append({"type": "photo", "file_id": file_id, "caption": caption, "date": timestamp})
+        msg = "✅ " + ("تم حفظ الصورة" if lang=="ar" else "Photo saved")
+    elif u.message.document:
+        # حفظ ملف
+        doc = u.message.document
+        file_id = doc.file_id
+        file_name = doc.file_name or "ملف"
+        notes.append({"type": "file", "file_id": file_id, "name": file_name, "date": timestamp})
+        msg = "✅ " + ("تم حفظ الملف: " + file_name if lang=="ar" else "File saved: " + file_name)
+    elif u.message.text:
+        # حفظ نص
+        notes.append({"type": "text", "content": u.message.text, "date": timestamp})
+        msg = "✅ " + ("تم حفظ الملاحظة" if lang=="ar" else "Note saved")
+    else:
+        msg = "❌ " + ("نوع غير مدعوم" if lang=="ar" else "Unsupported type")
+    
+    save_patients(ctx)
+    
+    # نعرض ملف المريض
+    lines = ["👤 *" + p.get("name","") + "*", ""]
+    if p.get("notes"):
+        lines.append("📝 " + ("الملاحظات:" if lang=="ar" else "Notes:"))
+        for n in p["notes"][-3:]:
+            if n["type"] == "text":
+                lines.append("  • " + n["date"] + ": " + n["content"][:50])
+            elif n["type"] == "photo":
+                lines.append("  • " + n["date"] + ": 📸 " + ("صورة" if lang=="ar" else "Photo"))
+            elif n["type"] == "file":
+                lines.append("  • " + n["date"] + ": 📄 " + n.get("name",""))
+    
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📝 " + ("إضافة ملاحظة أخرى" if lang=="ar" else "Add Another"), callback_data="pat_note_" + pid)],
+        [InlineKeyboardButton("📋 " + ("عرض كل الملاحظات" if lang=="ar" else "View All Notes"), callback_data="pat_viewnotes_" + pid)],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_list")]
+    ])
+    
+    await u.message.reply_text(msg + "\n\n" + "\n".join(lines), reply_markup=btns, parse_mode="Markdown")
+    return STATE_PAT_MENU
+
+async def pat_view_notes(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    pid = q.data.replace("pat_viewnotes_", "")
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients", {})
+    p = patients.get(pid, {})
+    notes = p.get("notes", [])
+    
+    if not notes:
+        await q.message.edit_text("📭 " + ("لا توجد ملاحظات" if lang=="ar" else "No notes"), 
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+        return STATE_PAT_MENU
+    
+    # نرسل كل ملاحظة
+    for n in notes:
+        if n["type"] == "text":
+            await u.effective_chat.send_message("📝 " + n["date"] + ":\n" + n["content"])
+        elif n["type"] == "photo":
+            try:
+                await u.effective_chat.send_photo(n["file_id"], caption="📸 " + n["date"] + ("\n" + n["caption"] if n.get("caption") else ""))
+            except: pass
+        elif n["type"] == "file":
+            try:
+                await u.effective_chat.send_document(n["file_id"], caption="📄 " + n["date"] + ": " + n.get("name",""))
+            except: pass
+    
+    await u.effective_chat.send_message("✅ " + ("انتهت الملاحظات" if lang=="ar" else "End of notes"),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]]))
+    return STATE_PAT_MENU
+
+
+async def pat_log_menu(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    pid = q.data.replace("pat_log_","")
+    ctx.user_data["log_pid"] = pid
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients",{})
+    p = patients.get(pid,{})
+    
+    # نعرض آخر القراءات
+    logs = p.get("readings", [])
+    lines = ["📊 *" + ("سجل " if lang=="ar" else "Log: ") + p.get("name","") + "*", ""]
+    
+    if logs:
+        for r in logs[-5:]:
+            date = r.get("date","")
+            if r.get("sugar"):
+                lines.append("🩸 " + date + ": سكر " + str(r["sugar"]) + " mg/dL")
+            if r.get("bp"):
+                lines.append("💉 " + date + ": ضغط " + str(r["bp"]))
+    else:
+        lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings yet"))
+    
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("➕ " + ("أضف قراءة" if lang=="ar" else "Add Reading"), callback_data="pat_addreading_" + pid)],
+        [InlineKeyboardButton("💉 " + ("سجل الضغط" if lang=="ar" else "BP Log"), callback_data="pat_viewbp_" + pid)],
+        [InlineKeyboardButton("🌅 " + ("سكر صيام" if lang=="ar" else "Fasting"), callback_data="pat_viewfasting_" + pid)],
+        [InlineKeyboardButton("🍽️ " + ("سكر بعد الأكل" if lang=="ar" else "Post-meal"), callback_data="pat_viewpostmeal_" + pid)],
+        [InlineKeyboardButton("📊 " + ("سكر تراكمي HbA1c" if lang=="ar" else "HbA1c"), callback_data="pat_viewhba1c_" + pid)],
+        [InlineKeyboardButton("🎲 " + ("سكر عشوائي" if lang=="ar" else "Random"), callback_data="pat_viewrandom_" + pid)],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_view_" + pid)]
+    ])
+    
+    await q.message.edit_text("\n".join(lines), reply_markup=btns, parse_mode="Markdown")
+    return STATE_PAT_MENU
+
+async def pat_add_reading(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    
+    if q.data.startswith("pat_viewfasting_") or q.data.startswith("pat_viewpostmeal_") or q.data.startswith("pat_viewhba1c_") or q.data.startswith("pat_viewrandom_"):
+        for prefix in ["pat_viewfasting_","pat_viewpostmeal_","pat_viewhba1c_","pat_viewrandom_"]:
+            if q.data.startswith(prefix):
+                pid = q.data.replace(prefix,"")
+                stype = prefix.replace("pat_view","").replace("_","")
+                break
+        p = patients.get(pid,{})
+        readings = p.get("readings",[])
+        
+        stype_map = {"fasting":"🌅 سكر الصيام","postmeal":"🍽️ سكر بعد الأكل","hba1c":"📊 HbA1c التراكمي","random":"🎲 عشوائي"}
+        unit_map = {"hba1c":"%","fasting":"mg/dL","postmeal":"mg/dL","random":"mg/dL"}
+        
+        filtered = [r for r in readings if r.get("sugar") and r.get("stype","random") == stype]
+        lines = [stype_map.get(stype,"📊") + " *" + p.get("name","") + "*",""]
+        
+        if filtered:
+            for i, r in enumerate(filtered[-10:]):
+                unit = unit_map.get(stype,"mg/dL")
+                lines.append(f"  {i+1}. {r['date'][:16]}: {r['sugar']} {unit}")
         else:
-            raise e
+            lines.append("📭 لا توجد قراءات")
+        
+        # أزرار حذف
+        del_btns = []
+        for i, r in enumerate(filtered[-5:]):
+            del_btns.append([InlineKeyboardButton(f"🗑️ {r['date'][:10]}: {r['sugar']}", callback_data=f"pat_delreading_{pid}_{r['date']}")])
+        del_btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)])
+        
+        await q.message.edit_text("\n".join(lines), reply_markup=InlineKeyboardMarkup(del_btns), parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_delreading_"):
+        parts = q.data.replace("pat_delreading_","").split("_",1)
+        pid = parts[0]
+        date_key = parts[1] if len(parts)>1 else ""
+        p = patients.get(pid,{})
+        before = len(p.get("readings",[]))
+        p["readings"] = [r for r in p.get("readings",[]) if r.get("date","") != date_key]
+        after = len(p.get("readings",[]))
+        save_patients(ctx)
+        await q.answer("✅ " + (f"تم حذف {before-after} قراءة" if lang=="ar" else f"Deleted {before-after} reading"))
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_viewsugar_"):
+        pid = q.data.replace("pat_viewsugar_","")
+        p = patients.get(pid,{})
+        readings = [r for r in p.get("readings",[]) if r.get("sugar")]
+        lines = ["🩸 *" + ("سجل السكر - " if lang=="ar" else "Sugar Log - ") + p.get("name","") + "*",""]
+        if readings:
+            for r in readings[-15:]:
+                val = r["sugar"]
+                if val < 70: status = "⚠️"
+                elif val <= 100: status = "✅"
+                elif val <= 125: status = "🟡"
+                else: status = "🔴"
+                lines.append(status + " " + r["date"] + ": " + str(val) + " mg/dL")
+        else:
+            lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"))
+        await q.message.edit_text("\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]),
+            parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+    if q.data.startswith("pat_viewbp_"):
+        pid = q.data.replace("pat_viewbp_","")
+        p = patients.get(pid,{})
+        readings = [r for r in p.get("readings",[]) if r.get("bp")]
+        lines = ["💉 *" + ("سجل الضغط - " if lang=="ar" else "BP Log - ") + p.get("name","") + "*",""]
+        if readings:
+            for r in readings[-15:]:
+                sys_val = r.get("sys",0)
+                if sys_val < 120: status = "✅"
+                elif sys_val < 130: status = "🟡"
+                elif sys_val < 140: status = "🟠"
+                else: status = "🔴"
+                lines.append(status + " " + r["date"] + ": " + str(r["bp"]))
+        else:
+            lines.append("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"))
+        await q.message.edit_text("\n".join(lines),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]),
+            parse_mode="Markdown")
+        return STATE_PAT_MENU
+
+
+    if q.data.startswith("pat_addsugar_"):
+        pid = q.data.replace("pat_addsugar_","")
+        ctx.user_data["log_pid"] = pid
+        ctx.user_data["log_type"] = "sugar"
+        btns = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🌅 " + ("صيام" if lang=="ar" else "Fasting"), callback_data="logsugar_fasting"),
+             InlineKeyboardButton("🍽️ " + ("بعد الأكل" if lang=="ar" else "Post-meal"), callback_data="logsugar_postmeal")],
+            [InlineKeyboardButton("📊 HbA1c", callback_data="logsugar_hba1c")],
+        ])
+        await q.message.edit_text("🩸 " + ("نوع قراءة السكر؟" if lang=="ar" else "Sugar reading type?"), reply_markup=btns)
+        return STATE_PAT_LOG
+    
+    elif q.data.startswith("pat_addbp_"):
+        pid = q.data.replace("pat_addbp_","")
+        ctx.user_data["log_pid"] = pid
+        ctx.user_data["log_type"] = "bp"
+        await q.message.edit_text("💉 اكتب مثال: ضغط 120/80")
+        return STATE_PAT_LOG
+    
+    elif q.data.startswith("logsugar_"):
+        ctx.user_data["sugar_log_type"] = q.data.replace("logsugar_","")
+        await q.message.edit_text("🩸 " + ("أدخل قراءة السكر (mg/dL):" if lang=="ar" else "Enter sugar value (mg/dL):"))
+        return STATE_PAT_LOG
+
+async def pat_save_reading(u, ctx):
+    lang = get_lang(ctx)
+    pid = ctx.user_data.get("log_pid","")
+    log_type = ctx.user_data.get("log_type","")
+    text = u.message.text.strip()
+    # نقرأ النوع من النص مباشرة
+    txt = text.strip()
+    stype_detected = "random"
+    val_text = txt
+    for kw, st in [("صيام ","fasting"),("صايم ","fasting"),("بعداكل ","postmeal"),
+                   ("بعد اكل ","postmeal"),("تراكمي ","hba1c"),("hba1c ","hba1c"),
+                   ("ضغط ","bp"),("عشوائي ","random")]:
+        if txt.lower().startswith(kw.lower()):
+            stype_detected = st
+            val_text = txt[len(kw):].strip()
+            break
+    
+    
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients",{})
+    p = patients.get(pid,{})
+    if not p: return STATE_PAT_MENU
+    
+    from datetime import datetime
+    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    readings = p.setdefault("readings",[])
+    
+    # نقرأ النوع من النص مباشرة
+    text_lower = text.strip().lower()
+    detected_stype = "random"
+    detected_val = text_lower
+    
+    type_keywords = {
+        "صيام": "fasting", "صايم": "fasting", "fasting": "fasting", "f ": "fasting",
+        "بعداكل": "postmeal", "بعد اكل": "postmeal", "postmeal": "postmeal", "p ": "postmeal",
+        "تراكمي": "hba1c", "hba1c": "hba1c", "h ": "hba1c",
+        "ضغط": "bp", "bp": "bp", "b ": "bp",
+        "عشوائي": "random", "random": "random", "r ": "random"
+    }
+    
+    for keyword, stype_val in type_keywords.items():
+        if text_lower.startswith(keyword):
+            detected_stype = stype_val
+            detected_val = text_lower.replace(keyword,"").strip().strip(":")
+            break
+    
+    if detected_stype == "bp" or (log_type == "bp" and "/"  in text):
+        # معالجة الضغط
+        try:
+            bp_text = detected_val if detected_val else text
+            parts_bp = bp_text.replace(" ","").split("/")
+            from datetime import datetime
+            date = datetime.now().strftime("%Y-%m-%d %H:%M")
+            load_patients(ctx)
+            patients = ctx.user_data.get("patients",{})
+            p2 = patients.get(pid,{})
+            if p2:
+                p2.setdefault("readings",[]).append({"date":date,"bp":bp_text,"sys":int(parts_bp[0]),"dia":int(parts_bp[1])})
+                save_patients(ctx)
+                await u.message.reply_text("✅ 💉 ضغط: " + bp_text,
+                    reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙", callback_data="pat_view_" + pid)]]))
+        except:
+            await u.message.reply_text("❌ صيغة خاطئة مثال: ضغط 120/80")
+            return STATE_PAT_LOG
+        return STATE_PAT_MENU
+
+    if log_type == "sugar" or detected_stype != "random":
+        try:
+            val = float(detected_val.replace(",",".") if detected_val else text.replace(",","."))
+            # نقرأ النوع من كل المصادر الممكنة
+            sugar_type = (ctx.user_data.get(f"stype_{pid}") or 
+                         ctx.user_data.get("sugar_type") or 
+                         ctx.user_data.get("sugar_type_confirmed") or 
+                         "random")
+            type_names = {
+                "fasting":"صيام","postmeal":"بعد الأكل",
+                "random":"عشوائي","hba1c":"تراكمي HbA1c"
+            }
+            stype_clean = sugar_type.replace("sugar_","")
+            readings.append({"date": date, "sugar": val, "stype": stype_clean, "stype_ar": type_names.get(sugar_type,"")})
+            
+            # تصنيف القراءة
+            if stype_clean == "hba1c" or val < 20:
+                if val < 5.7: status = "✅ طبيعي"
+                elif val <= 6.4: status = "🟡 ما قبل السكري"
+                elif val <= 7.0: status = "🟠 مضبوط"
+                else: status = "🔴 مرتفع"
+            elif stype_clean == "fasting":
+                if val < 70: status = "⚠️ منخفض"
+                elif val <= 100: status = "✅ طبيعي"
+                elif val <= 125: status = "🟡 ما قبل السكري"
+                else: status = "🔴 مرتفع"
+            else:
+                if val < 140: status = "✅ طبيعي"
+                elif val <= 199: status = "🟡 ما قبل السكري"
+                else: status = "🔴 مرتفع"
+            
+            msg = "✅ " + ("تم حفظ قراءة السكر\n🩸 " if lang=="ar" else "Sugar reading saved\n🩸 ") + str(val) + " mg/dL " + status
+        except:
+            await u.message.reply_text("❌ " + ("أدخل رقماً صحيحاً" if lang=="ar" else "Enter valid number"))
+            return STATE_PAT_LOG
+    
+    elif log_type == "bp":
+        try:
+            parts = text.replace(" ","").split("/")
+            sys_val = int(parts[0])
+            dia_val = int(parts[1])
+            readings.append({"date": date, "bp": text, "sys": sys_val, "dia": dia_val})
+            
+            if sys_val < 120 and dia_val < 80: status = "✅ طبيعي"
+            elif sys_val < 130: status = "🟡 مرتفع قليلاً"
+            elif sys_val < 140: status = "🟠 مرحلة 1"
+            else: status = "🔴 مرتفع"
+            
+            msg = "✅ " + ("تم حفظ قراءة الضغط\n💉 " if lang=="ar" else "BP saved\n💉 ") + text + " " + status
+        except:
+            await u.message.reply_text("❌ " + ("صيغة خاطئة، مثال: 120/80" if lang=="ar" else "Wrong format, e.g. 120/80"))
+            return STATE_PAT_LOG
+    
+    save_patients(ctx)
+    
+    btns = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📊 " + ("سجل القراءات" if lang=="ar" else "View Log"), callback_data="pat_log_" + pid)],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_view_" + pid)]
+    ])
+    await u.message.reply_text(msg, reply_markup=btns)
+    return STATE_PAT_MENU
+
+async def pat_view_log(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    pid = q.data.replace("pat_viewlog_","")
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients",{})
+    p = patients.get(pid,{})
+    readings = p.get("readings",[])
+    
+    if not readings:
+        await q.message.edit_text("📭 " + ("لا توجد قراءات" if lang=="ar" else "No readings"),
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]))
+        return STATE_PAT_MENU
+    
+    lines = ["📊 *" + ("كل القراءات - " if lang=="ar" else "All Readings - ") + p.get("name","") + "*", ""]
+    for r in readings[-20:]:
+        if r.get("sugar"):
+            lines.append("🩸 " + r["date"] + ": " + str(r["sugar"]) + " mg/dL")
+        if r.get("bp"):
+            lines.append("💉 " + r["date"] + ": " + str(r["bp"]))
+    
+    await q.message.edit_text("\n".join(lines),
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(tx("btn_back", lang), callback_data="pat_log_" + pid)]]),
+        parse_mode="Markdown")
+    return STATE_PAT_MENU
+
+async def rem_menu(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "back": return await go_back(u, ctx)
+    if q.data == "r_add":
+        await q.message.edit_text("📸 " + ("أرسل صورة الدواء أو اكتب اسمه:" if lang=="ar" else "Send medication photo or type its name:"), reply_markup=kb_back(lang))
+        return STATE_REM_ADD_NAME
+    if q.data == "r_list":
+        await q.message.edit_text(fmt_rems(get_rems(ctx), lang),
+            reply_markup=kb_remind(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_REM_MENU
+    if q.data in ("r_del", "r_edit"):
+        rems = get_rems(ctx)
+        if not rems:
+            await q.message.edit_text(tx("no_rems", lang), reply_markup=kb_remind(lang))
+            return STATE_REM_MENU
+        cb = "dr_" if q.data == "r_del" else "er_"
+        lbl = tx("sel_del", lang) if q.data == "r_del" else tx("sel_edit", lang)
+        btns = [[InlineKeyboardButton(
+            f"[{r['id']}] {r['drug']} {r['time']}", callback_data=f"{cb}{r['id']}")] for r in rems]
+        btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="r_back")])
+        await q.message.edit_text(lbl, reply_markup=InlineKeyboardMarkup(btns))
+        return STATE_REM_EDIT_SEL if q.data == "r_edit" else STATE_REM_MENU
+    if q.data.startswith("dr_"):
+        rid = int(q.data[3:])
+        uid = u.effective_user.id
+        rems = get_rems(ctx)
+        ok = False
+        for i, r in enumerate(rems):
+            if r["id"] == rid:
+                rems.pop(i)
+                ok = True
+                # نلغي الـ job من job_queue
+                try:
+                    drug_name = r.get("drug","")
+                    for job in ctx.application.job_queue.jobs():
+                        if str(uid) in job.name and drug_name in job.name:
+                            job.schedule_removal()
+                except: pass
+                break
+        if ok: save_rems(ctx)
+        await q.message.edit_text(tx("rem_deleted" if ok else "rem_not_found", lang), reply_markup=kb_remind(lang))
+        return STATE_REM_MENU
+    if q.data == "r_back":
+        await q.message.edit_text(tx("rem_menu", lang), reply_markup=kb_remind(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_REM_MENU
+    return STATE_REM_MENU
+
+
+async def _rem_show_patients(msg_obj, ctx, lang):
+    load_patients(ctx)
+    patients = ctx.user_data.get("patients", {})
+    if patients:
+        btns = []
+        for pid, p in list(patients.items())[:8]:
+            name = p.get("name","")
+            if name:
+                btns.append([InlineKeyboardButton("👤 " + name, callback_data="rem_pat_" + pid)])
+        btns.append([InlineKeyboardButton("👤 " + ("شخص آخر" if lang=="ar" else "Other"), callback_data="rem_pat_none")])
+        btns.append([InlineKeyboardButton(tx("btn_back", lang), callback_data="back")])
+        await msg_obj.reply_text("👤 " + ("لمن هذا الدواء؟" if lang=="ar" else "Who is this for?"), reply_markup=InlineKeyboardMarkup(btns))
+    else:
+        await msg_obj.reply_text(tx("rem_time", lang), reply_markup=kb_back(lang))
+
+
+async def rem_photo_receive(u, ctx):
+    lang = get_lang(ctx)
+    if u.message.photo:
+        file_id = u.message.photo[-1].file_id
+        ctx.user_data["nr_photo"] = file_id
+        ctx.user_data["nr_drug"] = ("دواء من صورة" if lang=="ar" else "Medication from photo")
+        await u.message.reply_text("✅ " + ("تم حفظ الصورة!" if lang=="ar" else "Photo saved!"))
+    await _rem_show_patients(u.message, ctx, lang)
+    return STATE_REM_ADD_TIME
+
+async def rem_add_name(u, ctx):
+    lang = get_lang(ctx)
+    ctx.user_data["uid"] = str(u.effective_user.id)
+    ctx.user_data["nr_drug"] = u.message.text.strip()
+    ctx.user_data.pop("nr_photo", None)
+    await _rem_show_patients(u.message, ctx, lang)
+    return STATE_REM_ADD_TIME
+
+async def rem_pat_select(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    
+    if q.data == "rem_pat_none":
+        ctx.user_data.pop("nr_patient", None)
+    else:
+        pid = q.data.replace("rem_pat_", "")
+        load_patients(ctx)
+        patients = ctx.user_data.get("patients", {})
+        pat_name = patients.get(pid, {}).get("name", "")
+        ctx.user_data["nr_patient"] = pat_name
+    
+    await q.message.edit_text(tx("rem_time", lang), reply_markup=kb_back(lang))
+    return STATE_REM_ADD_TIME
+
+async def rem_add_time(u, ctx):
+    lang = get_lang(ctx)
+    t = u.message.text.strip()
+    if not re.match(r"^\d{1,2}:\d{2}$", t):
+        await u.message.reply_text(tx("bad_time", lang), reply_markup=kb_back(lang))
+        return STATE_REM_ADD_TIME
+    try:
+        h, m = map(int, t.split(":"))
+        if not (0 <= h <= 23 and 0 <= m <= 59): raise ValueError
+        ctx.user_data["nr_time"] = f"{h:02d}:{m:02d}"
+    except:
+        await u.message.reply_text(tx("bad_time", lang), reply_markup=kb_back(lang))
+        return STATE_REM_ADD_TIME
+    await u.message.reply_text(tx("rem_freq", lang), reply_markup=kb_back(lang))
+    return STATE_REM_ADD_FREQ
+
+async def rem_add_freq(u, ctx):
+    lang = get_lang(ctx)
+    try:
+        track(u, "reminders")
+    except: pass
+    try:
+        f = int(u.message.text.strip())
+        if not 1 <= f <= 6: raise ValueError
+    except:
+        await u.message.reply_text(tx("bad_freq", lang), reply_markup=kb_back(lang))
+        return STATE_REM_ADD_FREQ
+    ctx.user_data["nr_freq"] = f
+    # نحفظ مباشرة
+    drug = ctx.user_data.get("nr_drug", "?")
+    time_s = ctx.user_data.get("nr_time", "08:00")
+    f = ctx.user_data.get("nr_freq", 1)
+    rems = get_rems(ctx)
+    pat_name_rem = ctx.user_data.pop("nr_patient", "")
+    import time as _time
+    rem_entry = {"id": int(_time.time()), "drug": drug, "time": time_s, "freq": f, "photo": ctx.user_data.get("nr_photo")}
+    if pat_name_rem:
+        rem_entry["patient"] = pat_name_rem
+    rems.append(rem_entry)
+    save_rems(ctx)
+    sched(ctx.application, u.effective_chat.id, drug, time_s, f, lang, ctx.user_data.get("timezone", "Asia/Riyadh"), photo=ctx.user_data.get("nr_photo"))
+    msg = "✅ " + drug + " - " + time_s + " - " + str(f) + ("x/يوم" if lang=="ar" else "x/day")
+    await u.message.reply_text(msg, reply_markup=kb_remind(lang))
+    return STATE_REM_MENU
+
+async def rem_edit_sel(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "r_back":
+        await q.message.edit_text(tx("rem_menu", lang), reply_markup=kb_remind(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_REM_MENU
+    if q.data.startswith("er_"):
+        ctx.user_data["edit_id"] = int(q.data[3:])
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(tx("ef_name", lang), callback_data="ef_drug")],
+            [InlineKeyboardButton(tx("ef_time", lang), callback_data="ef_time")],
+            [InlineKeyboardButton(tx("ef_freq", lang), callback_data="ef_freq")],
+            [InlineKeyboardButton(tx("btn_back", lang), callback_data="r_back")]])
+        await q.message.edit_text(tx("edit_fields", lang), reply_markup=kb)
+        return STATE_REM_EDIT_FIELD
+    return STATE_REM_EDIT_SEL
+
+async def rem_edit_field(u, ctx):
+    q = u.callback_query; await q.answer()
+    lang = get_lang(ctx)
+    if q.data == "r_back":
+        await q.message.edit_text(tx("rem_menu", lang), reply_markup=kb_remind(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_REM_MENU
+    fmap = {"ef_drug": "drug", "ef_time": "time", "ef_freq": "freq"}
+    if q.data in fmap:
+        ctx.user_data["edit_field"] = fmap[q.data]
+        await q.message.edit_text(tx("new_val", lang), reply_markup=kb_back(lang))
+        return STATE_REM_EDIT_VAL
+    return STATE_REM_EDIT_FIELD
+
+async def rem_edit_val(u, ctx):
+    lang = get_lang(ctx)
+    val = u.message.text.strip()
+    rid = ctx.user_data.get("edit_id")
+    field = ctx.user_data.get("edit_field", "")
+    for r in get_rems(ctx):
+        if r["id"] == rid:
+            if field == "drug":
+                r["drug"] = val
+            elif field == "time":
+                if not re.match(r"^\d{1,2}:\d{2}$", val):
+                    await u.message.reply_text(tx("bad_time", lang))
+                    return STATE_REM_EDIT_VAL
+                r["time"] = val
+            elif field == "freq":
+                try:
+                    f = int(val)
+                    if not 1 <= f <= 6: raise ValueError
+                    r["freq"] = f
+                except:
+                    await u.message.reply_text(tx("bad_freq", lang))
+                    return STATE_REM_EDIT_VAL
+            break
+    save_rems(ctx)
+    # نعيد جدولة التذكير بالوقت الجديد
+    for r in get_rems(ctx):
+        if r["id"] == rid:
+            try:
+                # نحذف كل jobs المرتبطة بهذا التذكير
+                drug_name = r.get("drug","")
+                uid = str(u.effective_user.id)
+                for job in ctx.application.job_queue.jobs():
+                    if ("rem_" + uid in job.name or "snooze_" + uid in job.name) and drug_name in job.name:
+                        job.schedule_removal()
+                        logger.warning(f"🗑️ Removed job: {job.name}")
+                # نضيف جدولة جديدة
+                sched(ctx.application, u.effective_chat.id, r["drug"], r["time"], r["freq"], lang, 
+                      ctx.user_data.get("timezone","Asia/Riyadh"), photo=r.get("photo"))
+            except Exception as e:
+                logger.error(f"resched error: {e}")
+            break
+    await u.message.reply_text(tx("rem_updated", lang), reply_markup=kb_remind(lang))
+    return STATE_REM_MENU
+
+async def fallback(u, ctx):
+    # تجاهل callbacks فقط
+    if u.callback_query:
+        return None
+    # لا نتدخل في النصوص - نتركها للـ handlers
+    return None
+
+
+async def activate_cmd(u, ctx):
+    """أمر الأدمن لتفعيل الاشتراك"""
+    if u.effective_user.id != 6298206492:
+        return
+    try:
+        args = ctx.args
+        if len(args) < 2:
+            await u.message.reply_text("استخدم: /activate uid plan\nمثال: /activate 123456 1m")
+            return
+        uid = args[0]
+        plan = args[1]
+        from datetime import datetime, timedelta
+        days = {"1m": 30, "3m": 90, "6m": 180, "1y": 365}
+        prices = {"1m": 6.99, "3m": 6.99, "6m": 11.99, "1y": 7.99}
+        d = days.get(plan, 30)
+        price = prices.get(plan, 1.99)
+        end_date = (datetime.now() + timedelta(days=d)).strftime("%Y-%m-%d")
+        if supabase_client:
+            supabase_client.table("subscriptions").upsert({
+                "uid": uid, "plan": plan, "start_date": datetime.now().strftime("%Y-%m-%d"),
+                "end_date": end_date, "amount": price, "status": "active"
+            }).execute()
+        await u.message.reply_text(f"✅ تم تفعيل اشتراك {plan} للمستخدم {uid} حتى {end_date}")
+        # نُبلغ المستخدم
+        try:
+            await ctx.bot.send_message(int(uid), "🎉 تم تفعيل اشتراكك! شكراً لك 💊")
+        except: pass
+    except Exception as e:
+        await u.message.reply_text(f"❌ خطأ: {e}")
+
+async def stats_cmd(u, ctx):
+    stats = load_stats()
+    users_dict = stats.get("users", {})
+    users = len(users_dict)
+    searches = stats.get("searches", 0)
+    child = stats.get("child_doses", 0)
+    rems = stats.get("reminders", 0)
+    total = stats.get("total_requests", 0)
+    drugs = len(DRUGS_DB)
+    images = stats.get("image_search", 0)
+    bmi = stats.get("bmi", 0)
+    cal = stats.get("calories", 0)
+    sugar = stats.get("sugar", 0)
+    bp = stats.get("bp", 0)
+    premium = stats.get("premium", 0)
+    # أكثر المستخدمين نشاطاً
+    top_users = sorted(users_dict.items(), key=lambda x: x[1].get("count",0) if isinstance(x[1],dict) else x[1], reverse=True)[:3]
+    lang = get_lang(ctx)
+    if lang == "ar":
+        lines = [
+            "📊 *إحصائيات البوت التفصيلية*", "",
+            "👥 *المستخدمون:*",
+            "  • إجمالي المستخدمين: *" + str(users) + "*",
+            "  • المشتركون المميزون: *" + str(premium) + "*", "",
+            "🔧 *استخدام الميزات:*",
+            "  • 🔍 البحث عن دواء: *" + str(searches) + "*",
+            "  • 🍼 جرعات الأطفال: *" + str(child) + "*",
+            "  • 📸 قراءة الصور: *" + str(images) + "*",
+            "  • ⏰ التذكيرات: *" + str(rems) + "*",
+            "  • 📊 BMI: *" + str(bmi) + "*",
+            "  • 🔥 السعرات: *" + str(cal) + "*",
+            "  • 🩸 السكر: *" + str(sugar) + "*",
+            "  • 💉 الضغط: *" + str(bp) + "*", "",
+            "📈 *الإجمالي:*",
+            "  • طلبات: *" + str(total) + "*",
+            "  • أدوية: *" + str(drugs) + "*",
+        ]
+        if top_users:
+            lines += ["", "🏆 *أكثر المستخدمين نشاطاً:*"]
+            for i, (uid, count) in enumerate(top_users, 1):
+                lines.append("  " + str(i) + ". ID:" + str(uid) + " — " + str(count) + " طلب")
+        msg = "\n".join(lines)
+    else:
+        lines = [
+            "📊 *Bot Statistics*", "",
+            f"👥 Users: *{users}*",
+            f"💊 Drugs in DB: *{drugs}*",
+            f"🔍 Drug Searches: *{searches}*",
+            f"🍼 Child Doses: *{child}*",
+            f"⏰ Reminders Added: *{rems}*",
+            f"📈 Total Requests: *{total}*",
+        ]
+        msg = "\n".join(lines)
+    await u.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
+async def cmd_pregnancy(u, ctx):
+    """فتح قسم رعاية الحامل مباشرة عبر الأمر /pregnancy"""
+    lang = get_lang(ctx)
+    txt = (
+        "🤰 *جناح رعاية ومتابعة صحة الحامل السريري (Dose Maternal Care)*\n\n"
+        "مرحباً بكِ في القسم المتخصص لطب التوليد ورعاية الأم والجنين المبني على المعايير السريرية العالمية (ACOG / ADA / WHO).\n\n"
+        "👇 *اختر الأداة السريرية المطلوبة:*"
+    ) if lang == "ar" else (
+        "🤰 *Clinical Maternal & Obstetric Care Suite*\n\n"
+        "Evidence-based prenatal care and maternal guidance based on ACOG / ADA standards.\n\n"
+        "👇 *Select a clinical module:*"
+    )
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 " + ("حاسبة الحمل وموعد الولادة (EDD)" if lang=="ar" else "Gestational Age & EDD Calculator"), callback_data="preg_calc")],
+        [InlineKeyboardButton("🩸 " + ("سكر الحمل السريري (GDM Target)" if lang=="ar" else "Gestational Diabetes Targets"), callback_data="preg_sugar"),
+         InlineKeyboardButton("🩺 " + ("ضغط الدم وتسمم الحمل" if lang=="ar" else "Blood Pressure & Pre-eclampsia"), callback_data="preg_bp")],
+        [InlineKeyboardButton("⚖️ " + ("الوزن المثالي والزيادة الآمنة" if lang=="ar" else "Gestational Weight Gain"), callback_data="preg_weight"),
+         InlineKeyboardButton("💊 " + ("أمان الأدوية للحامل (FDA)" if lang=="ar" else "FDA Drug Safety"), callback_data="preg_drugs")],
+        [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
+         InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
+        [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
+        [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+        [InlineKeyboardButton("🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="back")]
+    ])
+    await u.message.reply_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    return STATE_MAIN_MENU
+
+def build_conv():
+    return ConversationHandler(
+        entry_points=[
+            CommandHandler("start", start),
+            CommandHandler("pregnancy", cmd_pregnancy),
+        ],
+        states={
+            STATE_CAL_GENDER: [
+                CallbackQueryHandler(cal_gender, pattern="^(cal_|back)")],
+            STATE_CAL_AGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cal_age)],
+            STATE_CAL_WEIGHT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cal_weight)],
+            STATE_CAL_HEIGHT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, cal_height)],
+            STATE_CAL_ACTIVITY: [
+                CallbackQueryHandler(cal_activity, pattern="^act_")],
+            STATE_CAL_DISEASE: [
+                CallbackQueryHandler(cal_disease, pattern="^dis_")],
+            STATE_DIET: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(main_cb, pattern="^m_diet$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, diet_search)],
+            STATE_FOOD_SEARCH: [
+                CallbackQueryHandler(main_cb, pattern="^m_food$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, food_search)],
+            STATE_INTERACTION: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(interaction_start, pattern="^m_interaction$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, interaction_input)],
+            STATE_PAT_LOG: [
+                CallbackQueryHandler(pat_add_reading, pattern="^(pat_addsugar_|pat_addbp_|logsugar_)"),
+                CallbackQueryHandler(pat_view_log, pattern="^pat_viewlog_"),
+                CallbackQueryHandler(patient_menu, pattern="^pat_log_"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_save_reading)],
+            STATE_PAT_NOTE: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_note_save),
+                MessageHandler(filters.PHOTO, pat_note_save),
+                MessageHandler(filters.Document.ALL, pat_note_save)],
+            STATE_PAT_MENU: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(pat_log_menu, pattern="^pat_log_"),
+                CallbackQueryHandler(patient_menu, pattern="^sugtype_"),
+                CallbackQueryHandler(patient_menu, pattern="^pat_edit_"),
+                CallbackQueryHandler(patient_menu, pattern="^patedit_"),
+                CallbackQueryHandler(patient_menu, pattern="^pattoggle_"),
+                CallbackQueryHandler(patient_menu, pattern="^patdel_"),
+                CallbackQueryHandler(patient_menu, pattern="^patadd_"),
+                CallbackQueryHandler(pat_add_reading, pattern="^(pat_addsugar_|pat_addbp_)"),
+                CallbackQueryHandler(pat_note_start, pattern="^pat_note_"),
+                CallbackQueryHandler(pat_view_notes, pattern="^pat_viewnotes_"),
+                CallbackQueryHandler(patient_menu, pattern="^pat_"),
+                CallbackQueryHandler(patient_menu, pattern="^pr__")],
+            STATE_PAT_NAME: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_name)],
+            STATE_PAT_GENDER: [
+                CallbackQueryHandler(pat_gender, pattern="^pat_gender_")],
+            STATE_PAT_AGE: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_age)],
+            STATE_PAT_WEIGHT: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_weight)],
+            STATE_PAT_DISEASE: [
+                CallbackQueryHandler(pat_disease, pattern="^pat_dis_")],
+            STATE_PAT_MEDS: [
+                CallbackQueryHandler(pat_meds_cb, pattern="^pat_med_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_meds)],
+            STATE_PAT_ALLERGY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, pat_allergy)],
+            STATE_SUGAR: [
+                CallbackQueryHandler(sugar_get_type, pattern="^sug_"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, sugar_get_value)],
+            STATE_BP_AGE: [
+                CallbackQueryHandler(bp_age_btn, pattern="^bp_age_"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, bp_age)],
+            STATE_BP: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, bp_result)],
+            STATE_INFECTION_SITE: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(infection_site, pattern="^site_")],
+
+            STATE_COUNTRY: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, set_country)],
+            STATE_LANGUAGE: [
+                CallbackQueryHandler(pick_lang, pattern="^lang_"),
+],
+            STATE_MAIN_MENU: [
+
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(go_main_menu, pattern="^main_menu_now$"),
+                CallbackQueryHandler(sub_select, pattern="^sub_"),
+                CallbackQueryHandler(reg_handler, pattern="^reg_"),
+                CallbackQueryHandler(handle_m_bp, pattern="^m_bp$"),
+                CallbackQueryHandler(main_cb, pattern="^.*$"),
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$")],
+            STATE_BMI_WEIGHT: [
+                CallbackQueryHandler(bmi_cb, pattern="^bmi_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, bmi_text)],
+            STATE_BMI_DRUG: [
+                CallbackQueryHandler(bmi_cb, pattern="^bmi_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, bmi_text)],
+            STATE_XRAY: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.PHOTO, xray_photo_handler)],
+            STATE_LAB: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.PHOTO, lab_photo_handler)],
+            STATE_DRUG_SEARCH: [
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(handle_m_search, pattern="^m_search$"),
+                CallbackQueryHandler(handle_m_search_new, pattern="^m_search_new$"),
+                CallbackQueryHandler(drug_sel, pattern="^ds_"),
+                MessageHandler(filters.PHOTO, drug_search_image),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, drug_search)],
+            STATE_DRUG_FORM: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(drug_form_selected, pattern="^form_")],
+            STATE_CHILD_DRUG: [
+                CallbackQueryHandler(main_cb, pattern="^m_child$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$"),
+                CallbackQueryHandler(child_sel, pattern="^cs_"),
+                MessageHandler(filters.PHOTO, child_input),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, child_input)],
+            STATE_CHILD_WEIGHT: [
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$"),
+                CallbackQueryHandler(retry_photo, pattern="^retry_photo$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, child_weight)],
+            STATE_CHILD_CONC: [
+                CallbackQueryHandler(main_cb, pattern="^m_child$"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(child_conc, pattern="^conc_"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, child_conc)],
+            STATE_REM_MENU: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                CallbackQueryHandler(rem_menu)],
+            STATE_REM_ADD_NAME: [
+                CallbackQueryHandler(rem_pat_select, pattern="^rem_pat_"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.PHOTO, rem_photo_receive),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, rem_add_name)],
+            STATE_REM_ADD_TIME: [
+                CallbackQueryHandler(rem_pat_select, pattern="^rem_pat_"),
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, rem_add_time)],
+            STATE_REM_ADD_FREQ: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, rem_add_freq)],
+            STATE_REM_EDIT_SEL: [
+                CallbackQueryHandler(rem_edit_sel)],
+            STATE_REM_EDIT_FIELD: [
+                CallbackQueryHandler(rem_edit_field)],
+            STATE_REM_EDIT_VAL: [
+                CallbackQueryHandler(go_back, pattern="^back$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, rem_edit_val)],
+        },
+        fallbacks=[
+            CallbackQueryHandler(retry_photo, pattern="^retry_photo$"),
+            CommandHandler("start", start),
+            CommandHandler("stats", stats_cmd),
+            MessageHandler(filters.ALL, fallback)],
+        allow_reentry=True,
+        per_user=True,
+        per_chat=True)
+
+
+async def fix_doses_cmd(u, ctx):
+    """أمر للأدمن لإصلاح الجرعات من Claude API"""
+    if str(u.effective_user.id) != "6298206492":
+        return
+    
+    import json
+    with open("drugs.json", encoding="utf-8") as f:
+        drugs = json.load(f)
+    
+    await u.message.reply_text("🔍 جارٍ فحص الجرعات...")
+    fixed = 0
+    
+    for d in drugs:
+        name_en = d.get("name_en","")
+        name_ar = d.get("name_ar","")
+        
+        # نتخطى الأدوية ذات الجرعات الثابتة الصحيحة
+        if d.get("fixed_dose") and d.get("age_doses"):
+            continue
+        
+        # نتخطى الأدوية التي لديها جرعات صحيحة
+        mn = d.get("pediatric_min_mg_per_kg", 0)
+        mx = d.get("pediatric_max_mg_per_kg", 0)
+        if mn and mx and float(str(mn)) < 100 and float(str(mx)) < 100:
+            continue
+        
+        # نطلب الجرعة الصحيحة من Claude
+        try:
+            async with httpx.AsyncClient(timeout=20, http2=False) as hc:
+                prompt = f"""What is the correct pediatric oral syrup dose for {name_en}?
+Reply ONLY in this format:
+min_mg_per_kg: [number]
+max_mg_per_kg: [number]
+concentration: [e.g. 125mg/5ml]
+frequency: [e.g. 3 times daily]
+If not available as syrup write: NOT_SYRUP"""
+                
+                r = await hc.post("https://api.anthropic.com/v1/messages",
+                    headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+                    json={"model": "claude-haiku-4-5-20251001", "max_tokens": 100,
+                        "messages": [{"role": "user", "content": prompt}]})
+                result = r.json().get("content", [{}])[0].get("text","").strip()
+                
+                if "NOT_SYRUP" in result:
+                    d["not_syrup"] = True
+                    continue
+                
+                lines = result.split("\n")
+                for line in lines:
+                    if "min_mg_per_kg:" in line:
+                        val = line.split(":")[1].strip()
+                        try: d["pediatric_min_mg_per_kg"] = float(val)
+                        except: pass
+                    if "max_mg_per_kg:" in line:
+                        val = line.split(":")[1].strip()
+                        try: d["pediatric_max_mg_per_kg"] = float(val)
+                        except: pass
+                    if "concentration:" in line:
+                        val = line.split(":")[1].strip()
+                        if val and val != "N/A":
+                            d["concentration"] = val
+                    if "frequency:" in line:
+                        val = line.split(":")[1].strip()
+                        if val:
+                            d["pediatric_frequency_en"] = val
+                
+                fixed += 1
+                
+        except Exception as e:
+            logger.error(f"fix_doses: {name_en}: {e}")
+    
+    with open("drugs.json", "w", encoding="utf-8") as f:
+        json.dump(drugs, f, ensure_ascii=False, indent=2)
+    
+    await u.message.reply_text(f"✅ تم إصلاح {fixed} دواء!")
+
+async def restore_reminders(app):
+    """إعادة جدولة التذكيرات عند بدء التشغيل"""
+    # نحذف كل jobs القديمة أولاً
+    if app.job_queue is None:
+        logger.warning("JobQueue غير مفعلة، تم تجاوز استعادة التذكيرات.")
+        return
+
+    for job in app.job_queue.jobs():
+        if job.name and job.name.startswith("rem_"):
+            job.schedule_removal()
+    
+    all_rems = load_all_reminders()
+    count = 0
+    for uid, rems in all_rems.items():
+        if uid == "0" or not uid.isdigit():
+            continue
+        for r in rems:
+            try:
+                lang = "ar"
+                tz = r.get("tz", "Asia/Riyadh")
+                sched(app, int(uid), r["drug"], r["time"], r["freq"], lang, tz, photo=r.get("photo"))
+                count += 1
+            except Exception as e:
+                logger.error(f"restore reminder error: {e}")
+    if count:
+        logger.info(f"✅ تم استعادة {count} تذكير")
+
+def get_bmi_category(bmi, age, is_child, lang):
+    """تصنيف BMI حسب العمر"""
+    if is_child:
+        CDC = {
+            2:(14.7,17.0,17.8), 3:(14.0,16.5,17.4), 4:(13.6,16.2,17.1),
+            5:(13.5,16.2,17.4), 6:(13.5,16.6,18.0), 7:(13.7,17.2,18.9),
+            8:(14.0,17.9,19.9), 9:(14.3,18.7,21.0), 10:(14.7,19.5,22.1),
+            11:(15.2,20.4,23.2), 12:(15.7,21.2,24.2), 13:(16.2,22.0,25.1),
+            14:(16.7,22.6,25.9), 15:(17.2,23.2,26.5), 16:(17.6,23.7,27.0),
+            17:(18.0,24.0,27.4), 18:(18.4,24.3,27.8),
+        }
+        a = min(max(int(age), 2), 18)
+        p5, p85, p95 = CDC.get(a, (14.0, 17.0, 19.0))
+        if bmi < p5:
+            return ("نقص وزن (<5%)" if lang=="ar" else "Underweight (<5th %ile)")
+        elif bmi < p85:
+            return ("وزن طبيعي (5-85%)" if lang=="ar" else "Normal (5th-85th %ile)")
+        elif bmi < p95:
+            return ("زيادة وزن (85-95%)" if lang=="ar" else "Overweight (85th-95th %ile)")
+        else:
+            return ("سمنة (>95%)" if lang=="ar" else "Obese (>95th %ile)")
+    else:
+        if bmi < 18.5:
+            return ("نقص وزن" if lang=="ar" else "Underweight")
+        elif bmi < 25:
+            return ("وزن طبيعي" if lang=="ar" else "Normal weight")
+        elif bmi < 30:
+            return ("زيادة وزن" if lang=="ar" else "Overweight")
+        elif bmi < 35:
+            return ("سمنة درجة 1" if lang=="ar" else "Obesity grade 1")
+        elif bmi < 40:
+            return ("سمنة درجة 2" if lang=="ar" else "Obesity grade 2")
+        else:
+            return ("سمنة مرضية" if lang=="ar" else "Morbid obesity")
+
+async def bmi_cb(update, ctx):
+    """معالج موحد لكل BMI callbacks"""
+    q = update.callback_query
+    await q.answer()
+    lang = get_lang(ctx)
+    data = q.data
+
+    if data == "bmi_back":
+        ctx.user_data.pop("bmi_step", None)
+        await show_main(q.message, lang, edit=True)
+        return STATE_MAIN_MENU
+
+    if data in ("bmi_child", "bmi_adult"):
+        ctx.user_data["bmi_is_child"] = (data == "bmi_child")
+        ctx.user_data["bmi_step"] = "weight"
+        prompt = ("⚖️ أدخل الوزن بالكيلوغرام:" if lang=="ar" else "⚖️ Enter weight in kg:")
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            "🔙 " + ("رجوع" if lang=="ar" else "Back"), callback_data="bmi_back")]])
+        await q.message.edit_text(prompt, reply_markup=kb)
+        return STATE_BMI_WEIGHT
+
+    if data == "bmi_dose_yes":
+        ctx.user_data["bmi_step"] = "drug"
+        prompt = ("💊 أدخل اسم الدواء:" if lang=="ar" else "💊 Enter drug name:")
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+            "🔙 " + ("رجوع" if lang=="ar" else "Back"), callback_data="bmi_back")]])
+        await q.message.edit_text(prompt, reply_markup=kb)
+        return STATE_BMI_DRUG
+
+    if data == "bmi_dose_no":
+        await show_main(q.message, lang, edit=True)
+        return STATE_MAIN_MENU
+
+    return STATE_BMI_WEIGHT
+
+async def bmi_text(update, ctx):
+    """معالج النصوص لحاسبة BMI"""
+    lang = get_lang(ctx)
+    step = ctx.user_data.get("bmi_step", "weight")
+    text = update.message.text.strip().replace(",", ".")
+
+    kb_back_bmi = InlineKeyboardMarkup([[InlineKeyboardButton(
+        "🔙 " + ("رجوع" if lang=="ar" else "Back"), callback_data="bmi_back")]])
+
+    if step == "weight":
+        try:
+            w = float(text)
+            if not 1 <= w <= 300: raise ValueError
+        except:
+            err = "❌ وزن غير صحيح" if lang=="ar" else "❌ Invalid weight"
+            await update.message.reply_text(err, reply_markup=kb_back_bmi)
+            return STATE_BMI_WEIGHT
+        ctx.user_data["bmi_w"] = w
+        ctx.user_data["bmi_step"] = "height"
+        prompt = ("📏 أدخل الطول بالسنتيمتر:" if lang=="ar" else "📏 Enter height in cm:")
+        await update.message.reply_text(prompt, reply_markup=kb_back_bmi)
+        return STATE_BMI_WEIGHT
+
+    if step == "height":
+        try:
+            h = float(text)
+            if not 30 <= h <= 250: raise ValueError
+        except:
+            err = "❌ طول غير صحيح" if lang=="ar" else "❌ Invalid height"
+            await update.message.reply_text(err, reply_markup=kb_back_bmi)
+            return STATE_BMI_WEIGHT
+        ctx.user_data["bmi_h"] = h
+        ctx.user_data["bmi_step"] = "age"
+        prompt = ("🎂 أدخل العمر بالسنوات:" if lang=="ar" else "🎂 Enter age in years:")
+        await update.message.reply_text(prompt, reply_markup=kb_back_bmi)
+        return STATE_BMI_WEIGHT
+
+    if step == "age":
+        try:
+            age = float(text)
+            if not 0 <= age <= 120: raise ValueError
+        except:
+            err = "❌ عمر غير صحيح" if lang=="ar" else "❌ Invalid age"
+            await update.message.reply_text(err, reply_markup=kb_back_bmi)
+            return STATE_BMI_WEIGHT
+
+        w = ctx.user_data.get("bmi_w", 0)
+        h = ctx.user_data.get("bmi_h", 0)
+        is_child = ctx.user_data.get("bmi_is_child", True)
+        bmi = round(w / ((h/100)**2), 1)
+        cat = get_bmi_category(bmi, age, is_child, lang)
+        ideal = round(2*age+8, 1) if age <= 10 else round((age*4-2.5)/2, 1)
+
+        if lang == "ar":
+            msg = (
+                "📊 *نتيجة BMI*\n\n"
+                + f"⚖️ الوزن: {w} كغ\n"
+                + f"📏 الطول: {h} سم\n"
+                + f"🎂 العمر: {int(age)} سنة\n\n"
+                + f"📊 *BMI: {bmi}*\n"
+                + f"✅ التصنيف: *{cat}*\n"
+                + (f"🎯 الوزن المثالي: *{ideal} كغ*" if is_child else "")
+            )
+        else:
+            msg = (
+                "📊 *BMI Result*\n\n"
+                + f"⚖️ Weight: {w} kg\n"
+                + f"📏 Height: {h} cm\n"
+                + f"🎂 Age: {int(age)} years\n\n"
+                + f"📊 *BMI: {bmi}*\n"
+                + f"✅ Category: *{cat}*\n"
+                + (f"🎯 Ideal Weight: *{ideal} kg*" if is_child else "")
+            )
+
+        if is_child:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(
+                    "💊 " + ("احسب جرعة دواء" if lang=="ar" else "Calculate drug dose"),
+                    callback_data="bmi_dose_yes")],
+                [InlineKeyboardButton(
+                    "🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"),
+                    callback_data="bmi_dose_no")],
+            ])
+        else:
+            kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+                "🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"),
+                callback_data="bmi_dose_no")]])
+
+        ctx.user_data["bmi_step"] = "done"
+        await update.message.reply_text(msg, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        return STATE_BMI_DRUG
+
+    if step == "drug":
+        res = search_drugs(text)
+        w = ctx.user_data.get("bmi_w", 0)
+        if not res:
+            err = tx("not_found", lang)
+            await update.message.reply_text(err, reply_markup=kb_back_bmi)
+            return STATE_BMI_DRUG
+        dose = calc_child(res[0], w, lang)
+        await update.message.reply_text(dose, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_BMI_DRUG
+
+    await show_main(update.message, lang)
+    return STATE_MAIN_MENU
+
+# نظام الاشتراكات المميزة
+# ═══════════════════════════════════════
+
+import json
+from datetime import datetime, timedelta
+
+SUBS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "subscriptions.json")
+
+PLANS = {
+    "month":  {"stars": 200,  "days": 30,  "label": "شهري"},
+    "3month": {"stars": 500,  "days": 90,  "label": "3 أشهر"},
+    "6month": {"stars": 900,  "days": 180, "label": "6 أشهر"},
+    "year":   {"stars": 1500, "days": 365, "label": "سنوي"},
+}
+
+def load_subs():
+    try:
+        with open(SUBS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_subs(data):
+    with open(SUBS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def is_premium(user_id):
+    uid = str(user_id)
+    from datetime import datetime
+    today = datetime.now().strftime("%Y-%m-%d")
+    if supabase_client:
+        try:
+            # نتحقق من الاشتراك الفعال
+            res = supabase_client.table("subscriptions").select("end_date,status").eq("uid", uid).execute()
+            if res.data:
+                sub = res.data[0]
+                if sub.get("status") == "active" and sub.get("end_date","") >= today:
+                    return True
+            # نتحقق من التجربة المجانية
+            res2 = supabase_client.table("users").select("trial_expiry").eq("uid", uid).execute()
+            if res2.data:
+                trial = res2.data[0].get("trial_expiry","")
+                if trial and trial >= today:
+                    return True
+            return False
+        except:
+            return True
+    return True
+
+def get_expiry(user_id):
+    subs = load_subs()
+    uid = str(user_id)
+    if uid not in subs:
+        return None
+    return subs[uid]["expiry"]
+
+def activate_premium(user_id, days):
+    subs = load_subs()
+    uid = str(user_id)
+    now = datetime.now()
+    if uid in subs:
+        current = datetime.fromisoformat(subs[uid]["expiry"])
+        if current > now:
+            expiry = current + timedelta(days=days)
+        else:
+            expiry = now + timedelta(days=days)
+    else:
+        expiry = now + timedelta(days=days)
+    subs[uid] = {"expiry": expiry.isoformat(), "activated": now.isoformat()}
+    save_subs(subs)
+    return expiry.strftime("%Y-%m-%d")
+
+# Paddle Price IDs
+PADDLE_PRICES = {
+    "weekly":    "pri_01kyf5s78t52cze4nf2bp45t7e",
+    "monthly":   "pri_01kyf5t6qes6s4bwdt4111j3vp",
+    "quarterly": "pri_01kyf5v6mvqmjwzzd97cjbkt6v",
+    "biannual":  "pri_01kyf5w0g2fhw82p6554dt6m45",
+    "annual":    "pri_01kyf5wszwtsneevhbqwqmwbj2",
+}
+PADDLE_CHECKOUT = "https://web-dose.vercel.app/?welcome=1&v=3.8"
+
+def kb_premium(lang):
+    ar = lang == "ar"
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("📅 " + ("أسبوعي — $0.99" if ar else "Weekly — $0.99"), url=PADDLE_CHECKOUT+"?plan=weekly")],
+        [InlineKeyboardButton("📆 " + ("شهري — $2.99" if ar else "Monthly — $2.99"), url=PADDLE_CHECKOUT+"?plan=monthly")],
+        [InlineKeyboardButton("📦 " + ("3 أشهر — $6.99 🎁" if ar else "3 Months — $6.99 🎁"), url=PADDLE_CHECKOUT+"?plan=quarterly")],
+        [InlineKeyboardButton("📦 " + ("6 أشهر — $11.99 🎁" if ar else "6 Months — $11.99 🎁"), url=PADDLE_CHECKOUT+"?plan=biannual")],
+        [InlineKeyboardButton("🏆 " + ("سنوي — $19.99 🎁" if ar else "Annual — $19.99 🎁"), url=PADDLE_CHECKOUT+"?plan=annual")],
+        [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")],
+    ])
+
+async def premium_menu(update, ctx):
+    q = update.callback_query
+    await q.answer()
+    lang = get_lang(ctx)
+    uid = update.effective_user.id
+
+    if is_premium(uid):
+        expiry = get_expiry(uid)
+        msg = tx("already_premium", lang).format(date=expiry[:10])
+        await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
+        return STATE_MAIN_MENU
+
+    msg = tx("premium_menu", lang) + chr(10) + chr(10) + tx("premium_features", lang)
+    await q.message.edit_text(msg, reply_markup=kb_premium(lang), parse_mode=ParseMode.MARKDOWN)
+    return STATE_PREMIUM
+
+async def process_payment(update, ctx):
+    q = update.callback_query
+    await q.answer()
+    lang = get_lang(ctx)
+    plan_key = q.data.replace("pay_", "")
+    plan = PLANS.get(plan_key)
+
+    if not plan:
+        return STATE_MAIN_MENU
+
+    stars = plan["stars"]
+    title = "⭐ " + ("اشتراك مميز" if lang=="ar" else "Premium Subscription")
+    desc = plan["label"] if lang=="ar" else plan_key.replace("month","month").replace("year","year")
+
+    try:
+        await ctx.bot.send_invoice(
+            chat_id=update.effective_chat.id,
+            title=title,
+            description=("✨ وصول كامل لجميع ميزات البوت" if lang=="ar"
+                        else "✨ Full access to all bot features"),
+            payload=f"premium_{plan_key}_{update.effective_user.id}",
+            currency="XTR",
+            prices=[{"label": title, "amount": stars}],
+        )
+    except Exception as e:
+        logger.error(f"Invoice error: {e}")
+        await q.message.reply_text(
+            "❌ خطأ في إنشاء الفاتورة" if lang=="ar" else "❌ Invoice error",
+            reply_markup=kb_back(lang)
+        )
+    return STATE_MAIN_MENU
+
+async def pre_checkout(update, ctx):
+    query = update.pre_checkout_query
+    await query.answer(ok=True)
+
+async def successful_payment(update, ctx):
+    lang = get_lang(ctx)
+    payload = update.message.successful_payment.invoice_payload
+    parts = payload.split("_")
+    plan_key = parts[1] if len(parts) > 1 else "month"
+    plan = PLANS.get(plan_key, PLANS["month"])
+    uid = update.effective_user.id
+    expiry = activate_premium(uid, plan["days"])
+    msg = tx("payment_success", lang).format(date=expiry)
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
+
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
+class PingHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"OK")
+    def log_message(self, *args): pass
+
+def run_web():
+    server = HTTPServer(("0.0.0.0", 8080), PingHandler)
+    server.serve_forever()
+
+threading.Thread(target=run_web, daemon=True).start()
+
+async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر /link لربط حساب الموقع"""
+    uid = str(update.effective_user.id)
+    lang = get_lang(context)
+    
+    sub = api_check_sub(uid)
+    
+    if sub.get("linked"):
+        email = sub.get("email","")
+        plan = sub.get("plan_ar", sub.get("plan","Free"))
+        if lang == "ar":
+            msg = f"✅ *حسابك مرتبط*\n\n📧 البريد: {email}\n💳 الخطة: {plan}\n\n[🌐 فتح لوحة التحكم](https://web-dose.vercel.app/?welcome=1&v=3.8"
+        else:
+            msg = f"✅ *Account Linked*\n\n📧 Email: {email}\n💳 Plan: {plan}\n\n[🌐 Open Dashboard](https://web-dose.vercel.app/?welcome=1&v=3.8"
+    else:
+        if lang == "ar":
+            msg = f"🔗 *ربط حساب الموقع*\n\nاربط حسابك للحصول على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n✅ تذكيرات متقدمة\n\n👇 سجّل أو ادخل من هنا:"
+        else:
+            msg = f"🔗 *Link Website Account*\n\nGet unified subscription for website & bot\n\n👇 Register or login here:"
+        
+    keyboard = [[InlineKeyboardButton(
+        "🌐 تسجيل / دخول" if lang=="ar" else "🌐 Register / Login",
+        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
+    )]]
+    
+    await update.message.reply_text(
+        msg, parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+async def upgrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر /upgrade لترقية الاشتراك"""
+    uid = str(update.effective_user.id)
+    lang = get_lang(context)
+    sub = api_check_sub(uid)
+    plan = sub.get("plan_ar", sub.get("plan","Free"))
+    
+    if lang == "ar":
+        msg = f"💳 *خطتك الحالية: {plan}*\n\nللترقية والحصول على:\n🔍 بحث غير محدود\n⏰ تذكيرات غير محدودة\n📄 تصدير PDF\n\n👇 اختر خطتك:"
+    else:
+        msg = f"💳 *Your plan: {plan}*\n\nUpgrade for:\n🔍 Unlimited search\n⏰ Unlimited reminders\n📄 PDF export\n\n👇 Choose your plan:"
+    
+    keyboard = [[InlineKeyboardButton(
+        "⭐ الترقية الآن" if lang=="ar" else "⭐ Upgrade Now",
+        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
+    )]]
+    
+    await update.message.reply_text(
+        msg, parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
+
+
+def main():
+    print(f"✅ تم تحميل {len(DRUGS_DB)} دواء")
+    print(f"✅ Supabase: {bool(supabase_client)}")
+    if supabase_client:
+        try:
+            supabase_client.table("users").select("uid").limit(1).execute()
+            print("✅ Supabase connection OK")
+        except Exception as e:
+            print(f"❌ Supabase error: {e}")
+    persistence = PicklePersistence(filepath="bot_data.pkl")
+    request = HTTPXRequest(http_version="1.1")
+    app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
+    app.add_handler(build_conv())
+    app.add_handler(CallbackQueryHandler(rem_done, pattern="^rem_done_"), group=2)
+    app.add_handler(CallbackQueryHandler(rem_show_photo, pattern="^rem_showphoto_"), group=2)
+    app.add_handler(CallbackQueryHandler(rem_later, pattern="^rem_snooze_"), group=2)
+    app.add_handler(CommandHandler("pregnancy", cmd_pregnancy))
+    app.add_handler(CommandHandler("link", link_account_cmd))
+    app.add_handler(CommandHandler("upgrade", upgrade_cmd))
+    app.add_handler(CommandHandler("stats", stats_cmd))
+    app.add_handler(CommandHandler("activate", activate_cmd))
+    app.add_handler(CommandHandler("fixdose", fix_doses_cmd))
+    app.add_handler(PreCheckoutQueryHandler(pre_checkout))
+    app.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment))
+    # استعادة التذكيرات
+    import asyncio
+    app.post_init = restore_reminders
+    print("🚀 البوت يعمل!")
+    app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
+    app.run_polling(drop_pending_updates=True)
+
+if __name__ == "__main__":
+    main()
+
+# ═══════════════════════════════════════
+# حاسبة BMI - كود نظيف
+# ═══════════════════════════════════════
+
+
+# ═══════════════════════════════════════
