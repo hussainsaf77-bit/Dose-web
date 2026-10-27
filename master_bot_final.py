@@ -176,8 +176,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 class PingHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-type", "text/plain")
         self.end_headers()
         self.wfile.write(b"OK")
+    def do_HEAD(self):
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
     def log_message(self, format, *args):
         pass
 
@@ -5988,11 +5993,11 @@ def main():
             print("✅ Supabase connection OK")
         except Exception as e:
             print(f"❌ Supabase error: {e}")
-    persistence = PicklePersistence(filepath="bot_data.pkl")
+    persistence = PicklePersistence(filepath="bot_data.pkl", update_interval=60)
     request = HTTPXRequest(
         connection_pool_size=32,
-        connect_timeout=20.0,
-        read_timeout=20.0,
+        connect_timeout=15.0,
+        read_timeout=35.0,
         write_timeout=20.0,
         pool_timeout=15.0,
         http_version="1.1",
@@ -6015,12 +6020,12 @@ def main():
     # استعادة التذكيرات
     import asyncio
     app.post_init = restore_reminders
-    print("🚀 البوت يعمل بسرعة فائقة!")
+    print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
     app.run_polling(
         drop_pending_updates=True,
         bootstrap_retries=-1,
-        timeout=20,
+        timeout=15,
     )
 
 if __name__ == "__main__":
