@@ -5971,6 +5971,11 @@ async def upgrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def global_bot_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """معالج الأخطاء العام لمنع انهيار البوت عند تعارض الاتصال أو مشاكل الشبكة"""
+    err = context.error
+    logger.warning(f"Telegram Bot error encountered: {err}")
+
 def main():
     print(f"✅ تم تحميل {len(DRUGS_DB)} دواء")
     print(f"✅ Supabase: {bool(supabase_client)}")
@@ -5980,9 +5985,17 @@ def main():
             print("✅ Supabase connection OK")
         except Exception as e:
             print(f"❌ Supabase error: {e}")
+    # تنظيف أي اتصال قديم أو معلق على تليجرام
+    try:
+        import urllib.request
+        urllib.request.urlopen(f"https://api.telegram.org/bot{BOT_TOKEN}/close", timeout=5)
+        urllib.request.urlopen(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
+    except Exception as e:
+        logger.debug(f"Pre-poll reset notice: {e}")
     persistence = PicklePersistence(filepath="bot_data.pkl")
     request = HTTPXRequest(http_version="1.1")
     app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
+    app.add_error_handler(global_bot_error_handler)
     app.add_handler(build_conv())
     app.add_handler(CallbackQueryHandler(rem_done, pattern="^rem_done_"), group=2)
     app.add_handler(CallbackQueryHandler(rem_show_photo, pattern="^rem_showphoto_"), group=2)
