@@ -212,7 +212,7 @@ if os.path.exists(_env_file):
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAHiTqXLptjvpclDOD7wxQUS7PAMAKhb3gc"))
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
-logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY)} chars")
+logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0} chars")
 DRUGS_FILE = "drugs.json"
 REMINDER_SOUND = "reminder.mp3"
 
