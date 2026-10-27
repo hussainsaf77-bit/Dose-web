@@ -214,7 +214,7 @@ if os.path.exists(_env_file):
                 _k, _v = _line.split("=", 1)
                 os.environ[_k.strip()] = _v.strip()
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAHiTqXLptjvpclDOD7wxQUS7PAMAKhb3gc"))
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAEaKsiQ7UkCkvGZT0oA_OwF8HoosUXZlK0"))
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0} chars")
@@ -401,6 +401,8 @@ def tx(key, lang): return TEXTS.get(lang, TEXTS["ar"]).get(key, key)
 def get_lang(ctx): return ctx.user_data.get("lang", "ar")
 
 def load_drugs():
+    if not os.path.exists(DRUGS_FILE):
+        return []
     try:
         with open(DRUGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -5901,21 +5903,6 @@ async def successful_payment(update, ctx):
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 
-import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
-
-class PingHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"OK")
-    def log_message(self, *args): pass
-
-def run_web():
-    server = HTTPServer(("0.0.0.0", 8080), PingHandler)
-    server.serve_forever()
-
-threading.Thread(target=run_web, daemon=True).start()
 
 async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر /link لربط حساب الموقع"""
