@@ -183,8 +183,13 @@ class PingHandler(BaseHTTPRequestHandler):
 
 def run_ping_server():
     port = int(os.environ.get("PORT", 8080))
-    server = HTTPServer(("0.0.0.0", port), PingHandler)
-    server.serve_forever()
+    try:
+        import socket
+        server = HTTPServer(("0.0.0.0", port), PingHandler)
+        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.serve_forever()
+    except Exception as e:
+        logger.warning(f"Ping server notice: {e}")
 
 threading.Thread(target=run_ping_server, daemon=True).start()
 
