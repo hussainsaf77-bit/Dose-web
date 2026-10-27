@@ -1949,8 +1949,28 @@ async def go_back(u, ctx):
     await show_main(q.message, lang, edit=False)
     return STATE_MAIN_MENU
 
+async def safe_answer_cb(q):
+    try:
+        await q.answer()
+    except Exception:
+        pass
+
+async def safe_edit_cb(q, txt, kb):
+    try:
+        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.warning(f'edit_text markdown fallback: {e}')
+        try:
+            await q.message.edit_text(txt, reply_markup=kb)
+        except Exception as e2:
+            try:
+                await q.message.reply_text(txt, reply_markup=kb)
+            except Exception:
+                pass
+
 async def main_cb(u, ctx):
-    q = u.callback_query; await q.answer()
+    q = u.callback_query
+    await safe_answer_cb(q)
     lang = get_lang(ctx)
     if q.data == "m_xray":
         msg = ("🩻 *فحص وقراءة الأشعة السينية (X-Ray / MRI / CT)*\n\n"
@@ -1971,7 +1991,6 @@ async def main_cb(u, ctx):
         await q.message.edit_text(msg, reply_markup=kb_back(lang), parse_mode=ParseMode.MARKDOWN)
         return STATE_LAB
     elif q.data == "m_pregnancy":
-        await q.answer()
         txt = (
             "🤰 *جناح رعاية ومتابعة صحة الحامل السريري (Dose Maternal Care)*\n\n"
             "مرحباً بكِ في القسم المتخصص لطب التوليد ورعاية الأم والجنين المبني على المعايير السريرية العالمية (ACOG / ADA / WHO).\n\n"
@@ -1993,11 +2012,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_calc":
-        await q.answer()
         txt = (
             "📅 *حاسبة عمر الحمل وموعد الولادة المتوقع (EDD Calculator):*\n\n"
             "تعتمد الحاسبة قاعدة ناغل (Naegele’s Rule) ومعايير الكلية الأمريكية لأطباء النساء والتوليد (ACOG).\n\n"
@@ -2015,11 +2033,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data.startswith("pweek_"):
-        await q.answer()
         w_map = {
             "pweek_8": ("الأسبوع الثامن (8)", "الثلث الأول (First Trimester)", "الشهر الثاني", "حبة توت بري (Blueberry)", "224 يوماً", "20%", "سونار التأكد من نبض الجنين، فحص فصيلة الدم وعامل الريزوس (Rh)، وتحليل بول شامل."),
             "pweek_12": ("الأسبوع الثاني عشر (12)", "نهاية الثلث الأول", "الشهر الثالث", "ليمونة صغيرة (Lime)", "196 يوماً", "30%", "سونار الشفافية القفوية (NT Scan)، فحص مسحي للكرموسومات، قياس ضغط الدم الأساسي."),
@@ -2042,11 +2059,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_sugar":
-        await q.answer()
         txt = (
             "🩸 *المعايير السريرية لسكر الحمل (GDM Clinical Targets):*\n\n"
             "توصيات الجمعية الأمريكية للسكري (ADA) والكلية الأمريكية لأطباء النساء والتوليد (ACOG):\n\n"
@@ -2064,11 +2080,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_bp":
-        await q.answer()
         txt = (
             "🩺 *ضغط الدم السريري ومخاطر تسمم الحمل (Pre-eclampsia Protocol):*\n\n"
             "معايير وضوابط الكلية الأمريكية ACOG لمراقبة ضغط دم الحامل:\n\n"
@@ -2087,11 +2102,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_weight":
-        await q.answer()
         txt = (
             "⚖️ *الزيادة الموصى بها في وزن الحامل (IOM / ACOG Guidelines):*\n\n"
             "تُحدد الزيادة الصحية طوال فترة الحمل بحسب مؤشر كتلة الجسم (BMI) قبل الحمل:\n\n"
@@ -2105,11 +2119,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_drugs":
-        await q.answer()
         txt = (
             "💊 *دليل أمان الأدوية أثناء الحمل (FDA Pregnancy Risk Categories):*\n\n"
             "• ✅ *فئة A (آمنة تماماً):* دراسات محكمة أثبتت عدم وجود خطر (مثل: حمض الفوليك، فيتامين B6 بجرعاته المحددة).\n"
@@ -2127,11 +2140,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_diet":
-        await q.answer()
         txt = (
             "🥗 *التغذية العلاجية والممنوعات الغذائية للحامل:*\n\n"
             "🚫 *أطعمة ومشروبات يجب تجنبها تماماً:*\n"
@@ -2148,11 +2160,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_walk":
-        await q.answer()
         txt = (
             "🚶‍♀️ *النشاط البدني والمشي الآمن وتمارين كيجل للحامل:*\n\n"
             "• 🏃‍♀️ *المشي الهوائي المعتدل:* 20 إلى 30 دقيقة يومياً لمدة 4-5 أيام أسبوعياً، يساعد في ضبط السكر وتسهيل الولادة وتخفيف آلام الظهر.\n"
@@ -2167,11 +2178,10 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
 
     elif q.data == "preg_visits":
-        await q.answer()
         txt = (
             "🗓️ *جدول الزيارات والفحوصات الدورية أثناء الحمل:*\n\n"
             "• 🩺 *الزيارات الروتينية لعيادة التوليد:*\n"
@@ -2188,7 +2198,7 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
-        await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+        await safe_edit_cb(q, txt, kb)
         return STATE_MAIN_MENU
     elif q.data == "m_symptoms":
         await q.answer()
@@ -5980,15 +5990,16 @@ def main():
             print(f"❌ Supabase error: {e}")
     persistence = PicklePersistence(filepath="bot_data.pkl")
     request = HTTPXRequest(
-        connection_pool_size=16,
-        connect_timeout=60.0,
-        read_timeout=60.0,
-        write_timeout=60.0,
-        pool_timeout=60.0,
+        connection_pool_size=32,
+        connect_timeout=20.0,
+        read_timeout=20.0,
+        write_timeout=20.0,
+        pool_timeout=15.0,
         http_version="1.1",
     )
     app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
     app.add_error_handler(global_bot_error_handler)
+    app.add_handler(CallbackQueryHandler(main_cb, pattern="^(m_|preg_|pweek_)"), group=1)
     app.add_handler(build_conv())
     app.add_handler(CallbackQueryHandler(rem_done, pattern="^rem_done_"), group=2)
     app.add_handler(CallbackQueryHandler(rem_show_photo, pattern="^rem_showphoto_"), group=2)
@@ -6004,13 +6015,12 @@ def main():
     # استعادة التذكيرات
     import asyncio
     app.post_init = restore_reminders
-    print("🚀 البوت يعمل!")
+    print("🚀 البوت يعمل بسرعة فائقة!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
     app.run_polling(
         drop_pending_updates=True,
         bootstrap_retries=-1,
-        poll_interval=1.0,
-        timeout=30,
+        timeout=20,
     )
 
 if __name__ == "__main__":
