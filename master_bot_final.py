@@ -214,7 +214,13 @@ if os.path.exists(_env_file):
                 _k, _v = _line.split("=", 1)
                 os.environ[_k.strip()] = _v.strip()
 
-BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("BOT_SECRET", "8755290007:AAEaKsiQ7UkCkvGZT0oA_OwF8HoosUXZlK0"))
+_DEFAULT_VALID_TOKEN = "8755290007:AAEaKsiQ7UkCkvGZT0oA_OwF8HoosUXZlK0"
+_env_tok = (os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_SECRET") or "").strip()
+if _env_tok and not _env_tok.startswith("8755290007:AAHiTqX"):
+    BOT_TOKEN = _env_tok
+else:
+    BOT_TOKEN = _DEFAULT_VALID_TOKEN
+
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 logger.info(f"API Key loaded: {len(ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else 0} chars")
@@ -5972,15 +5978,15 @@ def main():
             print("✅ Supabase connection OK")
         except Exception as e:
             print(f"❌ Supabase error: {e}")
-    # تنظيف أي اتصال قديم أو معلق على تليجرام
-    try:
-        import urllib.request
-        urllib.request.urlopen(f"https://api.telegram.org/bot{BOT_TOKEN}/close", timeout=5)
-        urllib.request.urlopen(f"https://api.telegram.org/bot{BOT_TOKEN}/deleteWebhook?drop_pending_updates=true", timeout=5)
-    except Exception as e:
-        logger.debug(f"Pre-poll reset notice: {e}")
     persistence = PicklePersistence(filepath="bot_data.pkl")
-    request = HTTPXRequest(http_version="1.1")
+    request = HTTPXRequest(
+        connection_pool_size=16,
+        connect_timeout=60.0,
+        read_timeout=60.0,
+        write_timeout=60.0,
+        pool_timeout=60.0,
+        http_version="1.1",
+    )
     app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
     app.add_error_handler(global_bot_error_handler)
     app.add_handler(build_conv())
@@ -6000,7 +6006,12 @@ def main():
     app.post_init = restore_reminders
     print("🚀 البوت يعمل!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
-    app.run_polling(drop_pending_updates=True)
+    app.run_polling(
+        drop_pending_updates=True,
+        bootstrap_retries=-1,
+        poll_interval=1.0,
+        timeout=30,
+    )
 
 if __name__ == "__main__":
     main()
