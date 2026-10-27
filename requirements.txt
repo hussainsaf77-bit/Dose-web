@@ -1,6 +1,9 @@
+python-telegram-bot[job-queue]>=20.0
+pytz
+httpx>=0.24.0
 fastapi==0.95.2
 uvicorn==0.22.0
-httpx==0.24.1
 PyJWT==2.8.0
 bcrypt==4.0.1
 python-multipart==0.0.6
+Pillow
