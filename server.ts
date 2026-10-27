@@ -1387,10 +1387,10 @@ const userSessions = new Map<string, { mode?: string; timestamp?: number; meta?:
 
 const TELEGRAM_MAIN_KEYBOARD = {
   keyboard: [
-    [{ text: "🩺 فاحص الأعراض (DDx)" }, { text: "💳 الباقات والاشتراكات" }],
-    [{ text: "💊 دليل الأدوية والجرعات" }, { text: "👶 حاسبة جرعات الأطفال" }],
-    [{ text: "🩻 فحص الأشعة السينية" }, { text: "🧪 التحاليل المخبرية" }],
-    [{ text: "🎁 تفعيل كود الخصم" }, { text: "📊 باقتي وإحصائياتي" }]
+    [{ text: "🤰 رعاية ومتابعة الحامل" }, { text: "🩺 فاحص الأعراض (DDx)" }],
+    [{ text: "💳 الباقات والاشتراكات" }, { text: "💊 دليل الأدوية والجرعات" }],
+    [{ text: "👶 حاسبة جرعات الأطفال" }, { text: "🧪 التحاليل المخبرية" }],
+    [{ text: "🩻 فحص الأشعة السينية" }, { text: "📊 باقتي وإحصائياتي" }]
   ],
   resize_keyboard: true,
   is_persistent: true
