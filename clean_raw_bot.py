@@ -5287,6 +5287,126 @@ async def stats_cmd(u, ctx):
         msg = "\n".join(lines)
     await u.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
+def parse_lmp_date(raw_text):
+    import re
+    from datetime import datetime
+    raw_text = raw_text.strip()
+    patterns = [
+        r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{4})',
+        r'(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})',
+        r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2})'
+    ]
+    for p in patterns:
+        m = re.search(p, raw_text)
+        if m:
+            g = m.groups()
+            if len(g[0]) == 4:
+                year, month, day = int(g[0]), int(g[1]), int(g[2])
+            elif len(g[2]) == 4:
+                day, month, year = int(g[0]), int(g[1]), int(g[2])
+            else:
+                day, month, year = int(g[0]), int(g[1]), 2000 + int(g[2])
+            try:
+                return datetime(year, month, day)
+            except Exception:
+                pass
+    return None
+
+async def show_calculated_edd(u, ctx, lmp, lang):
+    from datetime import datetime, timedelta
+    edd = lmp + timedelta(days=280)
+    today = datetime.now()
+    diff_days = (today - lmp).days
+    
+    if diff_days < 0:
+        weeks = 0
+        days_rem = 280
+        trimester = "مرحلة التخطيط للحمل (Pre-conception)"
+        size = "بويضة مخصبة"
+    elif diff_days > 300:
+        weeks = 40
+        days_rem = 0
+        trimester = "نهاية فترة الحمل وموعد الولادة الفعلي"
+        size = "جنين مكتمل النمو وجاهز للولادة"
+    else:
+        weeks = max(1, diff_days // 7)
+        days_rem = max(0, 280 - diff_days)
+        if weeks <= 13:
+            trimester = "الثلث الأول (First Trimester)"
+        elif weeks <= 27:
+            trimester = "الثلث الثاني (Second Trimester)"
+        else:
+            trimester = "الثلث الثالث (Third Trimester)"
+            
+    if weeks <= 8:
+        size = "حبة توت بري (Blueberry)"
+    elif weeks <= 12:
+        size = "ليمونة صغيرة (Lime)"
+    elif weeks <= 16:
+        size = "حبة أفوكادو (Avocado)"
+    elif weeks <= 20:
+        size = "حبة موز (Banana)"
+    elif weeks <= 24:
+        size = "ذرة صفراء (Corn)"
+    elif weeks <= 28:
+        size = "باذنجانة كبيرة (Eggplant)"
+    elif weeks <= 32:
+        size = "حبة يقطين (Squash)"
+    elif weeks <= 36:
+        size = "حبة بطيخ صيفي (Watermelon)"
+    else:
+        size = "جنين مكتمل النمو وجاهز للولادة"
+
+    rep = (
+        f"📊 *التقرير السريري لحساب عمر الحمل وموعد الولادة (ACOG / Naegele):*\n\n"
+        f"• 📅 *تاريخ أول يوم لآخر دورة (LMP):* `{lmp.strftime('%Y-%m-%d')}`\n"
+        f"• 🎯 *موعد الولادة المتوقع (EDD):* **{edd.strftime('%Y-%m-%d')}**\n"
+        f"• ⏳ *عمر الحمل التقديري اليوم:* **{weeks} أسبوعاً** (الأيام المتبقية للولادة: **{days_rem} يوماً**)\n"
+        f"• 🤰 *المرحلة السريرية:* {trimester}\n"
+        f"• 👶 *حجم الجنين التقديري:* بحجم **{size}**\n\n"
+        f"🔬 *أهم الفحوصات الطبية المطلوبة لهذه المرحلة:*\n"
+        f"1. قياس ضغط الدم ومراقبة زلال البول دورياً لمنع تسمم الحمل.\n"
+        f"2. الاستمرار على المكملات المقررة (حمض الفوليك / الحديد / الكالسيوم).\n"
+        f"3. سونار دوري لمراقبة نبض ونمو الجنين وكمية السائل الأمنيوسي.\n\n"
+        f"⚠️ *تنبيه سريري:* راجعي طوارئ الولادة فوراً إذا شعرتِ بنزيف، تدفق سوائل، أو صداع شديد مع اضطراب رؤية."
+    )
+    
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🩸 سكر الحمل السريري", callback_data="preg_sugar"),
+         InlineKeyboardButton("🩺 ضغط الدم وتسمم الحمل", callback_data="preg_bp")],
+        [InlineKeyboardButton("⚖️ الوزن المثالي والزيادة الآمنة", callback_data="preg_weight"),
+         InlineKeyboardButton("💊 أمان الأدوية للحامل (FDA)", callback_data="preg_drugs")],
+        [InlineKeyboardButton("📅 حساب تاريخ آخر", callback_data="preg_calc")],
+        [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+        [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="back")]
+    ])
+    await u.message.reply_text(rep, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    return STATE_MAIN_MENU
+
+async def handle_global_text_input(u, ctx):
+    txt = (u.message.text or "").strip()
+    lang = get_lang(ctx)
+    if not txt:
+        return STATE_MAIN_MENU
+        
+    lmp = parse_lmp_date(txt)
+    if lmp or any(k in txt.lower() for k in ["دورة", "حمل", "ولادة", "حامل", "اسبوع", "أسبوع", "lmp", "edd", "period", "cycle"]):
+        if not lmp:
+            lmp = parse_lmp_date(txt)
+        if lmp:
+            return await show_calculated_edd(u, ctx, lmp, lang)
+        else:
+            await u.message.reply_text(
+                "📅 *حساب موعد الولادة وعمر الحمل:*\nيرجى كتابة التاريخ بصيغة يوم-شهر-سنة، مثال:\n`16-06-2026` أو `15/05/2026`",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+                    [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="back")]
+                ])
+            )
+            return STATE_MAIN_MENU
+    return None
+
 async def cmd_pregnancy(u, ctx):
     """فتح قسم رعاية الحامل مباشرة عبر الأمر /pregnancy"""
     lang = get_lang(ctx)
@@ -5406,14 +5526,14 @@ def build_conv():
                 CallbackQueryHandler(pick_lang, pattern="^lang_"),
 ],
             STATE_MAIN_MENU: [
-
                 CallbackQueryHandler(go_back, pattern="^back$"),
                 CallbackQueryHandler(go_main_menu, pattern="^main_menu_now$"),
                 CallbackQueryHandler(sub_select, pattern="^sub_"),
                 CallbackQueryHandler(reg_handler, pattern="^reg_"),
                 CallbackQueryHandler(handle_m_bp, pattern="^m_bp$"),
                 CallbackQueryHandler(main_cb, pattern="^.*$"),
-                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$")],
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_global_text_input)],
             STATE_BMI_WEIGHT: [
                 CallbackQueryHandler(bmi_cb, pattern="^bmi_"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, bmi_text)],
@@ -6022,6 +6142,7 @@ def main():
     app.post_init = restore_reminders
     print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل وموازاة متعددة (16 threads)!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_global_text_input), group=3)
     app.run_polling(
         drop_pending_updates=True,
         bootstrap_retries=-1,
