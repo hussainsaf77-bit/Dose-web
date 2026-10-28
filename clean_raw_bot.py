@@ -5995,14 +5995,14 @@ def main():
             print(f"❌ Supabase error: {e}")
     persistence = PicklePersistence(filepath="bot_data.pkl", update_interval=60)
     request = HTTPXRequest(
-        connection_pool_size=32,
-        connect_timeout=15.0,
-        read_timeout=35.0,
-        write_timeout=20.0,
-        pool_timeout=15.0,
+        connection_pool_size=64,
+        connect_timeout=10.0,
+        read_timeout=30.0,
+        write_timeout=15.0,
+        pool_timeout=10.0,
         http_version="1.1",
     )
-    app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
+    app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).concurrent_updates(16).build()
     app.add_error_handler(global_bot_error_handler)
     app.add_handler(CallbackQueryHandler(main_cb, pattern="^(m_|preg_|pweek_)"), group=1)
     app.add_handler(build_conv())
@@ -6020,12 +6020,13 @@ def main():
     # استعادة التذكيرات
     import asyncio
     app.post_init = restore_reminders
-    print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل!")
+    print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل وموازاة متعددة (16 threads)!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
     app.run_polling(
         drop_pending_updates=True,
         bootstrap_retries=-1,
         timeout=15,
+        concurrent_updates=16,
     )
 
 if __name__ == "__main__":
