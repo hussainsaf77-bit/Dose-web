@@ -2,8 +2,4 @@ python-telegram-bot[job-queue]>=20.0
 pytz
 httpx>=0.24.0
 Pillow
-fastapi>=0.110.0
-uvicorn>=0.29.0
-PyJWT>=2.8.0
 bcrypt>=4.2.0
-python-multipart>=0.0.9
