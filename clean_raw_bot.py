@@ -6026,7 +6026,6 @@ def main():
         drop_pending_updates=True,
         bootstrap_retries=-1,
         timeout=15,
-        concurrent_updates=16,
     )
 
 if __name__ == "__main__":
