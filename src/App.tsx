@@ -22,12 +22,12 @@ import { ClinicalSymptomChecker } from './components/ClinicalSymptomChecker';
 import { MedicalUserGuideSection } from './components/MedicalUserGuideSection';
 import { PregnancyCareSection } from './components/PregnancyCareSection';
 import { Language, TRANSLATIONS } from './utils/translations';
-import { downloadZipFile } from './utils/downloadHelper';
-
-import { Send, Sparkles, GitBranch, RefreshCw, Pill, Baby, Bot, Crown, ArrowLeft, Stethoscope, Download, Heart } from 'lucide-react';
+import { MainFeaturesGrid } from './components/MainFeaturesGrid';
+import { Send, Sparkles, Pill, Baby, Bot, Crown, ArrowLeft, ArrowRight, Stethoscope, Heart, Home } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
   const clean = h.replace(/^#\/?/, '').split('?')[0].toLowerCase();
+  if (clean === 'home' || clean === 'hub' || clean === 'main' || clean === '') return 'home';
   if (clean === 'plans' || clean === 'pricing') return 'plans';
   if (clean === 'guide' || clean === 'user_guide') return 'guide';
   if (clean === 'integration' || clean === 'bot_sync') return 'integration';
@@ -43,7 +43,7 @@ const resolveTab = (h: string): ActiveTabType => {
   if (clean === 'ai_chat' || clean === 'pharmacist') return 'ai_chat';
   if (clean === 'drugs') return 'drugs';
   if (clean === 'patient' || clean === 'profile') return 'patient';
-  return 'symptoms';
+  return 'home';
 };
 
 export default function App() {
@@ -53,7 +53,7 @@ export default function App() {
     if (typeof window !== 'undefined' && window.location.hash) {
       return resolveTab(window.location.hash);
     }
-    return 'symptoms';
+    return 'home';
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -249,110 +249,30 @@ export default function App() {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
             
-            <div className="space-y-1.5 max-w-2xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs font-semibold">
+            <div className="space-y-1 max-w-2xl">
+              <div className="inline-flex items-center gap-2 text-xs font-semibold text-teal-400">
                 <Pill className="w-3.5 h-3.5" />
                 <span>{t.hero_badge}</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-slate-400">ACOG · ADA · Nelson · Sanford</span>
               </div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
                 {t.hero_title}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
                 {t.hero_desc}
               </p>
             </div>
 
-            {/* Quick Navigation Chips */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Clean Feature Focus Pill Indicator */}
+            <div className="flex items-center gap-2 self-start md:self-center">
               <button
-                id="hero-quick-symptoms"
-                onClick={() => setActiveTab('symptoms')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-teal-950/40 transform hover:-translate-y-0.5"
-              >
-                <Stethoscope className="w-4 h-4" />
-                <span>{t.quick_symptoms}</span>
-              </button>
-
-              <button
-                id="hero-quick-lab"
-                onClick={() => setActiveTab('lab_imaging')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-              >
-                <Sparkles className="w-4 h-4 text-teal-400" />
-                <span>{t.quick_lab}</span>
-              </button>
-
-              <button
-                id="hero-quick-pediatric"
-                onClick={() => setActiveTab('pediatric')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-              >
-                <Baby className="w-4 h-4 text-amber-400" />
-                <span>{t.quick_pediatric}</span>
-              </button>
-
-              <button
-                id="hero-quick-pregnancy"
-                onClick={() => setActiveTab('pregnancy')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-semibold transition-all cursor-pointer"
-              >
-                <Heart className="w-4 h-4 text-rose-400" />
-                <span>{language === 'ar' ? 'صحة الحامل' : 'Maternal Care'}</span>
-              </button>
-
-              <button
-                id="hero-quick-ai"
-                onClick={() => setActiveTab('ai_chat')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-              >
-                <Bot className="w-4 h-4 text-teal-400" />
-                <span>{t.quick_ai}</span>
-              </button>
-
-              <button
-                id="hero-quick-plans"
-                onClick={() => setActiveTab('plans')}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-              >
-                <Crown className="w-4 h-4 text-amber-400" />
-                <span>{t.quick_plans}</span>
-              </button>
-
-
-
-              <a
-                id="hero-quick-telegram"
-                href="https://t.me/Drugscalculat_bot?start=onboarding_1"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-bold transition-all"
-                title="فتح بوت جرعة على تليجرام مع تفعيل مسار الترحيب والتسجيل"
-              >
-                <Send className="w-4 h-4 text-sky-400" />
-                <span>{language === 'ar' ? 'بوت تليجرام الطبي' : 'Telegram Bot'}</span>
-              </a>
-
-              <button
-                id="hero-quick-onboarding"
                 onClick={() => setIsWelcomeModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-teal-600/20 hover:bg-teal-600/30 border border-teal-500/40 text-teal-300 text-xs font-bold transition-all cursor-pointer"
-                title="فتح شاشة الترحيب وإخلاء المسؤولية والتسجيل"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs font-medium transition-all"
+                title="عرض إخلاء المسؤولية ومعلومات المنصة"
               >
-                <Sparkles className="w-4 h-4 text-teal-400" />
-                <span>{language === 'ar' ? 'شاشة الترحيب والتسجيل' : 'Welcome & Register'}</span>
-              </button>
-
-              <button
-                type="button"
-                id="hero-download-vercel-update"
-                onClick={async () => {
-                  await downloadZipFile('dose_update_new.zip');
-                }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/50 text-amber-300 text-xs font-bold transition-all cursor-pointer shadow-sm hover:border-amber-400"
-                title="تنزيل ملف تحديث Vercel لنقله إلى المستودع"
-              >
-                <Download className="w-4 h-4 text-amber-400" />
-                <span>{language === 'ar' ? 'تحميل حزمة تحديث Vercel (ZIP)' : 'Download Vercel ZIP'}</span>
+                <Sparkles className="w-3.5 h-3.5 text-teal-400" />
+                <span>{language === 'ar' ? 'إخلاء المسؤولية والربط' : 'Disclaimer & Sync'}</span>
               </button>
             </div>
 
@@ -361,8 +281,36 @@ export default function App() {
       </section>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
         
+        {/* Back button when inside any clinical feature */}
+        {activeTab !== 'home' && (
+          <div className="mb-4 flex items-center justify-between pb-3 border-b border-slate-800/80 animate-in fade-in">
+            <button
+              onClick={() => setActiveTab('home')}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs sm:text-sm font-bold transition-all shadow-sm hover:scale-[1.02] active:scale-95 cursor-pointer"
+            >
+              {language === 'ar' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+              <span>{language === 'ar' ? '🔙 العودة لقائمة الخدمات (كل اثنين بسطر)' : '🔙 Back to Features Hub'}</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('home')}
+              className="text-xs text-slate-400 hover:text-slate-200 hidden sm:inline-flex items-center gap-1 cursor-pointer"
+            >
+              <Home className="w-3.5 h-3.5" />
+              <span>{language === 'ar' ? 'الرئيسية' : 'Home'}</span>
+            </button>
+          </div>
+        )}
+
+        {/* 0. Clean 2-per-row Features Hub (الصفحة الأولى) */}
+        {activeTab === 'home' && (
+          <MainFeaturesGrid
+            onSelectFeature={(tab) => setActiveTab(tab)}
+            language={language}
+          />
+        )}
+
         {/* 1. Drug Catalog */}
         {activeTab === 'drugs' && (
           <DrugCatalogSection
@@ -558,8 +506,8 @@ export default function App() {
         }}
       />
 
-      {/* Floating Telegram Quick Action Button */}
-      <aside aria-label="رابط بوت تليجرام السريع" className="fixed bottom-5 left-5 z-40">
+      {/* Floating Telegram Quick Action Button (Desktop Only to prevent mobile overlap) */}
+      <aside aria-label="رابط بوت تليجرام السريع" className="hidden md:block fixed bottom-6 left-6 z-30">
         <a
           id="floating-telegram-bot-btn"
           href="https://t.me/Drugscalculat_bot?start=onboarding_1"
