@@ -146,17 +146,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Pill className="w-5 h-5 text-white -rotate-45" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-base sm:text-lg text-white tracking-tight">
-                      {t.brand_title}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-mono font-semibold">
-                      v3.8 Final
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 hidden sm:block">
-                    {t.brand_sub}
-                  </p>
+                  <span className="font-black text-lg sm:text-xl text-white tracking-tight flex items-center gap-2">
+                    {t.brand_title}
+                  </span>
                 </div>
               </div>
             </div>

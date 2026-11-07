@@ -8,7 +8,7 @@ import { BotIntegrationGuide } from './components/BotIntegrationGuide';
 import { SyncActivityLog } from './components/SyncActivityLog';
 import { SubscribersCRM } from './components/SubscribersCRM';
 
-// Dose Medical Components
+import { RegistrationDisclaimerGate } from './components/RegistrationDisclaimerGate';
 import { DrugCatalogSection } from './components/DrugCatalogSection';
 import { PediatricDoseCalculator } from './components/PediatricDoseCalculator';
 import { DrugInteractionsChecker } from './components/DrugInteractionsChecker';
@@ -84,24 +84,28 @@ export default function App() {
   const [prefillReminderName, setPrefillReminderName] = useState<string>('');
 
   useEffect(() => {
-    const defaultUser: TelegramUser = {
-      id: 'u_pro_1',
-      telegramId: '1001',
-      username: 'hussain_pro',
-      firstName: 'د. حسين (طبيب معتمد)',
-      authSource: 'telegram_login',
-      createdAt: new Date().toISOString(),
-      subscription: {
-        tier: 'pro',
-        status: 'active',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        dailyQuotaUsed: 5,
-        dailyQuotaTotal: 250,
-        creditsRemaining: 245,
-      },
-    };
-    setCurrentUser(defaultUser);
+    const urlParams = new URLSearchParams(window.location.search);
+    const forceAuth = urlParams.get('welcome') === '1' || window.location.hash.includes('auth') || window.location.hash.includes('login') || window.location.hash.includes('register');
+    const saved = localStorage.getItem('dose_user_session');
+    const accepted = localStorage.getItem('dose_disclaimer_accepted');
+
+    if (saved && accepted === 'true' && !forceAuth) {
+      try {
+        setCurrentUser(JSON.parse(saved));
+      } catch {
+        setCurrentUser(null);
+      }
+    } else {
+      setCurrentUser(null);
+    }
   }, []);
+
+  const handleUserLogout = () => {
+    localStorage.removeItem('dose_user_session');
+    localStorage.removeItem('dose_disclaimer_accepted');
+    setCurrentUser(null);
+    showToast('تم تسجيل الخروج، يرجى الموافقة على إخلاء المسؤولية للمتابعة', 'info');
+  };
 
   const handleUserLogin = (user: TelegramUser) => {
     setCurrentUser(user);
@@ -133,6 +137,18 @@ export default function App() {
     showToast(`تم فتح جدولة التذكيرات لدواء: ${drug.name_ar}`);
   };
 
+  if (!currentUser) {
+    return (
+      <RegistrationDisclaimerGate
+        language={language}
+        onLanguageChange={setLanguage}
+        onCompleteAuth={(user) => {
+          handleUserLogin(user);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Cairo',sans-serif]">
 
@@ -149,44 +165,12 @@ export default function App() {
         currentUser={currentUser}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenAuth={handleUserLogout}
         onOpenPlans={() => setActiveTab('plans')}
         onOpenWelcome={() => setIsWelcomeModalOpen(true)}
         language={language}
         setLanguage={setLanguage}
       />
-
-      {/* Hero Welcome Banner (Only visible on Home) */}
-      {activeTab === 'home' && (
-        <section className="border-b border-slate-800/60 bg-gradient-to-b from-slate-900/60 to-transparent py-5 px-4 sm:px-6 lg:px-8">
-          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 text-xs font-semibold text-teal-400">
-                <Pill className="w-3.5 h-3.5" />
-                <span>{t.hero_badge}</span>
-                <span className="text-slate-600">·</span>
-                <span className="text-slate-400">ACOG · ADA · Nelson · Sanford</span>
-              </div>
-              <h1 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">
-                {t.hero_title}
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-                {t.hero_desc}
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsWelcomeModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs font-semibold transition-all shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                <span>إخلاء المسؤولية والدليل</span>
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
