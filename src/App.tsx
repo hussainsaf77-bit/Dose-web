@@ -28,11 +28,12 @@ import { Send, Sparkles, Pill, Baby, Bot, Crown, ArrowLeft, ArrowRight, Stethosc
 const resolveTab = (h: string): ActiveTabType => {
   const clean = h.replace(/^#\/?/, '').split('?')[0].toLowerCase();
   if (clean === 'home' || clean === 'hub' || clean === 'main' || clean === '') return 'home';
+  if (clean === 'relief' || clean === 'humanitarian' || clean === 'charity') return 'relief';
   if (clean === 'plans' || clean === 'pricing') return 'plans';
   if (clean === 'guide' || clean === 'user_guide') return 'guide';
   if (clean === 'integration' || clean === 'bot_sync') return 'integration';
   if (clean === 'crm' || clean === 'subscribers_crm') return 'crm';
-  if (clean === 'pregnancy' || clean === 'maternal' || clean === 'pregnant' || clean === 'obstetric' || clean === 'حمل' || clean === 'حوامل') return 'pregnancy';
+  if (clean === 'pregnancy' || clean === 'maternal' || clean === 'pregnant') return 'pregnancy';
   if (clean === 'symptoms' || clean === 'ddx') return 'symptoms';
   if (clean === 'lab_imaging' || clean === 'xray' || clean === 'lab') return 'lab_imaging';
   if (clean === 'pediatric') return 'pediatric';
@@ -55,31 +56,15 @@ export default function App() {
     }
     return 'home';
   });
+
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
-  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(() => {
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const hash = window.location.hash;
-      const isRequested = 
-        urlParams.get('welcome') === '1' || 
-        urlParams.get('onboarding') === '1' ||
-        urlParams.get('start') === 'onboarding' ||
-        urlParams.has('v') ||
-        hash.includes('welcome') ||
-        hash.includes('onboarding');
-      if (isRequested) return true;
-      return !localStorage.getItem('dose_onboarding_completed');
-    } catch {
-      return true;
-    }
-  });
+  const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   const [onboardingUsername, setOnboardingUsername] = useState('');
   const [onboardingTgId, setOnboardingTgId] = useState('');
 
   const t = TRANSLATIONS[language];
 
-  // Direct tab hash routing
   useEffect(() => {
     const handleHash = () => {
       if (window.location.hash) {
@@ -90,102 +75,29 @@ export default function App() {
     return () => window.removeEventListener('hashchange', handleHash);
   }, []);
 
-  // Sync HTML dir & lang attributes
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     document.documentElement.lang = language;
   }, [language]);
 
-  // Cross-component state transfer
   const [selectedChildDrug, setSelectedChildDrug] = useState<DrugInfo | null>(null);
   const [prefillReminderName, setPrefillReminderName] = useState<string>('');
 
-  // Initialize with Telegram WebApp / URL params or verified user
   useEffect(() => {
-    // 1. Check URL search params and Hash search params for Telegram deep-linking
-    const urlParams = new URLSearchParams(window.location.search);
-    const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
-    const hashParams = new URLSearchParams(hashQuery);
-
-    const tgWebAppUser = (window as any)?.Telegram?.WebApp?.initDataUnsafe?.user;
-    const tgId = urlParams.get('tg_id') || hashParams.get('tg_id') || (tgWebAppUser ? String(tgWebAppUser.id) : null);
-    const tgFirstName = urlParams.get('name') || hashParams.get('name') || tgWebAppUser?.first_name || '';
-    const tgUsername = urlParams.get('user') || hashParams.get('user') || tgWebAppUser?.username || '';
-    const tgTier = (urlParams.get('tier') || hashParams.get('tier') || 'pro') as 'free' | 'pro' | 'vip';
-
-    const requestedTarget = urlParams.get('target') || hashParams.get('target');
-    if (requestedTarget) {
-      setActiveTab(resolveTab(requestedTarget));
-    }
-
-    if (tgId) {
-      setOnboardingTgId(tgId);
-      setOnboardingUsername(tgFirstName || tgUsername || '');
-      
-      const autoTgUser: TelegramUser = {
-        id: `tg_${tgId}`,
-        telegramId: tgId,
-        username: tgUsername || `user_${tgId}`,
-        firstName: tgFirstName || 'طبيب جرعة',
-        authSource: 'telegram_login',
-        createdAt: new Date().toISOString(),
-        subscription: {
-          tier: tgTier,
-          status: 'active',
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          dailyQuotaUsed: 0,
-          dailyQuotaTotal: tgTier === 'vip' ? 9999 : (tgTier === 'pro' ? 250 : 15),
-          creditsRemaining: tgTier === 'vip' ? 9999 : (tgTier === 'pro' ? 250 : 15),
-        },
-      };
-      setCurrentUser(autoTgUser);
-      localStorage.setItem('tg_sync_user', JSON.stringify(autoTgUser));
-      // Always show the welcome & registration gateway first when arriving from Telegram bot
-      setIsWelcomeModalOpen(true);
-    } else {
-      const onboardingCompleted = localStorage.getItem('dose_onboarding_completed');
-      const isOnboardingRequested = 
-        urlParams.get('onboarding') === '1' || 
-        urlParams.get('welcome') === '1' || 
-        urlParams.get('start') === 'onboarding' ||
-        urlParams.has('v') ||
-        hashParams.get('onboarding') === '1' || 
-        hashParams.get('welcome') === '1' || 
-        hashParams.get('start') === 'onboarding' ||
-        hashParams.has('v') ||
-        window.location.hash.includes('welcome') ||
-        window.location.hash.includes('onboarding');
-
-      if (!onboardingCompleted || isOnboardingRequested) {
-        setIsWelcomeModalOpen(true);
-      }
-    }
-
-    const savedUser = localStorage.getItem('tg_sync_user');
-    if (savedUser) {
-      try {
-        setCurrentUser(JSON.parse(savedUser));
-        return;
-      } catch (e) {
-        // Fallback
-      }
-    }
-
-    // Default active profile: Pro subscriber (Hussein)
     const defaultUser: TelegramUser = {
       id: 'u_pro_1',
       telegramId: '1001',
       username: 'hussain_pro',
-      firstName: 'حسين (مشترك Pro)',
+      firstName: 'د. حسين (طبيب معتمد)',
       authSource: 'telegram_login',
       createdAt: new Date().toISOString(),
       subscription: {
         tier: 'pro',
         status: 'active',
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        dailyQuotaUsed: 14,
+        dailyQuotaUsed: 5,
         dailyQuotaTotal: 250,
-        creditsRemaining: 236,
+        creditsRemaining: 245,
       },
     };
     setCurrentUser(defaultUser);
@@ -194,7 +106,7 @@ export default function App() {
   const handleUserLogin = (user: TelegramUser) => {
     setCurrentUser(user);
     localStorage.setItem('tg_sync_user', JSON.stringify(user));
-    showToast(`أهلاً بك يا ${user.firstName}! تم تسجيل الدخول وتفعيل صلاحيات باقة ${user.subscription.tier.toUpperCase()} في الموقع والبوت.`);
+    showToast(`أهلاً بك يا ${user.firstName}! تم تفعيل صلاحيات باقة ${user.subscription.tier.toUpperCase()}`);
   };
 
   const handleUserUpdate = (updatedUser: TelegramUser) => {
@@ -223,7 +135,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-['Cairo',sans-serif]">
-      
+
       {/* Toast Notification */}
       {notification && (
         <div className="fixed bottom-5 right-5 z-50 animate-bounce-short p-4 rounded-xl bg-slate-900 border border-teal-500/50 shadow-2xl text-xs sm:text-sm text-teal-300 flex items-center gap-3">
@@ -244,62 +156,55 @@ export default function App() {
         setLanguage={setLanguage}
       />
 
-      {/* Hero Welcome Banner */}
-      <section className="border-b border-slate-800/60 bg-gradient-to-b from-slate-900/60 to-transparent py-6 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-            
-            <div className="space-y-1 max-w-2xl">
+      {/* Hero Welcome Banner (Only visible on Home) */}
+      {activeTab === 'home' && (
+        <section className="border-b border-slate-800/60 bg-gradient-to-b from-slate-900/60 to-transparent py-5 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 text-xs font-semibold text-teal-400">
                 <Pill className="w-3.5 h-3.5" />
                 <span>{t.hero_badge}</span>
                 <span className="text-slate-600">·</span>
                 <span className="text-slate-400">ACOG · ADA · Nelson · Sanford</span>
               </div>
-              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-white tracking-tight">
                 {t.hero_title}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
                 {t.hero_desc}
               </p>
             </div>
 
-            {/* Clean Feature Focus Pill Indicator */}
-            <div className="flex items-center gap-2 self-start md:self-center">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setIsWelcomeModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs font-medium transition-all"
-                title="عرض إخلاء المسؤولية ومعلومات المنصة"
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs font-semibold transition-all shadow-sm"
               >
                 <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                <span>{language === 'ar' ? 'إخلاء المسؤولية والربط' : 'Disclaimer & Sync'}</span>
+                <span>إخلاء المسؤولية والدليل</span>
               </button>
             </div>
-
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
-        
-        {/* Back button when inside any clinical feature */}
+      <main className="flex-1 max-w-6xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 pb-24 md:pb-8">
+        {/* Prominent Back Button & Service Header when inside any feature */}
         {activeTab !== 'home' && (
-          <div className="mb-4 flex items-center justify-between pb-3 border-b border-slate-800/80 animate-in fade-in">
+          <div className="mb-5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between shadow-lg">
             <button
               onClick={() => setActiveTab('home')}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-teal-300 text-xs sm:text-sm font-bold transition-all shadow-sm hover:scale-[1.02] active:scale-95 cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-teal-900/40 cursor-pointer active:scale-95"
             >
               {language === 'ar' ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-              <span>{language === 'ar' ? '🔙 العودة لقائمة الخدمات (كل اثنين بسطر)' : '🔙 Back to Features Hub'}</span>
+              <span>{language === 'ar' ? '← العودة لقائمة الخدمات الرئيسية' : '← Back to Main Services'}</span>
             </button>
-            <button
-              onClick={() => setActiveTab('home')}
-              className="text-xs text-slate-400 hover:text-slate-200 hidden sm:inline-flex items-center gap-1 cursor-pointer"
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span>{language === 'ar' ? 'الرئيسية' : 'Home'}</span>
-            </button>
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <span className="hidden sm:inline">منصة صحة الطبية</span>
+              <span className="hidden sm:inline">/</span>
+              <span className="text-teal-400 font-bold">خدمة منفصلة</span>
+            </div>
           </div>
         )}
 
@@ -323,16 +228,7 @@ export default function App() {
           />
         )}
 
-        {/* 1.1 Lab & Radiology / Imaging AI Analyzer */}
-        {activeTab === 'lab_imaging' && (
-          <LabAndImagingAnalyzer
-            userTier={currentUser?.subscription.tier || 'free'}
-            telegramId={currentUser?.telegramId || '1001'}
-            onUpgradeClick={() => setActiveTab('plans')}
-          />
-        )}
-
-        {/* 1.2 Clinical Symptom Checker */}
+        {/* 1.1 Clinical Symptom Checker */}
         {activeTab === 'symptoms' && (
           <ClinicalSymptomChecker
             language={language}
@@ -359,6 +255,15 @@ export default function App() {
         {/* 2.1 Maternal & Pregnancy Care Suite */}
         {activeTab === 'pregnancy' && (
           <PregnancyCareSection />
+        )}
+
+        {/* 2.2 Lab & Imaging Analyzer */}
+        {activeTab === 'lab_imaging' && (
+          <LabAndImagingAnalyzer
+            userTier={currentUser?.subscription.tier || 'free'}
+            telegramId={currentUser?.telegramId || '1001'}
+            onUpgradeClick={() => setActiveTab('plans')}
+          />
         )}
 
         {/* 3. Drug-Drug Interactions Checker */}
@@ -404,7 +309,7 @@ export default function App() {
           <MedicalAiAssistant
             userTier={currentUser?.subscription.tier || 'free'}
             telegramId={currentUser?.telegramId || '1001'}
-            creditsRemaining={currentUser?.subscription.creditsRemaining || 15}
+            creditsRemaining={currentUser?.subscription.creditsRemaining || 245}
             onUpgradeClick={() => setActiveTab('plans')}
           />
         )}
@@ -415,7 +320,7 @@ export default function App() {
             currentUser={currentUser}
             onUpgradeSuccess={(upgradedUser) => {
               handleUserUpdate(upgradedUser);
-              showToast(`تمت الترقية بنجاح إلى باقة ${upgradedUser.subscription.tier.toUpperCase()}! الميزات مفعلة فورياً في الموقع والبوت.`);
+              showToast(`تمت الترقية بنجاح إلى باقة ${upgradedUser.subscription.tier.toUpperCase()}!`);
             }}
             onRequireLogin={() => setIsAuthModalOpen(true)}
             onNavigateToSymptoms={() => setActiveTab('symptoms')}
@@ -438,7 +343,6 @@ export default function App() {
             <SyncActivityLog />
           </div>
         )}
-
       </main>
 
       {/* Footer */}
@@ -446,89 +350,37 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Pill className="w-4 h-4 text-teal-500" />
-            <span className="font-semibold text-slate-300">منصة جرعة (Dose) • نظام صيدلاني وطبي متكامل مع بوت تليجرام</span>
+            <span className="font-semibold text-slate-300">منصة صحة (جرعة - Dose) • نظام صيدلاني وسريري معتمد</span>
           </div>
-          <div className="flex items-center gap-3 text-slate-400 text-xs flex-wrap justify-center">
-            <span>دعم Paddle Payments</span>
+          <div className="flex items-center gap-3 text-slate-400 text-xs">
+            <span>دعم الجرعات الدقيقة</span>
             <span>•</span>
-            <span>ربط Telegram Webhook & Bot API</span>
+            <span>التفاعلات الدوائية</span>
             <span>•</span>
-            <button
-              onClick={() => {
-                if (activeTab === 'integration' || activeTab === 'crm') {
-                  setActiveTab('symptoms');
-                } else {
-                  setActiveTab('integration');
-                }
-              }}
-              className="text-slate-500 hover:text-teal-400 transition-colors underline text-[11px]"
-            >
-              {activeTab === 'integration' || activeTab === 'crm' ? 'العودة للواجهة الطبية السريرية' : 'أدوات المطور والمزامنة (Admin)'}
-            </button>
+            <span>ذكاء اصطناعي سريري</span>
           </div>
         </div>
       </footer>
 
-      {/* Telegram Auth & Pairing Modal */}
+      {/* Modals */}
       <TelegramAuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccessLogin={handleUserLogin}
       />
 
-      {/* Welcome, Disclaimer, Language & Telegram ID Registration Onboarding Modal */}
       <WelcomeOnboardingModal
         isOpen={isWelcomeModalOpen}
-        onClose={() => {
-          setIsWelcomeModalOpen(false);
-          const urlParams = new URLSearchParams(window.location.search);
-          const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
-          const hashParams = new URLSearchParams(hashQuery);
-          const target = urlParams.get('target') || hashParams.get('target');
-          if (target) {
-            setActiveTab(resolveTab(target));
-          }
-        }}
+        onClose={() => setIsWelcomeModalOpen(false)}
         language={language}
         onLanguageChange={setLanguage}
         initialTelegramId={onboardingTgId}
         initialUsername={onboardingUsername}
         onCompleteRegistration={(newUser) => {
           handleUserLogin(newUser);
-          showToast(`أهلاً بك يا ${newUser.firstName}! تم ربط وتأكيد حساب تليجرام بنجاح 🚀`, 'success');
-          const urlParams = new URLSearchParams(window.location.search);
-          const hashQuery = window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '';
-          const hashParams = new URLSearchParams(hashQuery);
-          const target = urlParams.get('target') || hashParams.get('target');
-          if (target) {
-            setActiveTab(resolveTab(target));
-          }
+          showToast(`أهلاً بك يا ${newUser.firstName}! تم الحفظ.`);
         }}
       />
-
-      {/* Floating Telegram Quick Action Button (Desktop Only to prevent mobile overlap) */}
-      <aside aria-label="رابط بوت تليجرام السريع" className="hidden md:block fixed bottom-6 left-6 z-30">
-        <a
-          id="floating-telegram-bot-btn"
-          href="https://t.me/Drugscalculat_bot?start=onboarding_1"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold text-xs sm:text-sm shadow-xl shadow-sky-600/40 hover:shadow-sky-500/60 transition-all duration-300 transform hover:-translate-y-1 active:scale-95 border border-sky-400/40"
-          title="افتح بوت جرعة الطبي على تليجرام (@Drugscalculat_bot)"
-        >
-          <div className="relative">
-            <Send className="w-4 h-4 text-white -rotate-12" />
-            <span className="absolute -top-1 -right-1 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          </div>
-          <span className="font-extrabold tracking-wide">
-            {language === 'ar' ? 'بوت تليجرام الطبي' : 'Telegram Bot'}
-          </span>
-        </a>
-      </aside>
-
     </div>
   );
 }

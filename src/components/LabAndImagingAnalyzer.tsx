@@ -347,7 +347,7 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   onUpgradeClick,
 }) => {
   const [analysisType, setAnalysisType] = useState<'lab' | 'imaging'>('lab');
-  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('image_ocr');
+  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('manual');
   const [selectedLabCategory, setSelectedLabCategory] = useState<string>('all');
   const [imagingModality, setImagingModality] = useState<'xray' | 'ct' | 'mri' | 'ultrasound'>('xray');
   const [anatomicalRegion, setAnatomicalRegion] = useState<'chest' | 'brain' | 'spine' | 'joints' | 'abdomen'>('chest');

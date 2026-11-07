@@ -826,68 +826,21 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
   return (
     <div id="pediatric-calculator-section" className="space-y-6">
       {/* ── Top Header Banner ── */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 md:p-6 shadow-xl relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 text-teal-400 text-xs md:text-sm font-bold mb-1.5">
+            <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
               <Baby className="w-4 h-4 text-amber-400" />
-              <span className="uppercase tracking-wider">
-                {isAr ? 'المحرك السريري الشامل لجرعات الأطفال' : 'Comprehensive Clinical Pediatric Engine'}
-              </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-[11px] font-black text-emerald-300 animate-pulse">
-                v37.0 (2026) - النسخة الحديثة
-              </span>
+              <span>{isAr ? 'حاسبة جرعات الأطفال السريرية' : 'Clinical Pediatric Dosage Calculator'}</span>
             </div>
-            <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-2 flex-wrap">
-              <span>{isAr ? 'حساب جرعات الأطفال حسب الوزن والعمر والشكل الصيدلاني' : 'Weight, Age & Formulation-Based Pediatric Calculator'}</span>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-300 border border-teal-500/20">
-                5 أشكال دوائية + كاميرا OCR
-              </span>
+            <h2 className="text-lg md:text-xl font-bold text-white">
+              {isAr ? 'حساب دقيق لجرعات الأطفال حسب الوزن والعمر والشكل الصيدلاني' : 'Precision Pediatric Dosing by Weight, Age & Dosage Form'}
             </h2>
-            <p className="text-slate-400 text-xs md:text-sm mt-1 max-w-2xl">
+            <p className="text-slate-400 text-xs mt-1">
               {isAr 
-                ? 'يدعم 5 أشكال دوائية (شراب، مرهم FTU، قطرة، بخاخ، حقنة)، فحص الصورة بالكاميرا، مراجع التراكيز التجارية، وجرعات المضادات حسب موضع الالتهاب بالجسم.'
-                : 'Supports 5 dosage forms (Syrup, Ointment, Drops, Spray, Injection), Vision AI OCR, commercial strength presets, and anatomical infection-site dosing.'
-              }
+                ? 'وفق المراجع السريرية المعتمدة (BNF for Children و Harriet Lane) مع مراعاة الشكل الصيدلاني وتراكيز المستحضرات.'
+                : 'Based on BNF for Children & Harriet Lane Handbook with formulation & concentration presets.'}
             </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Direct API Sync Button */}
-            <button
-              type="button"
-              id="pediatric-api-sync-btn"
-              disabled={isCallingApi}
-              onClick={handleClinicalApiSync}
-              className="px-3.5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700 text-teal-300 text-xs md:text-sm font-bold transition-all flex items-center gap-1.5"
-            >
-              {isCallingApi ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
-                  <span>{isAr ? 'استعلام الـ API...' : 'Calling API...'}</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-amber-400" />
-                  <span>{isAr ? 'استعلام الـ API السريري' : 'Clinical API Query'}</span>
-                </>
-              )}
-            </button>
-
-            {/* Direct Download Update ZIP Button */}
-            <button
-              type="button"
-              id="pediatric-download-zip-btn"
-              onClick={async () => {
-                await downloadZipFile('dose_update_new.zip');
-              }}
-              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold text-xs md:text-sm transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 ring-2 ring-amber-400/50 hover:scale-105 active:scale-95 cursor-pointer"
-              title={isAr ? 'تنزيل حزمة التحديث البرمجية الجديدة dose_update_new.zip' : 'Download Update ZIP'}
-            >
-              <Download className="w-4 h-4 text-slate-950 stroke-[2.5]" />
-              <span>{isAr ? 'تحميل التحديث الشامل (ZIP)' : 'Download ZIP'}</span>
-            </button>
           </div>
         </div>
       </div>
@@ -1193,97 +1146,172 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
         </div>
       )}
 
-      {/* ── Main Two-Column Layout ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ── Left Column: Clean, Streamlined Controls ── */}
-        <div className="lg:col-span-7 space-y-5">
-          {/* 1. Patient Age & Weight: Stepper for number + Dropdown for year/month/day, and number only for weight */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <label className="text-xs font-bold text-white flex items-center gap-2">
-                <Baby className="w-4 h-4 text-amber-400" />
-                <span>{isAr ? '1. بيانات العمر والوزن للطفل:' : '1. Patient Age & Weight Parameters:'}</span>
+      {/* ── Unified Layout: Inputs Side-by-Side before Result Card ── */}
+      <div className="max-w-4xl mx-auto space-y-5">
+        
+        {/* Top Unified Input Card: Inputs Side-by-Side before results */}
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <Baby className="w-5 h-5 text-amber-400" />
+              <span>{isAr ? 'مدخلات وبيانات جرعة الطفل (قبل النتيجة):' : 'Pediatric Dosing Parameters (Inputs):'}</span>
+            </h3>
+            <button
+              type="button"
+              onClick={handleNelsonEstimate}
+              className="text-[11px] text-teal-400 hover:text-teal-300 bg-teal-500/10 border border-teal-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+              title={isAr ? 'معادلة نيلسون: الوزن = العمر بالسنين × 2 + 8' : "Nelson's Formula: Weight = (Age*2) + 8"}
+            >
+              <span>✨</span>
+              <span>{isAr ? 'تقدير نيلسون للوزن' : "Nelson's Rule"}</span>
+            </button>
+          </div>
+
+          {/* Row 1: Drug Selection (Dropdown with arrow + Search + Quick Chips) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <Search className="w-3.5 h-3.5 text-teal-400" />
+                <span>{isAr ? '1. اختيار الدواء (قائمة منسدلة بسهم أو بحث سريع):' : '1. Select Medication (Dropdown with arrow or search):'}</span>
               </label>
               <button
                 type="button"
-                onClick={handleNelsonEstimate}
-                className="text-[11px] text-teal-400 hover:text-teal-300 bg-teal-500/10 border border-teal-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1"
-                title={isAr ? 'معادلة نيلسون: الوزن = العمر بالسنين × 2 + 8' : "Nelson's Formula: Weight = (Age*2) + 8"}
+                onClick={() => setIsCustomDrugMode(!isCustomDrugMode)}
+                className="text-[11px] text-teal-400 hover:text-teal-300 font-bold cursor-pointer"
               >
-                <span>✨</span>
-                <span>{isAr ? 'تقدير نيلسون للوزن' : "Nelson's Rule"}</span>
+                {isCustomDrugMode ? (isAr ? '← العودة للقائمة المعتمدة' : '← Catalog') : (isAr ? '+ دواء مخصص' : '+ Custom Drug')}
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Age: Number Stepper with Up/Down arrows + Unit Dropdown with arrow */}
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <span>👶</span>
-                    <span>{isAr ? 'العمر (سهم للرقم وسهم للوحدة):' : 'Age (Number & Unit):'}</span>
-                  </span>
-                  <span className="text-[10px] text-teal-400 font-normal">
-                    {isAr ? '(يحدّث الوزن تلقائياً)' : '(Auto-weight sync)'}
-                  </span>
-                </label>
-                <div className="flex gap-2">
-                  {/* Number input with interactive up/down stepper arrows */}
-                  <div className="relative flex-1 flex items-center">
-                    <input
-                      type="number"
-                      min="1"
-                      max="180"
-                      value={ageValue}
-                      onChange={(e) => handleAgeNumberChange(e.target.value)}
-                      className={`w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500 ${
-                        isAr ? 'pl-8 pr-3.5' : 'pr-8 pl-3.5'
-                      }`}
-                    />
-                    <div className={`absolute ${isAr ? 'left-2' : 'right-2'} flex flex-col gap-0.5`}>
-                      <button
-                        type="button"
-                        onClick={handleIncrementAge}
-                        className="w-5 h-3.5 bg-slate-800 hover:bg-slate-700 text-teal-400 rounded text-[9px] flex items-center justify-center transition-colors shadow"
-                        title={isAr ? 'زيادة الرقم' : 'Increment'}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDecrementAge}
-                        className="w-5 h-3.5 bg-slate-800 hover:bg-slate-700 text-teal-400 rounded text-[9px] flex items-center justify-center transition-colors shadow"
-                        title={isAr ? 'نقصان الرقم' : 'Decrement'}
-                      >
-                        ▼
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Unit Dropdown Select with visible arrow */}
-                  <div className="relative w-36">
+            {!isCustomDrugMode ? (
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Dropdown with arrow */}
+                  <div className="relative">
                     <select
-                      value={ageUnit}
-                      onChange={(e) => handleAgeUnitChange(e.target.value as any)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-3 py-3 text-xs md:text-sm font-bold text-white focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-7"
+                      id="pediatric-drug-select"
+                      value={selectedDrugId}
+                      onChange={(e) => handleDrugSelect(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-9"
                     >
-                      <option value="years">{isAr ? 'سنة 🧒' : 'Year(s)'}</option>
-                      <option value="months">{isAr ? 'شهر 👶' : 'Month(s)'}</option>
-                      <option value="days">{isAr ? 'يوم 🍼' : 'Day(s)'}</option>
+                      <optgroup label={isAr ? 'الأدوية الأكثر طلباً' : 'Frequent'}>
+                        {EXTENDED_PEDIATRIC_DRUGS.slice(0, 15).map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {isAr ? d.name_ar : d.name_en} ({d.trade_names.slice(0, 2).join(', ')})
+                          </option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={isAr ? 'باقي أدوية الأطفال السريرية' : 'Full Catalog'}>
+                        {EXTENDED_PEDIATRIC_DRUGS.slice(15).map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {isAr ? d.name_ar : d.name_en} ({d.trade_names.slice(0, 2).join(', ')})
+                          </option>
+                        ))}
+                      </optgroup>
                     </select>
-                    <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs`}>
+                    <div className={`absolute ${isAr ? 'left-3.5' : 'right-3.5'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
                       ▼
                     </div>
                   </div>
+
+                  {/* Quick Search filter */}
+                  <div className="relative">
+                    <Search className={`absolute ${isAr ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400`} />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder={isAr ? 'أو اكتب اسم الدواء السريع...' : 'Or type drug name...'}
+                      className={`w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 ${
+                        isAr ? 'pr-9 pl-7' : 'pl-9 pr-7'
+                      }`}
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchQuery('')}
+                        className={`absolute ${isAr ? 'left-2.5' : 'right-2.5'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs`}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Popular Drugs Quick Access Chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    { id: 'amoxicillin_clavulanate', name: 'أوجمنتين / كيورام' },
+                    { id: 'paracetamol', name: 'باراسيتامول / أدول' },
+                    { id: 'ibuprofen', name: 'بروفين' },
+                    { id: 'amoxicillin', name: 'أموكسيل' },
+                    { id: 'cefixime', name: 'سوبراكس' },
+                    { id: 'azithromycin', name: 'زيثروماكس' },
+                    { id: 'salbutamol', name: 'فنتولين' },
+                    { id: 'dimetindene', name: 'فينستيل' },
+                  ].map((fastDrug) => {
+                    const isSelected = selectedDrugId === fastDrug.id && !isCustomDrugMode;
+                    return (
+                      <button
+                        key={fastDrug.id}
+                        type="button"
+                        onClick={() => handleDrugSelect(fastDrug.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-teal-500/20 text-teal-300 border-teal-500 font-bold'
+                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
+                        }`}
+                      >
+                        {fastDrug.name}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
+            ) : (
+              /* Custom Free-Hand Drug Input Mode */
+              <div className="space-y-2.5 bg-amber-500/5 p-3.5 rounded-xl border border-amber-500/20">
+                <input
+                  type="text"
+                  value={customDrugName}
+                  onChange={(e) => setCustomDrugName(e.target.value)}
+                  placeholder={isAr ? 'اسم الدواء التجاري أو العلمي...' : 'Drug name...'}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+                <div className="grid grid-cols-2 gap-2.5">
+                  <input
+                    type="number"
+                    step="1"
+                    min="0.1"
+                    value={customMpk}
+                    onChange={(e) => setCustomMpk(e.target.value)}
+                    placeholder="مجم/كجم/يوم"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
+                  />
+                  <select
+                    value={customDosesPerDay}
+                    onChange={(e) => setCustomDosesPerDay(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value={1}>مرة واحدة (كل 24 ساعة)</option>
+                    <option value={2}>مرتان (كل 12 ساعة)</option>
+                    <option value={3}>3 مرات (كل 8 ساعات)</option>
+                    <option value={4}>4 مرات (كل 6 ساعات)</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
 
-              {/* Weight: Number only followed by kg badge */}
+          {/* Row 2: Weight and Age Side-by-Side (قبل النتيجة) */}
+          <div className="pt-2 border-t border-slate-800 space-y-1.5">
+            <span className="text-xs font-bold text-slate-300 block">
+              2. وزن الطفل وعمره (جنباً إلى جنب قبل النتيجة):
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Weight */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <span>⚖️</span>
-                  <span>{isAr ? 'الوزن (رقم فقط وبعده كغ):' : 'Weight (Number only + kg):'}</span>
-                </label>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">الوزن بالكيلوجرام (كجم):</label>
                 <div className="relative">
                   <input
                     id="pediatric-weight-input"
@@ -1294,364 +1322,154 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                     value={weightKg}
                     onChange={(e) => setWeightKg(e.target.value)}
                     placeholder="12"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-base md:text-lg font-mono font-bold text-white focus:outline-none focus:border-teal-500"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500"
                   />
-                  <span className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-teal-500/20 border border-teal-500/40 text-xs md:text-sm font-extrabold text-teal-300 pointer-events-none`}>
+                  <span className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 text-xs font-bold pointer-events-none`}>
                     {isAr ? 'كغ' : 'kg'}
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          {/* 2. Formulation Dropdown Select with Arrow */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-2">
-            <label className="block text-xs font-bold text-slate-300 flex items-center gap-2">
-              <Droplets className="w-4 h-4 text-teal-400" />
-              <span>{isAr ? '2. نوع وشكل الدواء (سهم وقائمة منسدلة):' : '2. Dosage Form / Formulation (Dropdown):'}</span>
-            </label>
-            <div className="relative">
-              <select
-                value={selectedFormulation}
-                onChange={(e) => setSelectedFormulation(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3.5 text-xs md:text-sm text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-10"
-              >
-                <option value="syrup">🥄 {isAr ? 'شراب ومعلق فموي (Oral Syrup / Suspension — مل)' : 'Oral Syrup / Suspension (ml)'}</option>
-                <option value="drops">💧 {isAr ? 'قطرات فموية أو عينية/أذنية (Drops — نقطة)' : 'Drops (oral/eye/ear)'}</option>
-                <option value="suppository">💊 {isAr ? 'تحاميل ولبوس شرجي (Suppositories — تحميلة)' : 'Suppositories (Rectal)'}</option>
-                <option value="ointment">🩹 {isAr ? 'مرهم وكريم موضعي (Ointment / Cream — وحدة طرف الإصبع FTU)' : 'Topical Ointment / Cream (FTU)'}</option>
-                <option value="spray">💨 {isAr ? 'بخاخ ورذاذ واستنشاق (Inhaler / Nebulizer — بخة)' : 'Inhaler / Nebulizer (Puffs)'}</option>
-                <option value="injection">💉 {isAr ? 'حقن وريدية وعضلية (Injection / Vial — مجم / مل)' : 'Injection (IV/IM)'}</option>
-                <option value="sachet">📦 {isAr ? 'أكياس فوارة وأقراص (Sachets / Tablets — كيس / قرص)' : 'Sachets / Tablets'}</option>
-              </select>
-              <div className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs`}>
-                ▼
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Comprehensive Drug Search & Dropdown Select (All Possibilities) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <label className="text-xs font-bold text-white flex items-center gap-2">
-                <Search className="w-4 h-4 text-teal-400" />
-                <span>{isAr ? '3. اختيار أو بحث عن الدواء (شامل لكافة الاحتمالات):' : '3. Comprehensive Medicine Search (All Possibilities):'}</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsCustomDrugMode(!isCustomDrugMode)}
-                className="text-[11px] text-teal-400 hover:text-teal-300 font-bold"
-              >
-                {isCustomDrugMode ? (isAr ? '← العودة للقائمة المعتمدة' : '← Catalog') : (isAr ? '+ دواء مخصص غير مسجل' : '+ Custom Drug')}
-              </button>
-            </div>
-
-            {!isCustomDrugMode ? (
-              <div className="space-y-3">
-                {/* Comprehensive Live Search Input */}
-                <div className="relative">
-                  <Search className={`absolute ${isAr ? 'right-3.5' : 'left-3.5'} top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400`} />
+              {/* Age Value */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">عمر الطفل (رقم):</label>
+                <div className="relative flex items-center">
                   <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={isAr ? 'ابحث بالاسم التجاري أو العلمي (أوجمنتين، أدول، بروفين، سوبراكس، زينات، فنتولين، كحة، حرارة، أذن)...' : 'Search generic or brand (Augmentin, Panadol, Brufen, Suprax, Zinnat, cough, fever)...'}
-                    className={`w-full bg-slate-950 border border-slate-700 rounded-2xl py-3 text-xs md:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 ${
-                      isAr ? 'pr-10 pl-4' : 'pl-10 pr-4'
-                    }`}
+                    type="number"
+                    min="1"
+                    max="180"
+                    value={ageValue}
+                    onChange={(e) => handleAgeNumberChange(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500"
                   />
-                  {searchQuery && (
+                  <div className={`absolute ${isAr ? 'left-2' : 'right-2'} flex flex-col gap-0.5`}>
                     <button
                       type="button"
-                      onClick={() => setSearchQuery('')}
-                      className={`absolute ${isAr ? 'left-3.5' : 'right-3.5'} top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs`}
+                      onClick={handleIncrementAge}
+                      className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
                     >
-                      ✕
+                      ▲
                     </button>
-                  )}
-                </div>
-
-                {/* Instant Live Search Results Box */}
-                {searchQuery.trim().length > 0 && (
-                  <div className="p-2 bg-slate-950 border border-teal-500/40 rounded-2xl max-h-56 overflow-y-auto space-y-1 shadow-2xl animate-fadeIn">
-                    <div className="text-[10px] text-teal-400 font-bold px-2 py-1 flex items-center justify-between border-b border-slate-800">
-                      <span>{isAr ? `نتائج البحث الشامل (${filteredDrugs.length} دواء مطابق):` : `Matches (${filteredDrugs.length}):`}</span>
-                      <span className="text-slate-400">{isAr ? 'انقر للاختيار المباشر' : 'Click to select'}</span>
-                    </div>
-                    {filteredDrugs.length > 0 ? (
-                      filteredDrugs.slice(0, 10).map((drug) => (
-                        <button
-                          key={drug.id}
-                          type="button"
-                          onClick={() => {
-                            handleDrugSelect(drug.id);
-                            setSearchQuery('');
-                          }}
-                          className={`w-full text-right p-2.5 rounded-xl border transition-all flex items-center justify-between gap-2 text-xs ${
-                            selectedDrugId === drug.id
-                              ? 'bg-teal-500/20 text-teal-300 border-teal-500/50'
-                              : 'bg-slate-900/60 hover:bg-slate-800 border-slate-800 text-slate-200'
-                          }`}
-                        >
-                          <div>
-                            <span className="font-bold text-white block">
-                              {isAr ? drug.name_ar : drug.name_en}
-                            </span>
-                            <span className="text-[10px] text-slate-400 block line-clamp-1">
-                              {drug.trade_names.slice(0, 4).join(' • ')}
-                            </span>
-                          </div>
-                          <div className="text-left shrink-0">
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-teal-300 border border-slate-700">
-                              {isAr ? drug.class_ar.split(' ')[0] : drug.class_en.split(' ')[0]}
-                            </span>
-                          </div>
-                        </button>
-                      ))
-                    ) : (
-                      <div className="p-3 text-center text-xs text-slate-400">
-                        {isAr ? 'لم يتم العثور على دواء مطابق في القائمة السريعة.' : 'No matching medication in quick list.'}
-                      </div>
-                    )}
-
-                    {/* Instant AI Clinical Lookup for ANY typed drug */}
-                    {searchQuery.trim().length > 1 && (
-                      <div className="pt-2 mt-2 border-t border-slate-800">
-                        <button
-                          type="button"
-                          onClick={() => handleAiDrugQuickSelect(searchQuery.trim())}
-                          className="w-full text-right p-2.5 rounded-xl border border-indigo-500/40 bg-gradient-to-r from-indigo-950/80 to-purple-950/80 hover:from-indigo-900 hover:to-purple-900 text-indigo-200 transition-all flex items-center justify-between gap-2 text-xs font-bold shadow-md group cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 text-indigo-400 group-hover:rotate-12 transition-transform shrink-0" />
-                            <div>
-                              <span className="block font-bold text-white">
-                                {isAr ? `جلب جرعة «${searchQuery.trim()}» بالذكاء السريري الشامل` : `Fetch "${searchQuery.trim()}" dose via Clinical AI`}
-                              </span>
-                              <span className="block text-[10px] text-indigo-300 font-normal">
-                                {isAr ? 'حساب فوري معتمد من مراجع BNFC & Harriet Lane لأي دواء عالمي أو تجاري' : 'Instant clinical calculation for any international/commercial medication'}
-                              </span>
-                            </div>
-                          </div>
-                          <ArrowRight className="w-4 h-4 text-indigo-400 shrink-0 rotate-180" />
-                        </button>
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={handleDecrementAge}
+                      className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
+                    >
+                      ▼
+                    </button>
                   </div>
-                )}
+                </div>
+              </div>
 
-                {/* Categorized Dropdown Select */}
+              {/* Age Unit with Dropdown Arrow */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">وحدة العمر (سهم):</label>
                 <div className="relative">
                   <select
-                    id="pediatric-drug-select"
-                    value={selectedDrugId}
-                    onChange={(e) => handleDrugSelect(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs md:text-sm text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-10"
+                    value={ageUnit}
+                    onChange={(e) => handleAgeUnitChange(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
                   >
-                    {filteredDrugs.map((drug) => (
-                      <option key={drug.id} value={drug.id}>
-                        {isAr 
-                          ? `${drug.name_ar} — [علامات: ${drug.trade_names.slice(0, 3).join('، ')}]`
-                          : `${drug.name_en} — [Brands: ${drug.trade_names.slice(0, 3).join(', ')}]`
-                        }
-                      </option>
-                    ))}
+                    <option value="years">{isAr ? 'سنة 🧒' : 'Year(s)'}</option>
+                    <option value="months">{isAr ? 'شهر 👶' : 'Month(s)'}</option>
+                    <option value="days">{isAr ? 'يوم 🍼' : 'Day(s)'}</option>
                   </select>
-                  <div className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs`}>
+                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
                     ▼
                   </div>
                 </div>
-
-                {/* Popular Drugs Quick Access Chips */}
-                <div>
-                  <span className="text-[11px] text-slate-400 block mb-1.5 font-medium">
-                    {isAr ? '⚡ أدوية الأطفال الشائعة (تحديد فوري بنقرة واحدة):' : '⚡ 1-Tap Quick Frequent Medications:'}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { id: 'amoxicillin_clavulanate', name: isAr ? 'أوجمنتين / كيورام 457' : 'Augmentin 457' },
-                      { id: 'amoxicillin', name: isAr ? 'أموكسيل 250' : 'Amoxil 250' },
-                      { id: 'paracetamol', name: isAr ? 'بانادول / أدول 120' : 'Panadol 120' },
-                      { id: 'ibuprofen', name: isAr ? 'بروفين 100' : 'Brufen 100' },
-                      { id: 'cefixime', name: isAr ? 'سوبراكس 100' : 'Suprax 100' },
-                      { id: 'cefuroxime', name: isAr ? 'زينات 125' : 'Zinnat 125' },
-                      { id: 'azithromycin', name: isAr ? 'زيثروماكس 200' : 'Zithromax 200' },
-                      { id: 'salbutamol', name: isAr ? 'فنتولين شراب 2' : 'Ventolin 2mg' },
-                      { id: 'dexamethasone', name: isAr ? 'ديكادرون' : 'Decadron' },
-                      { id: 'dimetindene', name: isAr ? 'فينستيل نقط' : 'Fenistil Drops' },
-                      { id: 'prospan', name: isAr ? 'بروسبان كحة' : 'Prospan' },
-                      { id: 'cefalexin', name: isAr ? 'سيفالين 250 (سيفاليكسين)' : 'Cefalin 250' },
-                      { id: 'simethicone', name: isAr ? 'دينتينوكس مغص' : 'Dentinox' },
-                    ].map((fastDrug) => {
-                      const isSelected = selectedDrugId === fastDrug.id && !isCustomDrugMode;
-                      return (
-                        <button
-                          key={fastDrug.id}
-                          type="button"
-                          onClick={() => handleDrugSelect(fastDrug.id)}
-                          className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-                            isSelected
-                              ? 'bg-teal-500/20 text-teal-300 border-teal-500 font-bold shadow-sm'
-                              : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                          }`}
-                        >
-                          {fastDrug.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
               </div>
-            ) : (
-              /* Custom Free-Hand Drug Input Mode */
-              <div className="space-y-3 bg-amber-500/5 p-4 rounded-2xl border border-amber-500/20">
-                <div>
-                  <label className="block text-xs font-semibold text-amber-300 mb-1">
-                    {isAr ? 'اسم الدواء (العلمي أو التجاري):' : 'Drug Name (Generic / Brand):'}
-                  </label>
-                  <input
-                    type="text"
-                    value={customDrugName}
-                    onChange={(e) => setCustomDrugName(e.target.value)}
-                    placeholder={isAr ? 'مثال: سيفاكلور (Ceclor)' : 'e.g. Cefaclor'}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      {isAr ? 'الجرعة (مجم/كجم/يوم):' : 'Dose (mg/kg/day):'}
-                    </label>
-                    <input
-                      type="number"
-                      step="1"
-                      min="0.1"
-                      value={customMpk}
-                      onChange={(e) => setCustomMpk(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-300 mb-1">
-                      {isAr ? 'عدد الجرعات باليوم:' : 'Doses Per Day:'}
-                    </label>
-                    <select
-                      value={customDosesPerDay}
-                      onChange={(e) => setCustomDosesPerDay(Number(e.target.value))}
-                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
-                    >
-                      <option value={1}>{isAr ? 'مرة واحدة (كل 24 ساعة)' : 'Once daily (24h)'}</option>
-                      <option value={2}>{isAr ? 'مرتان (كل 12 ساعة)' : 'Twice daily (12h)'}</option>
-                      <option value={3}>{isAr ? '3 مرات (كل 8 ساعات)' : '3 times daily (8h)'}</option>
-                      <option value={4}>{isAr ? '4 مرات (كل 6 ساعات)' : '4 times daily (6h)'}</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 4. Concentration Strength on Packaging (التركيز كما هو) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <span>🧪</span>
-                <span>{isAr ? '4. تركيز الدواء المدون على العلبة (Concentration):' : '4. Commercial Concentration on Box:'}</span>
-              </label>
-              <button
-                type="button"
-                onClick={() => setIsUsingCustomConc(!isUsingCustomConc)}
-                className="text-[11px] text-teal-400 hover:underline"
-              >
-                {isUsingCustomConc ? (isAr ? '← تراكيز السوق الشائعة' : '← Standard Strengths') : (isAr ? '+ كتابة تركيز يدوي مخصص' : '+ Custom Strength')}
-              </button>
             </div>
-
-            {!isUsingCustomConc ? (
-              <div className="relative">
-                <select
-                  value={activeConcentration}
-                  onChange={(e) => {
-                    setActiveConcentration(Number(e.target.value));
-                    setIsUsingCustomConc(false);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs md:text-sm text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-10"
-                >
-                  {(isCustomDrugMode ? [
-                    { labelAr: '125 مجم / 5 مل (شراب معتاد)', value: 125 },
-                    { labelAr: '156 مجم / 5 مل (أوجمنتين 156)', value: 156 },
-                    { labelAr: '200 مجم / 5 مل (زيثروماكس / بروفين)', value: 200 },
-                    { labelAr: '228 مجم / 5 مل (ميجاموكس 228)', value: 228 },
-                    { labelAr: '250 مجم / 5 مل (أموكسيل شائع جداً)', value: 250 },
-                    { labelAr: '312 مجم / 5 مل (أوجمنتين فورت)', value: 312 },
-                    { labelAr: '400 مجم / 5 مل (أموكسيل 400)', value: 400 },
-                    { labelAr: '457 مجم / 5 مل (أوجمنتين / كيورام الأوسع)', value: 457 },
-                    { labelAr: '600 مجم / 5 مل (Augmentin ES 600)', value: 600 },
-                  ] : currentDrug.available_concentrations
-                    .filter(c => c.formulation === selectedFormulation || selectedFormulation === 'syrup')
-                  ).map((c: any) => (
-                    <option key={`${c.value}-${c.labelAr}`} value={c.value}>
-                      {isAr ? c.labelAr : c.labelEn}
-                    </option>
-                  ))}
-                </select>
-                <div className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs`}>
-                  ▼
-                </div>
-              </div>
-            ) : (
-              <div className="relative">
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={customConcInput}
-                  onChange={(e) => {
-                    setCustomConcInput(e.target.value);
-                    const n = parseFloat(e.target.value);
-                    if (!isNaN(n) && n > 0) setActiveConcentration(n);
-                  }}
-                  placeholder={isAr ? 'اكتب كمية المجم لكل 5 مل (مثال: 457 أو 250)...' : 'Enter mg per 5ml (e.g. 457 or 250)...'}
-                  className="w-full bg-slate-950 border border-teal-500 rounded-2xl px-4 py-3 text-xs md:text-sm text-white font-mono focus:outline-none"
-                />
-                <span className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-xs text-slate-400`}>
-                  mg / 5ml
-                </span>
-              </div>
-            )}
           </div>
 
-          {/* 5. Infection Site for Antibiotics */}
-          {(currentDrug.is_antibiotic || currentDrug.site_doses) && (
-            <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-5 shadow-xl space-y-2">
-              <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
-                <span>{isAr ? '5. موضع ونوع الالتهاب (تعديل شدة جرعة المضاد):' : '5. Infection Site (Antibiotic Titration):'}</span>
-              </label>
-              <div className="relative">
-                <select
-                  value={site}
-                  onChange={(e) => setSite(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-2xl px-4 py-3 text-xs md:text-sm text-white font-bold focus:outline-none focus:border-amber-500 appearance-none cursor-pointer pr-10"
-                >
-                  <option value="general">🩺 {isAr ? 'التهاب عام معتاد / خفيف (جرعة قياسية متوازنة)' : 'Standard / Mild Infection'}</option>
-                  <option value="ear">👂 {isAr ? 'التهاب الأذن الوسطى الحاد (AOM) — يتطلب جرعة مكثفة 80-90 مجم/كجم' : 'Acute Otitis Media (AOM - High Dose)'}</option>
-                  <option value="pharynx">🗣️ {isAr ? 'التهاب الحلق واللوزتين البكتيري (Streptococcal)' : 'Streptococcal Pharyngitis'}</option>
-                  <option value="lung">🫁 {isAr ? 'التهاب الرئة والجهاز التنفسي السفلي (CAP)' : 'Lower Respiratory / Pneumonia'}</option>
-                  <option value="urinary">🫘 {isAr ? 'التهاب المسالك البولية عند الأطفال (UTI)' : 'Urinary Tract Infection (UTI)'}</option>
-                  <option value="skin">🩹 {isAr ? 'التهاب الجلد والأنسجة الرخوة والحصف (Impetigo)' : 'Skin & Soft Tissue / Impetigo'}</option>
-                </select>
-                <div className={`absolute ${isAr ? 'left-4' : 'right-4'} top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-xs`}>
-                  ▼
+          {/* Row 3: Formulation, Concentration, Infection Site Side-by-Side */}
+          <div className="pt-2 border-t border-slate-800 space-y-1.5">
+            <span className="text-xs font-bold text-slate-300 block">
+              3. الشكل الصيدلاني والتركيز والاستطباب (قوائم منسدلة بأسهم):
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Formulation Dropdown with Arrow */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">شكل الدواء:</label>
+                <div className="relative">
+                  <select
+                    value={selectedFormulation}
+                    onChange={(e) => setSelectedFormulation(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+                  >
+                    <option value="syrup">🥄 شراب ومعلق (ml)</option>
+                    <option value="drops">💧 قطرات فموية (Drops)</option>
+                    <option value="suppository">💊 تحاميل شرجية</option>
+                    <option value="spray">💨 بخاخ ورذاذ (Puffs)</option>
+                    <option value="ointment">🩹 مرهم موضعي (FTU)</option>
+                    <option value="injection">💉 حقن وريدية/عضلية</option>
+                  </select>
+                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                    ▼
+                  </div>
+                </div>
+              </div>
+
+              {/* Concentration Dropdown with Arrow */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">التركيز المدون:</label>
+                <div className="relative">
+                  <select
+                    value={activeConcentration}
+                    onChange={(e) => {
+                      setActiveConcentration(Number(e.target.value));
+                      setIsUsingCustomConc(false);
+                    }}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+                  >
+                    {(isCustomDrugMode ? [
+                      { labelAr: '125 مجم / 5 مل', value: 125 },
+                      { labelAr: '156 مجم / 5 مل (أوجمنتين)', value: 156 },
+                      { labelAr: '200 مجم / 5 مل (زيثروماكس)', value: 200 },
+                      { labelAr: '250 مجم / 5 مل (شائع)', value: 250 },
+                      { labelAr: '312 مجم / 5 مل', value: 312 },
+                      { labelAr: '457 مجم / 5 مل (أوجمنتين 457)', value: 457 },
+                      { labelAr: '600 مجم / 5 مل (Augmentin ES)', value: 600 },
+                    ] : currentDrug.available_concentrations
+                      .filter(c => c.formulation === selectedFormulation || selectedFormulation === 'syrup')
+                    ).map((c: any) => (
+                      <option key={`${c.value}-${c.labelAr}`} value={c.value}>
+                        {isAr ? c.labelAr : c.labelEn}
+                      </option>
+                    ))}
+                  </select>
+                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                    ▼
+                  </div>
+                </div>
+              </div>
+
+              {/* Infection Site / Indication with Arrow */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">شدة / موضع الالتهاب:</label>
+                <div className="relative">
+                  <select
+                    value={site}
+                    onChange={(e) => setSite(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+                  >
+                    <option value="general">🩺 التهاب عام معتاد</option>
+                    <option value="ear">👂 التهاب الأذن الوسطى (جرعة مكثفة)</option>
+                    <option value="pharynx">🗣️ التهاب الحلق واللوزتين</option>
+                    <option value="lung">🫁 التهاب الرئة والشعب</option>
+                    <option value="urinary">🫘 التهاب المسالك البولية</option>
+                    <option value="skin">🩹 التهاب الجلد والحصف</option>
+                  </select>
+                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                    ▼
+                  </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* ── Right Column: Recommended Dose Output Card ── */}
-        <div className="lg:col-span-6 space-y-5">
+        {/* ── Results Card Directly Below Inputs ── */}
           {calcResult ? (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-6 relative overflow-hidden">
               <div className="flex items-center justify-between pb-4 border-b border-slate-800">
@@ -1688,258 +1506,118 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                 </button>
               </div>
 
-              {/* ── Main Big Output Badge ── */}
-              <div className="p-5 rounded-3xl bg-gradient-to-br from-teal-950/40 via-slate-950 to-slate-950 border border-teal-500/30 space-y-3">
-                <span className="text-xs font-semibold text-teal-400 uppercase tracking-wider block">
-                  {isAr ? '🎯 مقدار الجرعة الواحدة الموصى بها:' : '🎯 Single Dose Recommended:'}
-                </span>
-
-                {/* For Syrup */}
-                {selectedFormulation === 'syrup' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                        {calcResult.singleMinMl === calcResult.singleMaxMl 
-                          ? `${calcResult.singleMinMl}` 
-                          : `${calcResult.singleMinMl} – ${calcResult.singleMaxMl}`
-                        }
+              {/* ── Single Unified Results Card in Lines (مربع واحد شامل على شكل أسطر واضحة) ── */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                <div className="divide-y divide-slate-800/80 text-xs text-slate-300">
+                  {/* Row 1: Single Recommended Dose (الجرعة الواحدة) */}
+                  <div className="p-4 bg-teal-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="font-bold text-teal-300 shrink-0 w-44 flex items-center gap-1.5 text-sm">
+                      <span className="text-base">🎯</span>
+                      <span>{isAr ? 'مقدار الجرعة الواحدة:' : 'Single Recommended Dose:'}</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2 flex-wrap">
+                      <span className="text-2xl sm:text-3xl font-black text-white font-mono">
+                        {selectedFormulation === 'syrup' && (
+                          calcResult.singleMinMl === calcResult.singleMaxMl 
+                            ? `${calcResult.singleMinMl}` 
+                            : `${calcResult.singleMinMl} – ${calcResult.singleMaxMl}`
+                        )}
+                        {selectedFormulation === 'drops' && `${calcResult.dropsPerDose}`}
+                        {selectedFormulation === 'suppository' && `${calcResult.suppositoryDoseText || Math.round(calcResult.singleMinMg)}`}
+                        {selectedFormulation === 'ointment' && `${calcResult.ftuRecommendation}`}
+                        {selectedFormulation === 'spray' && `${calcResult.puffsPerDose}`}
+                        {selectedFormulation === 'injection' && `${calcResult.injectionSingleMg}`}
+                        {selectedFormulation === 'sachet' && (calcResult.sachetDoseText || (isAr ? 'كيس واحد' : '1 Sachet'))}
                       </span>
-                      <span className="text-xl font-bold text-teal-300">
-                        {isAr ? 'مل (ml)' : 'ml'}
+                      <span className="text-base font-bold text-teal-400">
+                        {selectedFormulation === 'syrup' ? (isAr ? 'مل (ml)' : 'ml') : ''}
+                        {selectedFormulation === 'drops' ? (isAr ? 'نقطة (Drops)' : 'Drops') : ''}
+                        {selectedFormulation === 'ointment' ? (isAr ? 'وحدة طرف إصبع (FTU)' : 'FTU') : ''}
+                        {selectedFormulation === 'injection' ? (isAr ? 'مجم (mg)' : 'mg') : ''}
                       </span>
-                      <span className="text-xs text-slate-400">
-                        {isAr ? `(تساوي ${calcResult.singleMinMg} مجم)` : `(${calcResult.singleMinMg} mg)`}
-                      </span>
-                    </div>
-
-                    <div className="mt-2.5 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center gap-2 text-xs text-slate-300">
-                      <Droplets className="w-4 h-4 text-teal-400 shrink-0" />
-                      <span>
-                        {isAr 
-                          ? `💡 اعطِ الطفل ${calcResult.singleMinMl} مل باستخدام سرنجة القياس الفموية أو مكيال الدواء المدرج.`
-                          : `💡 Administer ${calcResult.singleMinMl} ml using a calibrated oral measuring syringe.`
-                        }
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* For Ointment */}
-                {selectedFormulation === 'ointment' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-white font-mono">
-                        {calcResult.ftuRecommendation}
-                      </span>
-                      <span className="text-lg font-bold text-amber-300">
-                        {isAr ? 'وحدة طرف الإصبع (FTU)' : 'FTU Units'}
+                      <span className="text-[11px] text-slate-400">
+                        ({isAr ? `تعادل ${calcResult.singleMinMg} مجم من المادة الفعالة` : `equals ${calcResult.singleMinMg} mg active ingredient`})
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? currentDrug.formulation_guidelines?.ointment_ftu_advice_ar || 'ضع كمية بطول طرف الإصبع (0.5 جم) وافردها بلطف على المنطقة المصابة مرتان يومياً.'
-                        : 'Apply 1 Finger-Tip Unit gently over affected skin twice daily.'
-                      }
-                    </p>
                   </div>
-                )}
 
-                {/* For Drops */}
-                {selectedFormulation === 'drops' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-white font-mono">
-                        {calcResult.dropsPerDose}
-                      </span>
-                      <span className="text-lg font-bold text-teal-300">
-                        {isAr ? 'نقاط (Drops)' : 'Drops'}
+                  {/* Row 2: Frequency & Intervals (التكرار بالساعات) */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      <span>{isAr ? 'التكرار ومواعيد الجرعة:' : 'Interval & Timing:'}</span>
+                    </span>
+                    <div className="flex-1 font-bold text-white flex items-center gap-2">
+                      <span>{isAr ? `كل ${calcResult.intervalHours} ساعات` : `Every ${calcResult.intervalHours} hours`}</span>
+                      <span className="text-teal-400 font-normal">
+                        {isAr ? `(${calcResult.dosesPerDay} مرات يومياً)` : `(${calcResult.dosesPerDay} times daily)`}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? currentDrug.formulation_guidelines?.drops_count_advice_ar || 'ضع النقاط في الموضع المحدد حسب إرشادات الطبيب وتكرارها بالساعات.'
-                        : 'Administer drops into target site as directed.'
-                      }
-                    </p>
                   </div>
-                )}
 
-                {/* For Inhaler / Spray */}
-                {selectedFormulation === 'spray' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl font-black text-white">
-                        {calcResult.puffsPerDose}
+                  {/* Row 3: Daily Total Volume & mg (إجمالي اليوم) */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <Calculator className="w-3.5 h-3.5 text-sky-400" />
+                      <span>{isAr ? 'إجمالي الجرعة اليومية:' : 'Daily Total Dosage:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      <span className="font-bold font-mono text-white">
+                        {calcResult.dailyMinMl === calcResult.dailyMaxMl ? `${calcResult.dailyMinMl}` : `${calcResult.dailyMinMl} - ${calcResult.dailyMaxMl}`} {selectedFormulation === 'syrup' ? (isAr ? 'مل باليوم' : 'ml/day') : ''}
+                      </span>
+                      <span className="text-slate-400 mr-2 ml-2">({calcResult.dailyMinMg} {isAr ? 'مجم/يوم' : 'mg/day'})</span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Weight Rate & Max Daily Cap (المعدل بالوزن والحد الأقصى) */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isAr ? 'معدل الوزن والحد الأقصى:' : 'Weight Rate & Max Cap:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200 flex items-center gap-3">
+                      <span className="font-mono text-amber-300 font-bold">{calcResult.minMpk}–{calcResult.maxMpk} mg/kg/day</span>
+                      <span className="text-slate-600">|</span>
+                      <span className="text-rose-400 font-mono font-bold">
+                        {isAr ? `الحد الأقصى: ${calcResult.maxDailyCap} مجم/يوم` : `Max Cap: ${calcResult.maxDailyCap} mg/day`}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? currentDrug.formulation_guidelines?.inhaler_puffs_advice_ar || 'احرص على استخدام أنبوب التباعد والماسك (Spacer) لضمان وصول الرذاذ للرئتين.'
-                        : 'Use with spacer chamber & mask for pediatric pulmonary delivery.'
-                      }
-                    </p>
                   </div>
-                )}
 
-                {/* For Injection */}
-                {selectedFormulation === 'injection' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-black text-white font-mono">
-                        {calcResult.injectionSingleMg}
-                      </span>
-                      <span className="text-lg font-bold text-rose-300">
-                        {isAr ? 'مجم (mg)' : 'mg'}
-                      </span>
+                  {/* Row 5: Administration Pearl (طريقة الاستخدام) */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Droplets className="w-3.5 h-3.5 text-teal-400" />
+                      <span>{isAr ? 'طريقة وتوجيه الإعطاء:' : 'Administration Pearl:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200 leading-relaxed">
+                      {selectedFormulation === 'syrup' && (isAr ? `يُرج المعلق جيداً قبل الاستعمال، واستخدم سرنجة القياس الفموية المدرجة بدقة لتفادي الخطأ في الجرعة.` : 'Shake well before use. Use calibrated syringe for exact dosing.')}
+                      {selectedFormulation === 'drops' && (isAr ? `ضع النقاط في الفم مباشرة، وتجنب استخدام القطارة لأكثر من طفل.` : 'Administer drops directly into mouth.')}
+                      {selectedFormulation === 'suppository' && (isAr ? `توضع التحميلة عند ارتفاع الحرارة أو القيء، مع عدم تكرارها قبل مضي ${calcResult.intervalHours} ساعات.` : 'Administer rectally as needed.')}
+                      {selectedFormulation === 'ointment' && (isAr ? `ضع طبقة رقيقة بطول طرف الإصبع (FTU) وافردها بلطف على الجلد المصاب.` : 'Apply thin layer gently over affected area.')}
+                      {selectedFormulation === 'spray' && (isAr ? `استخدم أنبوب التباعد والماسك (Spacer) لضمان وصول الدواء للرئتين.` : 'Use spacer device for effective pulmonary delivery.')}
+                      {selectedFormulation === 'injection' && (isAr ? `تُعطى في المستشفى أو المركز الصحي تحت إشراف تمريضي وطبي معتمد.` : 'Clinical hospital administration.')}
+                      {selectedFormulation === 'sachet' && (isAr ? `يُذاب الكيس في 200 مل ماء نقي بدرجة حرارة الغرفة، ويُعطى بملعقة صغيرة بالتدريج.` : 'Dissolve in 200ml clean water; give slowly.')}
                     </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? currentDrug.formulation_guidelines?.injection_reconstitution_ar || 'تُعطى تحت الإشراف الطبي في المستشفى مع مراعاة طريقة الحل وحجم السائل.'
-                        : 'Hospital clinical administration; reconstitute with recommended diluent.'
-                      }
-                    </p>
                   </div>
-                )}
 
-                {/* For Suppositories */}
-                {selectedFormulation === 'suppository' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-2xl sm:text-3xl font-black text-amber-300 font-mono">
-                        {calcResult.suppositoryDoseText || (isAr ? `${Math.round(calcResult.singleMinMg)} مجم` : `${Math.round(calcResult.singleMinMg)} mg`)}
-                      </span>
+                  {/* Row 6: Clinical Warning & Pearl (تنبيه الصيدلي وموانع الاستعمال) */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 bg-rose-950/20 hover:bg-rose-950/30 transition-colors">
+                    <span className="font-bold text-rose-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>{isAr ? 'التوجيه السريري والموانع:' : 'Contraindications & Safety:'}</span>
+                    </span>
+                    <div className="flex-1 text-rose-200 leading-relaxed">
+                      {isAr ? currentDrug.clinical_pearls_ar : currentDrug.clinical_pearls_en}
+                      {currentDrug.contraindications_ar && (
+                        <span className="block mt-1 text-slate-300 text-[11px]">
+                          ⚠️ {isAr ? `موانع الاستعمال: ${currentDrug.contraindications_ar}` : `Contraindications: ${currentDrug.contraindications_en}`}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? `تحميلة شرجية واحدة كل ${calcResult.intervalHours} ساعات عند اللزوم (لا تتجاوز ${calcResult.dosesPerDay} تحاميل باليوم).`
-                        : `1 rectal suppository every ${calcResult.intervalHours} hours PRN.`}
-                    </p>
-                  </div>
-                )}
-
-                {/* For Sachets / ORS */}
-                {selectedFormulation === 'sachet' && (
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-xl sm:text-2xl font-black text-emerald-300">
-                        {calcResult.sachetDoseText || (isAr ? 'كيس واحد' : '1 Sachet')}
-                      </span>
-                    </div>
-                    <p className="text-xs text-slate-300 mt-2">
-                      {isAr 
-                        ? 'يُذاب الكيس في 200 مل ماء نقي بدرجة حرارة الغرفة، ويُعطى بملعقة صغيرة بالتدريج.'
-                        : 'Dissolve sachet in 200ml clean water; give slowly by spoon.'}
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Key Metrics Grid ── */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
-                    <Clock className="w-3.5 h-3.5 text-teal-400" />
-                    <span>{isAr ? 'التكرار بالساعات:' : 'Interval:'}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white">
-                    {isAr ? `كل ${calcResult.intervalHours} ساعات` : `Every ${calcResult.intervalHours} hrs`}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    {isAr ? `(${calcResult.dosesPerDay} مرات يومياً)` : `(${calcResult.dosesPerDay} times daily)`}
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
-                    <Calculator className="w-3.5 h-3.5 text-amber-400" />
-                    <span>{isAr ? 'معدل الجرعة بالوزن:' : 'Dose Rate:'}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white font-mono">
-                    {calcResult.minMpk}–{calcResult.maxMpk}
-                  </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
-                    mg / kg / day
-                  </div>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800">
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs mb-1">
-                    <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
-                    <span>{isAr ? 'الحد الأقصى اليومي:' : 'Max Daily Cap:'}</span>
-                  </div>
-                  <div className="text-sm font-bold text-white font-mono">
-                    {calcResult.maxDailyCap} mg
-                  </div>
-                  <div className="text-[10px] text-rose-400/80 mt-0.5">
-                    {isAr ? 'لا يُتجاوز مطلقاً' : 'Never exceed'}
                   </div>
                 </div>
               </div>
-
-              {/* Clinical Antibiotic Rationale Note (if antibiotic modified) */}
-              {calcResult.rationaleAr && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2.5">
-                  <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-bold block mb-0.5">
-                      {isAr ? 'تكييف جرعة المضاد حسب موضع الالتهاب:' : 'Site-Specific Antibiotic Adjustment:'}
-                    </span>
-                    <p className="text-slate-300">
-                      {isAr ? calcResult.rationaleAr : calcResult.rationaleEn}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Safety Warnings & Red Flags */}
-              <div className="space-y-2">
-                {calcResult.isWeightWarning && (
-                  <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                    <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>
-                      {isAr 
-                        ? 'تنبيه سريري: وزن الطفل غير معتاد (أقل من 2.5 كجم أو أكثر من 55 كجم). يُرجى التدقيق الطبي.'
-                        : 'Clinical alert: Out-of-range child weight (<2.5kg or >55kg). Clinical verification required.'
-                      }
-                    </span>
-                  </div>
-                )}
-
-                <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-1">
-                  <span className="font-bold text-slate-200 block">
-                    {isAr ? '💡 توجيهات الصيدلي السريري وموانع الاستعمال:' : 'Clinical Pearls & Contraindications:'}
-                  </span>
-                  <p className="text-slate-400">
-                    {isAr ? currentDrug.clinical_pearls_ar : currentDrug.clinical_pearls_en}
-                  </p>
-                  <p className="text-rose-400/90 text-[11px] pt-1">
-                    {isAr ? `⚠️ موانع الاستعمال: ${currentDrug.contraindications_ar}` : `⚠️ Contraindications: ${currentDrug.contraindications_en}`}
-                  </p>
-                </div>
-              </div>
-
-              {/* Live Clinical API Response Integration Badge */}
-              {apiResult && (
-                <div className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>{isAr ? 'تحقق سريري معتمد من الـ API الذكي:' : 'Verified Clinical AI Engine Result:'}</span>
-                    </span>
-                    <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-mono">
-                      {apiResult.scientificReference || 'BNFC Guidelines'}
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-300">
-                    {isAr ? apiResult.volumeTextAr : apiResult.volumeTextEn} — {isAr ? apiResult.frequencyTextAr : apiResult.frequencyTextEn}
-                  </p>
-                  {apiResult.infectionSiteEffectAr && (
-                    <p className="text-[11px] text-indigo-200">
-                      {isAr ? apiResult.infectionSiteEffectAr : apiResult.infectionSiteEffectEn}
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           ) : (
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center text-slate-400">
@@ -1951,6 +1629,6 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
           )}
         </div>
       </div>
-    </div>
   );
 };
+

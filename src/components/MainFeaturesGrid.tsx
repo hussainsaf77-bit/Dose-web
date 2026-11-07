@@ -42,6 +42,7 @@ export const MainFeaturesGrid: React.FC<MainFeaturesGridProps> = ({ onSelectFeat
   const isAr = language === 'ar';
 
   const features: FeatureItem[] = [
+
     // السطر 1
     {
       id: 'pregnancy',

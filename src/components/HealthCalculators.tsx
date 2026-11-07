@@ -443,211 +443,166 @@ export const HealthCalculators: React.FC = () => {
           TAB 1: IDEAL BODY WEIGHT (IBW), BMI & CLINICAL DOSING WEIGHT
          ======================================================== */}
       {activeTab === 'ibw_bmi' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="space-y-6">
           
-          {/* Inputs Column */}
-          <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
-              <Scale className="w-4 h-4 text-teal-400" />
-              <span>القياسات الحيوية للمريض</span>
-            </h3>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">الوزن الفعلي الحالي (كجم):</label>
-              <input
-                id="ibw-weight-input"
-                type="number"
-                step="0.5"
-                value={weightKg}
-                onChange={(e) => setWeightKg(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-teal-500"
-              />
+          {/* Inputs Row: Side-by-Side before results */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Scale className="w-4 h-4 text-teal-400" />
+                <span>المدخلات والقياسات الحيوية (قبل النتيجة):</span>
+              </h3>
+              <span className="text-[11px] text-teal-400 font-mono">حساب فوري وتلقائي</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">الطول (سم):</label>
-              <input
-                id="ibw-height-input"
-                type="number"
-                value={heightCm}
-                onChange={(e) => setHeightCm(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-teal-500"
-              />
-            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الوزن الحالي (كجم):</label>
+                <input
+                  id="ibw-weight-input"
+                  type="number"
+                  step="0.5"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                  placeholder="74"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-teal-500"
+                />
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الطول (سم):</label>
+                <input
+                  id="ibw-height-input"
+                  type="number"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  placeholder="174"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-teal-500"
+                />
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">العمر (سنوات):</label>
                 <input
                   type="number"
                   value={bmiAge}
                   onChange={(e) => setBmiAge(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-teal-500"
+                  placeholder="30"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-teal-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الجنس البيولوجي:</label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-teal-500"
-                >
-                  <option value="male">ذكر (Male)</option>
-                  <option value="female">أنثى (Female)</option>
-                </select>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الجنس البيولوجي (سهم):</label>
+                <div className="relative">
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-semibold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+                  >
+                    <option value="male">ذكر (Male) 👨</option>
+                    <option value="female">أنثى (Female) 👩</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs">
+                    ▼
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Clinical Note on Drug Dosing */}
-            <div className="p-3.5 rounded-xl bg-teal-950/40 border border-teal-500/30 text-xs text-teal-200 space-y-1">
-              <div className="flex items-center gap-1.5 font-bold text-teal-300">
-                <Info className="w-3.5 h-3.5 shrink-0" />
-                <span>أهمية الوزن المثالي في الصيدلة السريرية:</span>
-              </div>
-              <p className="text-[11px] leading-relaxed text-teal-100/90">
-                تعتمد بروتوكولات المستشفيات على معادلة <strong>ديفاين (Devine Formula)</strong> لحساب جرعات المضادات الحيوية (كالـ Aminoglycosides و Vancomycin) والأدوية الحرجة لتجنب الفشل الكلوي الناجم عن التوزيع المائي الزائد في حالات السمنة.
-              </p>
             </div>
           </div>
 
-          {/* Results Column */}
-          <div className="lg:col-span-7 space-y-5">
+          {/* Results Area Directly Below */}
+          <div className="space-y-5">
             {ibwAndBmiResult ? (
-              <>
-                {/* BMI Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <h3 className="text-base font-bold text-white flex items-center gap-2">
-                      <Scale className="w-4 h-4 text-teal-400" />
-                      <span>مؤشر كتلة الجسم (BMI)</span>
-                    </h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold border ${ibwAndBmiResult.colorClass}`}>
-                      {ibwAndBmiResult.category}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row items-center gap-6">
-                    <div className="text-center p-4 rounded-2xl bg-slate-950 border border-slate-800 min-w-[140px]">
-                      <span className="text-xs text-slate-400 block mb-1">الـ BMI الحالي</span>
-                      <div className="text-4xl font-black text-white font-mono">{ibwAndBmiResult.bmi}</div>
-                      <span className="text-[10px] text-slate-500">kg/m²</span>
-                    </div>
-
-                    <div className="flex-1 space-y-2 text-xs">
-                      <p className="text-slate-300 leading-relaxed">
-                        {ibwAndBmiResult.tip}
-                      </p>
-                      <div className="grid grid-cols-2 gap-2 pt-2 text-[11px] text-slate-400">
-                        <div>
-                          <span>النطاق الصحي لطولك: </span>
-                          <strong className="text-emerald-400 font-mono">{ibwAndBmiResult.minHealthyWt} - {ibwAndBmiResult.maxHealthyWt} كجم</strong>
-                        </div>
-                        <div>
-                          <span>احتياج الماء اليومي: </span>
-                          <strong className="text-sky-400 font-mono">{ibwAndBmiResult.waterLiters} لتر</strong>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+                <div className="px-5 py-3.5 bg-slate-800/60 border-b border-slate-800 flex items-center justify-between">
+                  <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-teal-400" />
+                    <span>النتائج السريرية لمؤشرات الوزن وكتلة الجسم (ملخص منظم في أسطر):</span>
+                  </h3>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${ibwAndBmiResult.colorClass}`}>
+                    {ibwAndBmiResult.category}
+                  </span>
                 </div>
 
-                {/* Clinical IBW Dosing Formulas Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div>
-                      <h3 className="text-base font-bold text-white flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                        <span>معادلات الوزن المثالي السريرية (Clinical IBW Formulas)</span>
-                      </h3>
-                      <p className="text-[11px] text-slate-400">مقارنة شاملة بين أشهر المعادلات المعتمدة في مراجع الطب والصيدلة</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    
-                    {/* Devine */}
-                    <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-500/40 text-center">
-                      <span className="text-[10px] text-emerald-400 font-bold block mb-1">معادلة ديفاين (Devine)</span>
-                      <div className="text-2xl font-black text-white font-mono">{ibwAndBmiResult.devineIBW}</div>
-                      <span className="text-[10px] text-emerald-300/80 font-semibold block mt-0.5">المعيار السريري الذهبي</span>
-                    </div>
-
-                    {/* Robinson */}
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 font-bold block mb-1">معادلة روبنسون (Robinson)</span>
-                      <div className="text-2xl font-black text-white font-mono">{ibwAndBmiResult.robinsonIBW}</div>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">كجم</span>
-                    </div>
-
-                    {/* Miller */}
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 font-bold block mb-1">معادلة ميلر (Miller)</span>
-                      <div className="text-2xl font-black text-white font-mono">{ibwAndBmiResult.millerIBW}</div>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">كجم</span>
-                    </div>
-
-                    {/* Hamwi */}
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 font-bold block mb-1">معادلة هاموي (Hamwi)</span>
-                      <div className="text-2xl font-black text-white font-mono">{ibwAndBmiResult.hamwiIBW}</div>
-                      <span className="text-[10px] text-slate-500 block mt-0.5">كجم</span>
-                    </div>
-                  </div>
-
-                  {/* Adjusted Body Weight for Dosing Alert */}
-                  <div className={`p-4 rounded-xl border ${
-                    ibwAndBmiResult.isObeseForDosing
-                      ? 'bg-amber-950/30 border-amber-500/40 text-amber-200'
-                      : 'bg-slate-950 border-slate-800 text-slate-300'
-                  } space-y-2`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className={`w-4 h-4 ${ibwAndBmiResult.isObeseForDosing ? 'text-amber-400' : 'text-slate-400'}`} />
-                        <span className="font-bold text-xs sm:text-sm">
-                          الوزن المعدل للجرعات الدوائية (Adjusted Body Weight - AdjBW):
-                        </span>
-                      </div>
-                      <span className="text-lg font-black font-mono text-white">
-                        {ibwAndBmiResult.adjustedBW} كجم
+                <div className="divide-y divide-slate-800/80 text-xs text-slate-300">
+                  {/* Row 1: BMI */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
+                      <Scale className="w-3.5 h-3.5 text-teal-400" />
+                      <span>مؤشر كتلة الجسم (BMI):</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="text-xl sm:text-2xl font-black text-white font-mono">{ibwAndBmiResult.bmi}</span>
+                      <span className="text-xs text-slate-400">kg/m²</span>
+                      <span className={`mr-2 px-2 py-0.5 rounded text-[11px] font-bold border ${ibwAndBmiResult.colorClass}`}>
+                        {ibwAndBmiResult.category}
                       </span>
                     </div>
-                    <p className="text-[11px] leading-relaxed">
-                      {ibwAndBmiResult.isObeseForDosing ? (
-                        <span>
-                          ⚠️ <strong>تنبيه سريري:</strong> وزن المريض الفعلي يعادل <strong>{ibwAndBmiResult.percentOfIBW}%</strong> من وزنه المثالي (&gt; 120% سمنة). يجب استخدام <strong>الوزن المعدل ({ibwAndBmiResult.adjustedBW} kg)</strong> لحساب جرعات الأدوية المحبة للماء (Hydrophilic drugs: أدوية العناية، أميكاسين، جنتامايسين، فانكومايسين) لتفادي السمية الكلوية والجرعات الزائدة.
-                        </span>
-                      ) : (
-                        <span>
-                          وزن المريض يعادل {ibwAndBmiResult.percentOfIBW}% من وزنه المثالي (ضمن المعدل الآمن &le; 120%). يتم اعتماد الوزن الفعلي أو المثالي وفق طبيعة كل دواء.
-                        </span>
-                      )}
-                    </p>
                   </div>
 
-                  {/* Surface Area & Lean Body Weight */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 block mb-0.5">مساحة سطح الجسم (Mosteller BSA)</span>
-                      <div className="text-xl font-bold text-teal-400 font-mono">{ibwAndBmiResult.bsaMosteller} m²</div>
-                      <span className="text-[10px] text-slate-500">لجرعات الأورام والمحاليل</span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 block mb-0.5">مساحة سطح الجسم (DuBois BSA)</span>
-                      <div className="text-xl font-bold text-sky-400 font-mono">{ibwAndBmiResult.bsaDuBois} m²</div>
-                      <span className="text-[10px] text-slate-500">معادلة دوبوا التقليدية</span>
-                    </div>
-
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                      <span className="text-[10px] text-slate-400 block mb-0.5">كتلة الجسم الصافية (Lean Mass Boer)</span>
-                      <div className="text-xl font-bold text-purple-400 font-mono">{ibwAndBmiResult.lbwBoer} كجم</div>
-                      <span className="text-[10px] text-slate-500">بدون دهون المخزون</span>
+                  {/* Row 2: Ideal Body Weight */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>الوزن المثالي الطبي (Devine IBW):</span>
+                    </span>
+                    <div className="flex-1 flex items-center gap-3">
+                      <span className="text-lg font-bold text-emerald-400 font-mono">{ibwAndBmiResult.devineIBW} كجم</span>
+                      <span className="text-slate-400">| النطاق الصحي لطولك: {ibwAndBmiResult.minHealthyWt} - {ibwAndBmiResult.maxHealthyWt} كجم</span>
                     </div>
                   </div>
 
+                  {/* Row 3: Daily Water Requirement */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
+                      <Droplets className="w-3.5 h-3.5 text-sky-400" />
+                      <span>احتياج الماء اليومي الموصى به:</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      <span className="text-base font-bold text-sky-400 font-mono">{ibwAndBmiResult.waterLiters} لتر/يوم</span>
+                      <span className="text-slate-400 mr-2 ml-2">(حوالي {Math.round(parseFloat(ibwAndBmiResult.waterLiters) * 4)} أكواب ماء)</span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Clinical Dosing Weight */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-400" />
+                      <span>الوزن المعتمد لجرعات الأدوية (AdjBW):</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      <span className="text-base font-bold text-amber-300 font-mono">{ibwAndBmiResult.adjustedBW} كجم</span>
+                      <span className="text-slate-400 mr-2 ml-2 text-[11px]">
+                        ({ibwAndBmiResult.percentOfIBW}% من الوزن المثالي - {ibwAndBmiResult.isObeseForDosing ? 'يستخدم للأدوية المحبة للماء كالمضادات والمحاليل' : 'ضمن النطاق الآمن المعتاد'})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Body Surface Area & Lean Mass */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-purple-400" />
+                      <span>مساحة سطح الجسم والكتلة الصافية:</span>
+                    </span>
+                    <div className="flex-1 text-slate-300 text-[11px] flex items-center gap-3">
+                      <span>Mosteller BSA: <strong className="text-teal-400 font-mono">{ibwAndBmiResult.bsaMosteller} m²</strong></span>
+                      <span>•</span>
+                      <span>كتلة الجسم الصافية: <strong className="text-purple-300 font-mono">{ibwAndBmiResult.lbwBoer} كجم</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Row 6: Clinical Recommendation */}
+                  <div className="p-3.5 bg-slate-950/60 flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                    <span className="font-bold text-teal-300 shrink-0 w-48 flex items-center gap-1.5 pt-0.5">
+                      <span>💡 التوجيه والنصيحة الطبية:</span>
+                    </span>
+                    <div className="flex-1 text-slate-300 leading-relaxed">
+                      {ibwAndBmiResult.tip}
+                    </div>
+                  </div>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="p-8 rounded-2xl bg-slate-900 border border-slate-800 text-center text-slate-500">
                 يرجى إدخال الطول والوزن بدقة لاحتساب كافة المؤشرات السريرية
@@ -695,28 +650,41 @@ export const HealthCalculators: React.FC = () => {
               </button>
             </div>
 
-            {/* Condition Pills */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-              {clinicalConditions.map((c) => {
-                const isSelected = selectedCondition === c.id;
+            {/* Condition Dropdown Select with Arrow */}
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-slate-300">
+                اختر الحالة المرضية (قائمة منسدلة):
+              </label>
+              <div className="relative">
+                <select
+                  value={selectedCondition}
+                  onChange={(e) => {
+                    setSelectedCondition(e.target.value);
+                    handleGenerateTherapeuticDiet(e.target.value);
+                  }}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-xs sm:text-sm text-white font-bold focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer pr-10"
+                >
+                  {clinicalConditions.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 pointer-events-none text-xs">
+                  ▼
+                </div>
+              </div>
+
+              {/* Selected Condition Quick Description */}
+              {(() => {
+                const activeC = clinicalConditions.find(c => c.id === selectedCondition);
+                if (!activeC) return null;
                 return (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setSelectedCondition(c.id);
-                      handleGenerateTherapeuticDiet(c.id);
-                    }}
-                    className={`p-3 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between ${
-                      isSelected
-                        ? 'bg-emerald-500/15 border-emerald-500 text-white shadow-md shadow-emerald-500/10'
-                        : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className="font-bold text-xs leading-snug">{c.name}</span>
-                    <span className="text-[10px] text-slate-400 line-clamp-2 mt-1">{c.desc}</span>
-                  </button>
+                  <p className="text-xs text-emerald-300/90 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20">
+                    💡 <strong>الملف السريري:</strong> {activeC.desc}
+                  </p>
                 );
-              })}
+              })()}
             </div>
           </div>
 
@@ -1050,103 +1018,185 @@ export const HealthCalculators: React.FC = () => {
       {/* ========================================================
           TAB 4: CALORIES & MACROS (TDEE)
          ======================================================== */}
+      {/* ========================================================
+          TAB 4: CALORIES & MACROS (TDEE)
+         ======================================================== */}
       {activeTab === 'calories' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Controls */}
-          <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <h3 className="text-base font-bold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
-              <Flame className="w-4 h-4 text-amber-400" />
-              <span>النشاط والهدف البدني</span>
-            </h3>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">مستوى النشاط الحركي:</label>
-              <select
-                value={activityLevel}
-                onChange={(e) => setActivityLevel(parseFloat(e.target.value))}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
-              >
-                <option value={1.2}>خامل (عمل مكتبي، قليل الحركة أو ملازم للفراش)</option>
-                <option value={1.375}>خفيف (رياضة خفيفة أو مشي 1-3 أيام/أسبوع)</option>
-                <option value={1.55}>متوسط (تمارين معتدلة 3-5 أيام/أسبوع)</option>
-                <option value={1.725}>عالي (تمارين شاقة أو عمل بدني 6-7 أيام/أسبوع)</option>
-              </select>
+        <div className="space-y-6">
+          {/* Controls: Inputs and options side-by-side before results */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <Flame className="w-4 h-4 text-amber-400" />
+                <span>المدخلات والنشاط والهدف البدني (قبل النتيجة):</span>
+              </h3>
+              <span className="text-[11px] text-amber-400 font-mono">معادلة Mifflin-St Jeor</span>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">الهدف العلاجي / البدني:</label>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'lose', label: 'إنقاص وزن (عجز 500)' },
-                  { id: 'maintain', label: 'تثبيت الوزن الحالي' },
-                  { id: 'gain', label: 'بناء عضلي (+450)' },
-                ].map((g) => (
-                  <button
-                    key={g.id}
-                    type="button"
-                    onClick={() => setCalorieGoal(g.id as any)}
-                    className={`py-2 px-2 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
-                      calorieGoal === g.id
-                        ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 font-bold'
-                        : 'bg-slate-950/60 text-slate-400 border-slate-800'
-                    }`}
+            {/* Row 1: Basic Biometrics side-by-side */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الوزن (كجم):</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الطول (سم):</label>
+                <input
+                  type="number"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">العمر (سنوات):</label>
+                <input
+                  type="number"
+                  value={bmiAge}
+                  onChange={(e) => setBmiAge(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">الجنس (سهم):</label>
+                <div className="relative">
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-semibold focus:outline-none focus:border-amber-500 appearance-none cursor-pointer pr-8"
                   >
-                    {g.label}
-                  </button>
-                ))}
+                    <option value="male">ذكر (Male) 👨</option>
+                    <option value="female">أنثى (Female) 👩</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none text-xs">
+                    ▼
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="pt-2 text-[11px] text-slate-400 space-y-1">
-              <p>* يعتمد الحساب على معادلة <strong>ميفلين-سانت جور (Mifflin-St Jeor)</strong> وهي الأدق سريرياً بحسب جمعية التغذية الأمريكية (AND).</p>
+            {/* Row 2: Activity & Goal Dropdowns side-by-side with arrows */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2 border-t border-slate-800">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  مستوى النشاط الحركي اليومي (قائمة منسدلة):
+                </label>
+                <div className="relative">
+                  <select
+                    value={activityLevel}
+                    onChange={(e) => setActivityLevel(parseFloat(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-medium focus:outline-none focus:border-amber-500 appearance-none cursor-pointer pr-8"
+                  >
+                    <option value={1.2}>خامل (عمل مكتبي، قليل الحركة أو ملازم للفراش)</option>
+                    <option value={1.375}>خفيف (رياضة خفيفة أو مشي 1-3 أيام/أسبوع)</option>
+                    <option value={1.55}>متوسط (تمارين معتدلة 3-5 أيام/أسبوع)</option>
+                    <option value={1.725}>عالي (تمارين شاقة أو عمل بدني 6-7 أيام/أسبوع)</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none text-xs">
+                    ▼
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  الهدف البدني والغذائي (قائمة منسدلة):
+                </label>
+                <div className="relative">
+                  <select
+                    value={calorieGoal}
+                    onChange={(e) => setCalorieGoal(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-medium focus:outline-none focus:border-amber-500 appearance-none cursor-pointer pr-8"
+                  >
+                    <option value="lose">إنقاص الوزن ونزول الدهون (عجز آمن 500 سعر/يوم)</option>
+                    <option value="maintain">تثبيت واستقرار الوزن الحالي</option>
+                    <option value="gain">بناء وزيادة كتلة عضلية (+450 سعر/يوم)</option>
+                  </select>
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 pointer-events-none text-xs">
+                    ▼
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Calorie Output */}
-          <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
+          {/* Calorie Output Directly Below */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5">
             <h3 className="text-base font-bold text-white pb-3 border-b border-slate-800">
               الخطة اليومية للسعرات والمغذيات الكبرى (Macros)
             </h3>
 
             {calorieResult ? (
-              <div className="space-y-5">
-                <div className="p-5 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-950 to-slate-900 border border-amber-500/30 text-center">
-                  <span className="text-xs text-amber-300 font-semibold block mb-1">
-                    السعرات اليومية الموصى بها لهدفك:
-                  </span>
-                  <div className="text-5xl font-black text-white font-mono tracking-tight my-2">
-                    {calorieResult.target} <span className="text-xl font-bold text-amber-400">kcal</span>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-400 mt-2">
-                    <span>معدل الأيض الأساسي (BMR Mifflin): {calorieResult.bmrMifflin} kcal</span>
-                    <span>•</span>
-                    <span>معدل هاريس-بينيديكت (Harris): {calorieResult.bmrHarris} kcal</span>
-                    <span>•</span>
-                    <span>إجمالي الاستهلاك (TDEE): {calorieResult.tdee} kcal</span>
-                  </div>
-                </div>
-
-                {/* Macro Split */}
-                <div className="grid grid-cols-3 gap-3">
-                  {/* Protein */}
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <span className="text-xs text-rose-400 font-bold block mb-1">بروتين (Protein)</span>
-                    <div className="text-2xl font-bold text-white font-mono">{calorieResult.proteinGrams}g</div>
-                    <span className="text-[11px] text-slate-500 mt-0.5 block">30% من السعرات</span>
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                <div className="divide-y divide-slate-800/80 text-xs text-slate-300">
+                  {/* Row 1: Target Calories */}
+                  <div className="p-4 bg-amber-950/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="font-bold text-amber-300 shrink-0 w-44 flex items-center gap-1.5 text-sm">
+                      <span>🔥</span>
+                      <span>السعرات اليومية الموصى بها:</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="text-3xl font-black text-white font-mono">{calorieResult.target}</span>
+                      <span className="text-base font-bold text-amber-400">سعر حراري (kcal/day)</span>
+                    </div>
                   </div>
 
-                  {/* Carbs */}
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <span className="text-xs text-sky-400 font-bold block mb-1">كربوهيدرات (Carbs)</span>
-                    <div className="text-2xl font-bold text-white font-mono">{calorieResult.carbsGrams}g</div>
-                    <span className="text-[11px] text-slate-500 mt-0.5 block">40% من السعرات</span>
+                  {/* Row 2: TDEE & BMR */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <Activity className="w-3.5 h-3.5 text-teal-400" />
+                      <span>معدل الحرق والاستهلاك (TDEE):</span>
+                    </span>
+                    <div className="flex-1 text-slate-200 flex items-center gap-3">
+                      <span>إجمالي الحرق اليومي: <strong className="text-white font-mono">{calorieResult.tdee} kcal</strong></span>
+                      <span className="text-slate-600">|</span>
+                      <span>معدل الأيض الأساسي (BMR): <strong className="text-slate-300 font-mono">{calorieResult.bmrMifflin} kcal</strong></span>
+                    </div>
                   </div>
 
-                  {/* Fats */}
-                  <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-center">
-                    <span className="text-xs text-amber-400 font-bold block mb-1">دهون صحية (Fats)</span>
-                    <div className="text-2xl font-bold text-white font-mono">{calorieResult.fatGrams}g</div>
-                    <span className="text-[11px] text-slate-500 mt-0.5 block">30% من السعرات</span>
+                  {/* Row 3: Protein */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-rose-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <span>🥩</span>
+                      <span>احتياج البروتين اليومي (30%):</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-white font-mono">{calorieResult.proteinGrams}</span>
+                      <span className="text-xs text-rose-300">جرام/يوم (لبناء وترميم الأنسجة)</span>
+                    </div>
+                  </div>
+
+                  {/* Row 4: Carbs */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-sky-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <span>🌾</span>
+                      <span>الكربوهيدرات المعقدة (40%):</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-white font-mono">{calorieResult.carbsGrams}</span>
+                      <span className="text-xs text-sky-300">جرام/يوم (طاقة للجسم والدماغ)</span>
+                    </div>
+                  </div>
+
+                  {/* Row 5: Healthy Fats */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-amber-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <span>🥑</span>
+                      <span>الدهون الصحية الأساسية (30%):</span>
+                    </span>
+                    <div className="flex-1 flex items-baseline gap-2">
+                      <span className="text-xl font-bold text-white font-mono">{calorieResult.fatGrams}</span>
+                      <span className="text-xs text-amber-300">جرام/يوم (للهرمونات وامتصاص الفيتامينات)</span>
+                    </div>
                   </div>
                 </div>
               </div>

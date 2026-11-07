@@ -524,21 +524,58 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
           </div>
         )}
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 mt-3 scrollbar-thin">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === cat.id
-                  ? 'bg-teal-500 text-white shadow-md shadow-teal-500/20 font-bold'
-                  : 'bg-slate-800/80 text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              {isAr ? cat.labelAr : cat.labelEn}
-            </button>
-          ))}
+        {/* Sleek Category Dropdown Select with Arrow */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3 border-t border-slate-800">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>{isAr ? 'تصنيف ومجموعة الأدوية (قائمة منسدلة):' : 'Drug Therapeutic Class (Dropdown):'}</span>
+              <span className="text-[10px] text-teal-400 font-mono">({categories.length} فئات)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="select-drug-category"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-medium focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-9"
+              >
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {isAr ? cat.labelAr : cat.labelEn}
+                  </option>
+                ))}
+              </select>
+              <div className={`absolute ${isAr ? 'left-3.5' : 'right-3.5'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                ▼
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
+              <span>{isAr ? 'اختيار دواء مباشر من القائمة:' : 'Quick Select Medication:'}</span>
+              <span className="text-[10px] text-slate-400">({filteredDrugs.length} دواء متاح)</span>
+            </label>
+            <div className="relative">
+              <select
+                id="select-direct-drug"
+                value={activeDrug?.id || ''}
+                onChange={(e) => {
+                  const found = drugsList.find(d => d.id === e.target.value);
+                  if (found) setActiveDrug(found);
+                }}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white font-medium focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-9"
+              >
+                {filteredDrugs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name_ar} ({d.name_en}) — {d.trade_names?.slice(0, 2).join(', ') || d.class_ar}
+                  </option>
+                ))}
+              </select>
+              <div className={`absolute ${isAr ? 'left-3.5' : 'right-3.5'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                ▼
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -731,202 +768,191 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
                 </div>
               )}
 
-              {/* Commercial & Trade Aliases */}
-              <div>
-                <span className="text-xs font-semibold text-slate-400 block mb-1.5">
-                  {isCardAr 
-                    ? 'الأسماء التجارية والبدائل الصيدلانية الشائعة (Brand & Trade Names):'
-                    : 'Popular Trade Names & Pharmacy Brands:'}
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {(activeDrug.trade_names && activeDrug.trade_names.length > 0 ? activeDrug.trade_names : activeDrug.aliases).map((alias, i) => (
-                    <span
-                      key={i}
-                      className="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-200 text-xs border border-slate-700/80 font-medium"
-                    >
-                      {alias}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Indications (دواعي الاستعمال) if available */}
-              {((isCardAr && activeDrug.indications_ar && activeDrug.indications_ar.length > 0) ||
-                (!isCardAr && activeDrug.indications_en && activeDrug.indications_en.length > 0)) && (
-                <div className="p-3.5 rounded-xl bg-teal-950/15 border border-teal-900/30">
-                  <span className="text-xs font-bold text-teal-300 block mb-1.5 flex items-center gap-1.5">
-                    <BookmarkCheck className="w-3.5 h-3.5 text-teal-400" />
-                    {isCardAr ? 'دواعي الاستعمال السريرية (Indications):' : 'Clinical Indications:'}
+              {/* Unified Single Clinical Monograph Card (مربع واحد شامل على شكل أسطر واضحة) */}
+              <div className="bg-slate-950/80 border border-slate-800 rounded-2xl overflow-hidden shadow-inner">
+                <div className="px-5 py-3.5 bg-slate-800/60 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-bold text-teal-300 flex items-center gap-2">
+                    <Pill className="w-4 h-4 text-teal-400" />
+                    <span>{isCardAr ? '📋 البيانات السريرية المعتمدة للدواء (ملخص منظم في أسطر):' : '📋 Verified Clinical Monograph (Clean Row Summary):'}</span>
                   </span>
-                  <div className="flex flex-wrap gap-2">
-                    {(isCardAr ? activeDrug.indications_ar : activeDrug.indications_en)?.map((ind, idx) => (
-                      <span key={idx} className="px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-200 text-xs border border-teal-500/20">
-                        • {ind}
-                      </span>
-                    ))}
-                  </div>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    BNF / FDA Guidelines
+                  </span>
                 </div>
-              )}
 
-              {/* Dosages Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Adult Dose */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div className="flex items-center gap-2 text-sky-400 text-xs font-bold mb-1">
-                    <Activity className="w-4 h-4" />
-                    <span>{isCardAr ? 'جرعة الكبار (Adult Dosage)' : 'Adult Dosage'}</span>
+                <div className="divide-y divide-slate-800/80 text-xs text-slate-300">
+                  {/* Row 1: Brand & Trade Names */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5">
+                      <BookmarkCheck className="w-3.5 h-3.5 text-teal-400" />
+                      <span>{isCardAr ? 'الأسماء التجارية والبدائل:' : 'Trade & Brand Names:'}</span>
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 flex-1">
+                      {(activeDrug.trade_names && activeDrug.trade_names.length > 0 ? activeDrug.trade_names : activeDrug.aliases).map((alias, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 border border-slate-700 font-medium">
+                          {alias}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-sm sm:text-base font-bold text-white mt-1 leading-relaxed">
-                    {isCardAr 
-                      ? (activeDrug.adult_dosage_text_ar || (activeDrug.adult_min ? `${activeDrug.adult_min} - ${activeDrug.adult_max || activeDrug.adult_min} mg` : 'حسب التوجيه السريري'))
-                      : (activeDrug.adult_dosage_text_en || (activeDrug.adult_min ? `${activeDrug.adult_min} - ${activeDrug.adult_max || activeDrug.adult_min} mg` : 'As clinically directed'))
-                    }
+
+                  {/* Row 2: Indications */}
+                  {((isCardAr && activeDrug.indications_ar && activeDrug.indications_ar.length > 0) ||
+                    (!isCardAr && activeDrug.indications_en && activeDrug.indications_en.length > 0)) && (
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                      <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                        <Activity className="w-3.5 h-3.5 text-sky-400" />
+                        <span>{isCardAr ? 'دواعي الاستعمال:' : 'Clinical Indications:'}</span>
+                      </span>
+                      <div className="flex-1 space-y-1 text-slate-200">
+                        {(isCardAr ? activeDrug.indications_ar : activeDrug.indications_en)?.map((ind, idx) => (
+                          <div key={idx} className="flex items-center gap-1.5">
+                            <span className="text-teal-400">•</span>
+                            <span>{ind}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Adult Dose */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{isCardAr ? 'جرعة البالغين اليومية:' : 'Adult Daily Dosage:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      <div className="font-bold text-white text-sm">
+                        {isCardAr 
+                          ? (activeDrug.adult_dosage_text_ar || (activeDrug.adult_min ? `${activeDrug.adult_min} - ${activeDrug.adult_max || activeDrug.adult_min} مجم` : 'حسب التوجيه السريري'))
+                          : (activeDrug.adult_dosage_text_en || (activeDrug.adult_min ? `${activeDrug.adult_min} - ${activeDrug.adult_max || activeDrug.adult_min} mg` : 'As directed'))
+                        }
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-3">
+                        <span>{activeDrug.adult_freq || (isCardAr ? 'حسب التوجيه الطبي' : 'As directed')}</span>
+                        {activeDrug.max_daily && (
+                          <span className="text-amber-400 font-mono">
+                            {isCardAr ? `(الحد الأقصى: ${activeDrug.max_daily})` : `(Max cap: ${activeDrug.max_daily})`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-slate-400 text-xs mt-1">
-                    {activeDrug.adult_freq || (isCardAr ? 'حسب التوجيه الطبي' : 'As clinically directed')}
-                  </p>
-                  {activeDrug.max_daily && (
-                    <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-                      <span>{isCardAr ? 'الحد الأقصى اليومي:' : 'Max Daily Dose:'}</span>
-                      <span className="font-semibold text-white">{activeDrug.max_daily}</span>
+
+                  {/* Row 4: Pediatric Dose */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Baby className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isCardAr ? 'جرعة الأطفال بالوزن:' : 'Pediatric Dosing:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      <div className="font-semibold text-white">
+                        {isCardAr 
+                          ? (activeDrug.pediatric_dosage_text_ar || (activeDrug.mpk_min ? `${activeDrug.mpk_min} - ${activeDrug.mpk_max || activeDrug.mpk_min} مجم/كجم/يوم` : 'لا يُعطى للأطفال أو يحتاج تقييم استشاري أطفال'))
+                          : (activeDrug.pediatric_dosage_text_en || (activeDrug.mpk_min ? `${activeDrug.mpk_min} - ${activeDrug.mpk_max || activeDrug.mpk_min} mg/kg/day` : 'Not indicated or specialist review'))
+                        }
+                      </div>
+                      {activeDrug.conc && (
+                        <div className="text-[11px] text-teal-400 mt-0.5 font-mono">
+                          {isCardAr ? `تركيز الشراب المعتاد: ${activeDrug.conc} مجم / 5 مل` : `Syrup Conc: ${activeDrug.conc} mg / 5ml`}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 5: Administration Instructions */}
+                  {(activeDrug.administration_ar || activeDrug.administration_en) && (
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                      <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                        <Clock className="w-3.5 h-3.5 text-teal-400" />
+                        <span>{isCardAr ? 'طريقة وتوقيت الاستخدام:' : 'Administration Timing:'}</span>
+                      </span>
+                      <div className="flex-1 text-slate-200">
+                        {isCardAr ? (activeDrug.administration_ar || activeDrug.administration_en) : (activeDrug.administration_en || activeDrug.administration_ar)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 6: Pregnancy & Lactation */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                      <span>{isCardAr ? 'أمان الحمل والرضاعة:' : 'Pregnancy & Lactation:'}</span>
+                    </span>
+                    <div className="flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        {activeDrug.preg_badge === 'ok' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                            {isCardAr ? 'الحمل: آمن نسبياً' : 'Pregnancy: Safe'}
+                          </span>
+                        ) : activeDrug.preg_badge === 'warn' ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                            {isCardAr ? 'الحمل: بحذر واستشارة' : 'Pregnancy: Caution'}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                            {isCardAr ? 'الحمل: محظور قطعياً (فئة X)' : 'Pregnancy: Contraindicated'}
+                          </span>
+                        )}
+                        <span className="text-slate-300">
+                          {isCardAr ? activeDrug.preg : (activeDrug.preg_en || activeDrug.preg)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400">
+                        <span className="text-slate-300 font-semibold">{isCardAr ? 'الرضاعة: ' : 'Lactation: '}</span>
+                        {isCardAr ? activeDrug.lact : (activeDrug.lact_en || activeDrug.lact)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Row 7: Renal & Hepatic */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-slate-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Info className="w-3.5 h-3.5 text-blue-400" />
+                      <span>{isCardAr ? 'تعديل وظائف الكلى/الكبد:' : 'Renal & Hepatic:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      {isCardAr ? activeDrug.renal : (activeDrug.renal_en || activeDrug.renal)}
+                    </div>
+                  </div>
+
+                  {/* Row 8: Contraindications */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-rose-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                      <span>{isCardAr ? 'موانع الاستعمال:' : 'Contraindications:'}</span>
+                    </span>
+                    <div className="flex-1 text-rose-200/90 font-medium">
+                      {isCardAr ? activeDrug.contra_ar : (activeDrug.contra_en || activeDrug.contra_ar)}
+                    </div>
+                  </div>
+
+                  {/* Row 9: Side Effects */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-amber-400 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Info className="w-3.5 h-3.5 text-amber-400" />
+                      <span>{isCardAr ? 'الآثار الجانبية الشائعة:' : 'Common Side Effects:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-300">
+                      {isCardAr ? activeDrug.side_ar : (activeDrug.side_en || activeDrug.side_ar)}
+                    </div>
+                  </div>
+
+                  {/* Row 10: Pharmacist Clinical Pearl */}
+                  {(activeDrug.note || activeDrug.pharmacist_advice_ar) && (
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 bg-teal-950/20 hover:bg-teal-950/30 transition-colors">
+                      <span className="font-bold text-teal-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                        <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
+                        <span>{isCardAr ? 'توجيه الصيدلي السريري:' : 'Clinical Pearl & Advice:'}</span>
+                      </span>
+                      <div className="flex-1 text-teal-100 font-medium space-y-1">
+                        {activeDrug.note && <p>• {isCardAr ? activeDrug.note : (activeDrug.note_en || activeDrug.note)}</p>}
+                        {activeDrug.pharmacist_advice_ar && <p>• {activeDrug.pharmacist_advice_ar}</p>}
+                      </div>
                     </div>
                   )}
                 </div>
-
-                {/* Pediatric Dose */}
-                <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800">
-                  <div className="flex items-center gap-2 text-amber-400 text-xs font-bold mb-1">
-                    <Baby className="w-4 h-4" />
-                    <span>{isCardAr ? 'جرعة الأطفال بالوزن (Pediatric)' : 'Weight-Based Pediatric Dose'}</span>
-                  </div>
-                  <div className="text-sm sm:text-base font-bold text-white mt-1 leading-relaxed">
-                    {isCardAr 
-                      ? (activeDrug.pediatric_dosage_text_ar || (activeDrug.mpk_min ? `${activeDrug.mpk_min} - ${activeDrug.mpk_max || activeDrug.mpk_min} mg/kg/يوم` : 'لا يُعطى للأطفال أو يحتاج استشارة أخصائي'))
-                      : (activeDrug.pediatric_dosage_text_en || (activeDrug.mpk_min ? `${activeDrug.mpk_min} - ${activeDrug.mpk_max || activeDrug.mpk_min} mg/kg/day` : 'Not indicated or requires medical specialist'))
-                    }
-                  </div>
-                  <p className="text-slate-400 text-xs mt-1">
-                    {isCardAr 
-                      ? (activeDrug.freq_ar || 'مقسمة على جرعات متساوية')
-                      : (activeDrug.freq_en || 'Divided in equal doses')}
-                  </p>
-                  {activeDrug.conc && (
-                    <div className="mt-3 pt-2 border-t border-slate-800/80 text-[11px] text-slate-400 flex items-center justify-between">
-                      <span>{isCardAr ? 'التركيز المعتاد للشراب:' : 'Standard Oral Liquid Conc:'}</span>
-                      <span className="font-semibold text-teal-400">{activeDrug.conc} mg / 5ml</span>
-                    </div>
-                  )}
-                </div>
               </div>
-
-              {/* Administration Guidelines */}
-              {(activeDrug.administration_ar || activeDrug.administration_en) && (
-                <div className="p-3.5 rounded-xl bg-slate-950/50 border border-slate-800 text-slate-300">
-                  <span className="text-xs font-bold text-sky-400 block mb-1">
-                    {isCardAr ? 'طريقة الاستخدام وتوقيته (Administration Instructions):' : 'Administration & Food Instructions:'}
-                  </span>
-                  <p className="text-xs text-slate-200 leading-relaxed">
-                    {isCardAr ? (activeDrug.administration_ar || activeDrug.administration_en) : (activeDrug.administration_en || activeDrug.administration_ar)}
-                  </p>
-                </div>
-              )}
-
-              {/* Safety Badges: Pregnancy, Lactation, Renal */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {/* Pregnancy */}
-                <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/90">
-                  <span className="text-[11px] text-slate-400 block mb-1">
-                    {isCardAr ? 'أمان الحمل (Pregnancy):' : 'Pregnancy Safety:'}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {activeDrug.preg_badge === 'ok' ? (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        {isCardAr ? 'آمن نسبياً' : 'Relatively Safe'}
-                      </span>
-                    ) : activeDrug.preg_badge === 'warn' ? (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {isCardAr ? 'بحذر واستشارة' : 'Caution / Cautionary'}
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20">
-                        {isCardAr ? 'ممنوع / خطر' : 'Contraindicated / Risk'}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">
-                    {isCardAr ? activeDrug.preg : (activeDrug.preg_en || activeDrug.preg)}
-                  </p>
-                </div>
-
-                {/* Lactation */}
-                <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/90">
-                  <span className="text-[11px] text-slate-400 block mb-1">
-                    {isCardAr ? 'الرضاعة الطبيعية (Lactation):' : 'Lactation & Breastfeeding:'}
-                  </span>
-                  <p className="text-slate-200 text-xs font-medium mt-1 leading-relaxed">
-                    {isCardAr ? activeDrug.lact : (activeDrug.lact_en || activeDrug.lact)}
-                  </p>
-                </div>
-
-                {/* Renal */}
-                <div className="p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/90">
-                  <span className="text-[11px] text-slate-400 block mb-1">
-                    {isCardAr ? 'تعديل جرعة الكلى والكبد:' : 'Renal & Hepatic Adjustments:'}
-                  </span>
-                  <p className="text-slate-200 text-xs font-medium mt-1 leading-relaxed">
-                    {isCardAr ? activeDrug.renal : (activeDrug.renal_en || activeDrug.renal)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Contraindications & Side Effects */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20">
-                  <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold mb-1">
-                    <AlertTriangle className="w-4 h-4" />
-                    <span>{isCardAr ? 'موانع الاستعمال (Contraindications):' : 'Contraindications:'}</span>
-                  </div>
-                  <p className="text-xs text-rose-200/90 leading-relaxed">
-                    {isCardAr ? activeDrug.contra_ar : (activeDrug.contra_en || activeDrug.contra_ar)}
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                  <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold mb-1">
-                    <Info className="w-4 h-4" />
-                    <span>{isCardAr ? 'الآثار الجانبية الشائعة (Side Effects):' : 'Adverse Effects:'}</span>
-                  </div>
-                  <p className="text-xs text-amber-200/90 leading-relaxed">
-                    {isCardAr ? activeDrug.side_ar : (activeDrug.side_en || activeDrug.side_ar)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Clinical Warnings / Note */}
-              {activeDrug.note && (
-                <div className="p-3.5 rounded-xl bg-sky-950/30 border border-sky-800/40 flex items-start gap-2.5">
-                  <ShieldCheck className="w-5 h-5 text-sky-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-sky-200/90 leading-relaxed">
-                    <span className="font-bold text-sky-300 block mb-0.5">
-                      {isCardAr ? 'تنبيه سريري هام (Clinical Pearl):' : 'Clinical Pearl / Warning:'}
-                    </span>
-                    {isCardAr ? activeDrug.note : (activeDrug.note_en || activeDrug.note)}
-                  </div>
-                </div>
-              )}
-
-              {/* Pharmacist Counseling Advice */}
-              {activeDrug.pharmacist_advice_ar && (
-                <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-800/40 flex items-start gap-2.5">
-                  <Stethoscope className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                  <div className="text-xs text-emerald-200/90 leading-relaxed">
-                    <span className="font-bold text-emerald-300 block mb-0.5">
-                      {isCardAr ? 'نصيحة الصيدلي السريري الذهبية للمريض:' : 'Pharmacist Patient Counseling:'}
-                    </span>
-                    {activeDrug.pharmacist_advice_ar}
-                  </div>
-                </div>
-              )}
             </div>
           ) : (
             <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-12 text-center text-slate-500">

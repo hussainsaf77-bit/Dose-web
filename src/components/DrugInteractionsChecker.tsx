@@ -571,15 +571,6 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <a
-              href="/dose_update_new.zip"
-              download="dose_update_new.zip"
-              className="bg-emerald-600/90 hover:bg-emerald-500 px-3.5 py-2.5 rounded-xl border border-emerald-500/70 text-xs font-bold text-white flex items-center gap-1.5 transition-colors shadow"
-              title="تحميل ملف التحديث للنسخ على Vercel و GitHub"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>تحميل التحديث ZIP</span>
-            </a>
             <button
               type="button"
               onClick={() => setShowApiConfig(!showApiConfig)}
@@ -587,7 +578,7 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
               title="إعدادات محرك التحليل والذكاء الاصطناعي"
             >
               <Settings className="w-3.5 h-3.5 text-rose-400" />
-              <span>محرك الفحص</span>
+              <span>محرك الفحص السريري</span>
             </button>
             <div className="bg-slate-800/90 px-4 py-2.5 rounded-xl border border-slate-700/80 text-center sm:text-right">
               <span className="text-[11px] text-slate-400 block font-medium">الأدوية المحددة:</span>

@@ -29,6 +29,7 @@ import {
 
 export type ActiveTabType =
   | 'home'
+  | 'relief'
   | 'drugs'
   | 'pregnancy'
   | 'lab_imaging'
