@@ -169,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Right: Bot + Language + Profile */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               
               {/* Telegram Bot */}
               <a
@@ -177,7 +177,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 href="https://t.me/Drugscalculat_bot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-semibold transition-all"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-semibold transition-all whitespace-nowrap shrink-0"
                 title="فتح بوت جرعة على تليجرام"
               >
                 <Send className="w-3.5 h-3.5 text-sky-400" />
@@ -188,7 +188,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="header-plans-btn"
                 onClick={onOpenPlans}
-                className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition-all"
+                className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition-all whitespace-nowrap shrink-0 cursor-pointer"
               >
                 <Crown className="w-3.5 h-3.5 text-amber-400" />
                 <span>{t.tab_plans}</span>
@@ -198,23 +198,31 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="language-switcher-btn"
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 transition-all"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 transition-all whitespace-nowrap shrink-0 cursor-pointer"
                 title={isAr ? 'Switch to English' : 'التحويل إلى العربية'}
               >
                 <Globe className="w-3.5 h-3.5 text-teal-400" />
                 <span>{isAr ? 'English' : 'العربية'}</span>
               </button>
 
-              {/* User Profile */}
+              {/* User Profile (Shows Name + Telegram @username when linked) */}
               {currentUser ? (
                 <button
                   type="button"
                   onClick={onOpenWelcome || onOpenAuth}
-                  className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl px-2.5 py-1.5 transition-colors cursor-pointer"
+                  className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl px-2.5 py-1 transition-colors cursor-pointer shrink-0"
+                  title={currentUser.username ? `@${currentUser.username.replace(/^@/, '')}` : currentUser.firstName}
                 >
-                  <span className="text-xs font-bold text-teal-300 max-w-[80px] sm:max-w-none truncate block">
-                    {currentUser.firstName}
-                  </span>
+                  <div className="text-right min-w-0">
+                    <span className="text-xs font-bold text-teal-300 max-w-[95px] sm:max-w-[140px] truncate block leading-tight">
+                      {currentUser.firstName}
+                    </span>
+                    {currentUser.username && currentUser.username !== 'guest_preview' && (
+                      <span className="text-[10px] font-mono text-sky-400 max-w-[95px] sm:max-w-[140px] truncate block leading-tight" dir="ltr">
+                        @{currentUser.username.replace(/^@/, '')}
+                      </span>
+                    )}
+                  </div>
                   {tierBadge && (
                     <span className={`hidden md:inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium rounded border ${tierBadge.color}`}>
                       {tierBadge.label}
@@ -225,7 +233,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   id="btn-nav-login"
                   onClick={onOpenWelcome || onOpenAuth}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/30 cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-teal-600/30 cursor-pointer whitespace-nowrap shrink-0"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>{isAr ? 'تسجيل' : 'Login'}</span>
@@ -263,7 +271,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     {isAr ? 'القائمة الطبية الشاملة' : 'Clinical Medical Menu'}
                   </h3>
                   <p className="text-[10px] text-teal-400 font-mono">
-                    Dose v3.8 Final
+                    {isAr ? 'منصة جرعة السريرية' : 'Dose Clinical Platform'}
                   </p>
                 </div>
               </div>
@@ -324,10 +332,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                   setActiveTab('home');
                   setSidebarOpen(false);
                 }}
-                className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
               >
                 <Home className="w-3.5 h-3.5 text-teal-400" />
-                <span>{isAr ? 'العودة لشبكة الميزات (2 بسطر)' : 'Back to 2-Column Grid'}</span>
+                <span>{isAr ? 'العودة للخدمات الرئيسية' : 'Back to Main Services'}</span>
               </button>
             </div>
 

@@ -1,6 +1,8 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
+import { execSync } from "child_process";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import { analyzeAllMedications } from "./src/data/clinicalInteractionEngine";
@@ -12,6 +14,9 @@ interface StoredUser {
   username: string;
   firstName: string;
   lastName?: string;
+  email?: string;
+  passwordHash?: string;
+  role?: string;
   plan: 'free' | 'pro' | 'vip';
   planExpiresAt: string;
   dailyQuotaUsed: number;
@@ -52,7 +57,7 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
-app.use(express.static(path.join(process.cwd(), "public")));
+app.use(express.static(path.join(process.cwd(), "public"), { index: false }));
 
 // Quick direct export of the fixed standalone index.html
 app.get("/api/raw-index", (req, res) => {
@@ -79,9 +84,21 @@ app.get([
     path.join(process.cwd(), "dose_update_new.zip"),
     path.join(process.cwd(), "public", "dose_v36_final.zip")
   ];
-  const finalPath = candidatePaths.find(p => fs.existsSync(p));
+  let finalPath = candidatePaths.find(p => fs.existsSync(p));
+  if (!finalPath || req.query.refresh === "1") {
+    try {
+      const distIndex = path.join(process.cwd(), "dist", "index.html");
+      if (!fs.existsSync(distIndex) || req.query.refresh === "1") {
+        execSync("npm run build", { cwd: process.cwd(), stdio: "pipe", timeout: 120000 });
+      }
+      execSync("python3 scripts/generate_zip.py", { cwd: process.cwd(), stdio: "pipe", timeout: 60000 });
+      finalPath = candidatePaths.find(p => fs.existsSync(p));
+    } catch (err: any) {
+      console.error("Failed to generate update archive on demand:", err?.message || err);
+    }
+  }
   if (!finalPath) {
-    return res.status(404).send("Update archive not ready yet");
+    return res.status(500).send("Failed to prepare update archive. Please retry.");
   }
   const stat = fs.statSync(finalPath);
   res.writeHead(200, {
@@ -99,7 +116,14 @@ app.get([
 let aiClient: GoogleGenAI | null = null;
 function getGenAI(): GoogleGenAI | null {
   if (!aiClient && process.env.GEMINI_API_KEY) {
-    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    aiClient = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
   }
   return aiClient;
 }
@@ -162,6 +186,44 @@ const usersDB: Map<string, StoredUser> = new Map([
   ],
 ]);
 
+// Email -> telegramId index for persistent web email auth & bot account linking
+const emailIndex: Map<string, string> = new Map();
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
+  return `${salt}:${derived}`;
+}
+
+function verifyPassword(password: string, storedHash?: string): boolean {
+  if (!storedHash || !storedHash.includes(":")) return false;
+  const [salt, keyHex] = storedHash.split(":");
+  const keyBuf = Buffer.from(keyHex, "hex");
+  const derived = crypto.scryptSync(password, salt, 64);
+  if (keyBuf.length !== derived.length) return false;
+  return crypto.timingSafeEqual(keyBuf, derived);
+}
+
+function sanitizeUser(user: StoredUser) {
+  const { passwordHash: _ignored, ...safeUser } = user;
+  return safeUser;
+}
+
+function buildTelegramWebUrl(hashPath: string = "", user?: StoredUser, fallbackChatId?: string | number): string {
+  const cleanHash = hashPath ? (hashPath.startsWith("#") ? hashPath : `#${hashPath}`) : "";
+  const params = new URLSearchParams();
+  const tgId = user?.telegramId || (fallbackChatId ? String(fallbackChatId) : "");
+  if (tgId) params.set("tg_id", tgId);
+  if (user?.username && !user.username.startsWith("user_")) {
+    params.set("tg_user", user.username.replace(/^@/, ""));
+  }
+  if (user?.firstName) {
+    params.set("tg_name", user.firstName);
+  }
+  const qs = params.toString();
+  return `${DEFAULT_APP_URL}/${qs ? `?${qs}` : ""}${cleanHash}`;
+}
+
 // One-time pairing codes: code -> { telegramId, expiresAt }
 const pairingCodes: Map<string, { telegramId: string; expiresAt: number; plan: 'free' | 'pro' | 'vip'; username: string; firstName: string }> = new Map();
 
@@ -210,6 +272,8 @@ interface StoredReminder {
   dose: string;
   times: string[];
   days: string[];
+  intervalHours?: number;
+  notes?: string;
   email_notify: boolean;
   is_active: boolean;
   created_at: string;
@@ -493,41 +557,252 @@ app.post("/api/auth/code-verify", (req, res) => {
   });
 });
 
-// 5. Direct login / Switch demo account (Allows instant testing with Free, Pro, VIP)
+// 5. Direct login / Telegram WebApp / Handle Sync
 app.post("/api/auth/direct", (req, res) => {
-  const { telegramId, username, firstName, plan } = req.body;
-  if (!telegramId) {
-    return res.status(400).json({ error: "telegramId is required" });
+  const { telegramId, username, firstName, lastName, plan, role, authSource } = req.body;
+  const rawIdentifier = String(telegramId || username || "").trim();
+  if (!rawIdentifier) {
+    return res.status(400).json({ success: false, errorAr: "معرف تليجرام أو اسم المستخدم مطلوب", error: "telegramId or username is required" });
   }
 
-  let user = usersDB.get(String(telegramId));
+  const cleanHandle = (username || (rawIdentifier.startsWith("@") ? rawIdentifier : "")).replace(/^@/, "").trim();
+  const lookupId = rawIdentifier.startsWith("@") ? "" : rawIdentifier;
+
+  // Find by numeric/string telegramId first, then fallback by @username match
+  let user = lookupId ? usersDB.get(lookupId) : undefined;
+  if (!user && cleanHandle) {
+    for (const candidate of usersDB.values()) {
+      if (candidate.username && candidate.username.toLowerCase() === cleanHandle.toLowerCase()) {
+        user = candidate;
+        break;
+      }
+    }
+  }
+
+  const normalizedKey = user?.telegramId || lookupId || `tg_${cleanHandle.toLowerCase()}`;
+
   if (!user) {
-    const chosenPlan: 'free' | 'pro' | 'vip' = plan || "pro";
+    const chosenPlan: 'free' | 'pro' | 'vip' = plan || "free";
     const quota = chosenPlan === "vip" ? 9999 : chosenPlan === "pro" ? 250 : 15;
     user = {
       id: `u_${Date.now()}`,
-      telegramId: String(telegramId),
-      username: username || `user_${telegramId}`,
-      firstName: firstName || "مستخدم تليجرام",
+      telegramId: normalizedKey,
+      username: cleanHandle || (lookupId ? `user_${lookupId}` : "telegram_user"),
+      firstName: (firstName && String(firstName).trim()) || (cleanHandle ? `@${cleanHandle}` : "مستخدم تليجرام"),
+      lastName: lastName ? String(lastName).trim() : undefined,
+      role: role || undefined,
       plan: chosenPlan,
       planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       dailyQuotaUsed: 0,
       dailyQuotaTotal: quota,
       creditsRemaining: quota,
-      authSource: "telegram_login",
+      authSource: authSource || "telegram_login",
       createdAt: new Date().toISOString(),
+      lastActiveAt: new Date().toISOString(),
+      totalRequests: 1,
     };
-    usersDB.set(String(telegramId), user);
-  } else if (plan && user.plan !== plan) {
-    user.plan = plan;
-    const quota = plan === "vip" ? 9999 : plan === "pro" ? 250 : 15;
-    user.dailyQuotaTotal = quota;
-    user.creditsRemaining = Math.max(0, quota - user.dailyQuotaUsed);
+    usersDB.set(normalizedKey, user);
+  } else {
+    if (cleanHandle && (!user.username || user.username.startsWith("user_"))) {
+      user.username = cleanHandle;
+    } else if (cleanHandle && authSource === "webapp") {
+      user.username = cleanHandle;
+    }
+    if (firstName && String(firstName).trim() && firstName !== "مستخدم تليجرام") {
+      user.firstName = String(firstName).trim();
+    }
+    if (lastName) user.lastName = String(lastName).trim();
+    if (role) user.role = role;
+    if (plan && user.plan !== plan) {
+      user.plan = plan;
+      const quota = plan === "vip" ? 9999 : plan === "pro" ? 250 : 15;
+      user.dailyQuotaTotal = quota;
+      user.creditsRemaining = Math.max(0, quota - user.dailyQuotaUsed);
+    }
+    user.lastActiveAt = new Date().toISOString();
+    usersDB.set(user.telegramId, user);
   }
+
+  syncLogs.unshift({
+    id: `log_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    source: "web_platform",
+    userTelegramId: user.telegramId,
+    userName: user.username ? `@${user.username}` : user.firstName,
+    actionAr: `تسجيل دخول ومزامنة عبر تليجرام (${user.username ? `@${user.username}` : user.telegramId})`,
+    actionEn: `Telegram web sync (${user.username ? `@${user.username}` : user.telegramId})`,
+    status: "success",
+    tierUsed: user.plan,
+  });
 
   res.json({
     success: true,
-    user,
+    user: sanitizeUser(user),
+  });
+});
+
+// 5b. Real Email Registration & Login Endpoint (with optional Telegram handle linking)
+app.post("/api/auth/email", (req, res) => {
+  const {
+    mode = "register",
+    email,
+    password,
+    fullName,
+    role = "doctor",
+    telegramHandle,
+  } = req.body || {};
+
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const cleanPassword = String(password || "");
+
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return res.status(400).json({
+      success: false,
+      errorAr: "يرجى إدخال بريد إلكتروني صحيح (مثال: name@domain.com).",
+      errorEn: "Please enter a valid email address.",
+    });
+  }
+
+  if (cleanPassword.length < 4) {
+    return res.status(400).json({
+      success: false,
+      errorAr: "كلمة المرور يجب أن تكون 4 أحرف على الأقل.",
+      errorEn: "Password must be at least 4 characters.",
+    });
+  }
+
+  if (mode === "login") {
+    const existingTgId = emailIndex.get(normalizedEmail);
+    const existingUser = existingTgId ? usersDB.get(existingTgId) : undefined;
+    if (!existingUser || !verifyPassword(cleanPassword, existingUser.passwordHash)) {
+      return res.status(401).json({
+        success: false,
+        errorAr: "البريد الإلكتروني غير مسجل أو كلمة المرور غير صحيحة.",
+        errorEn: "Invalid email or password.",
+      });
+    }
+
+    // Update optional Telegram handle if newly supplied
+    const cleanTg = String(telegramHandle || "").replace(/^@/, "").trim();
+    if (cleanTg && (!existingUser.username || existingUser.username.startsWith("web_"))) {
+      existingUser.username = cleanTg;
+    }
+    existingUser.lastActiveAt = new Date().toISOString();
+    existingUser.totalRequests = (existingUser.totalRequests || 0) + 1;
+    usersDB.set(existingUser.telegramId, existingUser);
+
+    syncLogs.unshift({
+      id: `log_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      source: "web_platform",
+      userTelegramId: existingUser.telegramId,
+      userName: existingUser.username ? `@${existingUser.username}` : existingUser.firstName,
+      actionAr: `تسجيل دخول بالبريد الإلكتروني (${normalizedEmail})`,
+      actionEn: `Email login (${normalizedEmail})`,
+      status: "success",
+      tierUsed: existingUser.plan,
+    });
+
+    return res.json({
+      success: true,
+      user: sanitizeUser(existingUser),
+    });
+  }
+
+  // Register mode
+  if (emailIndex.has(normalizedEmail)) {
+    return res.status(409).json({
+      success: false,
+      errorAr: "هذا البريد الإلكتروني مسجل مسبقاً. انتقل لتبويب «تسجيل الدخول».",
+      errorEn: "This email is already registered. Please switch to Sign In.",
+    });
+  }
+
+  const cleanName = String(fullName || "").trim() || normalizedEmail.split("@")[0];
+  const cleanTg = String(telegramHandle || "").replace(/^@/, "").trim();
+
+  // Check if user already exists in Telegram DB (by numeric ID or @username) so we can link them!
+  let linkedUser: StoredUser | undefined;
+  if (cleanTg) {
+    linkedUser = usersDB.get(cleanTg);
+    if (!linkedUser) {
+      for (const candidate of usersDB.values()) {
+        if (candidate.username && candidate.username.toLowerCase() === cleanTg.toLowerCase()) {
+          linkedUser = candidate;
+          break;
+        }
+      }
+    }
+  }
+
+  if (linkedUser) {
+    linkedUser.email = normalizedEmail;
+    linkedUser.passwordHash = hashPassword(cleanPassword);
+    linkedUser.role = role;
+    if (cleanName && (!linkedUser.firstName || linkedUser.firstName === "مستخدم تليجرام")) {
+      linkedUser.firstName = cleanName;
+    }
+    linkedUser.lastActiveAt = new Date().toISOString();
+    usersDB.set(linkedUser.telegramId, linkedUser);
+    emailIndex.set(normalizedEmail, linkedUser.telegramId);
+
+    syncLogs.unshift({
+      id: `log_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      source: "web_platform",
+      userTelegramId: linkedUser.telegramId,
+      userName: linkedUser.username ? `@${linkedUser.username}` : linkedUser.firstName,
+      actionAr: `تسجيل بالبريد وربطه تلقائياً بحساب تليجرام (@${linkedUser.username})`,
+      actionEn: `Email registered and linked to Telegram (@${linkedUser.username})`,
+      status: "success",
+      tierUsed: linkedUser.plan,
+    });
+
+    return res.json({
+      success: true,
+      user: sanitizeUser(linkedUser),
+      linkedTelegram: true,
+    });
+  }
+
+  const webTgId = cleanTg && /^\d+$/.test(cleanTg) ? cleanTg : `web_${crypto.randomBytes(4).toString("hex")}`;
+  const newUser: StoredUser = {
+    id: `u_${Date.now()}`,
+    telegramId: webTgId,
+    username: cleanTg && !/^\d+$/.test(cleanTg) ? cleanTg : normalizedEmail.split("@")[0],
+    firstName: cleanName,
+    email: normalizedEmail,
+    passwordHash: hashPassword(cleanPassword),
+    role,
+    plan: "free",
+    planExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    dailyQuotaUsed: 0,
+    dailyQuotaTotal: 15,
+    creditsRemaining: 15,
+    authSource: "telegram_login",
+    createdAt: new Date().toISOString(),
+    lastActiveAt: new Date().toISOString(),
+    totalRequests: 1,
+  };
+
+  usersDB.set(newUser.telegramId, newUser);
+  emailIndex.set(normalizedEmail, newUser.telegramId);
+
+  syncLogs.unshift({
+    id: `log_${Date.now()}`,
+    timestamp: new Date().toISOString(),
+    source: "web_platform",
+    userTelegramId: newUser.telegramId,
+    userName: newUser.username ? `@${newUser.username}` : newUser.firstName,
+    actionAr: `إنشاء حساب جديد بالبريد الإلكتروني (${normalizedEmail})`,
+    actionEn: `Registered new email account (${normalizedEmail})`,
+    status: "success",
+    tierUsed: newUser.plan,
+  });
+
+  return res.json({
+    success: true,
+    user: sanitizeUser(newUser),
   });
 });
 
@@ -710,7 +985,7 @@ app.post("/api/bot/execute-action", async (req, res) => {
             : `أنت مساعد ذكاء اصطناعي مرتبط ببوت تليجرام والويب. أجب على استفسار المستخدم بوضوح واحترافية وبشكل مفصل:\n\n${input}`;
 
           const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-4-hydrogen",
             contents: prompt,
           });
           resultOutput = response.text || "تمت المعالجة بنجاح.";
@@ -1003,7 +1278,7 @@ Return strictly a valid JSON object matching this schema:
   "clinicalSummary": "شرح سريري تحليلي دقيق وتوجيهات واضحة"
 }`;
 
-      const candidateModels = ["gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+      const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
       for (const modelName of candidateModels) {
         try {
           const response = await ai.models.generateContent({
@@ -1011,7 +1286,6 @@ Return strictly a valid JSON object matching this schema:
             contents: [{ text: prompt }],
             config: {
               responseMimeType: "application/json",
-              temperature: 0.2,
             }
           });
 
@@ -1412,8 +1686,8 @@ async function sendTelegramFullMenu(chatId: string | number, user?: StoredUser, 
   const inlineMarkup = {
     inline_keyboard: isEn ? [
       [
-        { text: "🩺 Symptoms Checker (DDx)", url: `${DEFAULT_APP_URL}/#symptoms?tg_id=${chatId}&target=symptoms&start=onboarding` },
-        { text: "💳 Subscription Plans", url: `${DEFAULT_APP_URL}/#plans?tg_id=${chatId}&target=plans&start=onboarding` }
+        { text: "🩺 Symptoms Checker (DDx)", url: buildTelegramWebUrl("#symptoms", user, chatId) },
+        { text: "💳 Subscription Plans", url: buildTelegramWebUrl("#plans", user, chatId) }
       ],
       [
         { text: "💊 Drug Guide & Dosing", callback_data: "action_pharma" },
@@ -1425,15 +1699,15 @@ async function sendTelegramFullMenu(chatId: string | number, user?: StoredUser, 
       ],
       [
         { text: "🎁 Redeem Promo Code", callback_data: "action_promo" },
-        { text: "🌐 Open Live Web Platform", url: `${DEFAULT_APP_URL}/#welcome?tg_id=${chatId}&start=onboarding` }
+        { text: "🌐 Open Live Web Platform", url: buildTelegramWebUrl("", user, chatId) }
       ]
     ] : [
       [
         { text: "🤰 رعاية ومتابعة الحامل (سكر، ضغط، وزن)", callback_data: "action_pregnancy" }
       ],
       [
-        { text: "🩺 فاحص الأعراض بالمنصة (DDx)", url: `${DEFAULT_APP_URL}/#symptoms?tg_id=${chatId}&target=symptoms&start=onboarding` },
-        { text: "💳 باقات الاشتراك بالمنصة", url: `${DEFAULT_APP_URL}/#plans?tg_id=${chatId}&target=plans&start=onboarding` }
+        { text: "🩺 فاحص الأعراض بالمنصة (DDx)", url: buildTelegramWebUrl("#symptoms", user, chatId) },
+        { text: "💳 باقات الاشتراك بالمنصة", url: buildTelegramWebUrl("#plans", user, chatId) }
       ],
       [
         { text: "💊 دليل الأدوية والجرعات", callback_data: "action_pharma" },
@@ -1445,7 +1719,7 @@ async function sendTelegramFullMenu(chatId: string | number, user?: StoredUser, 
       ],
       [
         { text: "🎁 تفعيل كود الترقية (PRO2026)", callback_data: "action_promo" },
-        { text: "🌐 فتح موقع المنصة المباشر", url: `${DEFAULT_APP_URL}/#welcome?tg_id=${chatId}&start=onboarding` }
+        { text: "🌐 فتح موقع المنصة المباشر", url: buildTelegramWebUrl("", user, chatId) }
       ]
     ]
   };
@@ -1560,7 +1834,7 @@ async function sendTelegramPregnancyMenu(chatId: string | number, user?: any) {
         { text: "📊 جدول الفحوصات والزيارات", callback_data: "preg_visits" }
       ],
       [
-        { text: "🌐 فتح ملف الحامل التفاعلي بالموقع", url: `${DEFAULT_APP_URL}/#pregnancy` },
+        { text: "🌐 فتح ملف الحامل التفاعلي بالموقع", url: buildTelegramWebUrl("#pregnancy", user, chatId) },
         { text: "🔙 القائمة الرئيسية", callback_data: "menu_back" }
       ]
     ]
@@ -1783,7 +2057,7 @@ async function handleTelegramPregnancyCalc(chatId: string | number, queryText?: 
       ],
       [
         { text: "👶 الثلث الثالث (الأسبوع 32)", callback_data: "calc_week_32" },
-        { text: "🌐 حاسبة الحمل المتكاملة بالويب", url: `${DEFAULT_APP_URL}/#pregnancy` }
+        { text: "🌐 حاسبة الحمل المتكاملة بالويب", url: buildTelegramWebUrl("#pregnancy", undefined, chatId) }
       ],
       [
         { text: "🔙 قائمة رعاية الحامل", callback_data: "action_pregnancy" }
@@ -2027,7 +2301,7 @@ async function handleTelegramSymptomCheck(chatId: string | number, rawQuery: str
           { text: "🧪 فحص تحليل مخبري", callback_data: "action_lab" }
         ],
         [
-          { text: "🖥️ فحص الأعراض التفاعلي وتصدير PDF", url: `${DEFAULT_APP_URL}/#symptoms` },
+          { text: "🖥️ فحص الأعراض التفاعلي وتصدير PDF", url: buildTelegramWebUrl("#symptoms", user, chatId) },
           { text: "🔙 القائمة الرئيسية", callback_data: "menu_back" }
         ]
       ]
@@ -2086,6 +2360,11 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
         totalRequests: 1,
       };
       usersDB.set(tgId, user);
+    } else if (user) {
+      user.lastActiveAt = new Date().toISOString();
+      if (cb.from?.first_name) user.firstName = cb.from.first_name;
+      if (cb.from?.username) user.username = cb.from.username;
+      usersDB.set(tgId, user);
     }
 
     // Handle Language selection & Main Menu callbacks
@@ -2142,7 +2421,7 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
               { text: "🔴 طفح جلدي وحكة مفاجئة", callback_data: "sym_rash" }
             ],
             [
-              { text: "🖥️ فتح فاحص الأعراض الشامل بالموقع", url: `${DEFAULT_APP_URL}/#symptoms` },
+              { text: "🖥️ فتح فاحص الأعراض الشامل بالموقع", url: buildTelegramWebUrl("#symptoms", user, chatId) },
               { text: "🔙 القائمة الرئيسية", callback_data: "menu_back" }
             ]
           ]
@@ -2285,17 +2564,14 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
             ],
             [
               { text: "📊 تفاصيل باقتي ورصيدي", callback_data: "refresh_my_plan" },
-              { text: "🌐 فتح منصة الويب", url: DEFAULT_APP_URL }
+              { text: "🌐 فتح منصة الويب", url: buildTelegramWebUrl("", user, chatId) }
             ]
           ]
         }
       );
     } else if ((cbData === "menu_back" || cbData === "back_to_menu") && chatId) {
-      await sendTelegramMessage(
-        chatId,
-        `القائمة الرئيسية لبوت منصة جرعة الطبي 🩺✨:`,
-        TELEGRAM_MAIN_KEYBOARD
-      );
+      await sendTelegramFullMenu(chatId, user);
+      safeReply(); return;
     } else if (cbData === "activate_vip" && chatId && user) {
       user.plan = "vip";
       user.dailyQuotaTotal = 9999;
@@ -2331,7 +2607,7 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
               { text: "🩻 فحص الأشعة السينية", callback_data: "action_imaging" }
             ],
             [
-              { text: "🌐 فتح منصة جرعة VIP", url: DEFAULT_APP_URL }
+              { text: "🌐 فتح منصة جرعة VIP", url: buildTelegramWebUrl("", user, chatId) }
             ]
           ]
         }
@@ -2360,7 +2636,7 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
         {
           inline_keyboard: [
             [{ text: "💎 ترقية الباقة الآن", callback_data: "upgrade" }],
-            [{ text: "🌐 إدارة الاشتراك عبر الموقع", url: `${DEFAULT_APP_URL}/#plans` }]
+            [{ text: "🌐 إدارة الاشتراك عبر الموقع", url: buildTelegramWebUrl("#plans", user, chatId) }]
           ]
         }
       );
@@ -2432,11 +2708,11 @@ async function handleSingleTelegramUpdate(update: any, res?: any) {
         refreshedMsg += `${i + 1}. **${u.firstName}** (${u.plan.toUpperCase()}) - آخر ظهور: _${formatDate(u.lastActiveAt || u.createdAt)}_\n`;
       });
 
-      refreshedMsg += `\n🔗 التفاصيل الكاملة: ${DEFAULT_APP_URL}/#crm`;
+      refreshedMsg += `\n🔗 التفاصيل الكاملة: ${buildTelegramWebUrl("#crm", user, chatId)}`;
 
       await sendTelegramMessage(chatId, refreshedMsg, {
         inline_keyboard: [
-          [{ text: "🖥️ فتح لوحة المشتركين (CRM)", url: `${DEFAULT_APP_URL}/#crm` }],
+          [{ text: "🖥️ فتح لوحة المشتركين (CRM)", url: buildTelegramWebUrl("#crm", user, chatId) }],
           [{ text: "🔄 تحديث مجدداً", callback_data: "refresh_stats" }]
         ]
       });
@@ -2592,7 +2868,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
   "recommendations": ["توصية 1", "توصية 2"]
 }`;
 
-          const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
+          const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
           for (const modelName of candidateModels) {
             try {
               const response = await ai.models.generateContent({
@@ -2660,7 +2936,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
 
         const replyMarkup = {
           inline_keyboard: [
-            [{ text: "🌐 فتح التقرير المفصل عبر الموقع", url: `${DEFAULT_APP_URL}/#lab_imaging` }],
+            [{ text: "🌐 فتح التقرير المفصل عبر الموقع", url: buildTelegramWebUrl("#lab_imaging", user, chatId) }],
             [{ text: "💎 ترقية باقة البوت والموقع", callback_data: "upgrade" }]
           ]
         };
@@ -2691,28 +2967,10 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     tierUsed: plan,
   });
 
-  // Handle /start: Show welcome + language selection
-  if (text === "/start" || text.startsWith("/start ")) {
-    const welcomeMsg = `أهلاً بك يا ${message.from.first_name || "مستخدمنا العزيز"} في **منصة جرعة الطبية الذكية (Dose)**! 🩺✨\n\n` +
-      `🌐 مرحباً بك في المنصة السريرية المتكاملة لفحص الأعراض، حاسبة الجرعات، وتحليل الأشعة والفحوصات.\n\n` +
-      `👇 **يرجى اختيار لغة الاستخدام للمتابعة وعرض القائمة الطبية الشاملة:**\n` +
-      `Please select your preferred language to view all medical features:`;
-
-    const langMarkup = {
-      inline_keyboard: [
-        [
-          { text: "🇸🇦 العربية (Arabic)", callback_data: "lang_ar" },
-          { text: "🇬🇧 English", callback_data: "lang_en" }
-        ]
-      ]
-    };
-
-    await sendTelegramMessage(chatId, welcomeMsg, langMarkup);
-    safeReply(); return;
-  }
-
-  // Handle /menu, /help, "القائمة", "Menu"
+  // Handle /start, /menu, /help, "القائمة", "Menu" -> Show Main Medical Menu directly
   if (
+    text === "/start" ||
+    text.startsWith("/start ") ||
     text.startsWith("/menu") ||
     text.startsWith("/help") ||
     text === "القائمة" ||
@@ -2752,7 +3010,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
         {
           inline_keyboard: [
             [{ text: "🩺 ابدأ فحص الأعراض الآن", callback_data: "action_symptoms" }],
-            [{ text: "🌐 فتح المنصة عبر الويب", url: DEFAULT_APP_URL }]
+            [{ text: "🌐 فتح المنصة عبر الويب", url: buildTelegramWebUrl("", user, chatId) }]
           ]
         }
       );
@@ -2863,7 +3121,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
             { text: "🔴 طفح جلدي وحكة مفاجئة", callback_data: "sym_rash" }
           ],
           [
-            { text: "🖥️ فحص الأعراض التفاعلي بالموقع (PDF)", url: `${DEFAULT_APP_URL}/#symptoms` },
+            { text: "🖥️ فحص الأعراض التفاعلي بالموقع (PDF)", url: buildTelegramWebUrl("#symptoms", user, chatId) },
             { text: "🔙 القائمة الرئيسية", callback_data: "menu_back" }
           ]
         ]
@@ -2918,7 +3176,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
       {
         inline_keyboard: [
           [{ text: "💎 ترقية الباقة أو تفعيل كود", callback_data: "upgrade" }],
-          [{ text: "🌐 إدارة الاشتراك عبر الموقع", url: `${DEFAULT_APP_URL}/#plans` }]
+          [{ text: "🌐 إدارة الاشتراك عبر الموقع", url: buildTelegramWebUrl("#plans", user, chatId) }]
         ]
       }
     );
@@ -3037,11 +3295,11 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
       statsMsg += `   • ⚡ آخر نشاط: _${lastSeen}_\n`;
     });
 
-    statsMsg += `\n🔗 **لوحة التحكم السحابية والمشتركين كاملة:**\n${DEFAULT_APP_URL}/#crm`;
+    statsMsg += `\n🔗 **لوحة التحكم السحابية والمشتركين كاملة:**\n${buildTelegramWebUrl("#crm", user, chatId)}`;
 
     const replyMarkup = {
       inline_keyboard: [
-        [{ text: "🖥️ فتح لوحة المشتركين (CRM) على الويب", url: `${DEFAULT_APP_URL}/#crm` }],
+        [{ text: "🖥️ فتح لوحة المشتركين (CRM) على الويب", url: buildTelegramWebUrl("#crm", user, chatId) }],
         [{ text: "🔄 تحديث الإحصائيات", callback_data: "refresh_stats" }]
       ]
     };
@@ -3075,7 +3333,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
 
       await sendTelegramMessage(chatId, reportMsg, {
         inline_keyboard: [
-          [{ text: "🖥️ فحص التداخلات الموسع على الموقع", url: `${DEFAULT_APP_URL}/#interactions` }],
+          [{ text: "🖥️ فحص التداخلات الموسع على الموقع", url: buildTelegramWebUrl("#interactions", user, chatId) }],
           [{ text: "💊 استعراض دليل الأدوية", callback_data: "browse_drugs" }]
         ]
       });
@@ -3108,7 +3366,7 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     const ai = getGenAI();
     let reply = "";
     if (ai) {
-      const candidateModels = ["gemini-2.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+      const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
       for (const modelName of candidateModels) {
         try {
           const prompt = `أنت صيدلاني واستشاري سريري خبير في بوت منصة جرعة الطبية. أجب باحترافية ودقة عالية باللغة العربية، موضحاً دواعي الاستعمال، الجرعات الموصى بها، التحذيرات، وإخلاء المسؤولية الطبي.\nسؤال المريض: ${text}`;
@@ -3246,7 +3504,7 @@ app.post(["/api/chat", "/chat"], async (req, res) => {
 ${patient_context ? `بيانات المريض وسياقه الطبي: ${patient_context}` : ""}`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-4-hydrogen",
         contents: `${systemInstruction}\n\nسؤال المستخدم: ${message}`,
       });
       replyText = response.text || "";
@@ -3287,16 +3545,17 @@ app.get(["/reminders", "/api/reminders"], (req, res) => {
 });
 
 app.post(["/reminders", "/api/reminders"], (req, res) => {
-  const { drug_name, dose, times = [], days = [], email_notify = false, telegramId = "1001" } = req.body;
+  const { drug_name, dose, times = [], days = [], intervalHours, notes = "", email_notify = false, telegramId = "1001" } = req.body;
   if (!drug_name) {
     return res.status(400).json({ error: "drug_name is required" });
   }
 
   const user = usersDB.get(String(telegramId));
-  if (user && user.plan === "free" && remindersDB.filter(r => r.telegramId === telegramId && r.is_active).length >= 1) {
+  const activeCount = remindersDB.filter(r => r.telegramId === String(telegramId) && r.is_active && !r.id.startsWith("rem_demo_")).length;
+  if (user && user.plan === "free" && activeCount >= 3) {
     return res.status(403).json({
       error: "Limit reached",
-      message: "الباقة المجانية تتيح تذكيراً واحداً فقط. قم بالترقية لـ Pro لإضافة عدد غير محدود من تذكيرات الدواء والتزامن مع تليجرام."
+      message: "الباقة المجانية تتيح حتى 3 تذكيرات دوائية نشطة. قم بالترقية لـ Pro لإضافة عدد غير محدود من التذكيرات والتزامن مع تليجرام."
     });
   }
 
@@ -3307,6 +3566,8 @@ app.post(["/reminders", "/api/reminders"], (req, res) => {
     dose: dose || "جرعة اعتيادية",
     times: Array.isArray(times) && times.length ? times : ["08:00"],
     days: Array.isArray(days) && days.length ? days : ["يومياً"],
+    ...(intervalHours ? { intervalHours: Number(intervalHours) } : {}),
+    ...(notes ? { notes: String(notes) } : {}),
     email_notify: Boolean(email_notify),
     is_active: true,
     created_at: new Date().toISOString(),
@@ -3329,12 +3590,34 @@ app.post(["/reminders", "/api/reminders"], (req, res) => {
   res.json({ id: newRem.id, message: "تم إنشاء التذكير بنجاح ✅", reminder: newRem });
 });
 
+app.patch(["/reminders/:id", "/api/reminders/:id"], (req, res) => {
+  const { id } = req.params;
+  const idx = remindersDB.findIndex(r => r.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: "Reminder not found" });
+  }
+  const existing = remindersDB[idx];
+  const { drug_name, dose, times, days, intervalHours, notes, email_notify, is_active } = req.body || {};
+  remindersDB[idx] = {
+    ...existing,
+    ...(drug_name !== undefined && { drug_name }),
+    ...(dose !== undefined && { dose }),
+    ...(Array.isArray(times) && times.length ? { times } : {}),
+    ...(Array.isArray(days) && days.length ? { days } : {}),
+    ...(intervalHours !== undefined && { intervalHours: Number(intervalHours) }),
+    ...(notes !== undefined && { notes: String(notes) }),
+    ...(email_notify !== undefined && { email_notify: Boolean(email_notify) }),
+    ...(is_active !== undefined && { is_active: Boolean(is_active) }),
+  };
+  res.json({ success: true, reminder: remindersDB[idx] });
+});
+
 app.delete(["/reminders/:id", "/api/reminders/:id"], (req, res) => {
   const { id } = req.params;
   const idx = remindersDB.findIndex(r => r.id === id);
   if (idx !== -1) {
-    remindersDB[idx].is_active = false;
-    res.json({ success: true, message: "تم إيقاف التذكير بنجاح ✅" });
+    remindersDB.splice(idx, 1);
+    res.json({ success: true, message: "تم حذف التذكير بنجاح ✅" });
   } else {
     res.status(404).json({ error: "Reminder not found" });
   }
@@ -3670,11 +3953,10 @@ app.post(["/api/medical/analyze-lab", "/api/medical/analyze-imaging"], async (re
     telegramId = "1001", 
     analysisType = "lab", 
     labCategory = "all", 
-    customApiKey,
     patientGender,
     patientAge
   } = req.body;
-  const ai = customApiKey ? new GoogleGenAI({ apiKey: customApiKey }) : getGenAI();
+  const ai = getGenAI();
 
   const user = usersDB.get(String(telegramId));
   const plan = user?.plan || "pro";
@@ -3811,10 +4093,8 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     }
     parts.push({ text: prompt });
 
-    // Multi-model resilience fallback - for imaging, prioritize high-detail vision models (gemini-3.8-flash, gemini-4-argon)
-    const candidateModels = isImaging
-      ? ["gemini-3.8-flash", "gemini-4-argon", "gemini-flash-latest", "gemini-3.1-flash-lite"]
-      : ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
+    // Multi-model resilience fallback using supported server Gemini models
+    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
     let modelReportRejection: any = null;
 
     for (const modelName of candidateModels) {
@@ -3871,217 +4151,35 @@ Output STRICTLY valid JSON with Arabic explanations and international medical te
     }
   }
 
-  // Fallback clinical logic if AI is offline or parsing fails
+  // Never hallucinate canned lab results or radiology diagnoses when AI is unavailable or fails to extract real findings.
   if (!detailedExplanation) {
-    const isImaging = analysisType === "imaging";
-    const textLower = (textNotes || "").toLowerCase();
-
-    if (isImaging) {
-      if (textLower.includes("كسر") || textLower.includes("صدر") || textLower.includes("رئة") || textLower.includes("سعال") || textLower.includes("كحة")) {
-        testName = "أشعة الصدر السينية (Chest X-Ray PA View)";
-        urgencyLevel = "medium";
-        items = [
-          { name: "حقول الرئة (Lung Fields)", value: "ارتشاح خفيف في القاعدة اليمنى", referenceRange: "Clear / رئة صافية", status: "high" },
-          { name: "الظل القلبي (Cardiothoracic Ratio)", value: "0.48", referenceRange: "< 0.50 (طبيعي)", status: "normal" },
-          { name: "الزوايا الضلعية الحجابية (Costophrenic Angles)", value: "حادة وسليمة", referenceRange: "Sharp / سليمة", status: "normal" },
-          { name: "الهيكل العظمي والأضلاع (Ribs & Thoracic Spine)", value: "لا توجد كسور واضحة", referenceRange: "Intact / سليم", status: "normal" }
-        ];
-        detailedExplanation = `**التقرير الإشعاعي السريري:**\n- لوحظ وجود زيادة طفيفة في التظليل الرئوي بالقرب من القاعدة اليمنى (Bronchovascular markings)، قد يتماشى مع التهاب شعبي حاد أو بداية ارتشاح صدري خفيف.\n- حجم القلب والظل الوعائي ضمن الحدود الطبيعية.\n- عظام القفص الصدري متناسقة وخالية من أي كسور حديثة أو قديمة.`;
-        recommendations = [
-          "مراجعة طبيب الأمراض الصدرية أو الباطنية لإجراء الفحص السريري بالسماعة.",
-          "تناول موسعات الشعب الهوائية أو السوائل الدافئة والراحة التامة.",
-          "التوجه للطوارئ في حال حدوث ضيق تنفس حاد أو ازرقاق في الشفاه."
-        ];
-      } else {
-        testName = "فحص الأشعة السينية للأطراف والمفاصل (Bone & Joint Radiography)";
-        urgencyLevel = "normal";
-        items = [
-          { name: "محاذاة المفاصل (Joint Alignment)", value: "طبيعية ومحفوظة", referenceRange: "Preserved / سليمة", status: "normal" },
-          { name: "كثافة القشرة العظمية (Cortical Margins)", value: "متصلة ولا انقطاع", referenceRange: "Continuous / سليمة", status: "normal" },
-          { name: "الفضاء المفصلي (Joint Space)", value: "متساوٍ ومناسب للعمر", referenceRange: "Normal / طبيعي", status: "normal" }
-        ];
-        detailedExplanation = `**التقرير الإشعاعي:**\n- لا توجد دلائل على كسور عظمية حادة أو خلع مفصلي.\n- الأنسجة الرخوة المحيطة تظهر تورماً خفيفاً قد يكون ناتجاً عن كدمة أو التواء أربطة رضي.`;
-        recommendations = [
-          "تطبيق كمادات باردة ورفع الطرف المصاب في أول 48 ساعة من الإصابة.",
-          "استخدام مسكنات ألم موضعية أو فموية بعد استشارة الصيدلاني.",
-          "إعادة الفحص الإشعاعي في حال استمرار الألم لأكثر من 10 أيام."
-        ];
-      }
-    } else {
-      // Robust Comprehensive Lab Fallback for all categories (CBC, Lipids, Diabetes, Renal, Liver, Thyroid, Urinalysis, Vitamins)
-      if (textLower.includes("cbc") || textLower.includes("دم") || textLower.includes("أنيميا") || textLower.includes("خضاب") || textLower.includes("صفائح") || textLower.includes("hemoglobin") || labCategory === "cbc") {
-        testName = "صورة الدم الشاملة - Complete Blood Count (CBC)";
-        findingsSummary = "أنيميا نقص الحديد المجهرية (Microcytic Hypochromic Anemia)";
-        urgencyLevel = "medium";
-        items = [
-          { name: "Hemoglobin (Hb / خضاب الدم)", value: "9.4 g/dL", referenceRange: "13.0 - 17.5 g/dL", status: "low" },
-          { name: "RBC (تعداد الكريات الحمراء)", value: "3.90 ×10^6/µL", referenceRange: "4.50 - 5.90 ×10^6/µL", status: "low" },
-          { name: "Hematocrit (HCT / مكداس الدم)", value: "29.8 %", referenceRange: "40.0 - 52.0 %", status: "low" },
-          { name: "MCV (متوسط حجم الكرية)", value: "71.2 fL", referenceRange: "80.0 - 100.0 fL", status: "low" },
-          { name: "MCH (متوسط هيموجلوبين الكرية)", value: "22.8 pg", referenceRange: "27.0 - 33.0 pg", status: "low" },
-          { name: "RDW (تفاوت أحجام الكريات)", value: "16.9 %", referenceRange: "11.5 - 14.5 %", status: "high" },
-          { name: "WBC (كريات الدم البيضاء)", value: "6,400 /µL", referenceRange: "4,000 - 11,000 /µL", status: "normal" },
-          { name: "Platelets (الصفائح الدموية)", value: "295,000 /µL", referenceRange: "150,000 - 450,000 /µL", status: "normal" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- يُظهر التحليل انخفاضاً صريحاً في خضاب الدم (9.4 g/dL) مع تراجع ملحوظ في الحجم الكروي MCV ووزن الهيموجلوبين MCH.\n- ارتفاع مؤشر تفاوت أحجام الكريات (RDW 16.9%) يشير بقوة لأنيميا نقص الحديد في مرحلة إنتاج كريات جديدة متباينة.\n- تعداد الكريات البيضاء والصفائح الدموية طبيعي تماماً ولا توجد علامات لعدوى أو خلل بنخاع العظم.`;
-        recommendations = [
-          "إجراء فحص مخزون الحديد في المصل (Serum Ferritin) والسعة الرابطة للحديد (TIBC).",
-          "بدء مكملات الحديد الفموية (مثل Ferrous Fumarate أو Bisglycinate) لمدة 3 أشهر تحت إشراف الطبيب.",
-          "تناول فيتامين C لتعزيز امتصاص الحديد، وتجنب الشاي والقهوة ومنتجات الألبان مع وجبة الدواء."
-        ];
-      } else if (textLower.includes("دهون") || textLower.includes("كوليسترول") || textLower.includes("كولسترول") || textLower.includes("lipid") || textLower.includes("cholesterol") || textLower.includes("triglyceride") || labCategory === "lipids") {
-        testName = "لوحة دهنيات الدم والكوليسترول الشاملة (Lipid Profile)";
-        findingsSummary = "فرط كوليسترول الدم والدهون الثلاثية (Mixed Dyslipidemia)";
-        urgencyLevel = "medium";
-        items = [
-          { name: "Total Cholesterol (الكوليسترول الكلي)", value: "235 mg/dL", referenceRange: "< 200 mg/dL", status: "high" },
-          { name: "Triglycerides (الدهون الثلاثية)", value: "210 mg/dL", referenceRange: "< 150 mg/dL", status: "high" },
-          { name: "HDL-Cholesterol (الكوليسترول النافع)", value: "38 mg/dL", referenceRange: "> 40 mg/dL", status: "low" },
-          { name: "LDL-Cholesterol (الكوليسترول الضار)", value: "155 mg/dL", referenceRange: "< 100 mg/dL", status: "high" },
-          { name: "Cholesterol / HDL Ratio", value: "6.18", referenceRange: "< 5.0", status: "high" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- يُظهر الفحص ارتفاعاً في الكوليسترول الكلي والضار LDL والدهون الثلاثية مع انخفاض الكوليسترول النافع HDL.\n- هذا النمط يزيد العبء الأيضي على الشرايين التاجية ويستوجب تدخلاً غذائياً وممارسة الرياضة وبحث الحاجة للستاتين.`;
-        recommendations = [
-          "اتباع حمية البحر الأبيض المتوسط وتقليل الدهون المشبعة والسكريات المكررة.",
-          "ممارسة المشي السريع 30-45 دقيقة يومياً لرفع الكوليسترول النافع HDL.",
-          "استشارة الطبيب المعالج لتقييم عامل الخطورة القلبي والبدء بجرعة وقائية من مخفضات الكوليسترول."
-        ];
-      } else if (textLower.includes("سكر") || textLower.includes("diabetes") || textLower.includes("تراكمي") || textLower.includes("hba1c") || textLower.includes("fbs") || labCategory === "diabetes") {
-        testName = "لوحة متابعة السكر والتمثيل الغذائي (Glycemic & HbA1c Panel)";
-        findingsSummary = "داء السكري غير المنضبط مع ارتفاع السكر التراكمي (HbA1c 8.9%)";
-        urgencyLevel = "high";
-        items = [
-          { name: "السكر الصائم (Fasting Blood Glucose)", value: "182 mg/dL", referenceRange: "70 - 99 mg/dL", status: "high" },
-          { name: "السكر التراكمي (HbA1c)", value: "8.9 %", referenceRange: "< 5.7 % (طبيعي) / < 7.0 % (هدف السكري)", status: "high" },
-          { name: "السكر بعد الأكل بساعتين (PPBS)", value: "245 mg/dL", referenceRange: "< 140 mg/dL", status: "high" },
-          { name: "متوسط السكر التقديري (eAG)", value: "208 mg/dL", referenceRange: "< 154 mg/dL", status: "high" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- السكر التراكمي (8.9%) يعكس عدم انضباط سكر الدم خلال الأشهر الثلاثة المنصرمة، وتجاوز المعدل المستهدف لمريض السكري (< 7.0%).\n- السكر الصائم وسكر ما بعد الأكل مرتفعان بشكل يستدعي تعديل الخطة العلاجية الدوائية والغذائية للوقاية من المضاعفات الوعائية.`;
-        recommendations = [
-          "مراجعة استشاري الغدد الصماء والسكري لتعديل جرعات الأدوية الفموية أو الإنسولين.",
-          "فحص قاع العين السنوي وفحص زلال البول المجهري (Microalbuminuria).",
-          "اتباع حمية غذائية منخفضة الكربوهيدرات المكررة وممارسة المشي اليومي 30 دقيقة."
-        ];
-      } else if (textLower.includes("غدة") || textLower.includes("درقية") || textLower.includes("thyroid") || textLower.includes("tsh") || textLower.includes("ft4") || labCategory === "thyroid") {
-        testName = "لوحة وظائف الغدة الدرقية (Thyroid Function Panel)";
-        findingsSummary = "قصور الغدة الدرقية تحت السريري (Subclinical Hypothyroidism)";
-        urgencyLevel = "medium";
-        items = [
-          { name: "TSH (الهرمون المنبه للدرقية)", value: "6.85 µIU/mL", referenceRange: "0.27 - 4.20 µIU/mL", status: "high" },
-          { name: "Free T4 (الثيروكسين الحر)", value: "1.15 ng/dL", referenceRange: "0.93 - 1.70 ng/dL", status: "normal" },
-          { name: "Free T3 (ثلاثي يود الثيرونين الحر)", value: "2.80 pg/mL", referenceRange: "2.0 - 4.4 pg/mL", status: "normal" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- ارتفاع هرمون TSH مع بقاء FT4 ضمن النطاق الطبيعي يمثل قصوراً درقياً مبكراً (Subclinical Hypothyroidism).\n- هذا الاضطراب يفسر الخمول والكسل، بطء الأيض، جفاف البشرة، وزيادة الوزن الخفيفة.`;
-        recommendations = [
-          "إجراء فحص الأجسام المضادة للدرقية (Anti-TPO Antibodies) لنفي التهاب هاشيموتو المناعي.",
-          "مراجعة طبيب الغدد لتقييم الحاجة لجرعة منخفضة من هرمون الليفوثيروكسين (Levothyroxine).",
-          "إعادة فحص TSH وFT4 بعد 6 إلى 8 أسابيع."
-        ];
-      } else if (textLower.includes("بول") || textLower.includes("urine") || textLower.includes("صديد") || textLower.includes("التهاب") || labCategory === "urine") {
-        testName = "فحص البول المخبري العام والراسب المجهري (Urinalysis)";
-        findingsSummary = "التهاب المسالك البولية الحاد مع بيلة قيحية (UTI - Pyuria)";
-        urgencyLevel = "medium";
-        items = [
-          { name: "Pus Cells (خلايا الصديد / الكريات البيضاء)", value: "25 - 30 /HPF", referenceRange: "0 - 5 /HPF", status: "high" },
-          { name: "RBCs (كريات الدم الحمراء)", value: "4 - 6 /HPF", referenceRange: "0 - 3 /HPF", status: "high" },
-          { name: "Bacteria (البكتيريا)", value: "Moderate (++)", referenceRange: "Nil / سلبية", status: "high" },
-          { name: "Epithelial Cells (الخلايا الظهارية)", value: "Few (+)", referenceRange: "Few", status: "normal" },
-          { name: "Nitrite (النتريت)", value: "Positive (إيجابي)", referenceRange: "Negative", status: "high" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- وجود خلايا صديدية مرتفعة (25-30) مع بكتيريا وإيجابية فحص النتريت يؤكد وجود عدوى بكتيرية بالمسالك البولية.\n- وجود كريات دم حمراء طفيفة ناتج عن تهيج الغشاء المخاطي للمثانة بسبب الالتهاب.`;
-        recommendations = [
-          "إجراء مزرعة بول واختبار حساسية المضادات (Urine Culture & Sensitivity) لتحديد المضاد الدقيق.",
-          "شرب كميات وفيرة من الماء (2.5 إلى 3 لترات يومياً) واستخدام مطهر بولي تحت إشراف الصيدلاني.",
-          "تجنب حبس البول والمحافظة على النظافة الشخصية."
-        ];
-      } else if (textLower.includes("فيتامين") || textLower.includes("مخزون") || textLower.includes("حديد") || textLower.includes("ferritin") || textLower.includes("vitamin") || labCategory === "vitamins") {
-        testName = "فحص الفيتامينات والمعادن ومخزون الحديد (Vitamins & Iron Panel)";
-        findingsSummary = "نقص حاد في مخزون الحديد وفيتامين د3 مع ثبات فيتامين ب12";
-        urgencyLevel = "medium";
-        items = [
-          { name: "Serum Ferritin (مخزون الحديد)", value: "8.2 ng/mL", referenceRange: "12 - 290 ng/mL", status: "low" },
-          { name: "25-OH Vitamin D3 (فيتامين د3)", value: "14.5 ng/mL", referenceRange: "30 - 100 ng/mL", status: "low" },
-          { name: "Vitamin B12 (فيتامين ب12)", value: "420 pg/mL", referenceRange: "200 - 900 pg/mL", status: "normal" },
-          { name: "Serum Calcium (الكالسيوم الكلي)", value: "9.3 mg/dL", referenceRange: "8.5 - 10.5 mg/dL", status: "normal" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- استنزاف صريح في مخازن الحديد (8.2 ng/mL) يسبق هبوط الهيموجلوبين ويفسر تساقط الشعر والإرهاق المزمن.\n- نقص حاد في فيتامين د3 (14.5 ng/mL) يستوجب جرعة علاجية تعويضية لدعم المناعة وصحة العظام.`;
-        recommendations = [
-          "بدء مكملات الحديد الفموية مع فيتامين C لمدة 3 إلى 6 أشهر.",
-          "أخذ فيتامين د3 بجرعة علاجية 50,000 وحدة أسبوعياً لمدة 8 أسابيع بعد وجبة رئيسية.",
-          "تناول الأطعمة الغنية بالحديد ومصادر الكالسيوم الصحية."
-        ];
-      } else if (textLower.includes("كلى") || textLower.includes("renal") || textLower.includes("kidney") || textLower.includes("كرياتينين") || textLower.includes("يوريا") || textLower.includes("egfr") || labCategory === "kidney") {
-        testName = "فحص وظائف الكلى والأملاح (Renal Panel & Electrolytes)";
-        findingsSummary = "قصور كلوي مزمن مبكر (المرحلة 3) مع ارتفاع حمض اليوريك";
-        urgencyLevel = "medium";
-        items = [
-          { name: "الكرياتينين في المصل (Serum Creatinine)", value: "1.75 mg/dL", referenceRange: "0.70 - 1.20 mg/dL", status: "high" },
-          { name: "نيتروجين يوريا الدم (BUN)", value: "44 mg/dL", referenceRange: "7 - 20 mg/dL", status: "high" },
-          { name: "معدل الترشيح الكبيبي (eGFR)", value: "44 mL/min/1.73m²", referenceRange: "> 60 mL/min", status: "low" },
-          { name: "حمض اليوريك (Uric Acid)", value: "8.4 mg/dL", referenceRange: "3.5 - 7.2 mg/dL", status: "high" },
-          { name: "البوتاسيوم (Serum Potassium)", value: "4.8 mEq/L", referenceRange: "3.5 - 5.0 mEq/L", status: "normal" },
-          { name: "الصوديوم (Serum Sodium)", value: "139 mEq/L", referenceRange: "135 - 145 mEq/L", status: "normal" }
-        ];
-        detailedExplanation = `**التحليل المخبري السريري:**\n- ارتفاع الكرياتينين واليوريا مع تراجع معدل الفلترة الكبيبية إلى 44 مل/دقيقة يشير لقصور وظيفي كلوي مزمن (CKD Stage 3a).\n- ارتفاع حمض اليوريك يزيد من خطر تشكل حصوات مجرى البول أو نوبات النقرس المفصلية.\n- شوارد الصوديوم والبوتاسيوم ما زالت متوازنة ومستقرة.`;
-        recommendations = [
-          "مراجعة استشاري أمراض الكلى لضبط الأدوية وتجنب الأدوية المسممة للكلى (NSAIDs كالبروفين والفولتارين).",
-          "مراقبة ضغط الدم بانتظام والحرص على شرب كميات ماء متوازنة يومياً.",
-          "إجراء فحص نسبة زلال البول إلى الكرياتينين وسونار للكليتين."
-        ];
-      } else if (textLower.includes("كبد") || textLower.includes("liver") || textLower.includes("lft") || textLower.includes("صفراء") || textLower.includes("alt") || textLower.includes("ast") || labCategory === "liver") {
-        testName = "لوحة وظائف الكبد والصفراء الشاملة (Liver Function Tests - LFT)";
-        findingsSummary = "ارتفاع إنزيمات خلايا الكبد (Hepatocellular Pattern) يرجح الكبد الدهني";
-        urgencyLevel = "medium";
-        items = [
-          { name: "ALT / SGPT (إنزيم ناقلة ألانين)", value: "78 U/L", referenceRange: "7 - 56 U/L", status: "high" },
-          { name: "AST / SGOT (إنزيم ناقلة أسبارتات)", value: "54 U/L", referenceRange: "10 - 40 U/L", status: "high" },
-          { name: "Total Bilirubin (الصفراء الكلية)", value: "1.0 mg/dL", referenceRange: "0.2 - 1.2 mg/dL", status: "normal" },
-          { name: "Alkaline Phosphatase (ALP)", value: "88 U/L", referenceRange: "44 - 147 U/L", status: "normal" },
-          { name: "Serum Albumin (الألبومين)", value: "4.3 g/dL", referenceRange: "3.5 - 5.5 g/dL", status: "normal" }
-        ];
-        detailedExplanation = `**التحليل السريري:**\n- ارتفاع إنزيمي الكبد ALT وAST بنمط ترشيح خلايا الكبد (ALT > AST) مع سلامة الصفراء والألبومين.\n- النمط يتماشى غالباً مع الكبد الدهني غير الكحولي (NAFLD) أو الإجهاد الدوائي للكبد، دون وجود انسداد في القنوات الصفراوية.`;
-        recommendations = [
-          "إجراء تصوير بالموجات فوق الصوتية (Ultrasound) للكبد والمرارة لتقييم درجة التشحم.",
-          "تخفيف الوزن التدريجي وتجنب الأطعمة المشبعة بالدهون والسكريات المكررة.",
-          "إجراء فحص الفيروسات الكبدية (HBsAg, HCV Ab) لنفي الأسباب الفيروسية."
-        ];
-      } else if (imageBase64) {
-        // Fallback for general uploaded lab images: provide a balanced comprehensive analysis
-        testName = "تقرير الفحص المخبري العام الشامل (Comprehensive Lab Panel)";
-        findingsSummary = "قراءة المؤشرات المخبرية ومقارنتها بالنطاقات السريرية المعتمدة";
-        urgencyLevel = "normal";
-        items = [
-          { name: "Fasting Glucose (السكر الصائم)", value: "96 mg/dL", referenceRange: "70 - 99 mg/dL", status: "normal" },
-          { name: "Hemoglobin (خضاب الدم)", value: "13.8 g/dL", referenceRange: "12.0 - 16.5 g/dL", status: "normal" },
-          { name: "Serum Creatinine (الكرياتينين)", value: "0.85 mg/dL", referenceRange: "0.60 - 1.20 mg/dL", status: "normal" },
-          { name: "Total Cholesterol (الكوليسترول الكلي)", value: "185 mg/dL", referenceRange: "< 200 mg/dL", status: "normal" },
-          { name: "ALT (إنزيم الكبد)", value: "28 U/L", referenceRange: "7 - 56 U/L", status: "normal" }
-        ];
-        detailedExplanation = `**التقرير المخبري الاسترشادي:**\n- تم فحص الصورة المرفقة واستخراج المؤشرات المخبرية الأساسية.\n- كافة المؤشرات الحيوية المقروءة تقع ضمن النطاق الفسيولوجي الطبيعي والآمن.\n- للاستفادة القصوى، يمكنك تدوين أي قيم محددة في خانة الملاحظات وسيقوم النظام بتفصيلها سريرياً.`;
-        recommendations = [
-          "الحفاظ على نمط التغذية السليم وممارسة النشاط البدني الدوري.",
-          "مراجعة الطبيب المعالج لعرض التقرير ومطابقته مع العلامات السريرية.",
-          "إجراء الفحص الدوري الشامل سنوياً للاطمئنان على الصحة العامة."
-        ];
-      } else {
-        return res.json({
-          success: true,
-          isValidReport: false,
-          validationError: 'NO_VALID_LAB_DATA',
-          testName: 'تنبيه: لم يتم العثور على نتائج تحاليل صالحة في الصورة',
-          findingsSummary: 'الصورة المرفوعة غير صالحة أو غير مكتملة المعالم المخبرية',
-          clinicalSummaryTitle: 'الصورة غير واضحة أو لا تحتوي على نتائج تحاليل مخبرية',
-          urgencyLevel: 'normal',
-          items: [],
-          detailedExplanation: 'لم يتمكن النظام من قراءة أو مطابقة أي مؤشرات مخبرية صالحة من الصورة المرفوعة.\n\nالأسباب المحتملة:\n1. الصورة لا تحتوي على تقرير فحص مخبري طبي (مثل صورة شخصية أو منظر طبيعي).\n2. صورة التقرير غير مكتملة أو مقطوعة الحواف مما يحجب أسماء الفحوصات والنتائج.\n3. جودة التصوير أو الإضاءة غير كافية لقراءة الأرقام.\n\nلتفادي أي استنتاج سريري غير دقيق، يرجى إعادة تصوير التقرير كاملاً بزاوية مستقيمة وإضاءة واضحة، أو كتابة نتائج التحاليل مباشرة في خانة الملاحظات.',
-          recommendations: [
-            'إعادة التقاط صورة كاملة ومستقيمة لتقرير المختبر الطبي تظهر أسماء التحاليل والنتائج والمجال المرجعي.',
-            'التأكد من عدم قص أطراف ورقة الفحص.',
-            'يمكنك تدوين قيم التحاليل كتابةً في خانة الملاحظات يدوياً وسيقوم النظام بتحليلها فوراً.'
-          ]
-        });
-      }
+    if (imageBase64) {
+      return res.status(503).json({
+        success: false,
+        fallbackToOcr: true,
+        isValidReport: false,
+        error: analysisType === "imaging"
+          ? "تعذر قراءة ملف الأشعة عبر الخادم حالياً. يرجى التأكد من وضوح الصورة وتحديد نوع الفحص والمنطقة وإعادة المحاولة."
+          : "لم يتمكن محلل الذكاء الاصطناعي على الخادم من قراءة هذه الورقة تلقائياً؛ جاري التبديل لقارئ النصوص المخبري المحلي (OCR).",
+      });
     }
+
+    // Without an uploaded file and without AI analysis, do not fabricate lab or imaging findings
+    return res.json({
+      success: true,
+      isValidReport: false,
+      validationError: "NO_VALID_LAB_DATA",
+      testName: analysisType === "imaging" ? "فحص وتصوير إشعاعي" : "تنبيه: لم يتم العثور على نتائج تحاليل صالحة",
+      findingsSummary: "يرجى إرفاق صورة أو ملف PDF واضح أو تدوين القيم المخبرية",
+      clinicalSummaryTitle: "لا توجد بيانات سريرية كافية للتحليل",
+      urgencyLevel: "normal",
+      items: [],
+      detailedExplanation: "لتفادي أي استنتاج سريري غير دقيق، لا يقوم النظام بتوليد نتائج افتراضية. يرجى رفع صورة واضحة أو ملف PDF للتقرير الطبي أو إدخال قيم التحاليل في الجدول اليدوي.",
+      recommendations: [
+        "ارفع صورة واضحة ومستقيمة لتقرير المختبر أو ملف PDF مباشرة.",
+        "يمكنك إدخال قيم الفحوصات يدوياً في تبويب الإدخال اليدوي للحصول على تحليل فوري دقيق."
+      ]
+    });
   }
 
   // Add sync log
@@ -4264,16 +4362,15 @@ Output strictly valid JSON in this structure:
   ]
 }`;
 
-      const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+      const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
       for (const modelName of candidateModels) {
         try {
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 4000));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 12000));
           const generatePromise = ai.models.generateContent({
             model: modelName,
             contents: prompt,
             config: { 
               responseMimeType: "application/json",
-              temperature: 0.1
             }
           });
           const response: any = await Promise.race([generatePromise, timeoutPromise]);
@@ -4408,22 +4505,31 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
       "note": "تحذيرات سريرية هامة وملاحظات المتابعة بالعربية",
       "note_en": "Important clinical monitoring notes and black box warnings in English",
       "interactions": ["InteractingDrug1", "InteractingDrug2", "InteractingDrug3"],
+      "mechanism_ar": "آلية العمل الفارماكولوجية الدقيقة بالعربية (المستقبلات والإنزيمات المستهدفة)",
+      "mechanism_en": "Detailed mechanism of action (receptors, enzymes, pathways) in English",
+      "food_interactions_ar": "التداخلات مع الطعام والمشروبات وتوقيت الوجبة بالعربية",
+      "food_interactions_en": "Food, drink, and meal timing interactions in English",
+      "monitoring_ar": "الفحوصات المخبرية والعلامات الحيوية المطلوب متابعتها دورياً بالعربية",
+      "monitoring_en": "Clinical lab & vital sign monitoring parameters in English",
+      "missed_dose_ar": "ماذا تفعل عند نسيان الجرعة بالعربية",
+      "missed_dose_en": "Missed dose instructions in English",
+      "storage_ar": "شروط الحفظ والتخزين والصلاحية بالعربية",
+      "storage_en": "Storage & stability conditions in English",
       "pharmacist_advice_ar": "نصيحة الصيدلي السريري الذهبية الموجهة للمريض بالعربية",
       "pharmacist_advice_en": "Clinical Pharmacist golden counseling advice in English"
     }
   ]
 }`;
 
-    const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
     for (const modelName of candidateModels) {
       try {
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 4000));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 15000));
         const generatePromise = ai.models.generateContent({
           model: modelName,
           contents: [{ text: prompt }],
           config: {
             responseMimeType: "application/json",
-            temperature: 0.2,
           }
         });
 
@@ -4435,7 +4541,7 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
             ...d,
             id: d.id || `api_drug_${Date.now()}_${idx}`,
             isAiResult: true,
-            source: "AI Clinical Pharmacology Engine (Gemini 3.8 Flash)",
+            source: "AI Clinical Pharmacology Engine",
             aliases: Array.isArray(d.aliases) ? d.aliases : [d.name_ar, d.name_en],
             trade_names: Array.isArray(d.trade_names) ? d.trade_names : [],
             interactions: Array.isArray(d.interactions) ? d.interactions : [],
@@ -4490,7 +4596,7 @@ app.post("/api/medical/prescription-ocr", async (req, res) => {
 
   let extractedInfo: any = null;
   if (ai) {
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
     const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, suppositories, and injections).
 Analyze this medical image (doctor prescription, medicine box, bottle, vial, suppository pack, or tube).
 
@@ -4560,7 +4666,6 @@ OUTPUT JSON SCHEMA ONLY:
           ],
           config: {
             responseMimeType: "application/json",
-            temperature: 0.1,
           },
         });
 
@@ -4615,7 +4720,7 @@ app.post("/api/medical/pediatric-dose", async (req, res) => {
 
   const ai = getGenAI();
   if (ai && drugName && drugName.trim().length > 1) {
-    const candidateModels = ["gemini-3.1-flash-lite", "gemini-3.8-flash", "gemini-flash-latest"];
+    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
     const prompt = `You are a clinical pediatric pharmacist following BNF for Children (BNFC), Harriet Lane Handbook, and AAP Pediatric Clinical Practice Guidelines.
 Calculate the exact, safe pediatric dose for:
 - Drug: "${drugName}"
@@ -4903,7 +5008,7 @@ STRICTLY RETURN JSON conforming to this structure:
   "monitoringParameters": ["فحوصات المتابعة المخبرية: السكر التراكمي، الكرياتينين، الشوارد..."]
 }`;
 
-    const candidateModels = ["gemini-2.5-flash", "gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
     for (const model of candidateModels) {
       try {
         const resp = await ai.models.generateContent({
@@ -4911,7 +5016,6 @@ STRICTLY RETURN JSON conforming to this structure:
           contents: [{ text: prompt }],
           config: {
             responseMimeType: "application/json",
-            temperature: 0.1,
           }
         });
         const parsed = JSON.parse(resp.text || "{}");

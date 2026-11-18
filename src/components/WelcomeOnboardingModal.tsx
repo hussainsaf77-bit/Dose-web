@@ -1,10 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  ShieldAlert, Globe, ArrowRight, ArrowLeft, CheckCircle2, 
-  Send, Stethoscope, Mail, Lock, User, UserCheck, Sparkles, X 
+import {
+  Globe,
+  Send,
+  Mail,
+  Lock,
+  User,
+  X,
+  LogOut,
+  Loader2,
+  ShieldAlert,
+  UserCheck,
 } from 'lucide-react';
-import { TelegramUser } from '../types';
+import { TelegramUser, SubscriptionTier } from '../types';
 import { Language } from '../utils/translations';
+import { getApiUrl } from '../utils/apiConfig';
 
 interface WelcomeOnboardingModalProps {
   isOpen: boolean;
@@ -12,6 +21,8 @@ interface WelcomeOnboardingModalProps {
   language: Language;
   onLanguageChange: (lang: Language) => void;
   onCompleteRegistration: (user: TelegramUser) => void;
+  onLogout?: () => void;
+  currentUser?: TelegramUser | null;
   initialTelegramId?: string;
   initialUsername?: string;
 }
@@ -22,200 +33,230 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
   language,
   onLanguageChange,
   onCompleteRegistration,
+  onLogout,
+  currentUser,
   initialTelegramId = '',
   initialUsername = '',
 }) => {
-  const [activeTab, setActiveTab] = useState<'welcome' | 'login' | 'register'>('welcome');
-  const [disclaimerAccepted, setDisclaimerAccepted] = useState(true);
-  
-  // Registration / Login fields
-  const [authMethod, setAuthMethod] = useState<'telegram' | 'email'>('telegram');
-  const [telegramId, setTelegramId] = useState(initialTelegramId || '');
-  const [fullName, setFullName] = useState(initialUsername || '');
+  const [activeTab, setActiveTab] = useState<'account' | 'register' | 'login'>('account');
+  const [authMethod, setAuthMethod] = useState<'telegram' | 'email'>('email');
+  const [telegramId, setTelegramId] = useState(initialUsername ? `@${initialUsername.replace(/^@/, '')}` : initialTelegramId || '');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [userRole, setUserRole] = useState<'doctor' | 'pharmacist' | 'patient'>('doctor');
+  const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    if (initialTelegramId) setTelegramId(initialTelegramId);
-    if (initialUsername) setFullName(initialUsername);
-  }, [initialTelegramId, initialUsername]);
+    if (initialUsername) {
+      setTelegramId(`@${initialUsername.replace(/^@/, '')}`);
+    } else if (initialTelegramId && initialTelegramId !== 'guest') {
+      setTelegramId(initialTelegramId);
+    }
+    if (currentUser?.firstName && currentUser.authSource !== 'demo') {
+      setFullName(currentUser.firstName);
+    }
+    if (currentUser?.email) {
+      setEmail(currentUser.email);
+    }
+  }, [initialTelegramId, initialUsername, currentUser, isOpen]);
 
   if (!isOpen) return null;
 
   const isAr = language === 'ar';
 
-  const handleQuickGuest = () => {
-    if (!disclaimerAccepted) {
-      setErrorMsg(isAr ? 'يرجى الموافقة على إخلاء المسؤولية الطبية للمتابعة' : 'Please accept medical disclaimer');
-      return;
-    }
-    const guestUser: TelegramUser = {
-      id: `u_guest_${Date.now().toString().slice(-4)}`,
-      telegramId: 'guest_doctor',
-      username: 'guest_doctor',
-      firstName: isAr ? 'طبيب زائر' : 'Guest Physician',
-      authSource: 'telegram_login',
-      createdAt: new Date().toISOString(),
-      subscription: {
-        tier: 'pro',
-        status: 'active',
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        dailyQuotaUsed: 0,
-        dailyQuotaTotal: 250,
-        creditsRemaining: 250,
-      },
-    };
-    localStorage.setItem('dose_onboarding_completed', 'true');
-    localStorage.setItem('tg_sync_user', JSON.stringify(guestUser));
-    onCompleteRegistration(guestUser);
-    onClose();
-  };
-
-  const handleFinishAuth = (e: React.FormEvent) => {
+  const handleFinishAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!disclaimerAccepted) {
-      setErrorMsg(isAr ? 'يرجى الموافقة على إخلاء المسؤولية الطبية' : 'Please accept medical disclaimer');
-      return;
-    }
+    setErrorMsg('');
+    setIsLoading(true);
 
-    let finalId = telegramId.trim();
-    let finalName = fullName.trim();
+    try {
+      if (authMethod === 'email') {
+        const cleanEmail = email.trim().toLowerCase();
+        if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+          throw new Error(isAr ? 'يرجى إدخال بريد إلكتروني صحيح.' : 'Please enter a valid email.');
+        }
+        if (password.length < 4) {
+          throw new Error(isAr ? 'كلمة المرور يجب أن تكون 4 أحرف على الأقل.' : 'Password must be at least 4 characters.');
+        }
 
-    if (authMethod === 'email') {
-      if (!email.trim() || !password.trim()) {
-        setErrorMsg(isAr ? 'يرجى إدخال البريد الإلكتروني وكلمة المرور' : 'Please enter email and password');
-        return;
+        const mode = activeTab === 'login' ? 'login' : 'register';
+        const res = await fetch(getApiUrl('/api/auth/email'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode,
+            email: cleanEmail,
+            password,
+            fullName: fullName.trim() || cleanEmail.split('@')[0],
+            role: userRole,
+            telegramHandle: telegramId.trim(),
+          }),
+        });
+
+        const ct = res.headers.get('content-type') || '';
+        if (ct.includes('application/json')) {
+          const data = await res.json();
+          if (!res.ok || !data.success) {
+            throw new Error((isAr ? data.errorAr : data.errorEn) || data.error || 'تعذر تسجيل الدخول');
+          }
+          const raw = data.user;
+          const loggedUser: TelegramUser = {
+            id: raw.id,
+            telegramId: raw.telegramId,
+            username: raw.username,
+            firstName: raw.firstName,
+            email: raw.email,
+            role: raw.role,
+            authSource: raw.authSource || 'telegram_login',
+            createdAt: raw.createdAt,
+            subscription: {
+              tier: (raw.plan || 'free') as SubscriptionTier,
+              status: 'active',
+              expiresAt: raw.planExpiresAt,
+              dailyQuotaUsed: raw.dailyQuotaUsed ?? 0,
+              dailyQuotaTotal: raw.dailyQuotaTotal ?? 15,
+              creditsRemaining: raw.creditsRemaining ?? 15,
+            },
+          };
+          onCompleteRegistration(loggedUser);
+          onClose();
+          return;
+        }
       }
-      finalId = email.split('@')[0];
-      if (!finalName) finalName = email.split('@')[0];
-    } else {
-      if (!finalId) {
-        finalId = `${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // Telegram Method
+      const rawTg = telegramId.trim();
+      if (!rawTg) {
+        throw new Error(isAr ? 'يرجى إدخال اسم مستخدم تليجرام (@username) أو رقم المعرف.' : 'Please enter Telegram @username or ID.');
       }
-      if (!finalName) finalName = isAr ? 'طبيب جرعة' : 'Dose Physician';
+      const cleanHandle = rawTg.startsWith('@') || !/^\d+$/.test(rawTg) ? rawTg.replace(/^@/, '') : '';
+      const displayName = fullName.trim() || (cleanHandle ? `@${cleanHandle}` : 'مستخدم تليجرام');
+
+      const res = await fetch(getApiUrl('/api/auth/direct'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: /^\d+$/.test(rawTg) ? rawTg : `@${cleanHandle}`,
+          username: cleanHandle || undefined,
+          firstName: displayName,
+          role: userRole,
+          authSource: 'telegram_login',
+        }),
+      });
+      const ct = res.headers.get('content-type') || '';
+      if (res.ok && ct.includes('application/json')) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          const raw = data.user;
+          onCompleteRegistration({
+            id: raw.id,
+            telegramId: raw.telegramId,
+            username: raw.username,
+            firstName: raw.firstName,
+            email: raw.email,
+            role: raw.role,
+            authSource: raw.authSource || 'telegram_login',
+            createdAt: raw.createdAt,
+            subscription: {
+              tier: (raw.plan || 'free') as SubscriptionTier,
+              status: 'active',
+              expiresAt: raw.planExpiresAt,
+              dailyQuotaUsed: raw.dailyQuotaUsed ?? 0,
+              dailyQuotaTotal: raw.dailyQuotaTotal ?? 15,
+              creditsRemaining: raw.creditsRemaining ?? 15,
+            },
+          });
+          onClose();
+          return;
+        }
+      }
+
+      // Fallback offline session
+      onCompleteRegistration({
+        id: `tg_${Date.now().toString().slice(-5)}`,
+        telegramId: rawTg.replace(/^@/, ''),
+        username: cleanHandle || undefined,
+        firstName: displayName,
+        authSource: 'telegram_login',
+        createdAt: new Date().toISOString(),
+        subscription: {
+          tier: 'free',
+          status: 'active',
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+          dailyQuotaUsed: 0,
+          dailyQuotaTotal: 15,
+          creditsRemaining: 15,
+        },
+      });
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || (isAr ? 'تعذر تحديث الحساب.' : 'Could not update account.'));
+    } finally {
+      setIsLoading(false);
     }
-
-    const newUser: TelegramUser = {
-      id: `u_${finalId}`,
-      telegramId: finalId,
-      username: finalName.replace(/\s+/g, '_').toLowerCase(),
-      firstName: finalName,
-      authSource: 'telegram_login',
-      createdAt: new Date().toISOString(),
-      subscription: {
-        tier: 'vip',
-        status: 'active',
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-        dailyQuotaUsed: 0,
-        dailyQuotaTotal: 9999,
-        creditsRemaining: 9999,
-      },
-    };
-
-    localStorage.setItem('dose_onboarding_completed', 'true');
-    localStorage.setItem('tg_sync_user', JSON.stringify(newUser));
-    onCompleteRegistration(newUser);
-    onClose();
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/90 backdrop-blur-md overflow-y-auto"
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        minHeight: '100%',
-        boxSizing: 'border-box'
-      }}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/85 backdrop-blur-sm overflow-y-auto"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
-        className="relative w-full max-w-[92vw] sm:max-w-md mx-auto my-auto bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-4 sm:p-6 space-y-4"
-        style={{
-          boxSizing: 'border-box',
-          maxWidth: 'min(440px, 92vw)',
-          margin: 'auto'
-        }}
-      >
-        {/* Glow Top Accent */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-teal-500 via-sky-500 to-indigo-500 rounded-t-2xl" />
-
-        {/* Close Button (X) */}
+      <div className="relative w-full max-w-md mx-auto bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4">
         <button
           type="button"
-          id="btn-close-onboarding-modal"
           onClick={onClose}
-          className="absolute top-3 right-3 rtl:right-auto rtl:left-3 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer border border-slate-700/60"
-          title={isAr ? 'إغلاق ومتابعة للمنصة' : 'Close and enter platform'}
+          className="absolute top-3.5 left-3.5 rtl:right-auto rtl:left-3.5 ltr:left-auto ltr:right-3.5 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors cursor-pointer"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        {/* Modal Top Header */}
-        <div className="text-center space-y-1 pt-1">
-          <div className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400 mb-0.5">
-            <Stethoscope className="w-6 h-6" />
-          </div>
-          <h2 className="text-lg sm:text-xl font-black text-white tracking-tight">
-            {isAr ? 'منصة جرعة الطبية' : 'Dose Medical Platform'}
+        {/* Modal Header */}
+        <div className="text-center space-y-1">
+          <h2 className="text-lg font-black text-white">
+            {isAr ? 'إدارة الحساب والربط مع تليجرام' : 'Account & Telegram Sync'}
           </h2>
-          <p className="text-[11px] text-slate-400">
-            {isAr 
-              ? 'دليل الأدوية • فاحص الأعراض • الجرعات • قراءة الأشعة والتحاليل'
-              : 'Clinical Pharmacology • DDx • Dosing • Lab & X-Ray AI'}
+          <p className="text-xs text-slate-400">
+            {isAr ? 'منصة جرعة الطبية — Dose' : 'Dose Medical Platform'}
           </p>
         </div>
 
-        {/* Navigation Tabs inside Modal */}
-        <div className="flex w-full gap-1 p-1 bg-slate-800/90 rounded-xl border border-slate-700/60 text-xs">
+        {/* Navigation Tabs */}
+        <div className="flex w-full gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
           <button
             type="button"
-            id="tab-modal-welcome"
-            onClick={() => { setActiveTab('welcome'); setErrorMsg(''); }}
-            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer truncate ${
-              activeTab === 'welcome' 
-                ? 'bg-teal-500 text-white shadow-md' 
-                : 'text-slate-400 hover:text-white'
+            onClick={() => { setActiveTab('account'); setErrorMsg(''); }}
+            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'account' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
-            {isAr ? 'دخول سريع' : 'Quick'}
+            {isAr ? 'الحساب الحالي' : 'Current'}
           </button>
           <button
             type="button"
-            id="tab-modal-register"
             onClick={() => { setActiveTab('register'); setErrorMsg(''); }}
-            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer truncate ${
-              activeTab === 'register' 
-                ? 'bg-teal-500 text-white shadow-md' 
-                : 'text-slate-400 hover:text-white'
+            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'register' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
             {isAr ? 'حساب جديد' : 'Register'}
           </button>
           <button
             type="button"
-            id="tab-modal-login"
             onClick={() => { setActiveTab('login'); setErrorMsg(''); }}
-            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer truncate ${
-              activeTab === 'login' 
-                ? 'bg-teal-500 text-white shadow-md' 
-                : 'text-slate-400 hover:text-white'
+            className={`flex-1 py-2 font-bold rounded-lg transition-all cursor-pointer ${
+              activeTab === 'login' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
             }`}
           >
-            {isAr ? 'تسجيل دخول' : 'Login'}
+            {isAr ? 'تبديل / دخول' : 'Switch / Login'}
           </button>
         </div>
 
-        {/* Language Selection Bar */}
-        <div className="p-2 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-center justify-between text-xs">
+        {/* Language Toggle */}
+        <div className="p-2.5 bg-slate-950/70 rounded-xl border border-slate-800 flex items-center justify-between text-xs">
           <div className="flex items-center gap-1.5 text-slate-300 font-medium">
             <Globe className="w-3.5 h-3.5 text-teal-400" />
             <span>{isAr ? 'اللغة:' : 'Language:'}</span>
@@ -223,247 +264,225 @@ export const WelcomeOnboardingModal: React.FC<WelcomeOnboardingModalProps> = ({
           <div className="flex gap-1">
             <button
               type="button"
-              id="btn-lang-ar"
               onClick={() => onLanguageChange('ar')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                isAr ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer ${
+                isAr ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              🇸🇦 العربية
+              العربية
             </button>
             <button
               type="button"
-              id="btn-lang-en"
               onClick={() => onLanguageChange('en')}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all cursor-pointer ${
-                !isAr ? 'bg-teal-500 text-white' : 'text-slate-400 hover:text-white'
+              className={`px-2.5 py-1 rounded text-[11px] font-bold cursor-pointer ${
+                !isAr ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'
               }`}
             >
-              🇬🇧 English
+              English
             </button>
           </div>
         </div>
 
-        {/* TAB 1: QUICK START / WELCOME */}
-        {activeTab === 'welcome' && (
-          <div className="space-y-3.5">
-            {/* Medical Disclaimer Box */}
-            <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl space-y-1">
-              <div className="flex items-center gap-1.5 text-amber-400 font-bold text-xs">
-                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                <span>{isAr ? 'إخلاء مسؤولية طبي رسمي:' : 'Medical Disclaimer:'}</span>
+        {/* TAB 1: CURRENT ACCOUNT OVERVIEW */}
+        {activeTab === 'account' && currentUser && (
+          <div className="space-y-3">
+            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2.5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-bold text-sm text-white truncate">{currentUser.firstName}</div>
+                  {currentUser.username && (
+                    <div className="text-xs font-mono text-sky-400 truncate" dir="ltr">
+                      @{currentUser.username.replace(/^@/, '')}
+                    </div>
+                  )}
+                  {currentUser.email && (
+                    <div className="text-[11px] text-slate-400 truncate" dir="ltr">
+                      {currentUser.email}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p className="text-[11px] leading-relaxed text-slate-300">
-                {isAr
-                  ? 'هذه المنصة وبوت تليجرام أدوات مساعدة واسترشادية للأطباء والكوادر الصحية والمراجعين. لا تغني عن الفحص السريري المباشر أو الطوارئ الطبية.'
-                  : 'This platform is an assistive clinical decision support tool and does not replace direct clinical examination.'}
-              </p>
+
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400">{isAr ? 'الباقة الحالية:' : 'Active Plan:'}</span>
+                <span className="font-bold text-teal-300 uppercase">{currentUser.subscription.tier}</span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">{isAr ? 'الرصيد المتبقي اليوم:' : 'Daily Credits:'}</span>
+                <span className="font-mono text-white">
+                  {currentUser.subscription.tier === 'vip' ? '∞' : `${currentUser.subscription.creditsRemaining} / ${currentUser.subscription.dailyQuotaTotal}`}
+                </span>
+              </div>
             </div>
 
-            {/* Disclaimer Checkbox */}
-            <label className="flex items-start gap-2 cursor-pointer select-none px-1">
-              <input
-                type="checkbox"
-                id="checkbox-disclaimer"
-                checked={disclaimerAccepted}
-                onChange={(e) => setDisclaimerAccepted(e.target.checked)}
-                className="mt-0.5 w-4 h-4 rounded border-slate-700 bg-slate-800 text-teal-500 focus:ring-teal-500 cursor-pointer shrink-0"
-              />
-              <span className="text-xs text-slate-300 leading-normal">
-                {isAr
-                  ? 'أوافق على إخلاء المسؤولية الطبية وشروط الاستخدام.'
-                  : 'I accept the clinical disclaimer and terms of use.'}
-              </span>
-            </label>
-
-            {errorMsg && (
-              <p className="text-xs text-rose-400 font-medium bg-rose-500/10 p-2 rounded-lg border border-rose-500/20 text-center">
-                {errorMsg}
-              </p>
-            )}
-
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                id="btn-direct-guest-login"
-                onClick={handleQuickGuest}
-                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-black text-sm shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                onClick={() => { setAuthMethod('telegram'); setActiveTab('login'); }}
+                className="py-2.5 px-3 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>{isAr ? 'الدخول المباشر كطبيب زائر 🚀' : 'Enter Directly (Guest Doctor) 🚀'}</span>
-                {isAr ? <ArrowLeft className="w-4 h-4" /> : <ArrowRight className="w-4 h-4" />}
+                <Send className="w-3.5 h-3.5" />
+                <span>{isAr ? 'ربط / تغيير تليجرام' : 'Link Telegram'}</span>
               </button>
-
-              <div className="grid grid-cols-2 gap-2">
+              {onLogout && (
                 <button
                   type="button"
-                  id="btn-switch-to-register"
-                  onClick={() => setActiveTab('register')}
-                  className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  onClick={() => {
+                    onLogout();
+                    onClose();
+                  }}
+                  className="py-2.5 px-3 rounded-xl bg-rose-950/40 hover:bg-rose-950/70 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-teal-400" />
-                  <span>{isAr ? 'إنشاء حساب' : 'Register'}</span>
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>{isAr ? 'تسجيل الخروج' : 'Sign Out'}</span>
                 </button>
-
-                <button
-                  type="button"
-                  id="btn-switch-to-login"
-                  onClick={() => setActiveTab('login')}
-                  className="py-2 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-bold text-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <Lock className="w-3.5 h-3.5 text-sky-400" />
-                  <span>{isAr ? 'تسجيل دخول' : 'Sign In'}</span>
-                </button>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* TAB 2 & 3: REGISTER / LOGIN FORM */}
+        {/* TAB 2 & 3: EMAIL OR TELEGRAM FORM */}
         {(activeTab === 'register' || activeTab === 'login') && (
           <form onSubmit={handleFinishAuth} className="space-y-3">
-            
-            {/* Method Toggle: Telegram ID or Email */}
             <div className="flex gap-1.5">
               <button
                 type="button"
-                id="btn-auth-method-telegram"
-                onClick={() => setAuthMethod('telegram')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                  authMethod === 'telegram'
-                    ? 'border-sky-500 bg-sky-500/15 text-sky-300'
-                    : 'border-slate-700 bg-slate-800/50 text-slate-400'
-                }`}
-              >
-                <Send className="w-3.5 h-3.5 text-sky-400" />
-                <span>{isAr ? 'معرّف تليجرام' : 'Telegram ID'}</span>
-              </button>
-              <button
-                type="button"
-                id="btn-auth-method-email"
-                onClick={() => setAuthMethod('email')}
-                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                onClick={() => { setAuthMethod('email'); setErrorMsg(''); }}
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 cursor-pointer ${
                   authMethod === 'email'
                     ? 'border-teal-500 bg-teal-500/15 text-teal-300'
                     : 'border-slate-700 bg-slate-800/50 text-slate-400'
                 }`}
               >
-                <Mail className="w-3.5 h-3.5 text-teal-400" />
+                <Mail className="w-3.5 h-3.5" />
                 <span>{isAr ? 'البريد الإلكتروني' : 'Email'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMethod('telegram'); setErrorMsg(''); }}
+                className={`flex-1 py-2 px-2 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 cursor-pointer ${
+                  authMethod === 'telegram'
+                    ? 'border-sky-500 bg-sky-500/15 text-sky-300'
+                    : 'border-slate-700 bg-slate-800/50 text-slate-400'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isAr ? 'معرف تليجرام' : 'Telegram ID'}</span>
               </button>
             </div>
 
-            {/* Role Selection (on Register) */}
             {activeTab === 'register' && (
-              <div>
-                <label className="block text-[11px] font-bold text-slate-300 mb-1">
-                  {isAr ? 'الصفة المهنية:' : 'Clinical Role:'}
-                </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(['doctor', 'pharmacist', 'patient'] as const).map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      id={`btn-role-${r}`}
-                      onClick={() => setUserRole(r)}
-                      className={`py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
-                        userRole === r
-                          ? 'border-teal-500 bg-teal-500/20 text-teal-300 font-bold'
-                          : 'border-slate-700 bg-slate-800/50 text-slate-400'
-                      }`}
-                    >
-                      {r === 'doctor' && (isAr ? 'طبيب 🩺' : 'Doctor')}
-                      {r === 'pharmacist' && (isAr ? 'صيدلي 💊' : 'Pharmacist')}
-                      {r === 'patient' && (isAr ? 'مراجع 👤' : 'Patient')}
-                    </button>
-                  ))}
-                </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['doctor', 'pharmacist', 'patient'] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setUserRole(r)}
+                    className={`py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
+                      userRole === r
+                        ? 'border-teal-500 bg-teal-500/20 text-teal-300 font-bold'
+                        : 'border-slate-700 bg-slate-800/50 text-slate-400'
+                    }`}
+                  >
+                    {r === 'doctor' && (isAr ? 'طبيب' : 'Doctor')}
+                    {r === 'pharmacist' && (isAr ? 'صيدلي' : 'Pharmacist')}
+                    {r === 'patient' && (isAr ? 'مراجع' : 'Patient')}
+                  </button>
+                ))}
               </div>
             )}
 
-            {/* Inputs based on method */}
-            {authMethod === 'telegram' ? (
+            {authMethod === 'email' ? (
               <div className="space-y-2.5">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    {isAr ? 'رقم أو معرّف تليجرام:' : 'Telegram ID or Username:'}
-                  </label>
-                  <input
-                    type="text"
-                    id="input-telegram-id"
-                    value={telegramId}
-                    onChange={(e) => setTelegramId(e.target.value)}
-                    placeholder={isAr ? 'مثال: 1001 أو اسمك بالتليجرام' : 'e.g. 1001 or username'}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-teal-500"
-                  />
-                </div>
                 {activeTab === 'register' && (
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                      {isAr ? 'الاسم بالكامل:' : 'Full Name:'}
-                    </label>
+                  <div className="relative">
                     <input
                       type="text"
-                      id="input-full-name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder={isAr ? 'مثال: د. حسين' : 'e.g. Dr. Hussein'}
+                      placeholder={isAr ? 'الاسم الكامل' : 'Full Name'}
                       className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-teal-500"
                     />
+                    <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="space-y-2.5">
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    {isAr ? 'البريد الإلكتروني:' : 'Email Address:'}
-                  </label>
+                <div className="relative">
                   <input
                     type="email"
-                    id="input-email"
+                    dir="ltr"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="doctor@example.com"
+                    placeholder="name@clinic.com"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-teal-500"
                   />
+                  <Mail className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
                 </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-300 mb-1">
-                    {isAr ? 'كلمة المرور:' : 'Password:'}
-                  </label>
+                <div className="relative">
                   <input
                     type="password"
-                    id="input-password"
+                    dir="ltr"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-teal-500"
                   />
+                  <Lock className="w-4 h-4 text-slate-500 absolute right-3 top-1/2 -translate-y-1/2" />
                 </div>
+                {activeTab === 'register' && (
+                  <input
+                    type="text"
+                    dir="ltr"
+                    value={telegramId}
+                    onChange={(e) => setTelegramId(e.target.value)}
+                    placeholder={isAr ? '@username (اختياري لربط البوت)' : '@username (optional)'}
+                    className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-teal-500"
+                  />
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <input
+                  type="text"
+                  dir="ltr"
+                  value={telegramId}
+                  onChange={(e) => setTelegramId(e.target.value)}
+                  placeholder="@username or Telegram ID"
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm font-mono focus:outline-none focus:border-sky-500"
+                />
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder={isAr ? 'الاسم المعروض' : 'Display Name'}
+                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white text-sm focus:outline-none focus:border-sky-500"
+                />
               </div>
             )}
 
             {errorMsg && (
-              <p className="text-xs text-rose-400 font-medium bg-rose-500/10 p-2 rounded-lg border border-rose-500/20 text-center">
-                {errorMsg}
+              <p className="text-xs text-rose-300 bg-rose-950/50 p-2.5 rounded-xl border border-rose-500/40 flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{errorMsg}</span>
               </p>
             )}
 
             <button
               type="submit"
-              id="btn-submit-auth-form"
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500 text-white font-black text-sm shadow-lg shadow-teal-500/20 transition-all cursor-pointer flex items-center justify-center gap-2 active:scale-98 mt-1"
+              disabled={isLoading}
+              className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
             >
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>
-                {activeTab === 'register' 
-                  ? (isAr ? 'تأكيد الحساب وتفعيل باقة VIP 🚀' : 'Confirm & Activate VIP 🚀') 
-                  : (isAr ? 'تسجيل الدخول الآن 🚀' : 'Sign In Now 🚀')}
+                {activeTab === 'register'
+                  ? isAr ? 'إنشاء الحساب والربط' : 'Create & Sync Account'
+                  : isAr ? 'تسجيل الدخول والربط' : 'Sign In & Sync'}
               </span>
             </button>
           </form>
         )}
-
       </div>
     </div>
   );

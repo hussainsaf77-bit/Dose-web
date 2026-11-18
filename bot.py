@@ -6,6 +6,29 @@ import json, os, re, logging, asyncio, base64
 from datetime import datetime
 import pytz
 
+from urllib.parse import urlencode as _urlencode
+
+def build_bot_web_url(user=None, hash_path: str = "", welcome: bool = False) -> str:
+    base = os.environ.get("API_BASE", "https://web-dose.vercel.app").rstrip("/")
+    params = {}
+    if welcome:
+        params["welcome"] = "1"
+    if user is not None:
+        uid = getattr(user, "id", None)
+        uname = getattr(user, "username", None)
+        fname = getattr(user, "first_name", None)
+        lname = getattr(user, "last_name", None)
+        full = " ".join([x for x in [fname, lname] if x]).strip()
+        if uid:
+            params["tg_id"] = str(uid)
+        if uname:
+            params["tg_user"] = str(uname).lstrip("@")
+        if full:
+            params["tg_name"] = full
+    qs = _urlencode(params) if params else ""
+    clean_hash = hash_path if not hash_path or hash_path.startswith("#") else f"#{hash_path}"
+    return f"{base}/{('?' + qs) if qs else ''}{clean_hash}"
+
 async def handle_symptoms_action(update, context):
     query = update.callback_query
     await query.answer()
@@ -17,7 +40,7 @@ async def handle_symptoms_action(update, context):
         msg = "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (DDx):*\n\nاكتب الآن أعراضك بالتفصيل في رسالة، أو افتح الفاحص التفاعلي بالموقع:"
         btn = "🖥️ فتح فاحص الأعراض الشامل بالموقع"
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1")]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url=build_bot_web_url(query.from_user, "#symptoms"))]])
     await query.message.reply_text(msg, reply_markup=kb, parse_mode="Markdown")
 
 try:
@@ -1375,18 +1398,18 @@ async def lab_photo_handler(u, ctx):
         await u.message.reply_text("❌ " + str(e)[:60], reply_markup=kb_back(lang))
     return STATE_LAB
 
-def kb_lang():
+def kb_lang(user=None):
     return InlineKeyboardMarkup([
         [
             InlineKeyboardButton("🇸🇦 العربية", callback_data="lang_ar"),
             InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
         ],
         [
-            InlineKeyboardButton("🌐 فتح تطبيق وموقع جرعة الطبي | Web App", url="https://web-dose.vercel.app/?welcome=1")
+            InlineKeyboardButton("🌐 فتح تطبيق وموقع جرعة الطبي | Web App", url=build_bot_web_url(user, "", welcome=True))
         ]
     ])
 
-def kb_main(lang):
+def kb_main(lang, user=None):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🤰 " + ("رعاية ومتابعة الحامل (حساب، سكر، ضغط، وزن)" if lang=="ar" else "Maternal & Pregnancy Care"), callback_data="m_pregnancy")],
         [InlineKeyboardButton("🩺 " + ("فاحص الأعراض والتشخيص السريري (DDx)" if lang=="ar" else "Symptom Checker (DDx)"), callback_data="m_symptoms")],
@@ -1405,7 +1428,7 @@ def kb_main(lang):
         [InlineKeyboardButton(tx("btn_settings", lang), callback_data="m_settings")],
         [InlineKeyboardButton("📖 " + ("دليل المستخدم" if lang=="ar" else "User Guide"), callback_data="m_guide")],
         [InlineKeyboardButton("🥗 " + ("التغذية العلاجية" if lang=="ar" else "Therapeutic Diet"), callback_data="m_diet")],
-        [InlineKeyboardButton("🌐 " + ("فتح تطبيق الويب" if lang=="ar" else "Open Web App"), url="https://web-dose.vercel.app/?welcome=1")]])
+        [InlineKeyboardButton("🌐 " + ("فتح تطبيق الويب" if lang=="ar" else "Open Web App"), url=build_bot_web_url(user, ""))]])
 
 
 def kb_back(lang):
@@ -1649,9 +1672,10 @@ def sched(app, chat_id, drug, time_str, freq, lang, tz_str="Asia/Riyadh", photo=
     except Exception as e:
         logger.error(f"sched error: {e}")
 
-async def show_main(msg, lang, edit=False):
+async def show_main(msg, lang, edit=False, user=None):
     t = tx("main_menu", lang)
-    k = kb_main(lang)
+    target_user = user or getattr(msg, "chat", None)
+    k = kb_main(lang, target_user)
     if edit:
         await msg.edit_text(t, reply_markup=k, parse_mode=ParseMode.MARKDOWN)
     else:
@@ -1685,7 +1709,7 @@ async def auto_welcome(u, ctx):
     """ترحيب تلقائي عند أي رسالة بدون حالة محادثة"""
     if not ctx.user_data.get("lang"):
         _tz = ctx.user_data.get("timezone"); ctx.user_data.clear(); ctx.user_data["timezone"] = _tz if _tz else ctx.user_data.get("timezone")
-        await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+        await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(u.effective_user), parse_mode=ParseMode.MARKDOWN)
         return STATE_LANGUAGE
     lang = get_lang(ctx)
     await show_main(u.message, lang)
@@ -1722,7 +1746,7 @@ async def start(u, ctx):
     except Exception:
         pass
     _tz = ctx.user_data.get("timezone"); ctx.user_data.clear(); ctx.user_data["timezone"] = _tz if _tz else ctx.user_data.get("timezone")
-    await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+    await u.message.reply_text(tx("welcome", "ar"), reply_markup=kb_lang(u.effective_user), parse_mode=ParseMode.MARKDOWN)
     return STATE_LANGUAGE
 
 async def reg_name_country(u, ctx):
@@ -1754,7 +1778,7 @@ async def reg_name_country(u, ctx):
     }
     save_stats(stats)
     
-    await u.message.reply_text("✅ مرحباً " + name + "! 🎉\n\nاختر لغتك:", reply_markup=kb_lang())
+    await u.message.reply_text("✅ مرحباً " + name + "! 🎉\n\nاختر لغتك:", reply_markup=kb_lang(u.effective_user))
     return STATE_LANGUAGE
 
 async def pick_lang(u, ctx):
@@ -2334,7 +2358,7 @@ async def main_cb(u, ctx):
         await q.message.edit_text(msg)
         return STATE_COUNTRY
     elif q.data == "do_lang":
-        await q.message.edit_text(tx("welcome", "ar"), reply_markup=kb_lang(), parse_mode=ParseMode.MARKDOWN)
+        await q.message.edit_text(tx("welcome", "ar"), reply_markup=kb_lang(q.from_user), parse_mode=ParseMode.MARKDOWN)
         return STATE_LANGUAGE
     return STATE_MAIN_MENU
 

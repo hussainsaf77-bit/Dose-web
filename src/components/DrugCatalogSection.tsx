@@ -77,13 +77,14 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
   const handleAddDrugToPatientProfile = (drug: DrugInfo) => {
     try {
       const saved = localStorage.getItem('dose_patient_roster');
-      let patients = saved ? JSON.parse(saved) : null;
+      const activeId = localStorage.getItem('dose_active_patient_id');
+      const patients = saved ? JSON.parse(saved) : null;
       if (!Array.isArray(patients) || patients.length === 0) {
         setPatientAddedToast(isAr ? 'يرجى فتح ملف المريض أولاً لتسجيل السجل' : 'Please open patient profile first');
         setTimeout(() => setPatientAddedToast(null), 3500);
         return;
       }
-      const activePat = patients[0];
+      const activePat = (activeId && patients.find((p: any) => p.id === activeId)) || patients[0];
       const newRx = {
         id: `rx_${Date.now()}`,
         drugName: `${drug.name_ar} (${drug.name_en})`,
@@ -269,10 +270,16 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       const genericName = item.openfda?.generic_name?.[0] || term;
       const brandNames = item.openfda?.brand_name || [term];
       const pharmClass = item.openfda?.pharm_class_epc?.[0] || 'Pharmaceutical Agent';
-      const indications = item.indications_and_usage?.[0]?.slice(0, 300) || 'Indicated as directed by physician';
-      const dosage = item.dosage_and_administration?.[0]?.slice(0, 300) || 'Refer to package insert';
-      const warnings = item.warnings?.[0]?.slice(0, 250) || 'Standard clinical precautions apply';
-      const contra = item.contraindications?.[0]?.slice(0, 200) || 'Known hypersensitivity to active substance';
+      const indications = item.indications_and_usage?.[0]?.slice(0, 400) || 'Indicated as directed by physician';
+      const dosage = item.dosage_and_administration?.[0]?.slice(0, 400) || 'Refer to package insert';
+      const warnings = (item.boxed_warning?.[0] || item.warnings_and_cautions?.[0] || item.warnings?.[0])?.slice(0, 350) || 'Standard clinical precautions apply';
+      const contra = item.contraindications?.[0]?.slice(0, 300) || 'Known hypersensitivity to active substance';
+      const mechanism = (item.mechanism_of_action?.[0] || item.clinical_pharmacology?.[0])?.slice(0, 350);
+      const drugInteractionsText = item.drug_interactions?.[0]?.slice(0, 320);
+      const storageText = item.storage_and_handling?.[0]?.slice(0, 260);
+      const pregnancyText = item.pregnancy?.[0]?.slice(0, 260);
+      const lactationText = item.nursing_mothers?.[0]?.slice(0, 240);
+      const overdosageText = item.overdosage?.[0]?.slice(0, 240);
 
       const fdaDrug: DrugInfo = {
         id: `fda_${Date.now()}`,
@@ -282,6 +289,8 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
         aliases: [term, ...brandNames],
         class_ar: pharmClass,
         class_en: pharmClass,
+        mechanism_ar: mechanism || `يعمل المستحضر وفق خصائصه الفارماكولوجية ضمن فئة ${pharmClass}.`,
+        mechanism_en: mechanism || `Pharmacologic activity consistent with ${pharmClass}.`,
         indications_ar: [indications],
         indications_en: [indications],
         adult_dosage_text_ar: dosage,
@@ -290,14 +299,26 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
         contra_en: contra,
         side_ar: warnings,
         side_en: warnings,
-        preg: 'استشر الطبيب للتحقق من فئة الحمل الدقيقة',
+        preg: pregnancyText || 'استشر الطبيب للتحقق من فئة الحمل الدقيقة',
+        preg_en: pregnancyText || 'Verify exact pregnancy risk/benefit profile per FDA labeling.',
         preg_badge: 'warn',
-        lact: 'يُفضل التحقق السريري',
-        renal: 'تعديل الجرعة بحسب الكرياتينين وeGFR',
+        lact: lactationText || 'يُفضل التحقق السريري قبل الاستخدام أثناء الرضاعة',
+        lact_en: lactationText || 'Verify infant exposure risk during breastfeeding.',
+        renal: 'تعديل الجرعة بحسب الكرياتينين وeGFR وتقييم الكبد حسب النشرة الداخلية',
+        renal_en: 'Assess renal (CrCl/eGFR) and hepatic impairment before dosing adjustments.',
+        food_interactions_ar: drugInteractionsText || 'تحقق من تداخل الدواء مع الطعام وأدوية المريض الأخرى عبر فاحص التداخلات.',
+        food_interactions_en: drugInteractionsText || 'Review drug-food and concomitant drug interactions carefully.',
+        monitoring_ar: overdosageText || 'مراقبة الاستجابة السريرية والآثار الجانبية وفحوصات الكلى والكبد عند اللزوم.',
+        monitoring_en: overdosageText || 'Monitor clinical efficacy, adverse signs, and renal/hepatic parameters.',
+        missed_dose_ar: 'تناول الجرعة المنسية فور تذكرها إلا إذا اقترب موعد الجرعة التالية؛ لا تضاعف الجرعة أبداً.',
+        missed_dose_en: 'Take missed dose as soon as remembered unless near next dose; never double.',
+        storage_ar: storageText || 'يُحفظ في عبوته المحكمة بدرجة حرارة الغرفة الموصى بها في النشرة.',
+        storage_en: storageText || 'Store in tightly closed container as indicated on official packaging.',
         note: 'تم استرجاع بيانات هذا الدواء مباشرة من السجل الدوائي المعتمد لمنظمة الغذاء والدواء الأمريكية (US FDA Drug Label Database).',
         note_en: 'Directly indexed from official US FDA Drug Label Database.',
-        interactions: [],
-        pharmacist_advice_ar: 'التزم بالجرعة وتوقيت تناول الدواء المعتمدين من الطبيب والصيدلاني.'
+        interactions: drugInteractionsText ? [drugInteractionsText] : [],
+        pharmacist_advice_ar: 'التزم بالجرعة وتوقيت تناول الدواء المعتمدين من الطبيب والصيدلاني.',
+        pharmacist_advice_en: 'Follow prescribed dosing schedule and consult pharmacist before combining therapies.'
       };
       return fdaDrug;
     } catch (e) {
@@ -415,14 +436,10 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl backdrop-blur-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div>
-            <div className="flex items-center gap-2 text-teal-400 text-sm font-semibold mb-1">
+            <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
               <Pill className="w-4 h-4" />
               <span>
-                {isAr ? 'دليل الأدوية السريري الذكي (جرعة — Dose Engine)' : 'Clinical Live Drug Engine (Dose)'}
-              </span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center gap-1">
-                <Sparkles className="w-2.5 h-2.5" />
-                Live API & Local DB
+                {isAr ? 'دليل الأدوية السريري — منصة جرعة' : 'Clinical Drug Reference — Dose'}
               </span>
             </div>
             <h2 className="text-xl md:text-2xl font-black text-white">
@@ -938,7 +955,79 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
                     </div>
                   </div>
 
-                  {/* Row 10: Pharmacist Clinical Pearl */}
+                  {/* Row 10: Mechanism of Action */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-indigo-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                      <span>{isCardAr ? 'آلية العمل الفارماكولوجية:' : 'Mechanism of Action:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200 leading-relaxed">
+                      {isCardAr
+                        ? (activeDrug.mechanism_ar || activeDrug.mechanism_en || `يعمل الدواء ضمن فئة (${activeDrug.class_ar}) على المستقبلات والإنزيمات المستهدفة لتحقيق التأثير العلاجي المطلوب.`)
+                        : (activeDrug.mechanism_en || activeDrug.mechanism_ar || `Acts within pharmacologic class (${activeDrug.class_en}) to achieve targeted therapeutic control.`)}
+                    </div>
+                  </div>
+
+                  {/* Row 11: Drug & Food Interactions */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-orange-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-orange-400" />
+                      <span>{isCardAr ? 'التداخلات الدوائية والغذائية:' : 'Drug & Food Interactions:'}</span>
+                    </span>
+                    <div className="flex-1 space-y-1.5">
+                      {activeDrug.interactions && activeDrug.interactions.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {activeDrug.interactions.map((inter, i) => (
+                            <span key={i} className="px-2 py-0.5 rounded-md bg-orange-950/50 text-orange-200 border border-orange-500/30 font-medium text-[11px]">
+                              {inter}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-slate-300">
+                        {isCardAr
+                          ? (activeDrug.food_interactions_ar || activeDrug.food_interactions_en || 'راجع علاقة الجرعة بالطعام والمشروبات (كالجريب فروت والكافيين ومنتجات الألبان) وتأكد من فاحص التداخلات عند الجمع مع أدوية أخرى.')
+                          : (activeDrug.food_interactions_en || activeDrug.food_interactions_ar || 'Verify food/beverage timing and check concomitant medications in the Interactions Checker.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Row 12: Clinical Monitoring */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-cyan-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <HeartPulse className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>{isCardAr ? 'المراقبة السريرية والفحوصات:' : 'Clinical Monitoring:'}</span>
+                    </span>
+                    <div className="flex-1 text-slate-200">
+                      {isCardAr
+                        ? (activeDrug.monitoring_ar || activeDrug.monitoring_en || 'متابعة التحسن السريري والعلامات الحيوية وفحص وظائف الكلى والكبد بشكل دوري عند الاستخدام الممتد.')
+                        : (activeDrug.monitoring_en || activeDrug.monitoring_ar || 'Monitor clinical symptom response, vital signs, and periodic renal/hepatic function during chronic use.')}
+                    </div>
+                  </div>
+
+                  {/* Row 13: Missed Dose & Storage */}
+                  <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
+                    <span className="font-bold text-emerald-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{isCardAr ? 'نسيان الجرعة والحفظ:' : 'Missed Dose & Storage:'}</span>
+                    </span>
+                    <div className="flex-1 space-y-1 text-slate-300">
+                      <p>
+                        <strong className="text-slate-200">{isCardAr ? 'عند نسيان الجرعة: ' : 'Missed dose: '}</strong>
+                        {isCardAr
+                          ? (activeDrug.missed_dose_ar || activeDrug.missed_dose_en || 'تناول الجرعة فور تذكرها، وإذا اقترب موعد الجرعة التالية تخطَّ الفائتة ولا تضاعف الجرعة أبداً.')
+                          : (activeDrug.missed_dose_en || activeDrug.missed_dose_ar || 'Take as soon as remembered; skip if near next scheduled dose and never double up.')}
+                      </p>
+                      <p>
+                        <strong className="text-slate-200">{isCardAr ? 'التخزين والحفظ: ' : 'Storage: '}</strong>
+                        {isCardAr
+                          ? (activeDrug.storage_ar || activeDrug.storage_en || 'يُحفظ في عبوته الأصلية بدرجة حرارة الغرفة (أقل من 25°م) بعيداً عن الرطوبة والضوء ومتناول الأطفال.')
+                          : (activeDrug.storage_en || activeDrug.storage_ar || 'Store tightly closed at room temperature (<25°C) away from moisture and children.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Row 14: Pharmacist Clinical Pearl */}
                   {(activeDrug.note || activeDrug.pharmacist_advice_ar) && (
                     <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 bg-teal-950/20 hover:bg-teal-950/30 transition-colors">
                       <span className="font-bold text-teal-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
@@ -947,7 +1036,9 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
                       </span>
                       <div className="flex-1 text-teal-100 font-medium space-y-1">
                         {activeDrug.note && <p>• {isCardAr ? activeDrug.note : (activeDrug.note_en || activeDrug.note)}</p>}
-                        {activeDrug.pharmacist_advice_ar && <p>• {activeDrug.pharmacist_advice_ar}</p>}
+                        {activeDrug.pharmacist_advice_ar && (
+                          <p>• {isCardAr ? activeDrug.pharmacist_advice_ar : (activeDrug.pharmacist_advice_en || activeDrug.pharmacist_advice_ar)}</p>
+                        )}
                       </div>
                     </div>
                   )}

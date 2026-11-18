@@ -17,7 +17,7 @@ async def handle_symptoms_action(update, context):
         msg = "🩺 *فاحص الأعراض والتشخيص التفريقي السريري (DDx):*\n\nاكتب الآن أعراضك بالتفصيل في رسالة، أو افتح الفاحص التفاعلي بالموقع:"
         btn = "🖥️ فتح فاحص الأعراض الشامل بالموقع"
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(btn, url="https://web-dose.vercel.app/?welcome=1")]])
     await query.message.reply_text(msg, reply_markup=kb, parse_mode="Markdown")
 
 try:
@@ -51,7 +51,7 @@ def api_check_sub(telegram_id: str) -> dict:
     except:
         return {"linked": False, "has_sub": False, "plan": "Free",
                 "search_limit": 5, "reminder_limit": 0,
-                "register_url": "https://web-dose.vercel.app/?welcome=1&v=3.8"}
+                "register_url": "https://web-dose.vercel.app/?welcome=1"}
 
 def api_track_usage(telegram_id: str, action: str = "search") -> dict:
     """يسجّل استخدام ويعيد هل مسموح أم لا"""
@@ -70,7 +70,7 @@ LINK_MSG = {
     "ar": "🔗 *ربط حساب الموقع*\n\nبربط حسابك ستحصل على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n\n👇 سجّل من هنا:",
     "en": "🔗 *Link Website Account*\n\nBy linking you get:\n✅ Unified subscription\n✅ Full dashboard\n✅ Saved history\n\n👇 Register here:"
 }
-LINK_URL = "https://web-dose.vercel.app/?welcome=1&v=3.8"
+LINK_URL = "https://web-dose.vercel.app/?welcome=1"
 
 
 # قاموس الدول والمناطق الزمنية
@@ -202,7 +202,7 @@ threading.Thread(target=run_ping_server, daemon=True).start()
 import urllib.request
 def self_ping():
     import time
-    url = os.environ.get("RENDER_EXTERNAL_URL", "https://web-dose.vercel.app/?welcome=1&v=3.8")
+    url = os.environ.get("RENDER_EXTERNAL_URL", "https://web-dose.vercel.app/?welcome=1")
     while True:
         time.sleep(600)
         try: urllib.request.urlopen(url, timeout=10)
@@ -249,7 +249,7 @@ REMINDER_SOUND = "reminder.mp3"
 
 TEXTS = {
 "ar": {
-"welcome": "🌟 *أهلاً بك في بوت جرعة الطبي!*\n\n━━━━━━━━━━━━━━━━━━━━\n\n⚕️ *إخلاء مسؤولية مهم:*\n\nهذا البوت أداة مرجعية تعليمية فقط ولا يُغني عن الاجتهاد السريري.\n\n• للكادر الصحي: المعلومات للاسترشاد فقط — القرار العلاجي يعود لك وحدك بناءً على تقييمك للمريض\n• للمرضى: لا تعتمد على البوت لتشخيص أو علاج أي حالة دون استشارة طبيبك\n• الجرعات تختلف حسب حالة كل مريض وعوامل أخرى لا يعلمها البوت\n• لا يتحمل القائمون على البوت أي مسؤولية قانونية أو طبية\n\n🚨 في الطوارئ: اتصل بالإسعاف فوراً\n\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *Welcome to Dose Medical Bot!*\n\n⚕️ *Important Disclaimer:*\n\nThis bot is a reference tool only and does not replace clinical judgment.\n\n• Healthcare professionals: Information is for reference only — clinical decisions are solely yours based on patient assessment\n• Patients: Never rely on this bot for diagnosis or treatment without consulting your doctor\n• Doses vary based on individual patient factors unknown to this bot\n• The bot operators bear no legal or medical responsibility\n\n🚨 Emergency: Call ambulance immediately\n\n━━━━━━━━━━━━━━━━━━━━\n\nاختر لغتك | Choose your language:\n\n🌐 [تطبيق الويب | Web App](https://web-dose.vercel.app/?welcome=1&v=3.8)",
+"welcome": "🌟 *أهلاً بك في بوت جرعة الطبي!*\n\n━━━━━━━━━━━━━━━━━━━━\n\n⚕️ *إخلاء مسؤولية مهم:*\n\nهذا البوت أداة مرجعية تعليمية فقط ولا يُغني عن الاجتهاد السريري.\n\n• للكادر الصحي: المعلومات للاسترشاد فقط — القرار العلاجي يعود لك وحدك بناءً على تقييمك للمريض\n• للمرضى: لا تعتمد على البوت لتشخيص أو علاج أي حالة دون استشارة طبيبك\n• الجرعات تختلف حسب حالة كل مريض وعوامل أخرى لا يعلمها البوت\n• لا يتحمل القائمون على البوت أي مسؤولية قانونية أو طبية\n\n🚨 في الطوارئ: اتصل بالإسعاف فوراً\n\n━━━━━━━━━━━━━━━━━━━━\n\n🌟 *Welcome to Dose Medical Bot!*\n\n⚕️ *Important Disclaimer:*\n\nThis bot is a reference tool only and does not replace clinical judgment.\n\n• Healthcare professionals: Information is for reference only — clinical decisions are solely yours based on patient assessment\n• Patients: Never rely on this bot for diagnosis or treatment without consulting your doctor\n• Doses vary based on individual patient factors unknown to this bot\n• The bot operators bear no legal or medical responsibility\n\n🚨 Emergency: Call ambulance immediately\n\n━━━━━━━━━━━━━━━━━━━━\n\nاختر لغتك | Choose your language:\n\n🌐 [تطبيق الويب | Web App](https://web-dose.vercel.app/?welcome=1)",
 "main_menu": "📋 *القائمة الرئيسية*\n\nاختر:",
 "btn_search": "🔍 استعلام عن دواء",
 "btn_child": "🍼 جرعات الأطفال",
@@ -1382,7 +1382,7 @@ def kb_lang():
             InlineKeyboardButton("🇬🇧 English", callback_data="lang_en")
         ],
         [
-            InlineKeyboardButton("🌐 فتح تطبيق وموقع جرعة الطبي | Web App", url="https://web-dose.vercel.app/?welcome=1&v=3.8")
+            InlineKeyboardButton("🌐 فتح تطبيق وموقع جرعة الطبي | Web App", url="https://web-dose.vercel.app/?welcome=1")
         ]
     ])
 
@@ -1405,7 +1405,7 @@ def kb_main(lang):
         [InlineKeyboardButton(tx("btn_settings", lang), callback_data="m_settings")],
         [InlineKeyboardButton("📖 " + ("دليل المستخدم" if lang=="ar" else "User Guide"), callback_data="m_guide")],
         [InlineKeyboardButton("🥗 " + ("التغذية العلاجية" if lang=="ar" else "Therapeutic Diet"), callback_data="m_diet")],
-        [InlineKeyboardButton("🌐 " + ("فتح تطبيق الويب" if lang=="ar" else "Open Web App"), url="https://web-dose.vercel.app/?welcome=1&v=3.8")]])
+        [InlineKeyboardButton("🌐 " + ("فتح تطبيق الويب" if lang=="ar" else "Open Web App"), url="https://web-dose.vercel.app/?welcome=1")]])
 
 
 def kb_back(lang):
@@ -2014,7 +2014,7 @@ async def main_cb(u, ctx):
             [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
              InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
             [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
-            [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+            [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1#pregnancy")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
         await safe_edit_cb(q, txt, kb)
@@ -2224,7 +2224,7 @@ async def main_cb(u, ctx):
              InlineKeyboardButton("🫁 سعال مستمر وحمى", callback_data="sym_cough")],
             [InlineKeyboardButton("👶 حرارة وسعال عند طفل", callback_data="sym_child"),
              InlineKeyboardButton("🩸 حرقان بول وألم خاصرة", callback_data="sym_uti")],
-            [InlineKeyboardButton("🌐 فتح فاحص الأعراض بالموقع وتصدير PDF", url="https://web-dose.vercel.app/?welcome=1&v=3.8")],
+            [InlineKeyboardButton("🌐 فتح فاحص الأعراض بالموقع وتصدير PDF", url="https://web-dose.vercel.app/?welcome=1")],
             [InlineKeyboardButton(tx("btn_back", lang), callback_data="back")]
         ])
         await q.message.edit_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
@@ -2245,7 +2245,7 @@ async def main_cb(u, ctx):
             f"🩺 *الانطباع الأولي:* {item[0]}\n\n"
             f"🚨 *مستوى الفرز:* {item[1]}\n\n"
             f"🔬 *الفحوصات المقترحة:*\n• " + "\n• ".join(item[2]) + "\n\n"
-            "🌐 [فتح الفاحص بالموقع وتصدير PDF](https://web-dose.vercel.app/?welcome=1&v=3.8)"
+            "🌐 [فتح الفاحص بالموقع وتصدير PDF](https://web-dose.vercel.app/?welcome=1)"
         )
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔙 العودة لفاحص الأعراض", callback_data="m_symptoms")],
@@ -5287,6 +5287,126 @@ async def stats_cmd(u, ctx):
         msg = "\n".join(lines)
     await u.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
+def parse_lmp_date(raw_text):
+    import re
+    from datetime import datetime
+    raw_text = raw_text.strip()
+    patterns = [
+        r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{4})',
+        r'(\d{4})[-/\.](\d{1,2})[-/\.](\d{1,2})',
+        r'(\d{1,2})[-/\.](\d{1,2})[-/\.](\d{2})'
+    ]
+    for p in patterns:
+        m = re.search(p, raw_text)
+        if m:
+            g = m.groups()
+            if len(g[0]) == 4:
+                year, month, day = int(g[0]), int(g[1]), int(g[2])
+            elif len(g[2]) == 4:
+                day, month, year = int(g[0]), int(g[1]), int(g[2])
+            else:
+                day, month, year = int(g[0]), int(g[1]), 2000 + int(g[2])
+            try:
+                return datetime(year, month, day)
+            except Exception:
+                pass
+    return None
+
+async def show_calculated_edd(u, ctx, lmp, lang):
+    from datetime import datetime, timedelta
+    edd = lmp + timedelta(days=280)
+    today = datetime.now()
+    diff_days = (today - lmp).days
+    
+    if diff_days < 0:
+        weeks = 0
+        days_rem = 280
+        trimester = "مرحلة التخطيط للحمل (Pre-conception)"
+        size = "بويضة مخصبة"
+    elif diff_days > 300:
+        weeks = 40
+        days_rem = 0
+        trimester = "نهاية فترة الحمل وموعد الولادة الفعلي"
+        size = "جنين مكتمل النمو وجاهز للولادة"
+    else:
+        weeks = max(1, diff_days // 7)
+        days_rem = max(0, 280 - diff_days)
+        if weeks <= 13:
+            trimester = "الثلث الأول (First Trimester)"
+        elif weeks <= 27:
+            trimester = "الثلث الثاني (Second Trimester)"
+        else:
+            trimester = "الثلث الثالث (Third Trimester)"
+            
+    if weeks <= 8:
+        size = "حبة توت بري (Blueberry)"
+    elif weeks <= 12:
+        size = "ليمونة صغيرة (Lime)"
+    elif weeks <= 16:
+        size = "حبة أفوكادو (Avocado)"
+    elif weeks <= 20:
+        size = "حبة موز (Banana)"
+    elif weeks <= 24:
+        size = "ذرة صفراء (Corn)"
+    elif weeks <= 28:
+        size = "باذنجانة كبيرة (Eggplant)"
+    elif weeks <= 32:
+        size = "حبة يقطين (Squash)"
+    elif weeks <= 36:
+        size = "حبة بطيخ صيفي (Watermelon)"
+    else:
+        size = "جنين مكتمل النمو وجاهز للولادة"
+
+    rep = (
+        f"📊 *التقرير السريري لحساب عمر الحمل وموعد الولادة (ACOG / Naegele):*\n\n"
+        f"• 📅 *تاريخ أول يوم لآخر دورة (LMP):* `{lmp.strftime('%Y-%m-%d')}`\n"
+        f"• 🎯 *موعد الولادة المتوقع (EDD):* **{edd.strftime('%Y-%m-%d')}**\n"
+        f"• ⏳ *عمر الحمل التقديري اليوم:* **{weeks} أسبوعاً** (الأيام المتبقية للولادة: **{days_rem} يوماً**)\n"
+        f"• 🤰 *المرحلة السريرية:* {trimester}\n"
+        f"• 👶 *حجم الجنين التقديري:* بحجم **{size}**\n\n"
+        f"🔬 *أهم الفحوصات الطبية المطلوبة لهذه المرحلة:*\n"
+        f"1. قياس ضغط الدم ومراقبة زلال البول دورياً لمنع تسمم الحمل.\n"
+        f"2. الاستمرار على المكملات المقررة (حمض الفوليك / الحديد / الكالسيوم).\n"
+        f"3. سونار دوري لمراقبة نبض ونمو الجنين وكمية السائل الأمنيوسي.\n\n"
+        f"⚠️ *تنبيه سريري:* راجعي طوارئ الولادة فوراً إذا شعرتِ بنزيف، تدفق سوائل، أو صداع شديد مع اضطراب رؤية."
+    )
+    
+    kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🩸 سكر الحمل السريري", callback_data="preg_sugar"),
+         InlineKeyboardButton("🩺 ضغط الدم وتسمم الحمل", callback_data="preg_bp")],
+        [InlineKeyboardButton("⚖️ الوزن المثالي والزيادة الآمنة", callback_data="preg_weight"),
+         InlineKeyboardButton("💊 أمان الأدوية للحامل (FDA)", callback_data="preg_drugs")],
+        [InlineKeyboardButton("📅 حساب تاريخ آخر", callback_data="preg_calc")],
+        [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+        [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="back")]
+    ])
+    await u.message.reply_text(rep, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
+    return STATE_MAIN_MENU
+
+async def handle_global_text_input(u, ctx):
+    txt = (u.message.text or "").strip()
+    lang = get_lang(ctx)
+    if not txt:
+        return STATE_MAIN_MENU
+        
+    lmp = parse_lmp_date(txt)
+    if lmp or any(k in txt.lower() for k in ["دورة", "حمل", "ولادة", "حامل", "اسبوع", "أسبوع", "lmp", "edd", "period", "cycle"]):
+        if not lmp:
+            lmp = parse_lmp_date(txt)
+        if lmp:
+            return await show_calculated_edd(u, ctx, lmp, lang)
+        else:
+            await u.message.reply_text(
+                "📅 *حساب موعد الولادة وعمر الحمل:*\nيرجى كتابة التاريخ بصيغة يوم-شهر-سنة، مثال:\n`16-06-2026` أو `15/05/2026`",
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔙 العودة لقسم الحامل", callback_data="m_pregnancy")],
+                    [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="back")]
+                ])
+            )
+            return STATE_MAIN_MENU
+    return None
+
 async def cmd_pregnancy(u, ctx):
     """فتح قسم رعاية الحامل مباشرة عبر الأمر /pregnancy"""
     lang = get_lang(ctx)
@@ -5308,7 +5428,7 @@ async def cmd_pregnancy(u, ctx):
         [InlineKeyboardButton("🥗 " + ("التغذية والممنوعات الغذائية" if lang=="ar" else "Nutrition & Diet Guidelines"), callback_data="preg_diet"),
          InlineKeyboardButton("🚶‍♀️ " + ("النشاط البدني وتمارين كيجل" if lang=="ar" else "Exercise & Pelvic Health"), callback_data="preg_walk")],
         [InlineKeyboardButton("🗓️ " + ("جدول الفحوصات والزيارات الدورية" if lang=="ar" else "Prenatal Visit Schedule"), callback_data="preg_visits")],
-        [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1&v=3.8#pregnancy")],
+        [InlineKeyboardButton("🌐 " + ("فتح جناح الحامل التفاعلي بالموقع" if lang=="ar" else "Open Pregnancy Portal Web"), url="https://web-dose.vercel.app/?welcome=1#pregnancy")],
         [InlineKeyboardButton("🔙 " + ("القائمة الرئيسية" if lang=="ar" else "Main Menu"), callback_data="back")]
     ])
     await u.message.reply_text(txt, reply_markup=kb, parse_mode=ParseMode.MARKDOWN)
@@ -5406,14 +5526,14 @@ def build_conv():
                 CallbackQueryHandler(pick_lang, pattern="^lang_"),
 ],
             STATE_MAIN_MENU: [
-
                 CallbackQueryHandler(go_back, pattern="^back$"),
                 CallbackQueryHandler(go_main_menu, pattern="^main_menu_now$"),
                 CallbackQueryHandler(sub_select, pattern="^sub_"),
                 CallbackQueryHandler(reg_handler, pattern="^reg_"),
                 CallbackQueryHandler(handle_m_bp, pattern="^m_bp$"),
                 CallbackQueryHandler(main_cb, pattern="^.*$"),
-                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$")],
+                CallbackQueryHandler(manual_drug_input, pattern="^manual_input$"),
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_global_text_input)],
             STATE_BMI_WEIGHT: [
                 CallbackQueryHandler(bmi_cb, pattern="^bmi_"),
                 MessageHandler(filters.TEXT & ~filters.COMMAND, bmi_text)],
@@ -5847,7 +5967,7 @@ PADDLE_PRICES = {
     "biannual":  "pri_01kyf5w0g2fhw82p6554dt6m45",
     "annual":    "pri_01kyf5wszwtsneevhbqwqmwbj2",
 }
-PADDLE_CHECKOUT = "https://web-dose.vercel.app/?welcome=1&v=3.8"
+PADDLE_CHECKOUT = "https://web-dose.vercel.app/?welcome=1"
 
 def kb_premium(lang):
     ar = lang == "ar"
@@ -5936,9 +6056,9 @@ async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         email = sub.get("email","")
         plan = sub.get("plan_ar", sub.get("plan","Free"))
         if lang == "ar":
-            msg = f"✅ *حسابك مرتبط*\n\n📧 البريد: {email}\n💳 الخطة: {plan}\n\n[🌐 فتح لوحة التحكم](https://web-dose.vercel.app/?welcome=1&v=3.8"
+            msg = f"✅ *حسابك مرتبط*\n\n📧 البريد: {email}\n💳 الخطة: {plan}\n\n[🌐 فتح لوحة التحكم](https://web-dose.vercel.app/?welcome=1"
         else:
-            msg = f"✅ *Account Linked*\n\n📧 Email: {email}\n💳 Plan: {plan}\n\n[🌐 Open Dashboard](https://web-dose.vercel.app/?welcome=1&v=3.8"
+            msg = f"✅ *Account Linked*\n\n📧 Email: {email}\n💳 Plan: {plan}\n\n[🌐 Open Dashboard](https://web-dose.vercel.app/?welcome=1"
     else:
         if lang == "ar":
             msg = f"🔗 *ربط حساب الموقع*\n\nاربط حسابك للحصول على:\n✅ اشتراك موحد للموقع والبوت\n✅ لوحة تحكم كاملة\n✅ تاريخ بحث محفوظ\n✅ تذكيرات متقدمة\n\n👇 سجّل أو ادخل من هنا:"
@@ -5947,7 +6067,7 @@ async def link_account_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     keyboard = [[InlineKeyboardButton(
         "🌐 تسجيل / دخول" if lang=="ar" else "🌐 Register / Login",
-        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
+        url="https://web-dose.vercel.app/?welcome=1"
     )]]
     
     await update.message.reply_text(
@@ -5970,7 +6090,7 @@ async def upgrade_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     keyboard = [[InlineKeyboardButton(
         "⭐ الترقية الآن" if lang=="ar" else "⭐ Upgrade Now",
-        url="https://web-dose.vercel.app/?welcome=1&v=3.8"
+        url="https://web-dose.vercel.app/?welcome=1"
     )]]
     
     await update.message.reply_text(
@@ -5995,14 +6115,14 @@ def main():
             print(f"❌ Supabase error: {e}")
     persistence = PicklePersistence(filepath="bot_data.pkl", update_interval=60)
     request = HTTPXRequest(
-        connection_pool_size=32,
-        connect_timeout=15.0,
-        read_timeout=35.0,
-        write_timeout=20.0,
-        pool_timeout=15.0,
+        connection_pool_size=64,
+        connect_timeout=10.0,
+        read_timeout=30.0,
+        write_timeout=15.0,
+        pool_timeout=10.0,
         http_version="1.1",
     )
-    app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).build()
+    app = Application.builder().token(BOT_TOKEN).request(request).persistence(persistence).concurrent_updates(16).build()
     app.add_error_handler(global_bot_error_handler)
     app.add_handler(CallbackQueryHandler(main_cb, pattern="^(m_|preg_|pweek_)"), group=1)
     app.add_handler(build_conv())
@@ -6020,8 +6140,9 @@ def main():
     # استعادة التذكيرات
     import asyncio
     app.post_init = restore_reminders
-    print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل!")
+    print("🚀 البوت يعمل بسرعة فائقة وبثبات كامل وموازاة متعددة (16 threads)!")
     app.add_handler(CallbackQueryHandler(handle_symptoms_action, pattern="^symptoms$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_global_text_input), group=3)
     app.run_polling(
         drop_pending_updates=True,
         bootstrap_retries=-1,

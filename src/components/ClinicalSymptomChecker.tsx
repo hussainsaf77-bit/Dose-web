@@ -321,14 +321,13 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
   return (
     <div className="space-y-6" id="clinical-symptom-checker-section">
       {/* Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold mb-2">
-              <Stethoscope className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
+              <Stethoscope className="w-4 h-4" />
               <span>
-                {isAr ? 'نظام الفرز والتشخيص التفريقي السريري (Clinical DDx & Triage)' : 'Precision Clinical DDx & Triage Engine'}
+                {isAr ? 'الفرز والتشخيص التفريقي السريري (Clinical DDx)' : 'Clinical DDx & Triage'}
               </span>
             </div>
             <h2 className="text-2xl font-black text-white">

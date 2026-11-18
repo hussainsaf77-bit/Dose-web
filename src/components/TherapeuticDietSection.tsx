@@ -264,13 +264,12 @@ export const TherapeuticDietSection: React.FC = () => {
   return (
     <div className="space-y-6" id="therapeutic-diet-section">
       {/* Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold mb-2">
-              <Apple className="w-3.5 h-3.5" />
-              <span>أنظمة التغذية العلاجية المتخصصة (Therapeutic Diets)</span>
+            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold mb-1">
+              <Apple className="w-4 h-4" />
+              <span>أنظمة التغذية العلاجية</span>
             </div>
             <h2 className="text-2xl font-black text-white">البرامج الغذائية الطبية للأمراض المزمنة</h2>
             <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">

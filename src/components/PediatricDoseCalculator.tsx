@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Baby, AlertCircle, CheckCircle, Droplets, Clock, Calculator, ShieldAlert, 
   Sparkles, Camera, Upload, Loader2, RefreshCw, Search, Syringe, Wind, 
-  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, Key, ArrowRight
+  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, ArrowRight
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { parsePediatricMedicineFromText } from '../utils/pediatricMedicineParser';
@@ -69,10 +69,39 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   const [ocrStatusText, setOcrStatusText] = useState<string | null>(null);
   const [ocrSuccessMsg, setOcrSuccessMsg] = useState<string | null>(null);
   const [ocrErrorMsg, setOcrErrorMsg] = useState<string | null>(null);
-  const [userGeminiApiKey, setUserGeminiApiKey] = useState<string>(() => {
-    try { return localStorage.getItem('user_gemini_api_key') || ''; } catch { return ''; }
-  });
-  const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [syncedPatientName, setSyncedPatientName] = useState<string | null>(null);
+
+  // Auto-prefill Weight & Age from URL hash (#pediatric?wt=...&age=...&unit=...) or active pediatric patient
+  useEffect(() => {
+    try {
+      const hash = window.location.hash || '';
+      const qIdx = hash.indexOf('?');
+      if (qIdx !== -1) {
+        const params = new URLSearchParams(hash.slice(qIdx + 1));
+        const wtParam = params.get('wt');
+        const ageParam = params.get('age');
+        const unitParam = params.get('unit');
+        if (wtParam && !isNaN(parseFloat(wtParam))) setWeightKg(String(parseFloat(wtParam)));
+        if (ageParam && !isNaN(parseFloat(ageParam))) setAgeValue(String(parseFloat(ageParam)));
+        if (unitParam === 'days' || unitParam === 'months' || unitParam === 'years') setAgeUnit(unitParam);
+        return;
+      }
+      const activeId = localStorage.getItem('dose_active_patient_id');
+      const savedRoster = localStorage.getItem('dose_patient_roster');
+      if (activeId && savedRoster) {
+        const roster = JSON.parse(savedRoster);
+        const pat = Array.isArray(roster) ? roster.find((p: any) => p.id === activeId) : null;
+        if (pat && (pat.isChild || Number(pat.age) <= 16)) {
+          if (pat.weight) setWeightKg(String(pat.weight));
+          if (pat.age) {
+            setAgeValue(String(pat.age));
+            setAgeUnit('years');
+          }
+          setSyncedPatientName(pat.fullName || null);
+        }
+      }
+    } catch {}
+  }, []);
   const [detectedDrugCard, setDetectedDrugCard] = useState<{
     tradeName?: string;
     genericName?: string;
@@ -390,7 +419,6 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
 
       let data: any = null;
       let isClientOcrUsed = false;
-      let serverNeedsApiKey = false;
 
       // 1. Attempt 1: Cloud Vision OCR via /api/medical/prescription-ocr
       try {
@@ -402,7 +430,6 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
             imageBase64,
             mimeType,
             lang: language,
-            customApiKey: userGeminiApiKey || undefined,
             weightKg: parseFloat(weightKg) || undefined,
             ageMonths: totalAgeMonths
           }),
@@ -411,9 +438,6 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const cloudJson = await res.json();
-          if (cloudJson?.noApiKey) {
-            serverNeedsApiKey = true;
-          }
           if (res.ok && cloudJson && (cloudJson.drugNameEn || cloudJson.drugNameAr || cloudJson.matchedDrugId || cloudJson.tradeName || cloudJson.genericName)) {
             data = cloudJson;
           }
@@ -576,20 +600,11 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
         );
       } else {
         setDetectedDrugCard(null);
-        if (serverNeedsApiKey && !userGeminiApiKey) {
-          setOcrErrorMsg(
-            isAr
-              ? 'تنبيه Vercel: خادم الاستضافة يحتاج إلى مفتاح Gemini API لقراءة الصور عبر السحاب. انقر على زر [مفتاح API] بالأسفل لحفظ مفتاحك المجاني، أو اختر الدواء مباشرة من الأدوية المقترحة أدناه.'
-              : 'Vercel Notice: Server requires a Gemini API key for cloud vision. Click [API Key] below or select your medication from the list.'
-          );
-          setShowApiKeyModal(true);
-        } else {
-          setOcrErrorMsg(
-            isAr
-              ? 'تعذر قراءة اسم الدواء بدقة من الصورة. يرجى التأكد من تسليط الإضاءة على علبة الدواء، أو اختيار الدواء من الأزرار السريعة أدناه.'
-              : 'Could not clearly recognize the medicine name. Please choose from the quick medication buttons below or enter details manually.'
-          );
-        }
+        setOcrErrorMsg(
+          isAr
+            ? 'تعذر قراءة اسم الدواء بدقة من الصورة. يرجى التأكد من تسليط الإضاءة على علبة الدواء، أو اختيار الدواء من القائمة أو الأزرار السريعة بالأسفل.'
+            : 'Could not clearly recognize the medicine name. Please choose from the medication list below or enter details manually.'
+        );
       }
     } catch (err: any) {
       setDetectedDrugCard(null);
@@ -845,6 +860,111 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
         </div>
       </div>
 
+      {/* ── STEP 1 (ALWAYS FIRST): Child Weight & Age before Mode & Drug Selection ── */}
+      <div className="bg-slate-900 border-2 border-teal-500/40 rounded-3xl p-5 md:p-6 shadow-2xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-xl bg-teal-500/20 border border-teal-500/40 text-teal-300 font-black text-xs flex items-center justify-center">1</span>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                <span>{isAr ? 'الخطوة الأولى: وزن وعمر الطفل (قبل اختيار الدواء أو التصوير)' : 'Step 1: Child Weight & Age (Required First)'}</span>
+                {syncedPatientName && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    {isAr ? `من ملف: ${syncedPatientName}` : `Synced: ${syncedPatientName}`}
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                {isAr ? 'أدخل الوزن بالكيلوجرام والعمر أولاً لضبط الجرعة الآمنة وحدود الأمان السريرية.' : 'Enter child weight (kg) and age first to calibrate safe dosing limits.'}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleNelsonEstimate}
+            className="text-xs font-bold text-teal-300 hover:text-teal-200 bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/30 px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+            title={isAr ? 'معادلة نيلسون: الوزن = العمر بالسنين × 2 + 8' : "Nelson's Formula: Weight = (Age*2) + 8"}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>{isAr ? 'تقدير الوزن بمعادلة نيلسون' : "Nelson's Weight Estimate"}</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Weight */}
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5">{isAr ? 'وزن الطفل (كجم):' : 'Child Weight (kg):'}</label>
+            <div className="relative">
+              <input
+                id="pediatric-weight-input"
+                type="number"
+                step="0.1"
+                min="0.5"
+                max="120"
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+                placeholder="12"
+                className="w-full bg-slate-950 border border-teal-500/40 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-400"
+              />
+              <span className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 text-xs font-bold pointer-events-none`}>
+                {isAr ? 'كغ' : 'kg'}
+              </span>
+            </div>
+          </div>
+
+          {/* Age Value */}
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5">{isAr ? 'عمر الطفل (رقم):' : 'Child Age:'}</label>
+            <div className="relative flex items-center">
+              <input
+                type="number"
+                min="1"
+                max="180"
+                value={ageValue}
+                onChange={(e) => handleAgeNumberChange(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500"
+              />
+              <div className={`absolute ${isAr ? 'left-2' : 'right-2'} flex flex-col gap-0.5`}>
+                <button
+                  type="button"
+                  onClick={handleIncrementAge}
+                  className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
+                >
+                  ▲
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDecrementAge}
+                  className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
+                >
+                  ▼
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Age Unit with Dropdown Arrow */}
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1.5">{isAr ? 'وحدة العمر:' : 'Age Unit:'}</label>
+            <div className="relative">
+              <select
+                value={ageUnit}
+                onChange={(e) => handleAgeUnitChange(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+              >
+                <option value="years">{isAr ? 'سنة 🧒' : 'Year(s)'}</option>
+                <option value="months">{isAr ? 'شهر 👶' : 'Month(s)'}</option>
+                <option value="days">{isAr ? 'يوم 🍼' : 'Day(s)'}</option>
+              </select>
+              <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                ▼
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* ── Mode Switcher: User Chooses Image Scan or Manual Entry ── */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-1.5 shadow-xl max-w-xl mx-auto">
         <div className="grid grid-cols-2 gap-1.5">
@@ -889,7 +1009,7 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 {isAr 
-                  ? 'التقط صورة واضحة لعلبة الدواء أو الشراب أو الروشتة لاستخراج الاسم والتركيز تلقائياً.'
+                  ? 'التقط صورة واضحة لعلبة الدواء أو الشراب أو الروشتة لاستخراج الاسم والتركيز وحساب الجرعة حسب الوزن المدخل بالأعلى.'
                   : 'Capture or upload a clear photo of medicine box or syrup bottle to auto-extract name & strength.'}
               </p>
             </div>
@@ -908,7 +1028,7 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                 id="pediatric-scan-btn"
                 disabled={isScanningOcr}
                 onClick={() => fileInputRef.current?.click()}
-                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-teal-900/30 flex items-center gap-2"
+                className="px-5 py-3 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white text-xs md:text-sm font-bold transition-all shadow-lg shadow-teal-900/30 flex items-center gap-2 cursor-pointer"
               >
                 {isScanningOcr ? (
                   <>
@@ -922,67 +1042,8 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                   </>
                 )}
               </button>
-
-              <button
-                type="button"
-                onClick={() => setShowApiKeyModal(!showApiKeyModal)}
-                className="px-3.5 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-all"
-                title={isAr ? 'إعداد مفتاح Gemini API السحابي (اختياري)' : 'Cloud API Key (Optional)'}
-              >
-                <Key className="w-3.5 h-3.5 text-teal-400" />
-                <span className="hidden sm:inline">{userGeminiApiKey ? (isAr ? 'مفتاح API مفعّل' : 'API Key Active') : (isAr ? 'مفتاح API' : 'API Key')}</span>
-              </button>
             </div>
           </div>
-
-          {/* Gemini API Key Drawer */}
-          {showApiKeyModal && (
-            <div className="p-4 rounded-2xl bg-slate-950 border border-teal-500/30 text-xs space-y-2 animate-fadeIn">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-teal-300 flex items-center gap-1.5">
-                  <Key className="w-4 h-4 text-teal-400" />
-                  <span>{isAr ? 'مفتاح Gemini API السحابي (للقراءة البصرية فائقة الدقة على Vercel):' : 'Cloud Gemini API Key (For High-Res Vercel Vision):'}</span>
-                </span>
-                <button 
-                  type="button" 
-                  onClick={() => setShowApiKeyModal(false)}
-                  className="text-slate-400 hover:text-white"
-                >
-                  ✕
-                </button>
-              </div>
-              <p className="text-slate-400 text-[11px]">
-                {isAr 
-                  ? 'خوادم Vercel لا تملك مفتاح ذكاء اصطناعي افتراضياً. إذا أدخلت مفتاحك هنا سيتم حفظه في جهازك محلياً لقراءة أي صورة بدقة فائقة. وإذا لم تضع مفتاحاً، سيعمل المحرك المدمج في المتصفح.'
-                  : 'Vercel serverless functions require an API key for cloud vision. Enter your key here to save locally on your device.'}
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  placeholder="AIzaSy..."
-                  value={userGeminiApiKey}
-                  onChange={(e) => {
-                    const val = e.target.value.trim();
-                    setUserGeminiApiKey(val);
-                    try { localStorage.setItem('user_gemini_api_key', val); } catch (_) {}
-                  }}
-                  className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white font-mono text-xs focus:outline-none focus:border-teal-500"
-                />
-                {userGeminiApiKey && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserGeminiApiKey('');
-                      try { localStorage.removeItem('user_gemini_api_key'); } catch (_) {}
-                    }}
-                    className="px-3 py-2 rounded-xl bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold"
-                  >
-                    {isAr ? 'مسح' : 'Clear'}
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* OCR Scanning Progress Indicator */}
           {isScanningOcr && (
@@ -1149,22 +1210,16 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
       {/* ── Unified Layout: Inputs Side-by-Side before Result Card ── */}
       <div className="max-w-4xl mx-auto space-y-5">
         
-        {/* Top Unified Input Card: Inputs Side-by-Side before results */}
+        {/* Step 2: Drug Selection & Parameters Card */}
         <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Baby className="w-5 h-5 text-amber-400" />
-              <span>{isAr ? 'مدخلات وبيانات جرعة الطفل (قبل النتيجة):' : 'Pediatric Dosing Parameters (Inputs):'}</span>
+              <span className="w-6 h-6 rounded-lg bg-teal-500/20 border border-teal-500/40 text-teal-300 font-black text-xs flex items-center justify-center">2</span>
+              <span>{isAr ? 'الخطوة الثانية: اختيار الدواء والشكل والتركيز:' : 'Step 2: Medication, Formulation & Concentration:'}</span>
             </h3>
-            <button
-              type="button"
-              onClick={handleNelsonEstimate}
-              className="text-[11px] text-teal-400 hover:text-teal-300 bg-teal-500/10 border border-teal-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
-              title={isAr ? 'معادلة نيلسون: الوزن = العمر بالسنين × 2 + 8' : "Nelson's Formula: Weight = (Age*2) + 8"}
-            >
-              <span>✨</span>
-              <span>{isAr ? 'تقدير نيلسون للوزن' : "Nelson's Rule"}</span>
-            </button>
+            <span className="text-[11px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 rounded-xl">
+              {isAr ? `الطفل: ${weightKg || '—'} كجم` : `Child: ${weightKg || '—'} kg`}
+            </span>
           </div>
 
           {/* Row 1: Drug Selection (Dropdown with arrow + Search + Quick Chips) */}
@@ -1172,7 +1227,7 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
             <div className="flex items-center justify-between">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                 <Search className="w-3.5 h-3.5 text-teal-400" />
-                <span>{isAr ? '1. اختيار الدواء (قائمة منسدلة بسهم أو بحث سريع):' : '1. Select Medication (Dropdown with arrow or search):'}</span>
+                <span>{isAr ? 'اختيار الدواء (قائمة منسدلة بسهم أو بحث سريع):' : 'Select Medication (Dropdown with arrow or search):'}</span>
               </label>
               <button
                 type="button"
@@ -1303,89 +1358,10 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
             )}
           </div>
 
-          {/* Row 2: Weight and Age Side-by-Side (قبل النتيجة) */}
+          {/* Row 2: Formulation, Concentration, Infection Site Side-by-Side */}
           <div className="pt-2 border-t border-slate-800 space-y-1.5">
             <span className="text-xs font-bold text-slate-300 block">
-              2. وزن الطفل وعمره (جنباً إلى جنب قبل النتيجة):
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Weight */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">الوزن بالكيلوجرام (كجم):</label>
-                <div className="relative">
-                  <input
-                    id="pediatric-weight-input"
-                    type="number"
-                    step="0.1"
-                    min="0.5"
-                    max="120"
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(e.target.value)}
-                    placeholder="12"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500"
-                  />
-                  <span className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-teal-500/20 text-teal-300 text-xs font-bold pointer-events-none`}>
-                    {isAr ? 'كغ' : 'kg'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Age Value */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">عمر الطفل (رقم):</label>
-                <div className="relative flex items-center">
-                  <input
-                    type="number"
-                    min="1"
-                    max="180"
-                    value={ageValue}
-                    onChange={(e) => handleAgeNumberChange(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm font-mono font-bold text-white focus:outline-none focus:border-teal-500"
-                  />
-                  <div className={`absolute ${isAr ? 'left-2' : 'right-2'} flex flex-col gap-0.5`}>
-                    <button
-                      type="button"
-                      onClick={handleIncrementAge}
-                      className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
-                    >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDecrementAge}
-                      className="w-4 h-3 bg-slate-800 text-teal-400 rounded text-[8px] flex items-center justify-center cursor-pointer"
-                    >
-                      ▼
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Age Unit with Dropdown Arrow */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">وحدة العمر (سهم):</label>
-                <div className="relative">
-                  <select
-                    value={ageUnit}
-                    onChange={(e) => handleAgeUnitChange(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-white focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
-                  >
-                    <option value="years">{isAr ? 'سنة 🧒' : 'Year(s)'}</option>
-                    <option value="months">{isAr ? 'شهر 👶' : 'Month(s)'}</option>
-                    <option value="days">{isAr ? 'يوم 🍼' : 'Day(s)'}</option>
-                  </select>
-                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
-                    ▼
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Row 3: Formulation, Concentration, Infection Site Side-by-Side */}
-          <div className="pt-2 border-t border-slate-800 space-y-1.5">
-            <span className="text-xs font-bold text-slate-300 block">
-              3. الشكل الصيدلاني والتركيز والاستطباب (قوائم منسدلة بأسهم):
+              {isAr ? 'الشكل الصيدلاني والتركيز والاستطباب (قوائم منسدلة بأسهم):' : 'Formulation, Concentration & Indication:'}
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Formulation Dropdown with Arrow */}

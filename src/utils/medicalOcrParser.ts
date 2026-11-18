@@ -1794,6 +1794,131 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
       status === 'high' || val > 1.0
         ? `فحص جرثومة المعدة إيجابي (Positive)، مما يفسر آلام المعدة والانتفاخ والحموضة، ويتطلب العلاج الثلاثي أو الرباعي.`
         : `فحص جرثومة المعدة سلبي وسليم.`
+  },
+  {
+    id: 'ggt',
+    patterns: [
+      /\bggt\b/i,
+      /gamma[\s_-]*glutamyl/i,
+      /ناقلة[\s_]*غاما[\s_]*غلوتاميل/i
+    ],
+    nameAr: 'GGT (إنزيم الكبد والقنوات المرارية)',
+    nameEn: 'Gamma-Glutamyl Transferase (GGT)',
+    category: 'liver',
+    defaultRefRange: '8 - 61 U/L (ذكور) / 5 - 36 U/L (إناث)',
+    defaultUnit: 'U/L',
+    minNormal: 5,
+    maxNormal: 61,
+    criticalHigh: 250,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `ارتفاع إنزيم GGT (${val} U/L) قد يشير إلى ركود صفراوي أو إجهاد القنوات المرارية والكبد.`
+        : `إنزيم GGT طبيعي وسليم (${val} U/L).`
+  },
+  {
+    id: 'ldh',
+    patterns: [
+      /\bldh\b/i,
+      /lactate[\s_-]*dehydrogenase/i,
+      /نازعة[\s_]*هيدروجين[\s_]*اللاكتات/i
+    ],
+    nameAr: 'LDH (نازعة هيدروجين اللاكتات)',
+    nameEn: 'Lactate Dehydrogenase (LDH)',
+    category: 'biochemistry',
+    defaultRefRange: '140 - 280 U/L',
+    defaultUnit: 'U/L',
+    minNormal: 140,
+    maxNormal: 280,
+    criticalHigh: 700,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `ارتفاع إنزيم LDH (${val} U/L) مؤشر عام لتجدد أو إجهاد الأنسجة أو الكريات الحمراء، ويُقيم مع الفحوصات السريرية.`
+        : `مستوى LDH ضمن المعدل الطبيعي (${val} U/L).`
+  },
+  {
+    id: 'phosphorus',
+    patterns: [
+      /\bphosphorus\b/i,
+      /\bphosphate\b/i,
+      /\bpo4\b/i,
+      /الفوسفور/i,
+      /فوسفات/i
+    ],
+    nameAr: 'Phosphorus (الفوسفور / الفوسفات بالدم)',
+    nameEn: 'Serum Phosphorus / Phosphate',
+    category: 'electrolytes',
+    defaultRefRange: '2.5 - 4.5 mg/dL',
+    defaultUnit: 'mg/dL',
+    minNormal: 2.5,
+    maxNormal: 4.5,
+    criticalLow: 1.0,
+    criticalHigh: 7.0,
+    explanationNote: (val, status) =>
+      status === 'low' || status === 'critical'
+        ? `انخفاض الفوسفور (${val} mg/dL) قد يرتبط بنقص فيتامين د أو اضطراب التمثيل الغذائي والعظام.`
+        : status === 'high'
+        ? `ارتفاع الفوسفور (${val} mg/dL) يستدعي مراجعة وظائف الكلى وصحة العظام.`
+        : `مستوى الفوسفور متوازن وطبيعي (${val} mg/dL).`
+  },
+  {
+    id: 'd_dimer',
+    patterns: [
+      /\bd[\s_-]*dimer\b/i,
+      /دي[\s_-]*دايمر/i
+    ],
+    nameAr: 'D-Dimer (مؤشر الجلطات والتخثر)',
+    nameEn: 'D-Dimer Quantitative',
+    category: 'coagulation',
+    defaultRefRange: '< 500 ng/mL (أو < 0.50 µg/mL)',
+    defaultUnit: 'ng/mL',
+    minNormal: 0,
+    maxNormal: 500,
+    criticalHigh: 2000,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `ارتفاع D-Dimer (${val}) يستدعي تقييماً طبياً لاستبعاد الخثرات الدموية أو الالتهابات الحادة.`
+        : `مؤشر D-Dimer طبيعي وسلبي (${val}).`
+  },
+  {
+    id: 'pt',
+    patterns: [
+      /\bprothrombin[\s_-]*time\b/i,
+      /\bpt\b(?![\s_-]*t)/i,
+      /زمن[\s_]*البروثرومبين/i
+    ],
+    nameAr: 'PT (زمن البروثرومبين لتخثر الدم)',
+    nameEn: 'Prothrombin Time (PT)',
+    category: 'coagulation',
+    defaultRefRange: '11.0 - 13.5 seconds',
+    defaultUnit: 'sec',
+    minNormal: 11.0,
+    maxNormal: 13.5,
+    criticalHigh: 25.0,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `استطالة زمن البروثرومبين PT (${val} ثانية) تدل على زيادة السيولة وتتطلب مراجعة أدوية التخثر ووظائف الكبد.`
+        : `زمن البروثرومبين PT ضمن الحدود الطبيعية (${val} ثانية).`
+  },
+  {
+    id: 'aptt',
+    patterns: [
+      /\baptt\b/i,
+      /\bptt\b/i,
+      /partial[\s_-]*thromboplastin/i,
+      /زمن[\s_]*الثرومبوبلاستين[\s_]*الجزئي/i
+    ],
+    nameAr: 'aPTT / PTT (زمن الثرومبوبلاستين الجزئي)',
+    nameEn: 'Activated Partial Thromboplastin Time (aPTT)',
+    category: 'coagulation',
+    defaultRefRange: '25 - 35 seconds',
+    defaultUnit: 'sec',
+    minNormal: 25,
+    maxNormal: 35,
+    criticalHigh: 70,
+    explanationNote: (val, status) =>
+      status === 'high' || status === 'critical'
+        ? `استطالة زمن الثرومبوبلاستين aPTT (${val} ثانية) تستدعي التقييم الطبي لسيولة الدم أو مسارات التخثر.`
+        : `زمن aPTT ضمن المعدل الطبيعي (${val} ثانية).`
   }
 ];
 
@@ -1823,7 +1948,7 @@ export function validateClinicalOcrText(text: string): ValidationResult {
     /cbc/i, /wbc/i, /rbc/i, /hgb/i, /hb\b/i, /hba1c/i, /glucose/i, /creatinine/i, /urea/i, /bun/i,
     /cholesterol/i, /triglyceride/i, /hdl/i, /ldl/i, /alt/i, /ast/i, /sgpt/i, /sgot/i, /bilirubin/i,
     /tsh/i, /ft4/i, /ft3/i, /ferritin/i, /iron/i, /vitamin/i, /crp/i, /esr/i, /uric/i, /electrolyte/i,
-    /potassium/i, /sodium/i, /calcium/i, /platelet/i, /inr/i, /pt\b/i, /ptt/i, /urine/i, /homa/i,
+    /potassium/i, /sodium/i, /calcium/i, /platelet/i, /inr/i, /pt\b/i, /aptt/i, /ptt/i, /dimer/i, /ggt/i, /ldh/i, /phosph/i, /urine/i, /homa/i,
     /تحليل/i, /مختبر/i, /فحص/i, /تقرير/i, /نتيجة/i, /دم/i, /بول/i, /سكر/i, /كبد/i, /كلى/i,
     /خضاب/i, /صفائح/i, /كريات/i, /تراكمي/i, /هيموجلوبين/i, /مقاومة/i, /انسولين/i, /فيريتين/i,
     /فيتامين/i, /يوريا/i, /كرياتينين/i, /أملاح/i, /دهون/i, /كوليسترول/i, /غدة/i, /درقية/i, /التهاب/i
@@ -1913,15 +2038,22 @@ export function parseClinicalReportFromText(
     }
 
     if (matchedLine) {
-      // Find value in the matched line or subsequent lines (in case OCR split into columns or table rows)
+      // Find value in the matched line or up to 2 subsequent lines (in case OCR split columns/rows)
       let numInfo = extractNumericInfo(matchedLine, lab.patterns);
       let consumedSubsequent = 0;
-      if (!numInfo && matchedLineIndex + 1 < lines.length && !consumedLineIndices.has(matchedLineIndex + 1)) {
-        const nextLine = lines[matchedLineIndex + 1];
-        const isAnotherTest = KNOWN_LAB_DATABASE.some(k => k.patterns.some(p => p.test(nextLine)));
-        if (!isAnotherTest) {
-          numInfo = extractNumericInfo(nextLine);
-          if (numInfo) consumedSubsequent = 1;
+      if (!numInfo) {
+        for (let lineOffset = 1; lineOffset <= 2; lineOffset++) {
+          const nextIdx = matchedLineIndex + lineOffset;
+          if (nextIdx >= lines.length || consumedLineIndices.has(nextIdx)) break;
+          const nextLine = lines[nextIdx];
+          const isAnotherTest = KNOWN_LAB_DATABASE.some(k => k.patterns.some(p => p.test(nextLine)));
+          if (isAnotherTest) break;
+          const candidate = extractNumericInfo(nextLine);
+          if (candidate) {
+            numInfo = candidate;
+            consumedSubsequent = lineOffset;
+            break;
+          }
         }
       }
 
@@ -2017,10 +2149,10 @@ export function parseClinicalReportFromText(
           clinicalNote: lab.explanationNote(numInfo.num, status)
         });
 
-        // Mark line as consumed
+        // Mark line(s) as consumed
         consumedLineIndices.add(matchedLineIndex);
         if (consumedSubsequent >= 1) {
-          consumedLineIndices.add(matchedLineIndex + 1);
+          consumedLineIndices.add(matchedLineIndex + consumedSubsequent);
         }
 
         // Add tokens for deduplication
@@ -2158,8 +2290,8 @@ export function parseClinicalReportFromText(
     let extractedUnit = '';
     let extractedRange = '';
 
-    // Approach A: Delimited row (Pipe |, Tab \t, or multiple spaces between columns)
-    const columns = line.split(/[|\t]+/).map(c => c.trim()).filter(Boolean);
+    // Approach A: Delimited row (Pipe |, Tab \t, or 2+ spaces between table columns)
+    const columns = line.split(/[|\t]+| {2,}/).map(c => c.trim()).filter(Boolean);
     if (columns.length >= 2) {
       const col0 = columns[0];
       const col1 = columns[1];

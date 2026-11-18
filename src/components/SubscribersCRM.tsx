@@ -214,7 +214,7 @@ export const SubscribersCRM: React.FC<SubscribersCRMProps> = ({
                     {/* Last Active Date */}
                     <td className="py-3.5 px-4 text-[11px] text-emerald-400 font-mono whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                         <span>
                           {user.lastActiveAt
                             ? new Date(user.lastActiveAt).toLocaleDateString('ar-EG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })

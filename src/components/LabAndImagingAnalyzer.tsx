@@ -1,9 +1,9 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FileText, Upload, Sparkles, AlertCircle, CheckCircle2, ShieldAlert,
   ArrowRight, Eye, RefreshCw, Search, ListFilter, Camera, Copy, Check,
   Info, ChevronRight, Activity, BookOpen, Layers, Download, CheckCircle,
-  HelpCircle, ExternalLink, Filter, Edit3, Plus, Trash2, Key, Settings
+  HelpCircle, Filter, Edit3, Plus, Trash2
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { SubscriptionTier } from '../types';
@@ -349,25 +349,42 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   const [analysisType, setAnalysisType] = useState<'lab' | 'imaging'>('lab');
   const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('manual');
   const [selectedLabCategory, setSelectedLabCategory] = useState<string>('all');
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const h = window.location.hash || '';
+      const qIdx = h.indexOf('?');
+      if (qIdx === -1) return;
+      const params = new URLSearchParams(h.slice(qIdx + 1));
+      const mode = params.get('mode');
+      if (mode === 'imaging' || mode === 'xray') {
+        setAnalysisType('imaging');
+        setResult(null);
+      } else if (mode === 'ocr' || mode === 'image_ocr') {
+        setAnalysisType('lab');
+        setLabSubMode('image_ocr');
+        setResult(null);
+      } else if (mode === 'manual') {
+        setAnalysisType('lab');
+        setLabSubMode('manual');
+      }
+    };
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, []);
   const [imagingModality, setImagingModality] = useState<'xray' | 'ct' | 'mri' | 'ultrasound'>('xray');
   const [anatomicalRegion, setAnatomicalRegion] = useState<'chest' | 'brain' | 'spine' | 'joints' | 'abdomen'>('chest');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedIsPdf, setSelectedIsPdf] = useState<boolean>(false);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [textNotes, setTextNotes] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedReport, setCopiedReport] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // User Gemini API key & Settings
-  const [userGeminiApiKey, setUserGeminiApiKey] = useState(() => {
-    try { return localStorage.getItem('user_gemini_api_key') || localStorage.getItem('gemini_api_key') || ''; } catch { return ''; }
-  });
-  const [tempApiKey, setTempApiKey] = useState(() => {
-    try { return localStorage.getItem('user_gemini_api_key') || localStorage.getItem('gemini_api_key') || ''; } catch { return ''; }
-  });
-  const [showApiKeySetting, setShowApiKeySetting] = useState(false);
   const [ocrStatus, setOcrStatus] = useState<string | null>(null);
 
   // Patient Demographics (Gender & Age) - Requested for both manual and image OCR analysis
@@ -559,20 +576,64 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
   });
 }
 
+// High-resolution RGB image resizer for Multimodal Gemini Vision (preserves full color, bone/soft tissue contrast & charts)
+async function resizeImageForVision(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(dataUrl);
+
+          let w = img.width;
+          let h = img.height;
+          const maxDim = 1600;
+          if (w > maxDim || h > maxDim) {
+            const scale = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+
+          canvas.width = w;
+          canvas.height = h;
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.90));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    } catch {
+      resolve(dataUrl);
+    }
+  });
+}
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
       setSelectedFile(file);
+      setSelectedIsPdf(isPdf);
+      setSelectedFileName(file.name);
       const reader = new FileReader();
       reader.onloadend = async () => {
         const dataUrl = reader.result as string;
-        try {
-          // IMPORTANT: Only enhance contrast for paper lab reports.
-          // NEVER binarize imaging/radiology (X-Ray, CT, MRI, Ultrasound), as it destroys subtle grayscale bone, lung, and soft-tissue details!
-          const optimized = analysisType === 'lab' ? await enhanceImageForMedicalOcr(dataUrl) : dataUrl;
-          setPreviewUrl(optimized);
-        } catch {
+        if (isPdf) {
           setPreviewUrl(dataUrl);
+        } else {
+          try {
+            // Preserve crisp full-color RGB JPEG for server Gemini Vision AI; OCR enhancement runs only before Tesseract fallback
+            const visionReady = await resizeImageForVision(dataUrl);
+            setPreviewUrl(visionReady);
+          } catch {
+            setPreviewUrl(dataUrl);
+          }
         }
         setResult(null);
         setErrorMsg(null);
@@ -758,7 +819,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
       const endpoint = analysisType === 'lab' ? '/api/medical/analyze-lab' : '/api/medical/analyze-imaging';
       let analyzedSuccessfully = false;
 
-      // 1. First attempt: Server API (with system GEMINI_API_KEY or user-provided customApiKey)
+      // 1. First attempt: Server API with multimodal Gemini Vision (supports JPEG/PNG/PDF directly)
       try {
         const response = await fetch(getApiUrl(endpoint), {
           method: 'POST',
@@ -771,7 +832,6 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
             anatomicalRegion,
             imageBase64: base64Data,
             mimeType,
-            customApiKey: userGeminiApiKey || undefined,
             patientGender,
             patientAge: patientAge.trim() ? parseInt(patientAge, 10) : undefined,
             textNotes: analysisType === 'lab' 
@@ -790,134 +850,15 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           }
         }
       } catch (fetchErr: any) {
-        console.warn('Lab/Imaging server fetch error, engaging client engine:', fetchErr);
+        console.warn('Lab/Imaging server fetch error, engaging OCR fallback:', fetchErr);
       }
 
-      // 1.5. Direct Client-Side Gemini Vision Call (If user has Gemini API Key or VITE_GEMINI_API_KEY)
-      const directKey = userGeminiApiKey?.trim() || (import.meta as any).env?.VITE_GEMINI_API_KEY;
-      if (!analyzedSuccessfully && directKey && activeDataUrl) {
+      // 2. Second attempt: Client-Side OCR with Tesseract.js for image lab reports (skip PDF since Tesseract expects raster images)
+      if (!analyzedSuccessfully && activeDataUrl && analysisType === 'lab' && mimeType !== 'application/pdf') {
         try {
-          setOcrStatus('جاري القراءة والتشخيص المباشر بالرؤية البصرية عبر Gemini Vision...');
-          let base64Clean = activeDataUrl;
-          let mime = 'image/jpeg';
-          if (activeDataUrl.startsWith('data:')) {
-            const p = activeDataUrl.split(',');
-            mime = p[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
-            base64Clean = p[1];
-          }
-
-          const isLab = analysisType === 'lab';
-          const genderLabel = patientGender === 'female' ? 'أنثى' : patientGender === 'male' ? 'ذكر' : 'غير محدد';
-          const ageLabel = patientAge ? `${patientAge} سنة` : 'غير محدد';
-
-          const clientPrompt = isLab
-            ? `أنت استشاري الطب المخبري والتحاليل السريرية وعلم الأمراض (Consultant Clinical Pathologist).
-قم بقراءة وتحليل صورة الفحص المخبري المرفقة (ورقة التحليل الطبي) واستخراج كافة النتائج بدقة متناهية.
-[بيانات المريض: الجنس: ${genderLabel} | العمر: ${ageLabel} - راعِ النطاقات المرجعية الخاصة بهذا الجنس والعمر بدقة]
-الملاحظات: ${customPrompt || textNotes || 'قراءة وتحليل صورة فحص مخبري'}.
-
-المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
-{
-  "isValidReport": true,
-  "testName": "اسم التقرير أو باقة الفحوصات بدقة",
-  "clinicalSummaryTitle": "الخلاصة الإكلينيكية والتشخيص المرجح بدقة",
-  "urgencyLevel": "normal أو medium أو high أو critical",
-  "items": [
-    {
-      "name": "اسم الفحص (عربي وإنجليزي)",
-      "value": "القيمة المقروءة مع الوحدة بدقة وفواصلها العشرية الكاملة",
-      "referenceRange": "المدى المرجعي السليم",
-      "status": "normal أو high أو low أو critical"
-    }
-  ],
-  "detailedExplanation": "تقرير سريري تفصيلي يشرح معنى النتائج، أسباب الارتفاع أو الانخفاض، والربط الفسيولوجي للمريض بلغة طبية واضحة ومطمئنة",
-  "recommendations": [
-    "توصيات طبية وعلاجية وغذائية دقيقة"
-  ]
-}`
-            : `أنت استشاري التشخيص الإشعاعي والتصوير الطبي (Consultant Diagnostic Radiologist).
-قم بقراءة وفحص صورة الفحص الشعاعي المرفقة (${imagingModality.toUpperCase()} لمنطقة ${anatomicalRegion}) بدقة تشخيصية سريرية متقدمة.
-الملاحظات السريرية: ${customPrompt || textNotes || 'فحص شعاعي تشخيصي'}.
-
-معايير التقييم الشعاعي المنهجي:
-1. فحص الصدر (CXR): تقييم ABCDEF (المجرى الهوائي والبلعوم، العظام والقفص الصدري والترقوة، ظل القلب ومؤشر CTR، الحجاب الحاجز والزوايا الضلعية الحجابية Costophrenic Angles، الأنسجة الرخوة، حقول الرئة: الارتشاح Consolidation، الانصباب Effusion، استرواح الصدر Pneumothorax، والعقد الرئوية).
-2. فحص العظام والمفاصل (MSK): تقييم ABCs (المحاذاة والخلع Alignment، سلامة القشرة العظمية ونفي الشروخ والكسور الشعرية Cortical continuity، المفاصل والغضاريف Cartilage، وتورم الأنسجة الرخوة Soft tissues).
-3. فحص العمود الفقري: استقامة الفقرات، الفراغات بين الفقرات، وأي انزلاق أو كسر انضغاطي.
-4. فحص البطن والحوض: توزيع الغازات، أي هواء حر تحت الحجاب الحاجز (Pneumoperitoneum)، أو ظلال تكلسية وحصوات.
-5. راعِ احتمالية وجود انعكاسات ضوئية إذا كانت الصورة ملتقطة لشاشة أو فيلم، وركز على التراكيب التشريحية الحقيقية بدقة.
-
-المطلوب: أخرج النتيجة بصيغة JSON حصراً بهذا الهيكل:
-{
-  "isValidReport": true,
-  "testName": "اسم الفحص الإشعاعي والمنطقة بدقة",
-  "clinicalSummaryTitle": "الخلاصة الإشعاعية والتشخيص الدقيق",
-  "urgencyLevel": "normal أو medium أو high أو critical",
-  "items": [
-    {
-      "name": "العنصر التشريحي / البنية العظمية أو النسيجية",
-      "value": "الملاحظة السريرية المحددة بدقة",
-      "referenceRange": "المعيار التشريحي الطبيعي",
-      "status": "normal أو high أو low أو critical"
-    }
-  ],
-  "detailedExplanation": "تقرير إشعاعي سريري تفصيلي وشامل يوضح حالة العظام، المفاصل، الأنسجة الرخوة، أو الأعضاء المستهدفة بدقة",
-  "recommendations": [
-    "توصيات سريرية للمتابعة أو الفحوصات الإضافية والعلاج"
-  ]
-}`;
-
-          const visionModels = ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
-          for (const vModel of visionModels) {
-            try {
-              const geminiRes = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${vModel}:generateContent?key=${directKey}`,
-                {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    contents: [{
-                      parts: [
-                        { inlineData: { mimeType: mime, data: base64Clean } },
-                        { text: clientPrompt }
-                      ]
-                    }],
-                    generationConfig: {
-                      responseMimeType: 'application/json',
-                      temperature: 0.1
-                    }
-                  })
-                }
-              );
-
-              if (geminiRes.ok) {
-                const gData = await geminiRes.json();
-                const textResp = gData?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (textResp) {
-                  const parsedG = JSON.parse(textResp);
-                  if (parsedG && Array.isArray(parsedG.items) && parsedG.items.length > 0) {
-                    setResult({ ...parsedG, isValidReport: true });
-                    setEditableItems(parsedG.items);
-                    analyzedSuccessfully = true;
-                    break;
-                  }
-                }
-              }
-            } catch (vErr) {
-              console.warn(`Direct client Gemini model ${vModel} error:`, vErr);
-            }
-          }
-        } catch (directErr) {
-          console.warn('Direct client Gemini vision attempt failed:', directErr);
-        } finally {
-          setOcrStatus(null);
-        }
-      }
-
-      // 2. Second attempt: Client-Side OCR with Tesseract.js (Extracts real text directly from the image)
-      if (!analyzedSuccessfully && activeDataUrl && analysisType === 'lab') {
-        try {
-          setOcrStatus('جاري استخراج أسماء ونتائج الفحوصات من الصورة عبر محرك OCR المباشر...');
-          const ocrRes = await Tesseract.recognize(activeDataUrl, 'eng');
+          setOcrStatus('جاري تحسين تباين الصورة واستخراج نتائج الفحوصات عبر محرك OCR المباشر...');
+          const ocrReadyImage = await enhanceImageForMedicalOcr(activeDataUrl);
+          const ocrRes = await Tesseract.recognize(ocrReadyImage, 'eng');
           const ocrText = ocrRes?.data?.text || '';
           if (ocrText.trim().length > 0) {
             const combinedOcrText = [ocrText, customPrompt, textNotes].filter(Boolean).join('\n');
@@ -960,7 +901,7 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
             detailedExplanation: 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح تام من هذه الصورة (قد يكون ذلك بسبب زاوية الالتقاط، ضعف الإضاءة، أو انخفاض دقة الكاميرا).\n\nلتفادي أي نتائج عشوائية أو غير دقيقة، يرجى استخدام جدول الفحوصات أدناه لتأكيد أو كتابة قيمك وسيقوم النظام بتشخيصها فسيولوجياً فوراً.',
             recommendations: [
               'إعادة التقاط صورة مستقيمة وعالية الوضوح لورقة التحليل الطبي.',
-              'يمكنك إدخال نتائج الفحص يدوياً في جدول النتائج أدناه للحصول على تفسير سريري دقيق 100% مطابق لتحليلك.'
+              'يمكنك إدخال نتائج الفحص يدوياً في جدول النتائج أدناه للحصول على تفسير سريري مطابق لتحليلك.'
             ]
           });
           setEditableItems([]);
@@ -995,6 +936,8 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
     if (sample.modality) setImagingModality(sample.modality);
     if (sample.region) setAnatomicalRegion(sample.region);
     if (sample.labCategory) setSelectedLabCategory(sample.labCategory);
+    setSelectedIsPdf(false);
+    setSelectedFileName(null);
     setResult(null);
     setErrorMsg(null);
 
@@ -1128,23 +1071,16 @@ ${recsText}
   return (
     <div className="space-y-6" id="lab-imaging-analyzer-section">
       {/* Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute -top-12 -right-12 w-48 h-48 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>تحليل ذكي فوري بالذكاء الاصطناعي الطبي</span>
-              </div>
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-[11px] font-mono font-bold shadow-sm">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>إصدار التحديث: v3.8 Live (التقرير السريري الشامل والمطمئن + خيارات الجنس والعمر)</span>
-              </div>
+            <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
+              <Activity className="w-4 h-4" />
+              <span>التفسير المخبري والشعاعي السريري</span>
             </div>
             <h2 className="text-2xl font-black text-white">المختبر والتحاليل الطبية وقراءة الأشعة</h2>
             <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              اختر بين <strong className="text-teal-300 font-semibold">قراءة وتحليل صورة التحليل (OCR)</strong> مباشرة من الكاميرا أو المستند، أو تصفح <strong className="text-teal-300 font-semibold">قائمة التحاليل الشاملة ودليل القيم المرجعية</strong>.
+              قراءة وتحليل صور التحاليل الطبية والأشعة أو الإدخال اليدوي للقيم ومقارنتها بالمعدلات المرجعية.
             </p>
           </div>
 
@@ -1171,19 +1107,10 @@ ${recsText}
               <span>🩻</span>
               <span>الأشعة والتصوير</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setShowApiKeySetting(true)}
-              className="px-3 py-2 rounded-lg text-xs font-bold bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all flex items-center gap-1.5 cursor-pointer"
-              title="ضبط مفتاح الذكاء الاصطناعي الطبي Gemini Vision"
-            >
-              <Key className="w-3.5 h-3.5 text-amber-400" />
-              <span>{userGeminiApiKey ? 'مفتاح AI مفعل ✓' : 'مفتاح الذكاء الاصطناعي'}</span>
-            </button>
           </div>
         </div>
 
-        {/* Lab Sub-Modes: Exactly the 2 requested features + Catalog */}
+        {/* Lab Sub-Modes */}
         {analysisType === 'lab' && (
           <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
             <button
@@ -1191,12 +1118,12 @@ ${recsText}
               onClick={() => { setLabSubMode('image_ocr'); setErrorMsg(null); }}
               className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 labSubMode === 'image_ocr'
-                  ? 'bg-gradient-to-r from-teal-500/25 to-emerald-500/25 text-teal-300 border-2 border-teal-500/70 shadow-md shadow-teal-950/40'
+                  ? 'bg-teal-600/20 text-teal-300 border border-teal-500/60 shadow-sm'
                   : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
               }`}
             >
               <Camera className="w-4 h-4 text-teal-400" />
-              <span>📸 الميزة الأولى: قراءة صور التحاليل (Image OCR)</span>
+              <span>قراءة صورة / PDF بالذكاء الاصطناعي</span>
             </button>
 
             <button
@@ -1204,12 +1131,12 @@ ${recsText}
               onClick={() => { setLabSubMode('manual'); setErrorMsg(null); }}
               className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 labSubMode === 'manual'
-                  ? 'bg-gradient-to-r from-teal-500/25 to-emerald-500/25 text-teal-300 border-2 border-teal-500/70 shadow-md shadow-teal-950/40'
+                  ? 'bg-teal-600/20 text-teal-300 border border-teal-500/60 shadow-sm'
                   : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
               }`}
             >
               <Edit3 className="w-4 h-4 text-emerald-400" />
-              <span>✍️ الميزة الثانية: إدخال يدوي (اسم التحليل + الوحدة + الرقم)</span>
+              <span>إدخال النتائج يدوياً</span>
             </button>
 
             <button
@@ -1218,11 +1145,11 @@ ${recsText}
               className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 labSubMode === 'catalog'
                   ? 'bg-slate-800 text-teal-300 border border-teal-500/50 shadow-sm'
-                  : 'bg-slate-950/40 text-slate-500 border border-slate-800 hover:text-slate-300'
+                  : 'bg-slate-950/40 text-slate-400 border border-slate-800 hover:text-slate-200'
               }`}
             >
               <ListFilter className="w-3.5 h-3.5" />
-              <span>📋 الدليل المرجعي للتحاليل</span>
+              <span>الدليل المرجعي للتحاليل</span>
             </button>
           </div>
         )}
@@ -1248,9 +1175,6 @@ ${recsText}
                   <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
                     <ShieldAlert className="w-3.5 h-3.5 text-teal-400" />
                     <span>المعيار الرباعي المعتمد للتعرف على التحليل (عربي / إنجليزي):</span>
-                  </span>
-                  <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-500/30">
-                    دقة 100%
                   </span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px] text-slate-300">
@@ -1350,59 +1274,7 @@ ${recsText}
                       <Edit3 className="w-3.5 h-3.5" />
                       <span>الانتقال للميزة الثانية: الإدخال اليدوي المباشر للتحاليل</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKeySetting(!showApiKeySetting)}
-                      className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
-                    >
-                      <Key className="w-3 h-3" />
-                      <span>مفتاح Gemini API (لنسخة Vercel)</span>
-                    </button>
                   </div>
-
-                  {/* API Key Drawer */}
-                  {showApiKeySetting && (
-                    <div className="p-3 rounded-lg bg-slate-950/90 border border-teal-500/40 space-y-2 mt-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1">
-                          <Key className="w-3.5 h-3.5 text-teal-400" />
-                          <span>تفعيل القراءة المباشرة على Vercel:</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setShowApiKeySetting(false)}
-                          className="text-[10px] text-slate-500 hover:text-slate-300"
-                        >
-                          ✕ إغلاق
-                        </button>
-                      </div>
-                      <p className="text-[10px] text-slate-400 leading-tight">
-                        إذا كنت تستخدم موقع Vercel، يمكنك لصق مفتاح Gemini المجاني هنا وسيحفظ في متصفحك لقراءة كافة الصور والأشعة تلقائياً.
-                      </p>
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          placeholder="AIzaSy..."
-                          value={userGeminiApiKey}
-                          onChange={(e) => {
-                            setUserGeminiApiKey(e.target.value);
-                            try { localStorage.setItem('user_gemini_api_key', e.target.value); } catch {}
-                          }}
-                          className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-teal-500 font-mono"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            try { localStorage.setItem('user_gemini_api_key', userGeminiApiKey); } catch {}
-                            setShowApiKeySetting(false);
-                          }}
-                          className="px-3 py-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs rounded-lg transition-all"
-                        >
-                          حفظ
-                        </button>
-                      </div>
-                    </div>
-                  )}
 
                   </div>
               )}
@@ -1478,25 +1350,37 @@ ${recsText}
                 </div>
               </div>
 
-              {/* Dropzone with Camera & File */}
+              {/* Dropzone with Camera, Image & PDF */}
               <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="image/*,.pdf,application/pdf"
                   onChange={handleFileChange}
                   className="hidden"
                 />
                 {previewUrl ? (
                   <div className="w-full text-center space-y-2">
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="max-h-52 mx-auto rounded-lg object-contain border border-slate-800 shadow bg-white/5 p-1"
-                    />
+                    {(selectedIsPdf || previewUrl.startsWith('data:application/pdf')) ? (
+                      <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
+                        <FileText className="w-10 h-10 text-teal-400" />
+                        <span className="text-xs font-bold text-white truncate max-w-full" dir="ltr">
+                          {selectedFileName || selectedFile?.name || 'lab-report.pdf'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
+                          مستند PDF جاهز للقراءة الذكية
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="max-h-52 mx-auto rounded-lg object-contain border border-slate-800 shadow bg-white/5 p-1"
+                      />
+                    )}
                     <p className="text-[11px] text-teal-300 font-medium flex items-center justify-center gap-1">
                       <RefreshCw className="w-3 h-3" />
-                      <span>انقر لاختيار أو تصوير صورة تحليل أخرى</span>
+                      <span>انقر لاختيار ملف PDF أو تصوير ورقة تحليل أخرى</span>
                     </p>
                   </div>
                 ) : (
@@ -1506,7 +1390,7 @@ ${recsText}
                     </div>
                     <div>
                       <span className="text-xs font-semibold text-slate-200 block">انقر لرفع أو تصوير تقرير التحليل</span>
-                      <span className="text-[10px] text-slate-500">يدعم كاميرا الهاتف، PNG, JPG, JPEG</span>
+                      <span className="text-[10px] text-slate-500">يدعم PDF وكاميرا الهاتف والصور (PNG, JPG, JPEG)</span>
                     </div>
                   </div>
                 )}
@@ -1648,15 +1532,12 @@ ${recsText}
                 <div>
                   <h3 className="text-sm font-bold text-white flex items-center gap-2">
                     <Edit3 className="w-4 h-4 text-emerald-400" />
-                    <span>الميزة الثانية: إدخال يدوي لنتائج التحاليل</span>
+                    <span>الإدخال اليدوي لنتائج التحاليل</span>
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    اختر اسم التحليل من القائمة، وحدد الوحدة، وضع الرقم ليتم تحليله ومقارنته بالنطاق المرجعي فوراً وبدقة 100%.
+                    اختر اسم التحليل من القائمة، وحدد الوحدة، وأدخل القيمة لمقارنتها فوراً بالنطاق المرجعي السريري.
                   </p>
                 </div>
-                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/70 border border-emerald-500/40 px-2 py-1 rounded-lg shrink-0">
-                  دقة سريرية 100%
-                </span>
               </div>
 
               {/* Input Card: Test Name + Unit + Value */}
@@ -2106,18 +1987,30 @@ ${recsText}
               <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
                 <input
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="image/*,.pdf,application/pdf"
                   onChange={handleFileChange}
                   className="hidden"
                 />
                 {previewUrl ? (
                   <div className="w-full text-center space-y-2">
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="max-h-48 mx-auto rounded-lg object-contain border border-slate-800 shadow"
-                    />
-                    <p className="text-[11px] text-teal-300 font-medium">انقر لتغيير الصورة المرفوعة</p>
+                    {(selectedIsPdf || previewUrl.startsWith('data:application/pdf')) ? (
+                      <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
+                        <FileText className="w-10 h-10 text-teal-400" />
+                        <span className="text-xs font-bold text-white truncate max-w-full" dir="ltr">
+                          {selectedFileName || selectedFile?.name || 'imaging-report.pdf'}
+                        </span>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
+                          تقرير أو أشعة PDF جاهزة للقراءة
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="max-h-48 mx-auto rounded-lg object-contain border border-slate-800 shadow"
+                      />
+                    )}
+                    <p className="text-[11px] text-teal-300 font-medium">انقر لتغيير الملف أو الصورة المرفوعة</p>
                   </div>
                 ) : (
                   <div className="text-center space-y-2">
@@ -2125,8 +2018,8 @@ ${recsText}
                       <Upload className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-300 block">انقر لرفع صورة الأشعة (X-Ray, CT, MRI)</span>
-                      <span className="text-[10px] text-slate-500">يدعم PNG, JPG, JPEG, أو تصوير الكاميرا المباشر</span>
+                      <span className="text-xs font-semibold text-slate-300 block">انقر لرفع صورة الأشعة أو تقرير PDF (X-Ray, CT, MRI)</span>
+                      <span className="text-[10px] text-slate-500">يدعم PDF, PNG, JPG, JPEG، أو تصوير الكاميرا المباشر</span>
                     </div>
                   </div>
                 )}
@@ -2314,12 +2207,18 @@ ${recsText}
                       </button>
 
                       <button
-                        onClick={() => setShowApiKeySetting(true)}
+                        onClick={() => {
+                          const noteInput = document.getElementById('textNotesInput');
+                          if (noteInput) {
+                            noteInput.focus();
+                            noteInput.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
                         className="p-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold text-right flex items-center justify-between transition-all cursor-pointer"
                       >
                         <span className="flex items-center gap-2">
-                          <Key className="w-4 h-4 text-amber-400" />
-                          <span>تفعيل القراءة البصرية المباشرة عبر Gemini API</span>
+                          <FileText className="w-4 h-4 text-sky-400" />
+                          <span>كتابة أو لصق قيم التحليل نصياً للتحليل الفوري</span>
                         </span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </button>
@@ -2586,121 +2485,6 @@ ${recsText}
           )}
         </div>
       </div>
-
-      {/* API Key Modal for Gemini Vision */}
-      {showApiKeySetting && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 text-right relative">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                  <Key className="w-5 h-5" />
-                </span>
-                <div>
-                  <h3 className="text-base font-bold text-white">إعداد مفتاح الذكاء الاصطناعي (Gemini Vision)</h3>
-                  <p className="text-xs text-slate-400">للقراءة البصرية فائقة الدقة لصور التحاليل والأشعة الطبية</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowApiKeySetting(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
-              <p>
-                يتيح لك هذا الخيار ربط مفتاح <strong className="text-amber-300 font-semibold">Google Gemini API</strong> مباشرة بالمتصفح ليقوم بالتشخيص الإشعاعي والمخبري البصري الحي بنسبة دقة 100% دون الاعتماد على أي خوادم وسيطة.
-              </p>
-              
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-200">
-                  أدخل مفتاح Gemini API الخاص بك:
-                </label>
-                <input
-                  type="text"
-                  value={tempApiKey}
-                  onChange={(e) => setTempApiKey(e.target.value)}
-                  placeholder="AIzaSy..."
-                  dir="ltr"
-                  className="w-full bg-slate-950 border border-slate-750 focus:border-amber-400 rounded-xl px-3 py-2.5 text-xs text-white font-mono outline-none transition-colors"
-                />
-              </div>
-
-              <div className="p-3 bg-slate-950/60 rounded-xl border border-slate-800 space-y-1.5 text-[11px] text-slate-400">
-                <div className="flex items-center gap-1.5 text-amber-300 font-bold">
-                  <Info className="w-3.5 h-3.5" />
-                  <span>كيف تحصل على مفتاح مجاني؟</span>
-                </div>
-                <p>
-                  يمكنك الحصول على مفتاح رسمي مجاني خلال دقيقة واحدة من منصة Google AI Studio:
-                </p>
-                <a
-                  href="https://aistudio.google.com/apikey"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-teal-400 hover:text-teal-300 underline font-mono text-xs"
-                >
-                  <span>https://aistudio.google.com/apikey</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-2 border-t border-slate-800 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const cleaned = tempApiKey.trim();
-                  setUserGeminiApiKey(cleaned);
-                  try {
-                    if (cleaned) {
-                      localStorage.setItem('user_gemini_api_key', cleaned);
-                      localStorage.setItem('gemini_api_key', cleaned);
-                    } else {
-                      localStorage.removeItem('user_gemini_api_key');
-                      localStorage.removeItem('gemini_api_key');
-                    }
-                  } catch (e) {
-                    console.warn(e);
-                  }
-                  setShowApiKeySetting(false);
-                }}
-                className="flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-teal-500 hover:from-amber-400 hover:to-teal-400 text-slate-950 font-bold text-xs rounded-xl shadow-lg transition-all text-center cursor-pointer"
-              >
-                حفظ وتفعيل المفتاح
-              </button>
-
-              {userGeminiApiKey && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTempApiKey('');
-                    setUserGeminiApiKey('');
-                    try {
-                      localStorage.removeItem('user_gemini_api_key');
-                      localStorage.removeItem('gemini_api_key');
-                    } catch (e) {}
-                  }}
-                  className="py-2.5 px-3 bg-red-950/40 hover:bg-red-900/50 text-red-300 border border-red-500/30 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-                >
-                  مسح المفتاح
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setShowApiKeySetting(false)}
-                className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl transition-all cursor-pointer"
-              >
-                إلغاء
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

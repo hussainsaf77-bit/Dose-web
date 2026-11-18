@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Activity, 
   Flame, 
@@ -76,6 +76,42 @@ export const HealthCalculators: React.FC = () => {
 
   // Food Search
   const [foodSearch, setFoodSearch] = useState('');
+
+  // Prefill biometrics from URL hash (#health?wt=...&ht=...) or active patient profile
+  useEffect(() => {
+    const applyPrefill = () => {
+      try {
+        const hash = window.location.hash || '';
+        const qIndex = hash.indexOf('?');
+        if (qIndex !== -1) {
+          const params = new URLSearchParams(hash.slice(qIndex + 1));
+          const wt = params.get('wt');
+          const ht = params.get('ht');
+          if (wt && parseFloat(wt) > 0) setWeightKg(wt);
+          if (ht && parseFloat(ht) > 0) setHeightCm(ht);
+        }
+
+        const activeId = localStorage.getItem('dose_active_patient_id');
+        const rosterStr = localStorage.getItem('dose_patient_roster');
+        if (rosterStr) {
+          const roster = JSON.parse(rosterStr);
+          if (Array.isArray(roster) && roster.length > 0) {
+            const patient = roster.find((p: any) => p.id === activeId) || roster[0];
+            if (patient) {
+              if (!hash.includes('wt=') && patient.weight) setWeightKg(String(patient.weight));
+              if (!hash.includes('ht=') && patient.height) setHeightCm(String(patient.height));
+              if (patient.age) setBmiAge(String(patient.age));
+              if (patient.gender === 'male' || patient.gender === 'female') setGender(patient.gender);
+            }
+          }
+        }
+      } catch {}
+    };
+
+    applyPrefill();
+    window.addEventListener('hashchange', applyPrefill);
+    return () => window.removeEventListener('hashchange', applyPrefill);
+  }, []);
 
   // 1. Comprehensive Ideal Body Weight & BMI Calculations
   const ibwAndBmiResult = useMemo(() => {
@@ -556,7 +592,7 @@ export const HealthCalculators: React.FC = () => {
                   {/* Row 3: Daily Water Requirement */}
                   <div className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-slate-800/20 transition-colors">
                     <span className="font-bold text-slate-400 shrink-0 w-48 flex items-center gap-1.5">
-                      <Droplets className="w-3.5 h-3.5 text-sky-400" />
+                      <Droplet className="w-3.5 h-3.5 text-sky-400" />
                       <span>احتياج الماء اليومي الموصى به:</span>
                     </span>
                     <div className="flex-1 text-slate-200">

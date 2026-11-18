@@ -200,15 +200,12 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
     <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-6 font-sans text-slate-100" dir="rtl">
       
       {/* Top Banner & Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-rose-950/70 via-slate-900 to-slate-950 border border-rose-500/30 p-5 sm:p-8 shadow-2xl mb-8">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-pink-600/10 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
-
-        <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+      <div className="rounded-3xl bg-gradient-to-br from-rose-950/60 via-slate-900 to-slate-950 border border-rose-500/30 p-5 sm:p-8 shadow-2xl mb-8">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 text-xs font-bold tracking-wide">
-              <Baby className="w-3.5 h-3.5 text-rose-400" />
-              <span>محرك رعاية الحوامل والتوليد السريري (Maternal Clinical Suite)</span>
+            <div className="flex items-center gap-2 text-rose-400 text-xs font-bold tracking-wide">
+              <Baby className="w-4 h-4" />
+              <span>رعاية الحوامل والتوليد السريري</span>
             </div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
               <span>رعاية وصحة الحامل</span>
@@ -261,9 +258,6 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
           >
             <Activity className="w-4 h-4 text-emerald-400" />
             <span>سجل القياسات الشهرية (سكر، ضغط، وزن)</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-emerald-950/80 text-[10px] text-emerald-300 border border-emerald-500/40 font-mono">
-              جديد
-            </span>
           </button>
           <button
             onClick={() => setActiveSubTab('drugs')}
@@ -618,7 +612,7 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
                             : 'bg-slate-950 border-slate-800 text-slate-300'
                         }`}
                       >
-                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${lab.isUrgent ? 'bg-rose-500 animate-pulse' : 'bg-teal-400'}`} />
+                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${lab.isUrgent ? 'bg-rose-500' : 'bg-teal-400'}`} />
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
                             <strong className="text-white text-xs">{lab.nameAr}</strong>
@@ -1416,7 +1410,7 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
           {/* Urgent Emergency Red Flags */}
           <div className="bg-gradient-to-br from-rose-950 via-slate-900 to-slate-950 border border-rose-500/70 rounded-2xl p-5 shadow-2xl space-y-4">
             <div className="flex items-center gap-2 text-rose-400">
-              <AlertTriangle className="w-6 h-6 animate-pulse" />
+              <AlertTriangle className="w-6 h-6" />
               <h3 className="text-base sm:text-lg font-bold text-white">
                 🚨 علامات الخطورة الحمراء (تستوجب التوجه الفوري لطوارئ التوليد)
               </h3>

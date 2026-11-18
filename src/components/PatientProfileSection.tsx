@@ -31,17 +31,9 @@ import {
   Check,
   BookmarkCheck
 } from 'lucide-react';
-import { PatientProfile, PatientReading, SubscriptionTier, PatientPrescription, PatientVitalEntry, PatientClinicalNote } from '../types';
+import { PatientProfile, PatientReading, SubscriptionTier, PatientPrescription, PatientVitalEntry, PatientClinicalNote, PatientMedicalDoc } from '../types';
 
-export interface PatientMedicalDoc {
-  id: string;
-  title: string;
-  category: 'xray' | 'lab' | 'report';
-  date: string;
-  imageUrl?: string;
-  summary: string;
-  status: 'normal' | 'abnormal' | 'review';
-}
+export type { PatientMedicalDoc };
 
 interface PatientProfileSectionProps {
   userTier?: SubscriptionTier;
@@ -74,6 +66,25 @@ const DEFAULT_PATIENTS: PatientProfile[] = [
     ],
     clinicalNotes: [
       { id: 'cn_1', date: '2025-05-10', author: 'د. خالد العمري (استشاري طب الأسرة)', diagnosis: 'ارتفاع ضغط دم منضبط - فحص روتيني', note: 'المريض منتظم على الأملوديبين. لا توجد وذمة في الكاحلين. ضغط الدم 122/81 ممتاز. استمرار نفس الجرعة وفحص الكرياتينين بعد 6 أشهر.' }
+    ],
+    documents: [
+      {
+        id: 'doc_1',
+        title: 'صورة أشعة الصدر (Chest X-Ray PA View)',
+        category: 'xray',
+        date: '2025-05-09',
+        imageUrl: '/sample_xray.jpg',
+        summary: 'أشعة سينية طبيعية: حقول الرئة نقية بدون ارتشاح والقلب بالحجم الطبيعي ولا انصباب جنبي.',
+        status: 'normal'
+      },
+      {
+        id: 'doc_2',
+        title: 'فحص صورة الدم الشاملة ووظائف الكلى (CBC Panel & Creatinine)',
+        category: 'lab',
+        date: '2025-05-07',
+        summary: 'الهيموجلوبين: 14.1 g/dL، الصفائح: 250,000، الكرياتينين: 0.9 mg/dL (معدل الترشيح eGFR 98 ممتاز).',
+        status: 'normal'
+      }
     ],
     notes: 'يفضل فحص الضغط كل أسبوعين والمتابعة مع عيادة طب الأسرة'
   },
@@ -144,7 +155,13 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
       const saved = localStorage.getItem('dose_patient_roster');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((p: PatientProfile) =>
+            p.id === 'pat_1' && !p.documents
+              ? { ...p, documents: DEFAULT_PATIENTS[0].documents }
+              : p
+          );
+        }
       }
     } catch (e) {
       console.warn('Failed to parse patient roster from localStorage:', e);
@@ -153,6 +170,12 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
   });
 
   const [activePatientId, setActivePatientId] = useState<string>(() => {
+    try {
+      const savedId = localStorage.getItem('dose_active_patient_id');
+      if (savedId && patients.some(p => p.id === savedId)) {
+        return savedId;
+      }
+    } catch {}
     return patients[0]?.id || 'pat_1';
   });
 
@@ -169,13 +192,24 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
     }
   }, [patients]);
 
+  useEffect(() => {
+    try {
+      if (activePatientId) {
+        localStorage.setItem('dose_active_patient_id', activePatientId);
+      }
+    } catch {}
+  }, [activePatientId]);
+
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editFormData, setEditFormData] = useState<PatientProfile>(activePatient);
+  const [confirmDeletePatientId, setConfirmDeletePatientId] = useState<string | null>(null);
 
-  // Sync edit form data when active patient changes
+  // Sync edit form data and vital weight when active patient changes
   useEffect(() => {
     setEditFormData(activePatient);
+    setVitalWeight(String(activePatient.weight || ''));
     setIsEditingProfile(false);
+    setConfirmDeletePatientId(null);
   }, [activePatientId]);
 
   // Modal States
@@ -214,32 +248,58 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
   const [noteDiagnosis, setNoteDiagnosis] = useState('');
   const [noteContent, setNoteContent] = useState('');
 
-  // Documents & Imaging
-  const [documents, setDocuments] = useState<PatientMedicalDoc[]>([
-    {
-      id: 'doc_1',
-      title: 'صورة أشعة الصدر (Chest X-Ray PA View)',
-      category: 'xray',
-      date: '2025-05-09',
-      imageUrl: '/sample_xray.jpg',
-      summary: 'أشعة سينية طبيعية: حقول الرئة نقية بدون ارتشاح والقلب بالحجم الطبيعي ولا انصباب جنبي.',
-      status: 'normal'
-    },
-    {
-      id: 'doc_2',
-      title: 'فحص صورة الدم الشاملة ووظائف الكلى (CBC Panel & Creatinine)',
-      category: 'lab',
-      date: '2025-05-07',
-      summary: 'الهيموجلوبين: 14.1 g/dL، الصفائح: 250,000، الكرياتينين: 0.9 mg/dL (معدل الترشيح eGFR 98 ممتاز).',
-      status: 'normal'
-    }
-  ]);
+  // Per-patient Documents & Imaging
+  const documents = activePatient.documents || [];
   const [showAddDocModal, setShowAddDocModal] = useState(false);
   const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocCategory, setNewDocCategory] = useState<'xray' | 'lab' | 'report'>('lab');
   const [newDocSummary, setNewDocSummary] = useState('');
   const [newDocImage, setNewDocImage] = useState<string | null>(null);
   const [viewingDocImage, setViewingDocImage] = useState<string | null>(null);
+
+  // Live Rx allergy cross-check warning
+  const rxAllergyWarning = useMemo(() => {
+    const drug = rxDrugName.trim().toLowerCase();
+    const allergies = (activePatient.allergies || '').trim().toLowerCase();
+    if (!drug || !allergies || allergies === 'لا توجد حساسيات مسجلة') return null;
+
+    const groups: Array<{ label: string; allergyRe: RegExp; drugRe: RegExp }> = [
+      {
+        label: 'حساسية البنسلين / بيتا-لاكتام (Penicillin / Beta-Lactam)',
+        allergyRe: /penicillin|amoxicillin|augmentin|ampicillin|بنسلين|بنيسيلين|أوجمنتين|اوجمنتين|أموكسيسيلين|اموكسيسيلين/i,
+        drugRe: /penicillin|amoxicillin|augmentin|curam|megamox|hibiotic|klavox|ampicillin|piperacillin|tazocin|unasyn|بنسلين|بنيسيلين|أوجمنتين|اوجمنتين|أموكسيسيلين|اموكسيسيلين|كيورام/i,
+      },
+      {
+        label: 'حساسية أدوية السلفا (Sulfonamide Allergy)',
+        allergyRe: /sulfa|sulfamethoxazole|bactrim|septra|سلفا|سلفوناميد|باكتريم/i,
+        drugRe: /sulfa|sulfamethoxazole|bactrim|septra|cotrimoxazole|septrin|furosemide|celecoxib|سلفا|باكتريم|كوتريموكسازول|سبترين/i,
+      },
+      {
+        label: 'حساسية مضادات الالتهاب / الأسبرين (NSAIDs / Aspirin)',
+        allergyRe: /nsaid|aspirin|ibuprofen|diclofenac|أسبرين|اسبرين|بروفين|إيبوبروفين|ديكلوفيناك|فولتارين/i,
+        drugRe: /aspirin|ibuprofen|brufen|diclofenac|voltaren|cataflam|naproxen|ketoprofen|meloxicam|celecoxib|ketorolac|أسبرين|اسبرين|بروفين|إيبوبروفين|ايبوبروفين|ديكلوفيناك|فولتارين|كتافلام/i,
+      },
+      {
+        label: 'حساسية السيفالوسبورين (Cephalosporin Allergy)',
+        allergyRe: /cephalosporin|ceftriaxone|cefuroxime|cefixime|cefaclor|سيفالوسبورين|سيفترياكسون|زينات|سوبراكس/i,
+        drugRe: /cef|ceph|rocephin|zinnat|suprax|omnicef|سيفترياكسون|سيفوروكسيم|سيفيكسيم|زينات|سوبراكس|روسيفين/i,
+      },
+    ];
+
+    for (const g of groups) {
+      if (g.allergyRe.test(allergies) && g.drugRe.test(drug)) {
+        return `تحذير سلامة حرج: هذا المريض لديه "${activePatient.allergies}" والدواء المدخل قد ينتمي إلى فئة (${g.label})!`;
+      }
+    }
+
+    const drugTokens = drug.split(/[\s,()+/-]+/).filter(t => t.length >= 3);
+    const matchedToken = drugTokens.find(t => allergies.includes(t));
+    if (matchedToken) {
+      return `تنبيه تعارض محتمل مع الحساسية المسجلة للمريض (${activePatient.allergies}) بسبب تطابق "${matchedToken}".`;
+    }
+
+    return null;
+  }, [rxDrugName, activePatient.allergies]);
 
   // Biometrics calculation
   const biometrics = useMemo(() => {
@@ -434,11 +494,75 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
       status: 'normal'
     };
 
-    setDocuments([newDoc, ...documents]);
+    setPatients(prev => prev.map(p => {
+      if (p.id === activePatient.id) {
+        const docs = p.documents || [];
+        return { ...p, documents: [newDoc, ...docs] };
+      }
+      return p;
+    }));
     setNewDocTitle('');
     setNewDocSummary('');
     setNewDocImage(null);
     setShowAddDocModal(false);
+  };
+
+  // Delete handlers & Rx status cycler
+  const handleConfirmDeletePatient = (patientId: string) => {
+    if (patients.length <= 1) return;
+    const remaining = patients.filter(p => p.id !== patientId);
+    setPatients(remaining);
+    if (activePatientId === patientId && remaining[0]) {
+      setActivePatientId(remaining[0].id);
+    }
+    setConfirmDeletePatientId(null);
+  };
+
+  const handleDeleteVital = (vitalId: string) => {
+    setPatients(prev => prev.map(p =>
+      p.id === activePatient.id
+        ? { ...p, vitalSignsHistory: (p.vitalSignsHistory || []).filter(v => v.id !== vitalId) }
+        : p
+    ));
+  };
+
+  const handleDeleteRx = (rxId: string) => {
+    setPatients(prev => prev.map(p =>
+      p.id === activePatient.id
+        ? { ...p, prescriptions: (p.prescriptions || []).filter(r => r.id !== rxId) }
+        : p
+    ));
+  };
+
+  const handleCycleRxStatus = (rxId: string) => {
+    const order: Array<PatientPrescription['status']> = ['active', 'completed', 'stopped'];
+    setPatients(prev => prev.map(p => {
+      if (p.id !== activePatient.id) return p;
+      return {
+        ...p,
+        prescriptions: (p.prescriptions || []).map(rx => {
+          if (rx.id !== rxId) return rx;
+          const idx = order.indexOf(rx.status);
+          return { ...rx, status: order[(idx + 1) % order.length] };
+        })
+      };
+    }));
+  };
+
+  const handleDeleteClinicalNote = (noteId: string) => {
+    setPatients(prev => prev.map(p =>
+      p.id === activePatient.id
+        ? { ...p, clinicalNotes: (p.clinicalNotes || []).filter(n => n.id !== noteId) }
+        : p
+    ));
+  };
+
+  const handleDeleteDoc = (docId: string) => {
+    setPatients(prev => prev.map(p =>
+      p.id === activePatient.id
+        ? { ...p, documents: (p.documents || []).filter(d => d.id !== docId) }
+        : p
+    ));
   };
 
   const handleDocImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -548,9 +672,47 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                 </>
               )}
             </button>
+
+            {patients.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setConfirmDeletePatientId(activePatient.id)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold border border-rose-500/30 transition-colors cursor-pointer"
+                title="حذف ملف هذا المريض"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">حذف الملف</span>
+              </button>
+            )}
           </div>
 
         </div>
+
+        {/* Inline Delete Patient Confirmation Banner */}
+        {confirmDeletePatientId === activePatient.id && patients.length > 1 && (
+          <div className="mt-4 pt-3 border-t border-rose-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-rose-950/30 px-4 py-3 rounded-xl border border-rose-500/40 text-xs">
+            <span className="text-rose-200 font-bold flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>هل أنت متأكد من حذف ملف المريض ({activePatient.fullName}) وجميع سجلاته نهائياً؟</span>
+            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleConfirmDeletePatient(activePatient.id)}
+                className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold transition-colors cursor-pointer"
+              >
+                نعم، حذف الملف
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDeletePatientId(null)}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition-colors cursor-pointer"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Allergies & Critical Alerts Banner */}
@@ -760,7 +922,7 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <a
-                href="#interactions"
+                href={`#interactions?patient=${encodeURIComponent(activePatient.id)}`}
                 className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-teal-500/50 transition-colors flex items-center gap-2 text-slate-200 font-semibold"
               >
                 <Shield className="w-4 h-4 text-amber-400 shrink-0" />
@@ -768,7 +930,7 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
               </a>
 
               <a
-                href={activePatient.isChild ? `#pediatric?wt=${activePatient.weight}` : `#health?wt=${activePatient.weight}&ht=${activePatient.height}`}
+                href={activePatient.isChild ? `#pediatric?wt=${activePatient.weight}&age=${activePatient.age}&unit=years` : `#health?wt=${activePatient.weight}&ht=${activePatient.height || 170}`}
                 className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-teal-500/50 transition-colors flex items-center gap-2 text-slate-200 font-semibold"
               >
                 {activePatient.isChild ? <Baby className="w-4 h-4 text-sky-400 shrink-0" /> : <Scale className="w-4 h-4 text-emerald-400 shrink-0" />}
@@ -810,14 +972,24 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                     key={item.id}
                     className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors space-y-2 text-xs"
                   >
-                    <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                    <div className="flex items-center justify-between text-slate-400 text-[11px] gap-2">
                       <span className="flex items-center gap-1.5 font-mono">
                         <Clock className="w-3 h-3 text-slate-500" />
                         <span>{item.date}</span>
                       </span>
-                      {item.note && (
-                        <span className="text-teal-400 font-medium">{item.note}</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {item.note && (
+                          <span className="text-teal-400 font-medium">{item.note}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteVital(item.id)}
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                          title="حذف القراءة"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 text-center pt-1 border-t border-slate-800/60">
@@ -896,11 +1068,22 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                     className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs"
                   >
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-white text-sm">{rx.drugName}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 text-[10px] font-semibold">
-                          {rx.status === 'active' ? 'نشط' : rx.status}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleCycleRxStatus(rx.id)}
+                          title="انقر لتبديل حالة الدواء (نشط / مكتمل / متوقف)"
+                          className={`px-2 py-0.5 rounded-full border text-[10px] font-semibold cursor-pointer transition-colors ${
+                            rx.status === 'active'
+                              ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/20'
+                              : rx.status === 'completed'
+                              ? 'bg-sky-500/10 text-sky-300 border-sky-500/30 hover:bg-sky-500/20'
+                              : 'bg-rose-500/10 text-rose-300 border-rose-500/30 hover:bg-rose-500/20'
+                          }`}
+                        >
+                          {rx.status === 'active' ? 'نشط' : rx.status === 'completed' ? 'مكتمل' : 'متوقف'}
+                        </button>
                       </div>
                       <div className="text-slate-300 text-xs flex flex-wrap gap-x-3 gap-y-1">
                         <span>الجرعة: <strong>{rx.dosage}</strong></span>
@@ -917,6 +1100,14 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
 
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[11px] text-slate-500 font-mono">بدء: {rx.startDate}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRx(rx.id)}
+                        className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                        title="حذف الدواء من الخطة"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -955,8 +1146,8 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                     key={note.id}
                     className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-xs"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sky-300">{note.author}</span>
                         {note.diagnosis && (
                           <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300">
@@ -964,7 +1155,17 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-slate-500 font-mono">{note.date}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-500 font-mono">{note.date}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteClinicalNote(note.id)}
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                          title="حذف الملاحظة"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
 
                     <p className="text-slate-300 leading-relaxed text-xs">
@@ -1000,38 +1201,55 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
               </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {documents.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors space-y-2 text-xs"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="font-bold text-white text-xs block leading-tight">{doc.title}</span>
-                      <span className="text-[10px] text-slate-500 font-mono">{doc.date}</span>
+            {documents.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors space-y-2 text-xs"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-bold text-white text-xs block leading-tight">{doc.title}</span>
+                        <span className="text-[10px] text-slate-500 font-mono">{doc.date}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] uppercase font-bold">
+                          {doc.category}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDoc(doc.id)}
+                          className="text-slate-500 hover:text-rose-400 p-1 rounded transition-colors cursor-pointer"
+                          title="حذف المرفق"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-300 border border-purple-500/30 text-[10px] uppercase font-bold shrink-0">
-                      {doc.category}
-                    </span>
+
+                    <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                      {doc.summary}
+                    </p>
+
+                    {doc.imageUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setViewingDocImage(doc.imageUrl || null)}
+                        className="inline-flex items-center gap-1.5 text-[11px] text-teal-400 hover:text-teal-300 font-medium cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>{doc.imageUrl.startsWith('data:application/pdf') ? 'عرض ملف PDF المرفق' : 'عرض الصورة المرفقة'}</span>
+                      </button>
+                    )}
                   </div>
-
-                  <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                    {doc.summary}
-                  </p>
-
-                  {doc.imageUrl && (
-                    <button
-                      onClick={() => setViewingDocImage(doc.imageUrl || null)}
-                      className="inline-flex items-center gap-1.5 text-[11px] text-teal-400 hover:text-teal-300 font-medium cursor-pointer"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>عرض الصورة المرفقة</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 rounded-xl bg-slate-950 border border-slate-800 text-center text-xs text-slate-500">
+                لا توجد تقارير أو فحوصات مرفقة لهذا المريض بعد. اضغط "إرفاق فحص" لحفظ ملف جديد.
+              </div>
+            )}
           </div>
 
         </div>
@@ -1334,6 +1552,13 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                 />
               </div>
 
+              {rxAllergyWarning && (
+                <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/60 text-rose-200 text-xs font-bold flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{rxAllergyWarning}</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 mb-1">الجرعة:</label>
@@ -1516,10 +1741,10 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-300 mb-1">صورة التقرير أو الأشعة (اختياري):</label>
+                <label className="block text-slate-300 mb-1">صورة أو ملف PDF للتقرير أو الأشعة (اختياري):</label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.pdf,application/pdf"
                   onChange={handleDocImageUpload}
                   className="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-teal-400 hover:file:bg-slate-700 cursor-pointer"
                 />
@@ -1545,7 +1770,7 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
         </div>
       )}
 
-      {/* 6. View Attached Image Modal */}
+      {/* 6. View Attached Image / PDF Modal */}
       {viewingDocImage && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
           <div className="relative max-w-3xl w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl">
@@ -1556,11 +1781,19 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
               <X className="w-5 h-5" />
             </button>
             <div className="flex items-center justify-center max-h-[80vh] overflow-hidden rounded-xl">
-              <img
-                src={viewingDocImage}
-                alt="Medical Attached Document"
-                className="max-h-[75vh] w-auto object-contain rounded-lg"
-              />
+              {viewingDocImage.startsWith('data:application/pdf') ? (
+                <iframe
+                  src={viewingDocImage}
+                  title="Medical PDF Document"
+                  className="w-full h-[75vh] rounded-lg bg-white"
+                />
+              ) : (
+                <img
+                  src={viewingDocImage}
+                  alt="Medical Attached Document"
+                  className="max-h-[75vh] w-auto object-contain rounded-lg"
+                />
+              )}
             </div>
           </div>
         </div>

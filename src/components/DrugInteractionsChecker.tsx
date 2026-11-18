@@ -18,7 +18,6 @@ import {
   History,
   Trash2,
   Search,
-  Settings,
   Utensils,
   Coffee,
   Wine,
@@ -239,13 +238,56 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
-  const [customApiKey, setCustomApiKey] = useState<string>(() => {
-    try { return localStorage.getItem('dose_gemini_api_key') || ''; } catch { return ''; }
-  });
-  const [showApiConfig, setShowApiConfig] = useState(false);
   const [engineSource, setEngineSource] = useState<'clinical_class' | 'gemini_ai'>('clinical_class');
   const [activeReportTab, setActiveReportTab] = useState<'all' | 'drugs' | 'food' | 'food_food' | 'timing'>('all');
   const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Prefill drugs from URL hash (#interactions?patient=... or #interactions?drug=...)
+  useEffect(() => {
+    const syncFromHash = () => {
+      try {
+        const hash = window.location.hash || '';
+        const qIndex = hash.indexOf('?');
+        if (qIndex === -1) return;
+        const params = new URLSearchParams(hash.slice(qIndex + 1));
+        const drugParam = params.get('drug');
+        const patientParam = params.get('patient');
+
+        if (drugParam) {
+          const parsed = drugParam.split(',').map(s => s.trim()).filter(Boolean);
+          if (parsed.length > 0) {
+            setSelectedTokens(parsed);
+            setAnalysisResult(null);
+            return;
+          }
+        }
+
+        if (patientParam) {
+          const rosterStr = localStorage.getItem('dose_patient_roster');
+          if (rosterStr) {
+            const roster = JSON.parse(rosterStr);
+            const patient = Array.isArray(roster)
+              ? roster.find((p: any) => p.id === patientParam)
+              : null;
+            if (patient) {
+              const rxNames = (patient.prescriptions || [])
+                .filter((r: any) => r.status === 'active')
+                .map((r: any) => r.drugName.split('(')[0].trim())
+                .filter(Boolean);
+              if (rxNames.length > 0) {
+                setSelectedTokens(Array.from(new Set(rxNames)));
+                setAnalysisResult(null);
+              }
+            }
+          }
+        }
+      } catch {}
+    };
+
+    syncFromHash();
+    window.addEventListener('hashchange', syncFromHash);
+    return () => window.removeEventListener('hashchange', syncFromHash);
+  }, []);
 
   // Persistent Medication History Memory
   const [recentHistory, setRecentHistory] = useState<string[]>(() => {
@@ -439,14 +481,12 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
     setErrorMessage('');
 
     try {
-      const savedApiKey = customApiKey || localStorage.getItem('dose_gemini_api_key') || '';
       const res = await fetch(getApiUrl('/api/interactions/check'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           drugs: selectedTokens,
           lang: language,
-          customApiKey: savedApiKey.trim() || undefined,
         }),
       });
 
@@ -571,63 +611,12 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setShowApiConfig(!showApiConfig)}
-              className="bg-slate-800/90 hover:bg-slate-800 px-3.5 py-2.5 rounded-xl border border-slate-700/80 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="إعدادات محرك التحليل والذكاء الاصطناعي"
-            >
-              <Settings className="w-3.5 h-3.5 text-rose-400" />
-              <span>محرك الفحص السريري</span>
-            </button>
             <div className="bg-slate-800/90 px-4 py-2.5 rounded-xl border border-slate-700/80 text-center sm:text-right">
               <span className="text-[11px] text-slate-400 block font-medium">الأدوية المحددة:</span>
               <span className="text-sm sm:text-base font-black text-rose-400">{selectedTokens.length} مستحضرات</span>
             </div>
           </div>
         </div>
-
-        {/* Engine Settings Drawer */}
-        {showApiConfig && (
-          <div className="mt-4 pt-4 border-t border-slate-800 bg-slate-950/70 p-4 rounded-xl border border-slate-700/60 space-y-3 relative z-10 animate-in fade-in duration-200">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>محرك الصيدلة السريرية الشامل (INN Stem & Class Engine) نشط ويعمل ذاتياً لجميع الأدوية</span>
-              </span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/30 self-start sm:self-auto">
-                جاهز بدون مفاتيح
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 leading-relaxed">
-              يقوم المحرك بتصنيف أي دواء في العالم تلقائياً عبر الجذر العلمي والمسارات الإنزيمية الكبدية (CYP450). كما يمكنك إدخال مفتاح Gemini API اختياري لإجراء تحليل ذكاء اصطناعي توليدي مخصص:
-            </p>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={customApiKey}
-                onChange={(e) => {
-                  setCustomApiKey(e.target.value);
-                  try { localStorage.setItem('dose_gemini_api_key', e.target.value); } catch {}
-                }}
-                placeholder="أدخل مفتاح Gemini API (اختياري)..."
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
-              />
-              {customApiKey && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCustomApiKey('');
-                    try { localStorage.removeItem('dose_gemini_api_key'); } catch {}
-                  }}
-                  className="px-3 py-1.5 rounded-lg bg-slate-800 text-xs text-slate-300 hover:text-rose-400 border border-slate-700 transition-colors"
-                >
-                  مسح
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -51,6 +51,8 @@ export interface TelegramUser {
   username?: string; // e.g. "saf_tech"
   firstName: string;
   lastName?: string;
+  email?: string;
+  role?: string;
   photoUrl?: string;
   authSource: 'bot_code' | 'telegram_login' | 'webapp' | 'demo';
   subscription: UserSubscription;
@@ -139,6 +141,16 @@ export interface DrugInfo {
   interactions: string[];
   pharmacist_advice_ar?: string;
   pharmacist_advice_en?: string;
+  mechanism_ar?: string;
+  mechanism_en?: string;
+  food_interactions_ar?: string;
+  food_interactions_en?: string;
+  monitoring_ar?: string;
+  monitoring_en?: string;
+  missed_dose_ar?: string;
+  missed_dose_en?: string;
+  storage_ar?: string;
+  storage_en?: string;
   isAiResult?: boolean;
   source?: string;
 }
@@ -155,6 +167,8 @@ export interface MedicationReminder {
   dose: string;
   times: string[];
   days: string[];
+  intervalHours?: number;
+  notes?: string;
   email_notify: boolean;
   is_active: boolean;
   created_at: string;
@@ -199,6 +213,16 @@ export interface PatientClinicalNote {
   note: string;
 }
 
+export interface PatientMedicalDoc {
+  id: string;
+  title: string;
+  category: 'xray' | 'lab' | 'report';
+  date: string;
+  imageUrl?: string;
+  summary: string;
+  status: 'normal' | 'abnormal' | 'review';
+}
+
 export interface PatientProfile {
   id?: string;
   fullName: string;
@@ -217,6 +241,7 @@ export interface PatientProfile {
   prescriptions?: PatientPrescription[];
   vitalSignsHistory?: PatientVitalEntry[];
   clinicalNotes?: PatientClinicalNote[];
+  documents?: PatientMedicalDoc[];
   notes: string;
 }
 
