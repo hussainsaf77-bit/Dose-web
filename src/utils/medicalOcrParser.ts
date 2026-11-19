@@ -48,9 +48,13 @@ export interface KnownLabDef {
 export function convertArabicDigits(str: string): string {
   const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
   const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
-  let res = str;
+  const subDigits = ['₀', '₁', '₂', '₃', '₄', '₅', '₆', '₇', '₈', '₉'];
+  let res = str.replace(/‹/g, '<').replace(/›/g, '>');
   for (let i = 0; i < 10; i++) {
-    res = res.split(arabicDigits[i]).join(String(i)).split(persianDigits[i]).join(String(i));
+    res = res
+      .split(arabicDigits[i]).join(String(i))
+      .split(persianDigits[i]).join(String(i))
+      .split(subDigits[i]).join(String(i));
   }
   return res;
 }
@@ -59,8 +63,8 @@ export function convertArabicDigits(str: string): string {
 export function normalizeLineSeparators(line: string): string {
   let cleaned = convertArabicDigits(line);
 
-  // 1. Remove footnote superscript letters (e.g. "111^a", "111a", "62^a", "132^b", "0.72^b") from numbers
-  cleaned = cleaned.replace(/(\d+)\s*[\^~]?\s*[ab]\b/gi, '$1');
+  // 1. Remove footnote superscript letters (e.g. "111^a", "111a", "62^a", "132^b", "0.72^b", "2.6)^a") from numbers
+  cleaned = cleaned.replace(/(\d+)\s*[\)\]]?\s*[\^~*]?\s*[ab]\b/gi, '$1');
 
   // 2. Unify all explicit decimal separators between digits with optional whitespace
   // Handles: . , ، ٫ ٬ ؍ ` ‘ ’ · • ° : ; ' "
@@ -84,7 +88,7 @@ export function normalizeLineSeparators(line: string): string {
 
 export function detectUnitInText(text: string): string | undefined {
   if (!text) return undefined;
-  const m = text.match(/\b(mg\/d[lL]|g\/d[lL]|g\/[lL]|mmol\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|u\/[lL]|iu\/[lL]|pg\/m[lL]|ng\/m[lL]|fl|%|index|ratio|\/hpf|\/µl|\/ul)\b/i);
+  const m = text.match(/(?:^|[\s,(:])(mg\/d[lL]|g\/d[lL]|g\/[lL]|mmol\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|µg\/d[lL]|ug\/d[lL]|u\/[lL]|iu\/[lL]|pg\/m[lL]|ng\/m[lL]|fl|%|index|ratio|\/hpf|\/µl|\/ul)(?=$|[\s,);.^])/i);
   if (m) {
     const raw = m[1].toLowerCase();
     if (raw === 'mg/dl') return 'mg/dL';
@@ -203,13 +207,14 @@ export function cleanLineForValueExtraction(line: string, testPatterns?: RegExp[
   cleaned = cleaned.replace(/\b(?:vit(?:amin)?|فيتامين)\s*(?:[dD]|[د]|[bB]|[ب])\b/gi, ' ');
   cleaned = cleaned.replace(/\b(?:d[123]|b12|b6|b1|b2|b3|b9|hba1c|a1c|ft4|ft3|t4|t3|ca125|ca19-9|ca15-3|cd4|cd8)\b/gi, ' ');
 
-  // 4. Strip scientific multiplier power prefixes (e.g. 10^3/uL, 10^6/cumm, *1000/ul) so their digits are not read as the patient value
-  cleaned = cleaned.replace(/(?:x|×|\*)?\s*10\s*[\^~*eE]?\s*[0-9]+(?:\s*\/\s*[a-zA-Zµ\^0-9]+)?/gi, ' ');
+  // 4. Strip scientific multiplier power prefixes ONLY when explicit exponent/multiplier exists (never strip normal numbers like 107!)
+  cleaned = cleaned.replace(/(?:[x×*]\s*)?10\s*[\^~*eE]\s*[0-9]+(?:\s*\/\s*[a-zA-Zµ\^0-9]+)?/gi, ' ');
+  cleaned = cleaned.replace(/[x×*]\s*10\s*[0-9]+(?:\s*\/\s*[a-zA-Zµ\^0-9]+)?/gi, ' ');
   cleaned = cleaned.replace(/\b(?:million|millon|lakh)\s*\/\s*(?:cumm|µl|ul|l)\b/gi, ' ');
   cleaned = cleaned.replace(/\*(?:1000|100)\s*\/\s*(?:cumm|µl|ul|l)\b/gi, ' ');
 
-  // 5. Strip standard laboratory units before checking for values / flags
-  cleaned = cleaned.replace(/\b(?:mg\/d[lL]|g\/d[lL]|g\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|ng\/m[lL]|pg\/m[lL]|µg\/d[lL]|ug\/d[lL]|mmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|u\/[lL]|iu\/[lL]|fl|pg|index|ratio|%|\/hpf|\/µl|\/ul|cumm)\b/gi, ' ');
+  // 5. Strip standard laboratory units (including µ-prefixed and /-prefixed units) before checking for values / flags
+  cleaned = cleaned.replace(/(?:^|(?<=[\s,(:]))(?:mg\/d[lL]|g\/d[lL]|g\/[lL]|µmol\/[lL]|umol\/[lL]|pmol\/[lL]|ng\/m[lL]|pg\/m[lL]|µg\/d[lL]|ug\/d[lL]|mmol\/[lL]|µiu\/m[lL]|uiu\/m[lL]|u\/[lL]|iu\/[lL]|fl|pg|index|ratio|%|\/hpf|\/µl|\/ul|cumm)(?=$|[\s,);.^])/gi, ' ');
 
   return cleaned;
 }
@@ -476,11 +481,11 @@ export function extractNumericInfo(
   const cleaned = cleanLineForValueExtraction(line, testPatterns);
   const normLine = normalizeLineSeparators(cleaned);
 
-  // 1. Check for H or L flag (high / low / alert)
-  const flagMatch = normLine.match(/(?:\b|[\(\[])([HL])(?:\b|[\)\]])/i) || normLine.match(/(مرتفع|منخفض)/);
+  // 1. Check for explicit H or L clinical flag (never match "/L" unit endings or lowercase letters inside words)
+  const flagMatch = normLine.match(/(?<![\/a-zA-Z])(?:[\(\[]\s*([HL])\s*[\)\]]|\b([HL])\b)(?![\/a-zA-Z])/) || normLine.match(/(مرتفع|منخفض)/);
   let flag: 'H' | 'L' | undefined = undefined;
   if (flagMatch) {
-    const rawFlag = (flagMatch[1] || '').toUpperCase();
+    const rawFlag = (flagMatch[1] || flagMatch[2] || '').toUpperCase();
     if (rawFlag === 'H' || flagMatch[0] === 'مرتفع') flag = 'H';
     else if (rawFlag === 'L' || flagMatch[0] === 'منخفض') flag = 'L';
   }
@@ -1420,6 +1425,7 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
   {
     id: 'co2',
     patterns: [
+      /\bc[o0]\s*2\b/i,
       /\bco2\b/i,
       /\bbicarbonate\b/i,
       /\bhco3\b/i,
@@ -1592,7 +1598,7 @@ export const KNOWN_LAB_DATABASE: KnownLabDef[] = [
     minNormal: 6.4,
     maxNormal: 8.3,
     explanationNote: (val, status) =>
-      `البروتين الكلي (${val} g/dL) ضمن المعدلات الفسيولوجية.`
+      `البروتين الكلي (${val} ${val > 25 ? 'g/L' : 'g/dL'}) ${status === 'normal' ? 'ضمن المعدلات الفسيولوجية' : status === 'low' ? 'منخفض عن المعدل المعتاد' : 'مرتفع نسبياً'}.`
   },
   {
     id: 'egfr',
@@ -2613,3 +2619,163 @@ export function parseClinicalReportFromText(
     recommendations
   };
 }
+
+// Genuine written radiology report interpreter (ONLY runs on real written report text, NEVER fabricates scan findings)
+export function parseRadiologyReportFromText(
+  rawText: string,
+  modality: string = 'xray',
+  region: string = 'chest'
+): ParsedClinicalReport | null {
+  const cleaned = convertArabicDigits(rawText || '')
+    .replace(/\[نوع التصوير:[^\]]+\]/g, ' ')
+    .trim();
+  if (cleaned.length < 18) return null;
+
+  const lower = cleaned.toLowerCase();
+  const radiologyKeywords = [
+    'impression', 'findings', 'conclusion', 'radiology', 'x-ray', 'xray', 'ct ', 'mri', 'ultrasound',
+    'fracture', 'dislocation', 'effusion', 'pneumothorax', 'consolidation', 'pneumonia', 'infiltrate',
+    'cardiomegaly', 'disc', 'herniation', 'protrusion', 'stenosis', 'hemorrhage', 'unremarkable', 'clear',
+    'كسر', 'خلع', 'انصباب', 'ارتشاح', 'التهاب رئوي', 'انزلاق', 'غضروف', 'ديسك', 'نزيف', 'نزف', 'تضخم', 'سليم', 'طبيعي', 'انطباع', 'تقرير'
+  ];
+
+  const matchedKeywordCount = radiologyKeywords.filter(k => lower.includes(k)).length;
+  if (matchedKeywordCount < 2) return null;
+
+  const items: ParsedLabItem[] = [];
+  let urgencyLevel: 'normal' | 'medium' | 'high' | 'critical' = 'normal';
+
+  const hasUnnegatedFinding = (pattern: RegExp): boolean => {
+    const clauses = cleaned.split(/[.\n;؛]+/);
+    for (const clause of clauses) {
+      const m = clause.match(pattern);
+      if (!m || m.index === undefined) continue;
+      const before = clause.slice(0, m.index).toLowerCase();
+      if (/\b(?:no|without|negative\s+for|free\s+of|clear\s+of|rule\s+out|unlikely|absent|nor|neither)\b|لا\s*يوجد|عدم\s*وجود|خلو\s*من|خالية\s*من|سليم\s*من|نفي\s*/i.test(before)) {
+        continue;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const rules: Array<{
+    re: RegExp;
+    requirePositiveCheck: boolean;
+    name: string;
+    value: string;
+    ref: string;
+    status: 'normal' | 'low' | 'high' | 'critical';
+    urgency: 'normal' | 'medium' | 'high' | 'critical';
+  }> = [
+    {
+      re: /\b(tension pneumothorax|intracranial hemorrhage|acute hemorrhage|pneumoperitoneum)\b|نزيف حاد|نزف دماغي|استرواح صدري ضاغط/i,
+      requirePositiveCheck: true,
+      name: 'مؤشر طارئ حرج (Critical Emergency Finding)',
+      value: 'مذكور في التقرير — يتطلب تدخلاً إسعافياً فورياً',
+      ref: 'انتفاء الموجودات الحرجة',
+      status: 'critical',
+      urgency: 'critical'
+    },
+    {
+      re: /\b(dislocation)\b|خلع مفصلي|خلع أمامي|خلع خلفي/i,
+      requirePositiveCheck: true,
+      name: 'استقرار المفصل والمحاذاة (Joint Alignment)',
+      value: 'تم رصد خلع مفصلي في التقرير',
+      ref: 'تموضع مركزي متطابق للمفصل',
+      status: 'critical',
+      urgency: 'critical'
+    },
+    {
+      re: /\b(fracture)\b|كسر عظمي|كسر\b/i,
+      requirePositiveCheck: true,
+      name: 'سلامة العظم والقشرة العظمية (Osseous Integrity)',
+      value: 'اشتباه أو وجود كسر عظمي مذكور بالتقرير',
+      ref: 'قشرة عظمية متصلة دون كسور',
+      status: 'high',
+      urgency: 'high'
+    },
+    {
+      re: /\b(consolidation|pneumonia|infiltrate)\b|ارتشاح|التهاب رئوي|تكثف رئوي/i,
+      requirePositiveCheck: true,
+      name: 'حقول الرئة والبرنشيمة (Lung Parenchyma)',
+      value: 'ارتشاح أو التهاب رئوي مذكور بالتقرير',
+      ref: 'رئتان صافيتان دون ارتشاح',
+      status: 'high',
+      urgency: 'high'
+    },
+    {
+      re: /\b(pleural effusion|pneumothorax)\b|انصباب جنبي|استرواح/i,
+      requirePositiveCheck: true,
+      name: 'التجويف الجنبي والزوايا الضلعية (Pleural Space)',
+      value: 'انصباب جنبي أو استرواح مذكور بالتقرير',
+      ref: 'زوايا ضلعية حادة وخالية من السوائل/الهواء',
+      status: 'high',
+      urgency: 'high'
+    },
+    {
+      re: /\b(cardiomegaly)\b|تضخم القلب|تضخم ظل القلب/i,
+      requirePositiveCheck: true,
+      name: 'الظل القلبي والمنصف (Cardiac Silhouette)',
+      value: 'تضخم في ظل القلب مذكور بالتقرير',
+      ref: 'نسبة قلبية صدرية طبيعية (< 0.50)',
+      status: 'high',
+      urgency: 'medium'
+    },
+    {
+      re: /\b(disc herniation|disc protrusion|disc bulge|stenosis)\b|انزلاق غضروفي|بروز غضروفي|تضيق القناة/i,
+      requirePositiveCheck: true,
+      name: 'الأقراص الغضروفية والقناة الشوكية (Spine & Discs)',
+      value: 'تغير أو انزلاق غضروفي مذكور بالتقرير',
+      ref: 'أقراص سليمة دون ضغط عصبي',
+      status: 'high',
+      urgency: 'medium'
+    },
+    {
+      re: /\b(clear lungs|lungs are clear|no acute|unremarkable|normal study|normal chest radiograph)\b|سليم|لا توجد كسور|رئتان صافيتان|طبيعي تماماً/i,
+      requirePositiveCheck: false,
+      name: 'التقييم العام بالتقرير المكتوب',
+      value: 'يشير التقرير لسلامة الفحص وعدم وجود موجودات حادة',
+      ref: 'فحص سليم ضمن الطبيعي',
+      status: 'normal',
+      urgency: 'normal'
+    }
+  ];
+
+  const rank: Record<string, number> = { normal: 0, medium: 1, high: 2, critical: 3 };
+  for (const r of rules) {
+    const matched = r.requirePositiveCheck ? hasUnnegatedFinding(r.re) : r.re.test(cleaned);
+    if (matched) {
+      items.push({
+        name: r.name,
+        value: r.value,
+        referenceRange: r.ref,
+        status: r.status
+      });
+      if (rank[r.urgency] > rank[urgencyLevel]) urgencyLevel = r.urgency;
+    }
+  }
+
+  if (items.length === 0) return null;
+
+  const summary = urgencyLevel === 'critical'
+    ? 'تقرير الأشعة يتضمن ملاحظات حرجة تستوجب مراجعة الطوارئ فوراً'
+    : urgencyLevel === 'high'
+    ? 'تقرير الأشعة يتضمن موجودات غير طبيعية تستدعي مراجعة الطبيب المختص'
+    : urgencyLevel === 'medium'
+    ? 'تقرير الأشعة يوضح تغيرات متوسطة تستدعي المتابعة الطبية'
+    : 'تفسير تقرير الأشعة المكتوب: الفحص يبدو ضمن الحدود الطبيعية';
+
+  return {
+    isValidReport: true,
+    testName: `تفسير تقرير تصوير طبي مكتوب (${modality.toUpperCase()} - ${region})`,
+    clinicalSummaryTitle: summary,
+    urgencyLevel,
+    items,
+    detailedExplanation: `تم تحليل نص التقرير الإشعاعي الفعلي المدخل أو المستخرج من الصورة.\n\nالنص المستخرج:\n${cleaned.slice(0, 700)}`,
+    recommendations: urgencyLevel === 'critical'
+      ? ['التوجه فوراً لقسم الطوارئ وعرض التقرير والصور على الطبيب المناوب.']
+      : ['عرض التقرير والأشعة الأصلية على الطبيب المختص لمطابقتها مع الفحص السريري.']
+  };
+}
+

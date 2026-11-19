@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
-    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-2.5-flash'];
+    const candidateModels = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
     const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading prescriptions and medicine packaging (syrup bottles, drops, ointments, inhalers, vials, suppositories).
 Carefully analyze this medicine image.
 Extract the exact information from the packaging or prescription:

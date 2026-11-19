@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
-    const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    const candidateModels = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
     const prompt = `You are a Senior Clinical Nutritionist and Dietitian specializing in medical nutrition therapy (MNT).
 Design a comprehensive, evidence-based therapeutic diet and metabolic plan for:
 - Clinical Condition: "${condition}" (e.g. Type 2 Diabetes, Hypertension (DASH), Chronic Kidney Disease, Gout, Fatty Liver, IBS, Cardiac/Lipid)

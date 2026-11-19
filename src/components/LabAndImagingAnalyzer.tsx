@@ -9,7 +9,7 @@ import Tesseract from 'tesseract.js';
 import { SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
 import { LAB_CATALOG_GROUPS, LabTestItem, LabCategoryGroup } from '../data/labCatalogData';
-import { parseClinicalReportFromText } from '../utils/medicalOcrParser';
+import { parseClinicalReportFromText, parseRadiologyReportFromText } from '../utils/medicalOcrParser';
 import { MANUAL_LAB_TEST_OPTIONS, UserManualRow, getTestRefRangeForPatient, PatientDemographics } from '../data/manualLabOptions';
 import { evaluateUserManualLabRows } from '../utils/manualLabEvaluator';
 
@@ -525,18 +525,19 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           const ctx = canvas.getContext('2d');
           if (!ctx) return resolve(dataUrl);
 
-          // Optimal resolution: limit max dimension to 1400px so mobile devices do not run out of RAM
+          // Preserve wide resolution for dense phone screenshots & hospital lab tables
           let w = img.width;
           let h = img.height;
-          const maxDim = 1400;
+          const maxDim = 2200;
           if (w > maxDim || h > maxDim) {
             const scale = Math.min(maxDim / w, maxDim / h);
             w = Math.round(w * scale);
             h = Math.round(h * scale);
-          } else if (w < 800) {
-            const scale = 800 / w;
-            w = 800;
-            h = Math.round(h * scale);
+          }
+          if (w < 1200) {
+            const upScale = Math.min(1800 / w, 2.2);
+            w = Math.round(w * upScale);
+            h = Math.round(h * upScale);
           }
 
           canvas.width = w;
@@ -548,14 +549,24 @@ async function enhanceImageForMedicalOcr(dataUrl: string): Promise<string> {
           const imgData = ctx.getImageData(0, 0, w, h);
           const d = imgData.data;
 
+          // Detect dark-mode screenshots so white text on dark background inverts to crisp dark-on-white
+          let lumSum = 0;
+          let sampleCount = 0;
+          for (let i = 0; i < d.length; i += 64) {
+            lumSum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            sampleCount++;
+          }
+          const isDarkBg = sampleCount > 0 && (lumSum / sampleCount) < 110;
+
           // Contrast enhancement and sharpening for fine dots (decimal points)
           for (let i = 0; i < d.length; i += 4) {
-            const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            let gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            if (isDarkBg) gray = 255 - gray;
             let enhanced = gray;
             if (gray < 200) {
-              enhanced = Math.max(0, Math.pow(gray / 200, 1.35) * 170); // darken numbers and preserve fine dots
+              enhanced = Math.max(0, Math.pow(gray / 200, 1.35) * 170);
             } else {
-              enhanced = Math.min(255, 220 + (gray - 200) * 0.6); // brighten page background
+              enhanced = Math.min(255, 225 + (gray - 200) * 0.55);
             }
             d[i] = enhanced;
             d[i + 1] = enhanced;
@@ -636,6 +647,7 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
           }
         }
         setResult(null);
+        setTextNotes('');
         setErrorMsg(null);
       };
       reader.readAsDataURL(file);
@@ -818,9 +830,11 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
 
       const endpoint = analysisType === 'lab' ? '/api/medical/analyze-lab' : '/api/medical/analyze-imaging';
       let analyzedSuccessfully = false;
+      let serverMissingKey = false;
 
       // 1. First attempt: Server API with multimodal Gemini Vision (supports JPEG/PNG/PDF directly)
       try {
+        const cleanUserNotes = (customPrompt !== undefined ? customPrompt : textNotes).trim();
         const response = await fetch(getApiUrl(endpoint), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -834,18 +848,23 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
             mimeType,
             patientGender,
             patientAge: patientAge.trim() ? parseInt(patientAge, 10) : undefined,
-            textNotes: analysisType === 'lab' 
-              ? (selectedLabCategory !== 'all' ? `[فحص مخبري: ${selectedLabCategory.toUpperCase()}] ${customPrompt || textNotes}` : (customPrompt || textNotes))
-              : `[نوع التصوير: ${imagingModality.toUpperCase()} | المنطقة: ${anatomicalRegion}] ${customPrompt || textNotes}`,
+            textNotes: analysisType === 'lab'
+              ? cleanUserNotes
+              : `[نوع التصوير: ${imagingModality.toUpperCase()} | المنطقة: ${anatomicalRegion}] ${cleanUserNotes}`,
           }),
         });
 
         const contentType = response.headers.get('content-type') || '';
-        if (response.ok && contentType.includes('application/json')) {
+        if (contentType.includes('application/json')) {
           const data = await response.json();
-          if (data && data.isValidReport !== false && data.items && data.items.length > 0) {
+          if (data?.noApiKey) serverMissingKey = true;
+          if (response.ok && data && data.isValidReport !== false && Array.isArray(data.items) && data.items.length > 0) {
             setResult({ ...data, isValidReport: true });
             setEditableItems(data.items);
+            analyzedSuccessfully = true;
+          } else if (response.ok && data?.validationError === 'NOT_A_LAB_REPORT') {
+            setResult(data);
+            setEditableItems([]);
             analyzedSuccessfully = true;
           }
         }
@@ -853,20 +872,39 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
         console.warn('Lab/Imaging server fetch error, engaging OCR fallback:', fetchErr);
       }
 
-      // 2. Second attempt: Client-Side OCR with Tesseract.js for image lab reports (skip PDF since Tesseract expects raster images)
-      if (!analyzedSuccessfully && activeDataUrl && analysisType === 'lab' && mimeType !== 'application/pdf') {
+      // 2. Second attempt: Client-Side OCR with Tesseract.js for image reports
+      if (!analyzedSuccessfully && activeDataUrl && mimeType !== 'application/pdf') {
         try {
-          setOcrStatus('جاري تحسين تباين الصورة واستخراج نتائج الفحوصات عبر محرك OCR المباشر...');
+          setOcrStatus(
+            analysisType === 'lab'
+              ? 'جاري تحسين تباين الصورة واستخراج نتائج الفحوصات عبر محرك OCR المباشر...'
+              : 'جاري فحص الصورة بحثاً عن تقرير إشعاعي مطبوع...'
+          );
           const ocrReadyImage = await enhanceImageForMedicalOcr(activeDataUrl);
           const ocrRes = await Tesseract.recognize(ocrReadyImage, 'eng');
-          const ocrText = ocrRes?.data?.text || '';
-          if (ocrText.trim().length > 0) {
-            const combinedOcrText = [ocrText, customPrompt, textNotes].filter(Boolean).join('\n');
-            const parsedOcrReport = parseClinicalReportFromText(combinedOcrText, getPatientDemographicsObj());
-            if (parsedOcrReport && parsedOcrReport.items && parsedOcrReport.items.length > 0) {
-              setResult({ ...parsedOcrReport, isValidReport: true });
-              setEditableItems(parsedOcrReport.items);
-              analyzedSuccessfully = true;
+          const ocrText = (ocrRes?.data?.text || '').trim();
+          if (ocrText.length > 0) {
+            if (analysisType === 'lab') {
+              const combinedOcrText = [ocrText, customPrompt].filter(Boolean).join('\n');
+              const parsedOcrReport = parseClinicalReportFromText(combinedOcrText, getPatientDemographicsObj());
+              if (parsedOcrReport && parsedOcrReport.items && parsedOcrReport.items.length > 0) {
+                setTextNotes(ocrText);
+                setResult({ ...parsedOcrReport, isValidReport: true });
+                setEditableItems(parsedOcrReport.items);
+                analyzedSuccessfully = true;
+              }
+            } else {
+              const parsedRadReport = parseRadiologyReportFromText(
+                [ocrText, customPrompt].filter(Boolean).join('\n'),
+                imagingModality,
+                anatomicalRegion
+              );
+              if (parsedRadReport && parsedRadReport.items.length > 0) {
+                setTextNotes(ocrText);
+                setResult({ ...parsedRadReport, isValidReport: true });
+                setEditableItems(parsedRadReport.items);
+                analyzedSuccessfully = true;
+              }
             }
           }
         } catch (ocrErr) {
@@ -876,20 +914,29 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
         }
       }
 
-      // 3. Third attempt: User text notes or prompt
-      if (!analyzedSuccessfully && analysisType === 'lab') {
-        const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n');
-        if (combinedText.trim().length > 0) {
-          const parsedReport = parseClinicalReportFromText(combinedText, getPatientDemographicsObj());
-          if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
-            setResult({ ...parsedReport, isValidReport: true });
-            setEditableItems(parsedReport.items);
-            analyzedSuccessfully = true;
+      // 3. Third attempt: User typed/pasted report text notes
+      if (!analyzedSuccessfully) {
+        const combinedText = [customPrompt, textNotes].filter(Boolean).join('\n').trim();
+        if (combinedText.length > 0) {
+          if (analysisType === 'lab') {
+            const parsedReport = parseClinicalReportFromText(combinedText, getPatientDemographicsObj());
+            if (parsedReport && parsedReport.items && parsedReport.items.length > 0) {
+              setResult({ ...parsedReport, isValidReport: true });
+              setEditableItems(parsedReport.items);
+              analyzedSuccessfully = true;
+            }
+          } else {
+            const parsedRad = parseRadiologyReportFromText(combinedText, imagingModality, anatomicalRegion);
+            if (parsedRad && parsedRad.items.length > 0) {
+              setResult({ ...parsedRad, isValidReport: true });
+              setEditableItems(parsedRad.items);
+              analyzedSuccessfully = true;
+            }
           }
         }
       }
 
-      // 4. If nothing was extracted: NEVER hallucinate or return fake canned tests!
+      // 4. If nothing was extracted: NEVER hallucinate or return fake canned tests/diagnoses!
       if (!analyzedSuccessfully) {
         if (analysisType === 'lab') {
           setResult({
@@ -898,10 +945,12 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
             clinicalSummaryTitle: 'تعذر استخراج أرقام الفحص بدقة من الصورة المرفوعة',
             urgencyLevel: 'normal',
             items: [],
-            detailedExplanation: 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح تام من هذه الصورة (قد يكون ذلك بسبب زاوية الالتقاط، ضعف الإضاءة، أو انخفاض دقة الكاميرا).\n\nلتفادي أي نتائج عشوائية أو غير دقيقة، يرجى استخدام جدول الفحوصات أدناه لتأكيد أو كتابة قيمك وسيقوم النظام بتشخيصها فسيولوجياً فوراً.',
+            detailedExplanation: serverMissingKey
+              ? 'مفتاح الرؤية الذكية على الخادم غير مفعّل لقراءة الصور المعقدة مباشرة، كما تعذر استخراج كل المؤشرات بدقة عبر قارئ المتصفح المحلي.\n\nلتفادي أي نتائج عشوائية، يمكنك استخدام «الإدخال اليدوي» أو لصق القيم نصياً للحصول على تفسير فسيولوجي دقيق فوراً.'
+              : 'لم يتمكن المحلل الآلي من استخراج أسماء الفحوصات وقيمها المرجعية بوضوح تام من هذه الصورة (قد يكون ذلك بسبب زاوية الالتقاط، ضعف الإضاءة، أو انخفاض دقة الكاميرا).\n\nلتفادي أي نتائج عشوائية أو غير دقيقة، يرجى استخدام جدول الفحوصات أدناه لتأكيد أو كتابة قيمك وسيقوم النظام بتشخيصها فسيولوجياً فوراً.',
             recommendations: [
               'إعادة التقاط صورة مستقيمة وعالية الوضوح لورقة التحليل الطبي.',
-              'يمكنك إدخال نتائج الفحص يدوياً في جدول النتائج أدناه للحصول على تفسير سريري مطابق لتحليلك.'
+              'استخدام تبويب «إدخال النتائج يدوياً» لكتابة قيمك ومطابقتها بالمدى المرجعي حسب الجنس والعمر.'
             ]
           });
           setEditableItems([]);
@@ -910,13 +959,17 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
           setResult({
             isValidReport: false,
             testName: 'فحص وتصوير إشعاعي',
-            clinicalSummaryTitle: 'الصورة الشعاعية بحاجة لتوضيح إضافي أو فحص سريري',
+            clinicalSummaryTitle: serverMissingKey
+              ? 'يتطلب تحليل صور الأشعة بالرؤية الذكية تفعيل GEMINI_API_KEY على الخادم'
+              : 'الصورة الشعاعية بحاجة لتوضيح إضافي أو لصق تقرير طبيب الأشعة',
             urgencyLevel: 'normal',
             items: [],
-            detailedExplanation: 'لم يتمكن المحلل الآلي من تحديد الموجودات الإشعاعية بدقة من زاوية الصورة المرفقة. يرجى توضيح الشكوى السريرية في خانة الملاحظات.',
+            detailedExplanation: serverMissingKey
+              ? 'لضمان الدقة الطبية وعدم اختلاق أي تشخيص افتراضي لصور الأشعة السينية أو المقطعية أو الرنين، يتطلب تحليل الصور الشعاعية تفعيل مفتاح GEMINI_API_KEY في متغيرات البيئة بالخادم، أو يمكنك تصوير/لصق التقرير النصي المكتوب لطبيب الأشعة لتفسيره فوراً.'
+              : 'لم يتمكن المحلل الآلي من تحديد الموجودات الإشعاعية بدقة من زاوية الصورة المرفقة. يرجى توضيح الشكوى السريرية أو لصق نص تقرير الأشعة في خانة الملاحظات.',
             recommendations: [
-              'إعادة رفع صورة الأشعة بوضوح وإضاءة خلفية جيدة.',
-              'تدوين تقرير طبيب الأشعة أو سبب الفحص في خانة الملاحظات.'
+              'إذا كان لديك تقرير مكتوب من طبيب الأشعة، الصقه في خانة الملاحظات أو ارفع صورته لتفسيره فوراً.',
+              'عند التشغيل على Vercel، تأكد من إضافة GEMINI_API_KEY في Environment Variables لتفعيل قراءة صور الأشعة بالرؤية الذكية.'
             ]
           });
           setEditableItems([]);

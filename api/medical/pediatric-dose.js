@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey && drugName && drugName.trim().length > 1) {
-    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+    const candidateModels = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
     const prompt = `You are a clinical pediatric pharmacist following BNF for Children (BNFC) and AAP guidelines.
 Calculate the exact, safe pediatric dose for:
 - Drug: "${drugName}"
