@@ -20,7 +20,11 @@ import {
   X
 } from 'lucide-react';
 import { DrugInfo, SubscriptionTier } from '../types';
-import { getAllSeededDrugs, synthesizeDrugMonograph } from '../data/universalDrugDirectory';
+import {
+  getAllSeededDrugs,
+  synthesizeDrugMonograph,
+  normalizeDrugSearchText
+} from '../data/universalDrugDirectory';
 import { Language } from '../utils/translations';
 
 const COMPREHENSIVE_CATALOG = getAllSeededDrugs();
@@ -42,7 +46,7 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [drugsList, setDrugsList] = useState<DrugInfo[]>(COMPREHENSIVE_CATALOG);
-  const [activeDrug, setActiveDrug] = useState<DrugInfo | null>(COMPREHENSIVE_CATALOG[0] || null);
+  const [activeDrug, setActiveDrug] = useState<DrugInfo | null>(null);
 
   const [isAiSearching, setIsAiSearching] = useState(false);
   const [cardLang, setCardLang] = useState<Language>(language);
@@ -80,51 +84,88 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       };
       activePat.prescriptions = [newRx, ...(activePat.prescriptions || [])];
       localStorage.setItem('dose_patient_roster', JSON.stringify(patients));
-      setPatientAddedToast(isAr ? `تمت إضافة ${drug.name_ar} إلى ملف المريض: ${activePat.fullName}` : `Added ${drug.name_en} to patient file: ${activePat.fullName}`);
+      setPatientAddedToast(
+        isAr ? `تمت إضافة ${drug.name_ar} إلى ملف المريض: ${activePat.fullName}` : `Added ${drug.name_en} to patient file: ${activePat.fullName}`
+      );
       setTimeout(() => setPatientAddedToast(null), 3500);
     } catch (e) {
       console.warn('Failed to add drug to patient profile:', e);
     }
   };
 
-  // Search across ALL drugs in catalog
-  const filteredDrugs = useMemo(() => {
-    if (!searchQuery.trim()) return drugsList;
+  // Ranked exact & normalized search strictly on Drug Names, Trade Names, and Aliases
+  const matchedDrugs = useMemo(() => {
+    const raw = searchQuery.trim();
+    if (!raw) return [];
 
-    const q = searchQuery.toLowerCase().trim();
-    return drugsList.filter(drug => {
-      const inAliases = (drug.aliases || []).some(a => a.toLowerCase().includes(q));
-      const inTrade = (drug.trade_names || []).some(t => t.toLowerCase().includes(q));
-      const inIndicationsAr = (drug.indications_ar || []).some(ind => ind.toLowerCase().includes(q));
-      const inIndicationsEn = (drug.indications_en || []).some(ind => ind.toLowerCase().includes(q));
+    const qNorm = normalizeDrugSearchText(raw);
+    if (!qNorm) return [];
 
-      return (
-        drug.name_ar.toLowerCase().includes(q) ||
-        drug.name_en.toLowerCase().includes(q) ||
-        drug.class_ar.toLowerCase().includes(q) ||
-        drug.class_en.toLowerCase().includes(q) ||
-        inAliases ||
-        inTrade ||
-        inIndicationsAr ||
-        inIndicationsEn
-      );
-    });
-  }, [drugsList, searchQuery]);
+    const scored: { drug: DrugInfo; score: number }[] = [];
+    const seenCoreNames = new Set<string>();
 
-  // Automatically highlight and display top matching detailed drug result while searching
-  useEffect(() => {
-    if (searchQuery.trim() && filteredDrugs.length > 0) {
-      if (!activeDrug || !filteredDrugs.some(d => d.id === activeDrug.id)) {
-        setActiveDrug(filteredDrugs[0]);
+    for (const drug of drugsList) {
+      const fields = [
+        drug.name_ar,
+        drug.name_en,
+        ...(drug.trade_names || []),
+        ...(drug.aliases || [])
+      ].filter(Boolean);
+
+      let bestScore = 0;
+      for (const f of fields) {
+        const fNorm = normalizeDrugSearchText(f);
+        if (!fNorm) continue;
+
+        if (fNorm === qNorm) {
+          bestScore = Math.max(bestScore, 100);
+        } else if (fNorm.startsWith(qNorm)) {
+          bestScore = Math.max(bestScore, 80);
+        } else if (fNorm.split(' ').some(w => w.startsWith(qNorm))) {
+          bestScore = Math.max(bestScore, 65);
+        } else if (qNorm.length >= 3 && fNorm.includes(qNorm)) {
+          bestScore = Math.max(bestScore, 45);
+        } else if (fNorm.length >= 4 && qNorm.includes(fNorm)) {
+          bestScore = Math.max(bestScore, 35);
+        }
+      }
+
+      if (bestScore > 0) {
+        // Prefer richer clinical monograph entries over short pediatric duplicates
+        const hasRichDetails = Boolean(drug.mechanism_ar && drug.adult_dosage_text_ar);
+        const coreKey = normalizeDrugSearchText(drug.name_en).split(' ')[0];
+        if (seenCoreNames.has(coreKey) && !hasRichDetails) continue;
+        seenCoreNames.add(coreKey);
+
+        scored.push({
+          drug,
+          score: bestScore + (hasRichDetails ? 5 : 0)
+        });
       }
     }
-  }, [searchQuery, filteredDrugs]);
 
-  // Fallback to OpenFDA API directly if backend is offline or empty
+    return scored.sort((a, b) => b.score - a.score).map(item => item.drug);
+  }, [drugsList, searchQuery]);
+
+  // Display top matching drug immediately when searching
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      return;
+    }
+    if (matchedDrugs.length > 0) {
+      if (!activeDrug || !matchedDrugs.some(d => d.id === activeDrug.id)) {
+        setActiveDrug(matchedDrugs[0]);
+      }
+    }
+  }, [searchQuery, matchedDrugs]);
+
+  // Timeout-safe OpenFDA fallback
   const searchOpenFdaFallback = async (term: string): Promise<DrugInfo | null> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3200);
     try {
       const url = `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(term)}"+openfda.brand_name:"${encodeURIComponent(term)}"&limit=1`;
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: controller.signal });
       if (!res.ok) return null;
       const json = await res.json();
       if (!json.results || json.results.length === 0) return null;
@@ -144,7 +185,7 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       const lactationText = item.nursing_mothers?.[0]?.slice(0, 240);
       const overdosageText = item.overdosage?.[0]?.slice(0, 240);
 
-      const fdaDrug: DrugInfo = {
+      return {
         id: `fda_${Date.now()}`,
         name_ar: genericName,
         name_en: genericName,
@@ -183,24 +224,34 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
         pharmacist_advice_ar: 'التزم بالجرعة وتوقيت تناول الدواء المعتمدين من الطبيب والصيدلاني.',
         pharmacist_advice_en: 'Follow prescribed dosing schedule and consult pharmacist before combining therapies.'
       };
-      return fdaDrug;
-    } catch (e) {
-      console.warn('OpenFDA fallback error:', e);
+    } catch {
       return null;
+    } finally {
+      clearTimeout(timer);
     }
   };
 
-  // Real-time Drug API Search
+  // Real-time Drug API Search with strict 4.5s timeout so it never hangs
   const handleApiDrugSearch = async (queryToSearch?: string) => {
     const term = (queryToSearch ?? searchQuery).trim();
     if (!term) return;
 
-    // If local exact/matching drug exists and search was triggered cleanly, focus it
+    // If an exact/strong local match already exists, display it immediately
+    if (matchedDrugs.length > 0 && !queryToSearch) {
+      setActiveDrug(matchedDrugs[0]);
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
     setIsAiSearching(true);
+    const controller = new AbortController();
+    const apiTimer = setTimeout(() => controller.abort(), 4500);
+
     try {
       const response = await fetch('/api/drugs/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           query: term,
           lang: language,
@@ -218,6 +269,7 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
             return [...toAdd, ...prev];
           });
           setActiveDrug(newDrugs[0]);
+          detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           return;
         }
       }
@@ -226,6 +278,7 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       if (fdaResult) {
         setDrugsList(prev => [fdaResult, ...prev]);
         setActiveDrug(fdaResult);
+        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         return;
       }
 
@@ -241,50 +294,56 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
         setActiveDrug(synthesized);
         return [synthesized, ...prev];
       });
-    } catch (err) {
-      console.error('Drug API Search failed, synthesizing monograph:', err);
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
       const synthesized = synthesizeDrugMonograph(term);
       setDrugsList(prev => [synthesized, ...prev]);
       setActiveDrug(synthesized);
     } finally {
+      clearTimeout(apiTimer);
       setIsAiSearching(false);
     }
   };
 
-  // Auto-search when user types 3+ letters and no local match found
+  // Auto-search only after user pauses (>=900ms) typing 4+ chars with 0 local matches
   useEffect(() => {
     const term = searchQuery.trim();
-    if (term.length >= 3 && filteredDrugs.length === 0 && !isAiSearching) {
+    if (term.length >= 4 && matchedDrugs.length === 0 && !isAiSearching) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         handleApiDrugSearch(term);
-      }, 600);
+      }, 900);
     }
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [searchQuery, filteredDrugs.length]);
+  }, [searchQuery, matchedDrugs.length]);
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      if (filteredDrugs.length > 0) {
-        setActiveDrug(filteredDrugs[0]);
-        detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      } else {
-        handleApiDrugSearch();
-      }
+  const handleSearchTrigger = () => {
+    if (!searchQuery.trim()) return;
+    if (matchedDrugs.length > 0) {
+      setActiveDrug(matchedDrugs[0]);
+      detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      handleApiDrugSearch(searchQuery.trim());
     }
   };
 
-  const handleSelectDrug = (drug: DrugInfo) => {
-    setActiveDrug(drug);
-    detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleSearchTrigger();
+    }
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setActiveDrug(null);
   };
 
   return (
-    <div id="drug-catalog-container" className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5" dir={isAr ? 'rtl' : 'ltr'}>
+    <div id="drug-catalog-container" className="w-full max-w-5xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5" dir={isAr ? 'rtl' : 'ltr'}>
 
-      {/* Clean Focused Search Bar Only (No extra options/dropdowns/clutter) */}
+      {/* Pure Focused Search Box Only (No suggestions, no dropdowns, no extra lists) */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center text-emerald-400 shrink-0">
@@ -304,14 +363,14 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={isAr ? 'ابحث عن أي دواء بالاسم العربي أو الإنجليزي أو التجاري...' : 'Search any drug by generic or brand name...'}
+              placeholder={isAr ? 'اكتب اسم الدواء بالعربية أو الإنجليزية أو الاسم التجاري...' : 'Enter generic or brand drug name...'}
               className={`w-full min-h-[52px] bg-slate-950 border border-slate-700 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-400 rounded-xl ${isAr ? 'pr-11 pl-12' : 'pl-11 pr-12'} py-3 text-sm sm:text-base text-white placeholder-slate-500 outline-none transition-all`}
             />
             {searchQuery && (
               <button
                 type="button"
                 id="btn-clear-drug-search"
-                onClick={() => setSearchQuery('')}
+                onClick={handleClearSearch}
                 className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer`}
                 aria-label={isAr ? 'مسح البحث' : 'Clear search'}
               >
@@ -323,16 +382,9 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
           <button
             type="button"
             id="btn-trigger-api-drug-search"
-            onClick={() => {
-              if (filteredDrugs.length > 0) {
-                setActiveDrug(filteredDrugs[0]);
-                detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else {
-                handleApiDrugSearch();
-              }
-            }}
+            onClick={handleSearchTrigger}
             disabled={isAiSearching || !searchQuery.trim()}
-            className="min-h-[52px] px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 disabled:opacity-45 disabled:cursor-not-allowed text-slate-950 text-sm sm:text-base font-black shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0"
+            className="min-h-[52px] px-7 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 disabled:opacity-45 disabled:cursor-not-allowed text-slate-950 text-sm sm:text-base font-black shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 transition-all cursor-pointer shrink-0"
           >
             {isAiSearching ? (
               <>
@@ -347,41 +399,13 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
             )}
           </button>
         </div>
-
-        {/* Multiple matching results quick selector (shown only when search returns >1 match) */}
-        {searchQuery.trim() !== '' && filteredDrugs.length > 1 && (
-          <div className="pt-2 border-t border-slate-800 space-y-2">
-            <span className="text-xs font-bold text-slate-400 block">
-              {isAr ? `النتائج المطابقة (${filteredDrugs.length}):` : `Matching results (${filteredDrugs.length}):`}
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {filteredDrugs.map((d) => {
-                const selected = activeDrug?.id === d.id;
-                return (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => handleSelectDrug(d)}
-                    className={`min-h-[42px] px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
-                      selected
-                        ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md'
-                        : 'bg-slate-950 hover:bg-emerald-950/40 text-slate-200 border-slate-800 hover:border-emerald-500/40'
-                    }`}
-                  >
-                    {isAr ? d.name_ar : d.name_en}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Detailed Drug Monograph Card (Appears immediately under search box) */}
+      {/* Detailed Drug Monograph Card (Appears cleanly as soon as drug is found) */}
       <div ref={detailRef} id="drug-detail-view">
         {activeDrug ? (
           <div className="bg-slate-900 border border-emerald-500/35 rounded-2xl p-4 sm:p-6 shadow-xl space-y-5">
-            {/* Clean Drug Header */}
+            {/* Drug Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
               <div className="space-y-1">
                 <div className="text-xs font-bold text-emerald-400">
@@ -467,7 +491,7 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
               </div>
             )}
 
-            {/* Complete Detailed Clinical Monograph Rows */}
+            {/* Full Detailed Clinical Monograph */}
             <div className="bg-slate-950/85 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800/80 text-xs sm:text-sm text-slate-200">
               {/* Brand & Trade Names */}
               <div className="p-4 flex flex-col sm:flex-row sm:items-start gap-2">
@@ -739,82 +763,43 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
                 </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-            <Pill className="w-10 h-10 mx-auto mb-2 opacity-40" />
-            <p className="text-sm font-bold text-slate-200">
-              {isAr ? 'ابحث عن أي دواء لعرض تفاصيله السريرية الكاملة' : 'Search any medication to display full clinical details'}
-            </p>
-          </div>
-        )}
-      </div>
 
-      {/* All Drugs Directory Grid */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl space-y-4">
-        <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-800">
-          <h3 className="text-sm sm:text-base font-bold text-white">
-            {searchQuery.trim()
-              ? (isAr ? 'نتائج البحث' : 'Search Results')
-              : (isAr ? 'جميع الأدوية' : 'All Medications')}
-          </h3>
-          <span className="text-xs font-bold text-emerald-400 tabular-nums">
-            {filteredDrugs.length} {isAr ? 'دواء' : 'drugs'}
-          </span>
-        </div>
-
-        {filteredDrugs.length === 0 ? (
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-6 text-center space-y-3">
-            <Pill className="w-10 h-10 text-slate-600 mx-auto" />
-            <p className="text-white font-bold text-sm">
-              {isAr ? `جاري البحث عن "${searchQuery}" أو اضغط بحث لإظهار النتيجة المفصلة` : `Click Search to retrieve "${searchQuery}"`}
-            </p>
-            {searchQuery.trim() && (
-              <button
-                type="button"
-                id="btn-auto-search-trigger"
-                onClick={() => handleApiDrugSearch()}
-                disabled={isAiSearching}
-                className="min-h-[48px] px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 text-sm font-black inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
-              >
-                {isAiSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                <span>{isAr ? `بحث عن "${searchQuery}"` : `Search "${searchQuery}"`}</span>
-              </button>
+            {/* Clean Stacked Switcher ONLY if 2-4 closely matching drug-name variants exist for this search */}
+            {searchQuery.trim() && matchedDrugs.length > 1 && (
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <span className="text-xs font-bold text-slate-400 block">
+                  {isAr ? 'أدوية أخرى مطابقة لبحثك:' : 'Other matching medications:'}
+                </span>
+                <div className="flex flex-col gap-2">
+                  {matchedDrugs
+                    .filter(d => d.id !== activeDrug.id)
+                    .slice(0, 4)
+                    .map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveDrug(d);
+                          detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }}
+                        className="w-full min-h-[46px] px-4 py-2.5 rounded-xl bg-slate-950 hover:bg-emerald-950/35 border border-slate-800 hover:border-emerald-500/40 text-right flex items-center justify-between gap-2 transition-all cursor-pointer"
+                      >
+                        <span className="text-sm font-bold text-white">{isAr ? d.name_ar : d.name_en}</span>
+                        <span className="text-xs font-mono text-emerald-400">{isAr ? d.name_en : d.name_ar}</span>
+                      </button>
+                    ))}
+                </div>
+              </div>
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {filteredDrugs.map((drug) => {
-              const isSelected = activeDrug?.id === drug.id;
-              return (
-                <button
-                  key={drug.id}
-                  type="button"
-                  id={`drug-item-${drug.id}`}
-                  onClick={() => handleSelectDrug(drug)}
-                  className={`min-h-[76px] p-3.5 rounded-xl border text-right transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                    isSelected
-                      ? 'bg-emerald-950/40 border-emerald-400 shadow-md shadow-emerald-500/15'
-                      : 'bg-slate-950/80 border-slate-800 hover:bg-slate-800/70 hover:border-emerald-500/40'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2 w-full">
-                    <div className="text-right">
-                      <div className="font-bold text-white text-sm leading-snug">
-                        {isAr ? drug.name_ar : drug.name_en}
-                      </div>
-                      <div className="text-emerald-400 font-mono text-xs">
-                        {isAr ? drug.name_en : drug.name_ar}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-slate-400 text-xs line-clamp-1 w-full">
-                    {isAr ? drug.class_ar : drug.class_en}
-                  </div>
-                </button>
-              );
-            })}
+          <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-8 sm:p-12 text-center space-y-2">
+            <Pill className="w-10 h-10 mx-auto text-emerald-400/70" />
+            <p className="text-sm sm:text-base font-bold text-slate-200">
+              {isAr
+                ? 'اكتب اسم أي دواء في خانة البحث بالأعلى لعرض النشرة السريرية الكاملة'
+                : 'Enter any medication name above to display its complete clinical monograph'}
+            </p>
           </div>
         )}
       </div>

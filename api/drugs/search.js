@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   let source = 'Dose Clinical Compendium (Vercel Serverless)';
 
   if (apiKey) {
-    const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    const candidateModels = ['gemini-2.5-flash'];
     const prompt = `You are a Senior Clinical Pharmacist and Board-Certified Pharmacotherapy Specialist (BCPS).
 A healthcare provider or patient is searching for drug information for query: "${cleanQuery}".
 Language preference is: "${lang === 'en' ? 'English' : 'Arabic'}".
@@ -100,6 +100,7 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(5500),
             body: JSON.stringify({
               contents: [{ parts: [{ text: prompt }] }],
               generationConfig: {
@@ -142,7 +143,7 @@ Each drug MUST contain thorough details in BOTH Arabic and English so the user c
   if (aiDrugs.length === 0) {
     try {
       const fdaUrl = `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(cleanQuery)}"+openfda.brand_name:"${encodeURIComponent(cleanQuery)}"&limit=1`;
-      const fdaRes = await fetch(fdaUrl);
+      const fdaRes = await fetch(fdaUrl, { signal: AbortSignal.timeout(3500) });
       if (fdaRes.ok) {
         const fdaData = await fdaRes.json();
         if (fdaData.results && fdaData.results.length > 0) {

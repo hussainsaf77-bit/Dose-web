@@ -2,27 +2,58 @@ import { DrugInfo } from '../types';
 import { MASTER_CLINICAL_DRUGS } from './masterClinicalDrugs';
 import { MEDICAL_DRUGS_DB } from './medicalData';
 import { EXTENDED_PEDIATRIC_DRUGS } from './pediatricDrugData';
+import { EXPANDED_CLINICAL_DRUGS } from './expandedClinicalDrugs';
+
+export function normalizeDrugSearchText(input: string): string {
+  return (input || '')
+    .replace(/[\u064B-\u065F\u0670]/g, '') // strip Arabic diacritics
+    .replace(/[أإآٱ]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .replace(/ؤ/g, 'و')
+    .replace(/ئ/g, 'ي')
+    .toLowerCase()
+    .replace(/[-_/+().,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 // Map of pre-indexed clinical monographs
 const DIRECTORY_MAP = new Map<string, DrugInfo>();
 
+function indexDrugKeys(drug: DrugInfo) {
+  const keys = [
+    drug.id,
+    drug.name_ar,
+    drug.name_en,
+    ...(drug.aliases || []),
+    ...(drug.trade_names || [])
+  ];
+  for (const k of keys) {
+    if (!k) continue;
+    const rawLower = k.toLowerCase().trim();
+    const norm = normalizeDrugSearchText(k);
+    if (rawLower && !DIRECTORY_MAP.has(rawLower)) DIRECTORY_MAP.set(rawLower, drug);
+    if (norm && !DIRECTORY_MAP.has(norm)) DIRECTORY_MAP.set(norm, drug);
+  }
+}
+
 // Seed with MASTER_CLINICAL_DRUGS
 for (const drug of MASTER_CLINICAL_DRUGS) {
-  DIRECTORY_MAP.set(drug.id.toLowerCase(), drug);
-  DIRECTORY_MAP.set(drug.name_ar.toLowerCase(), drug);
-  DIRECTORY_MAP.set(drug.name_en.toLowerCase(), drug);
-  (drug.aliases || []).forEach(a => DIRECTORY_MAP.set(a.toLowerCase(), drug));
-  (drug.trade_names || []).forEach(t => DIRECTORY_MAP.set(t.toLowerCase(), drug));
+  indexDrugKeys(drug);
+}
+
+// Seed with EXPANDED_CLINICAL_DRUGS
+for (const drug of EXPANDED_CLINICAL_DRUGS) {
+  if (!DIRECTORY_MAP.has(drug.id.toLowerCase())) {
+    indexDrugKeys(drug);
+  }
 }
 
 // Seed with MEDICAL_DRUGS_DB
 for (const drug of MEDICAL_DRUGS_DB) {
   if (!DIRECTORY_MAP.has(drug.id.toLowerCase())) {
-    DIRECTORY_MAP.set(drug.id.toLowerCase(), drug);
-    DIRECTORY_MAP.set(drug.name_ar.toLowerCase(), drug);
-    DIRECTORY_MAP.set(drug.name_en.toLowerCase(), drug);
-    (drug.aliases || []).forEach(a => DIRECTORY_MAP.set(a.toLowerCase(), drug));
-    (drug.trade_names || []).forEach(t => DIRECTORY_MAP.set(t.toLowerCase(), drug));
+    indexDrugKeys(drug);
   }
 }
 
@@ -40,11 +71,11 @@ for (const ped of EXTENDED_PEDIATRIC_DRUGS) {
       class_en: ped.class_en,
       indications_ar: [ped.clinical_pearls_ar || 'علاج الالتهابات والاعتلالات السريرية المعتمدة للأطفال والبالغين'],
       indications_en: [ped.clinical_pearls_en || 'Clinical indications according to approved medical references'],
-      adult_dosage_text_ar: ped.max_daily_adult_mg 
-        ? `الحد الأقصى اليومي المسموح للبالغين: ${ped.max_daily_adult_mg} مجم/يوم (بحسب التوجيه الطبي).` 
+      adult_dosage_text_ar: ped.max_daily_adult_mg
+        ? `الحد الأقصى اليومي المسموح للبالغين: ${ped.max_daily_adult_mg} مجم/يوم (بحسب التوجيه الطبي).`
         : 'راجع إرشادات الجرعات السريرية للبالغين حسب العمر والوزن.',
-      adult_dosage_text_en: ped.max_daily_adult_mg 
-        ? `Adult maximum daily cap: ${ped.max_daily_adult_mg} mg/day.` 
+      adult_dosage_text_en: ped.max_daily_adult_mg
+        ? `Adult maximum daily cap: ${ped.max_daily_adult_mg} mg/day.`
         : 'Refer to clinical weight-based dosing guidelines.',
       pediatric_dosage_text_ar: `للأطفال: ${ped.mpk_min}-${ped.mpk_max} مجم/كجم/يوم مقسمة على ${ped.doses_per_day} جرعات (كل ${ped.interval_hours} ساعة). التركيز المعتاد: ${ped.default_conc} مجم.`,
       pediatric_dosage_text_en: `Pediatric dose: ${ped.mpk_min}-${ped.mpk_max} mg/kg/day divided in ${ped.doses_per_day} doses (every ${ped.interval_hours} hours). Concentration: ${ped.default_conc} mg.`,
@@ -72,13 +103,11 @@ for (const ped of EXTENDED_PEDIATRIC_DRUGS) {
       pharmacist_advice_ar: 'التزم بمدة العلاج الموصوفة كاملة واستخدم أداة قياس دقيقة وتجنب إعطاء الدواء بالملاعق المنزلية.'
     };
     DIRECTORY_MAP.set(key, converted);
-    DIRECTORY_MAP.set(ped.name_ar.toLowerCase(), converted);
-    DIRECTORY_MAP.set(ped.name_en.toLowerCase(), converted);
-    (ped.trade_names || []).forEach(t => DIRECTORY_MAP.set(t.toLowerCase(), converted));
+    indexDrugKeys(converted);
   }
 }
 
-// Return deduplicated array of all seeded clinical drugs (+100 drugs)
+// Return deduplicated array of all seeded clinical drugs (200+ drugs)
 export function getAllSeededDrugs(): DrugInfo[] {
   const unique = new Map<string, DrugInfo>();
   for (const drug of DIRECTORY_MAP.values()) {
@@ -91,16 +120,22 @@ export function getAllSeededDrugs(): DrugInfo[] {
 export function synthesizeDrugMonograph(query: string): DrugInfo {
   const q = query.trim();
   const qLower = q.toLowerCase();
+  const qNorm = normalizeDrugSearchText(q);
 
-  // If already directly found
+  // If already directly found (raw or Arabic-normalized)
   if (DIRECTORY_MAP.has(qLower)) {
     return DIRECTORY_MAP.get(qLower)!;
   }
+  if (qNorm && DIRECTORY_MAP.has(qNorm)) {
+    return DIRECTORY_MAP.get(qNorm)!;
+  }
 
-  // Partial match in directory
-  for (const [k, d] of DIRECTORY_MAP.entries()) {
-    if (k.includes(qLower) || qLower.includes(k)) {
-      return d;
+  // Partial match in directory (only if query >= 3 chars to avoid false single-letter hits)
+  if (qNorm.length >= 3) {
+    for (const [k, d] of DIRECTORY_MAP.entries()) {
+      if (k.includes(qNorm) || (k.length >= 4 && qNorm.includes(k))) {
+        return d;
+      }
     }
   }
 
