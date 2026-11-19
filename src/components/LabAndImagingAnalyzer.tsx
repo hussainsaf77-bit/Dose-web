@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   FileText, Upload, Sparkles, AlertCircle, CheckCircle2, ShieldAlert,
-  ArrowRight, Eye, RefreshCw, Search, ListFilter, Camera, Copy, Check,
+  ArrowRight, RefreshCw, Search, ListFilter, Camera, Copy, Check,
   Info, ChevronRight, Activity, BookOpen, Layers, Download, CheckCircle,
   HelpCircle, Filter, Edit3, Plus, Trash2
 } from 'lucide-react';
@@ -14,6 +14,7 @@ import { MANUAL_LAB_TEST_OPTIONS, UserManualRow, getTestRefRangeForPatient, Pati
 import { evaluateUserManualLabRows } from '../utils/manualLabEvaluator';
 
 interface LabAndImagingAnalyzerProps {
+  lockedMode?: 'lab' | 'imaging';
   userTier?: SubscriptionTier;
   telegramId?: string;
   onUpgradeClick?: () => void;
@@ -342,13 +343,20 @@ export const LAB_PANELS: LabPanelInfo[] = [
 ];
 
 export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
+  lockedMode,
   userTier = 'pro',
   telegramId = '1001',
   onUpgradeClick,
 }) => {
-  const [analysisType, setAnalysisType] = useState<'lab' | 'imaging'>('lab');
-  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('manual');
+  const [analysisType, setAnalysisType] = useState<'lab' | 'imaging'>(lockedMode || 'lab');
+  const [labSubMode, setLabSubMode] = useState<'image_ocr' | 'manual' | 'catalog'>('image_ocr');
   const [selectedLabCategory, setSelectedLabCategory] = useState<string>('all');
+
+  useEffect(() => {
+    if (lockedMode) {
+      setAnalysisType(lockedMode);
+    }
+  }, [lockedMode]);
 
   useEffect(() => {
     const syncFromHash = () => {
@@ -357,22 +365,22 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
       if (qIdx === -1) return;
       const params = new URLSearchParams(h.slice(qIdx + 1));
       const mode = params.get('mode');
-      if (mode === 'imaging' || mode === 'xray') {
+      if (!lockedMode && (mode === 'imaging' || mode === 'xray')) {
         setAnalysisType('imaging');
         setResult(null);
       } else if (mode === 'ocr' || mode === 'image_ocr') {
-        setAnalysisType('lab');
+        if (!lockedMode) setAnalysisType('lab');
         setLabSubMode('image_ocr');
         setResult(null);
       } else if (mode === 'manual') {
-        setAnalysisType('lab');
+        if (!lockedMode) setAnalysisType('lab');
         setLabSubMode('manual');
       }
     };
     syncFromHash();
     window.addEventListener('hashchange', syncFromHash);
     return () => window.removeEventListener('hashchange', syncFromHash);
-  }, []);
+  }, [lockedMode]);
   const [imagingModality, setImagingModality] = useState<'xray' | 'ct' | 'mri' | 'ultrasound'>('xray');
   const [anatomicalRegion, setAnatomicalRegion] = useState<'chest' | 'brain' | 'spine' | 'joints' | 'abdomen'>('chest');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -429,67 +437,6 @@ export const LabAndImagingAnalyzer: React.FC<LabAndImagingAnalyzerProps> = ({
   const [catalogCategory, setCatalogCategory] = useState('all');
   const [selectedCatalogTest, setSelectedCatalogTest] = useState<LabTestItem | null>(null);
   const [customTestValue, setCustomTestValue] = useState('');
-
-  const sampleLabCases = [
-    { 
-      title: 'تقرير هرمونات ومقاومة إنسولين وفيتامين د ومخزون حديد', 
-      type: 'lab', 
-      labCategory: 'hormones', 
-      promptNotes: 'تقرير فحص مخبري: مقاومة الإنسولين HOMA-IR = 2.89 H، مخزون الحديد Ferritin < 5 L، وفيتامين د3 = 10.87 L. المطلوب: استخراج المؤشرات وتفسير الحالة.' 
-    },
-    { 
-      title: 'صورة تقرير مخبري رسمي (CBC & Chemistry - صورة تحليل)', 
-      type: 'lab', 
-      isImage: true, 
-      imageSrc: '/sample_lab_report.svg', 
-      labCategory: 'cbc', 
-      promptNotes: 'صورة تقرير فحص مخبري رسمي لمريض يشكو من شحوب وإرهاق. المطلوب: قراءة كامل المؤشرات من الصورة، وتحديد القيم المنخفضة والمرتفعة ومقارنتها بالمدى المرجعي وكتابة التقرير السريري والتوصيات.' 
-    },
-    { title: 'تحليل دم شامل (CBC) مع أنيميا نقص الحديد', type: 'lab', labCategory: 'cbc' },
-    { title: 'فحص وظائف كلى وسكر تراكمي وقصور ترشيح eGFR', type: 'lab', labCategory: 'kidney' },
-    { title: 'فحص وظائف الكبد وإنزيمات ALT/AST والصفراء', type: 'lab', labCategory: 'liver' },
-    { title: 'فحص دهون الدم والكوليسترول وأمراض الشرايين', type: 'lab', labCategory: 'lipids' },
-    { title: 'فحص الغدة الدرقية TSH وفيتامين د وفيتامين B12', type: 'lab', labCategory: 'thyroid' },
-    { 
-      title: 'صورة أشعة: خلع حاد بمفصل الكتف (Shoulder Dislocation)', 
-      type: 'imaging', 
-      isImage: true, 
-      imageSrc: '/sample_dislocation.jpg', 
-      modality: 'xray', 
-      region: 'joints',
-      promptNotes: 'صورة أشعة سينية لمفصل الكتف الأيمن لمريض تعرض لسقوط حاد ويعاني من ألم شديد وعجز عن تحريك الذراع. المطلوب: فحص التموضع المفصلي وكتابة التقرير التشخيصي.' 
-    },
-    { 
-      title: 'صورة أشعة سينية للصدر (Chest X-Ray طبيعية وسليمة)', 
-      type: 'imaging', 
-      isImage: true, 
-      imageSrc: '/sample_xray.jpg', 
-      modality: 'xray', 
-      region: 'chest',
-      promptNotes: 'فحص صورة أشعة سينية للصدر (Chest X-Ray PA View) للتأكد من خلو الرئتين من الالتهاب والارتشاح وسلامة الظل القلبي.' 
-    },
-    { 
-      title: 'أشعة مقطعية للمخ (Brain CT: استبعاد النزف والجلطة الحادة)', 
-      type: 'imaging', 
-      modality: 'ct', 
-      region: 'brain',
-      promptNotes: 'أشعة مقطعية محوسبة للدماغ (Non-Contrast Brain CT) لمريض يشكو من صداع انفجاري مفاجئ مع تشوش بسيط. المطلوب: فحص كثافة النسيج الدماغي واستبعاد النزف داخل الجمجمة والجلطة.' 
-    },
-    { 
-      title: 'رنين مغناطيسي للفقرات القطنية (Lumbar MRI: فحص الديسك وعرق النسا)', 
-      type: 'imaging', 
-      modality: 'mri', 
-      region: 'spine',
-      promptNotes: 'تصوير بالرنين المغناطيسي للفقرات القطنية العجزية (L-Spine MRI T1/T2) لمريض يشكو من ألم أسفل الظهر يمتد للساق اليسرى. المطلوب: فحص انزلاق الأقراص الغضروفية L4-L5 وL5-S1 وتضيق القناة الشوكية.' 
-    },
-    { 
-      title: 'رنين مغناطيسي لمفصل الركبة (Knee MRI: فحص الرباط الصليبي والغضروف)', 
-      type: 'imaging', 
-      modality: 'mri', 
-      region: 'joints',
-      promptNotes: 'رنين مغناطيسي لمفصل الركبة بعد إصابة رياضية والتواء مفصلي حاد مع انصباب. المطلوب: فحص الرباط الصليبي الأمامي (ACL) والغضاريف الهلالية (Menisci).' 
-    },
-  ];
 
   // Filtered Lab Catalog Tests
   const filteredCatalogTests = useMemo(() => {
@@ -984,40 +931,6 @@ async function resizeImageForVision(dataUrl: string): Promise<string> {
     }
   };
 
-  const loadSample = async (sample: any) => {
-    setAnalysisType(sample.type);
-    if (sample.modality) setImagingModality(sample.modality);
-    if (sample.region) setAnatomicalRegion(sample.region);
-    if (sample.labCategory) setSelectedLabCategory(sample.labCategory);
-    setSelectedIsPdf(false);
-    setSelectedFileName(null);
-    setResult(null);
-    setErrorMsg(null);
-
-    if (sample.isImage && sample.imageSrc) {
-      try {
-        const res = await fetch(sample.imageSrc);
-        const blob = await res.blob();
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const dataUri = reader.result as string;
-          setPreviewUrl(dataUri);
-          setTextNotes(sample.promptNotes || `فحص صورة (${sample.title}).`);
-          handleRunAnalysis(sample.promptNotes, dataUri);
-        };
-        reader.readAsDataURL(blob);
-        return;
-      } catch (e) {
-        console.error('Failed to load sample image:', e);
-      }
-    }
-
-    setTextNotes(sample.promptNotes || `عينة تجريبية: ${sample.title}\nالمطلوب: فحص المؤشرات، وتحديد القيم غير الطبيعية مع المدى المرجعي، واقتراح التوصية الطبية.`);
-    setPreviewUrl(null);
-    setSelectedFile(null);
-    handleRunAnalysis(sample.promptNotes || `عينة تجريبية: ${sample.title}`);
-  };
-
   // Instant evaluation for a selected test from the catalog
   const handleEvaluateCatalogTest = (test: LabTestItem, userVal: string) => {
     if (!userVal.trim()) return;
@@ -1129,79 +1042,87 @@ ${recsText}
           <div>
             <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
               <Activity className="w-4 h-4" />
-              <span>التفسير المخبري والشعاعي السريري</span>
+              <span>
+                {analysisType === 'lab' ? 'التفسير المخبري السريري' : 'التفسير الشعاعي السريري'}
+              </span>
             </div>
-            <h2 className="text-2xl font-black text-white">المختبر والتحاليل الطبية وقراءة الأشعة</h2>
+            <h2 className="text-2xl font-black text-white">
+              {analysisType === 'lab' ? 'المختبر والتحاليل الطبية' : 'قراءة الأشعة والتصوير الطبي'}
+            </h2>
             <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              قراءة وتحليل صور التحاليل الطبية والأشعة أو الإدخال اليدوي للقيم ومقارنتها بالمعدلات المرجعية.
+              {analysisType === 'lab'
+                ? 'قراءة وتحليل صور تقارير التحاليل الطبية وملفات PDF أو الإدخال اليدوي للقيم ومقارنتها بالمعدلات المرجعية.'
+                : 'تحليل صور الأشعة السينية والمقطعية والرنين والموجات فوق الصوتية أو تفسير تقارير الأشعة المكتوبة.'}
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800 flex-wrap">
-            <button
-              onClick={() => { setAnalysisType('lab'); setResult(null); }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                analysisType === 'lab'
-                  ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🧪</span>
-              <span>المختبر والتحاليل</span>
-            </button>
-            <button
-              onClick={() => { setAnalysisType('imaging'); setResult(null); }}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                analysisType === 'imaging'
-                  ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <span>🩻</span>
-              <span>الأشعة والتصوير</span>
-            </button>
-          </div>
+          {!lockedMode && (
+            <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800 flex-wrap">
+              <button
+                onClick={() => { setAnalysisType('lab'); setResult(null); }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  analysisType === 'lab'
+                    ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>🧪</span>
+                <span>المختبر والتحاليل</span>
+              </button>
+              <button
+                onClick={() => { setAnalysisType('imaging'); setResult(null); }}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  analysisType === 'imaging'
+                    ? 'bg-teal-600 text-white shadow-md shadow-teal-600/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>🩻</span>
+                <span>الأشعة والتصوير</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Lab Sub-Modes */}
         {analysisType === 'lab' && (
-          <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-2">
+          <div className="mt-5 pt-4 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <button
               type="button"
               onClick={() => { setLabSubMode('image_ocr'); setErrorMsg(null); }}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`min-h-[48px] px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 labSubMode === 'image_ocr'
-                  ? 'bg-teal-600/20 text-teal-300 border border-teal-500/60 shadow-sm'
-                  : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                  : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
               }`}
             >
-              <Camera className="w-4 h-4 text-teal-400" />
-              <span>قراءة صورة / PDF بالذكاء الاصطناعي</span>
+              <Camera className={`w-4 h-4 shrink-0 ${labSubMode === 'image_ocr' ? 'text-slate-950' : 'text-emerald-400'}`} />
+              <span>قراءة صورة / PDF</span>
             </button>
 
             <button
               type="button"
               onClick={() => { setLabSubMode('manual'); setErrorMsg(null); }}
-              className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`min-h-[48px] px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 labSubMode === 'manual'
-                  ? 'bg-teal-600/20 text-teal-300 border border-teal-500/60 shadow-sm'
-                  : 'bg-slate-950/70 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                  : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
               }`}
             >
-              <Edit3 className="w-4 h-4 text-emerald-400" />
+              <Edit3 className={`w-4 h-4 shrink-0 ${labSubMode === 'manual' ? 'text-slate-950' : 'text-emerald-400'}`} />
               <span>إدخال النتائج يدوياً</span>
             </button>
 
             <button
               type="button"
               onClick={() => { setLabSubMode('catalog'); setErrorMsg(null); }}
-              className={`px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+              className={`min-h-[48px] px-4 py-3 rounded-xl text-xs sm:text-sm font-extrabold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
                 labSubMode === 'catalog'
-                  ? 'bg-slate-800 text-teal-300 border border-teal-500/50 shadow-sm'
-                  : 'bg-slate-950/40 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                  : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
               }`}
             >
-              <ListFilter className="w-3.5 h-3.5" />
+              <ListFilter className={`w-4 h-4 shrink-0 ${labSubMode === 'catalog' ? 'text-slate-950' : 'text-emerald-400'}`} />
               <span>الدليل المرجعي للتحاليل</span>
             </button>
           </div>
@@ -1215,196 +1136,15 @@ ${recsText}
           {analysisType === 'lab' && labSubMode === 'image_ocr' && (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                  <Upload className="w-4 h-4 text-teal-400" />
+                <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-emerald-400" />
                   <span>رفع صورة التحليل الطبي</span>
                 </h3>
-                <span className="text-[11px] text-teal-400 font-medium">استخراج كامل المؤشرات</span>
-              </div>
-
-              {/* 4-Pillar Recognition Criteria Banner */}
-              <div className="p-3 rounded-xl bg-teal-950/30 border border-teal-500/30 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-teal-400" />
-                    <span>المعيار الرباعي المعتمد للتعرف على التحليل (عربي / إنجليزي):</span>
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 text-[10px] text-slate-300">
-                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-center font-medium">
-                    <span className="text-teal-400 block font-bold">1. اسم الفحص</span>
-                    <span className="text-slate-400">(عربي / إنجليزي)</span>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-center font-medium">
-                    <span className="text-teal-400 block font-bold">2. نتيجة التحليل</span>
-                    <span className="text-slate-400">(رقمية أو نوعية)</span>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-center font-medium">
-                    <span className="text-teal-400 block font-bold">3. وحدة القياس</span>
-                    <span className="text-slate-400">(mg/dL, g/dL...)</span>
-                  </div>
-                  <div className="p-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-center font-medium">
-                    <span className="text-teal-400 block font-bold">4. المجال المرجعي</span>
-                    <span className="text-slate-400">(النطاق الطبيعي)</span>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-400 leading-tight">
-                  طالما يحتوي تقريرك على فحص مخبري واحد أو أكثر يحقق هذه المعايير (حتى لو كانت لقطة جزئية أو ثنائية اللغة)، سيتم التعرف عليه واستخراجه بنجاح.
-                </p>
-              </div>
-
-              {/* Instant 1-Click Clinical CMP Analyzer Button */}
-              {!previewUrl ? (
-                <div className="p-3 bg-gradient-to-r from-teal-950/90 via-slate-900 to-emerald-950/90 border-2 border-teal-500/60 rounded-xl space-y-2 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-xs font-bold text-white">
-                        تجربة نموذج فحص مخبري جاهز (الكيمياء الشاملة CMP):
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
-                      نموذج تجريبي
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-relaxed">
-                    فحص مؤشرات الكيمياء والأملاح النموذجية: ALT 315، AST 285، لاكتيك 3.8، بوتاسيوم 3.4، يوريا 6، صوديوم 139، كلوريد 104، بيكربونات 24، كرياتينين 0.9.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLabCategory('cmp_electrolytes');
-                      const text = 'Sodium: 139 (136 - 145 mmol/L)\nPotassium: 3.4 L (3.5 - 5.1 mmol/L)\nChloride: 104 (98 - 107 mmol/L)\nCO2: 24 (22 - 29 mmol/L)\nBlood Urea Nitrogen: 6 L (8 - 23 mg/dL)\nCreatinine: 0.9 (0.7 - 1.3 mg/dL)\nAST: 285 H (10 - 40 U/L)\nALT: 315 H (7 - 56 U/L)\nLactic Acid: 3.8 H (0.5 - 2.2 mmol/L)';
-                      setTextNotes(text);
-                      handleRunAnalysis(text);
-                    }}
-                    className="w-full py-2.5 px-3 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold rounded-lg text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Sparkles className="w-4 h-4 text-slate-950" />
-                    <span>⚡ تجربة الفحص بالنموذج الجاهز (9 مؤشرات)</span>
-                  </button>
-                </div>
-              ) : (
-                <div className="p-3.5 bg-gradient-to-r from-teal-950/90 via-slate-900 to-emerald-950/90 border-2 border-teal-500/60 rounded-xl space-y-3 shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-xs font-bold text-white">
-                        تم تحميل صورة ورقة التحليل الطبي بنجاح 📷
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/40">
-                      جاهز للقراءة والتحليل
-                    </span>
-                  </div>
-
-                  {/* Primary OCR & Vision Analysis Button for the user's real image */}
-                  <button
-                    type="button"
-                    onClick={() => handleRunAnalysis()}
-                    disabled={isAnalyzing}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black rounded-xl text-xs sm:text-sm shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  >
-                    {isAnalyzing ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
-                        <span>{ocrStatus || 'جاري استخراج وقراءة نتائج صورتك الطبية بدقة...'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-4 h-4 text-slate-950" />
-                        <span>🔍 بدء قراءة وتحليل صورة فحصك الطبي بالذكاء الاصطناعي (OCR)</span>
-                      </>
-                    )}
-                  </button>
-
-                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setLabSubMode('manual')}
-                      className="text-teal-400 hover:text-teal-300 flex items-center gap-1 font-semibold cursor-pointer"
-                    >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>الانتقال للميزة الثانية: الإدخال اليدوي المباشر للتحاليل</span>
-                    </button>
-                  </div>
-
-                  </div>
-              )}
-
-              {/* Patient Demographics Selector (Gender & Age) for Image OCR */}
-              <div className="p-3 bg-slate-950/90 rounded-xl border border-teal-500/40 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
-                    <span>👤 بيانات المريض (لتطبيق النطاق المرجعي الفسيولوجي):</span>
-                  </span>
-                  <span className="text-[10px] text-teal-400 bg-teal-950/70 px-2 py-0.5 rounded border border-teal-500/30">
-                    ضروري للأنيميا والكلى والهرمونات
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                  {/* Gender Selector */}
-                  <div className="sm:col-span-6 flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                    <span className="text-[11px] text-slate-400 font-medium px-2 shrink-0">الجنس:</span>
-                    <button
-                      type="button"
-                      onClick={() => handleGenderChange('female')}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        patientGender === 'female'
-                          ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-200 border border-rose-500/50 shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span>👩 أنثى</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleGenderChange('male')}
-                      className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                        patientGender === 'male'
-                          ? 'bg-gradient-to-r from-cyan-500/30 to-teal-500/30 text-cyan-200 border border-cyan-500/50 shadow-sm'
-                          : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      <span>👨 ذكر</span>
-                    </button>
-                  </div>
-
-                  {/* Age Input */}
-                  <div className="sm:col-span-6 flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
-                    <span className="text-[11px] text-slate-400 font-medium shrink-0">العمر:</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="120"
-                      value={patientAge}
-                      onChange={(e) => handleAgeChange(e.target.value)}
-                      placeholder="28"
-                      className="flex-1 bg-slate-950 border border-slate-700 focus:border-teal-400 rounded-lg px-2 py-1 text-xs text-center text-teal-300 font-mono font-bold outline-none"
-                    />
-                    <span className="text-xs text-slate-400 font-medium shrink-0">سنة</span>
-                    <div className="hidden sm:flex items-center gap-1">
-                      {['10', '28', '45', '65'].map(a => (
-                        <button
-                          key={a}
-                          type="button"
-                          onClick={() => handleAgeChange(a)}
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                            patientAge === a
-                              ? 'bg-teal-500 text-slate-950'
-                              : 'bg-slate-800 text-slate-400 hover:text-slate-200'
-                          }`}
-                        >
-                          {a}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <span className="text-[11px] text-emerald-400 font-semibold">قراءة ذكية دقيقة</span>
               </div>
 
               {/* Dropzone with Camera, Image & PDF */}
-              <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
+              <label className="border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 transition-all rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-emerald-950/15 hover:bg-emerald-950/25 group relative overflow-hidden">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1413,81 +1153,140 @@ ${recsText}
                   className="hidden"
                 />
                 {previewUrl ? (
-                  <div className="w-full text-center space-y-2">
+                  <div className="w-full text-center space-y-2.5">
                     {(selectedIsPdf || previewUrl.startsWith('data:application/pdf')) ? (
-                      <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
-                        <FileText className="w-10 h-10 text-teal-400" />
+                      <div className="p-4 rounded-xl bg-slate-900 border border-emerald-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
+                        <FileText className="w-10 h-10 text-emerald-400" />
                         <span className="text-xs font-bold text-white truncate max-w-full" dir="ltr">
                           {selectedFileName || selectedFile?.name || 'lab-report.pdf'}
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
-                          مستند PDF جاهز للقراءة الذكية
+                        <span className="text-[11px] text-emerald-300 font-semibold">
+                          مستند PDF جاهز للقراءة والتحليل
                         </span>
                       </div>
                     ) : (
                       <img
                         src={previewUrl}
                         alt="Preview"
-                        className="max-h-52 mx-auto rounded-lg object-contain border border-slate-800 shadow bg-white/5 p-1"
+                        className="max-h-52 mx-auto rounded-xl object-contain border border-emerald-500/30 shadow bg-white/5 p-1"
                       />
                     )}
-                    <p className="text-[11px] text-teal-300 font-medium flex items-center justify-center gap-1">
-                      <RefreshCw className="w-3 h-3" />
-                      <span>انقر لاختيار ملف PDF أو تصوير ورقة تحليل أخرى</span>
+                    <p className="text-xs text-emerald-300 font-semibold flex items-center justify-center gap-1.5">
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>انقر لتغيير الصورة أو اختيار ملف آخر</span>
                     </p>
                   </div>
                 ) : (
-                  <div className="text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-teal-400 group-hover:scale-110 transition-all">
-                      <Upload className="w-6 h-6" />
+                  <div className="text-center space-y-2.5">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                      <Upload className="w-7 h-7" />
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-200 block">انقر لرفع أو تصوير تقرير التحليل</span>
-                      <span className="text-[10px] text-slate-500">يدعم PDF وكاميرا الهاتف والصور (PNG, JPG, JPEG)</span>
+                      <span className="text-sm font-bold text-white block">انقر هنا لرفع صورة التحليل أو ملف PDF</span>
+                      <span className="text-xs text-slate-400 mt-0.5 block">يدعم الصور (PNG, JPG) وملفات PDF</span>
                     </div>
                   </div>
                 )}
               </label>
 
-              {/* Direct Camera Button & Sample Quick Load */}
-              <div className="grid grid-cols-2 gap-2">
-                <label className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 text-xs font-semibold cursor-pointer transition-all">
-                  <Camera className="w-3.5 h-3.5 text-teal-400" />
-                  <span>تصوير مباشر للكاميرا</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
+              {/* Direct Camera Action (Full-width large emerald button) */}
+              <label className="w-full min-h-[50px] flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-100 border border-emerald-500/45 text-sm font-bold cursor-pointer transition-all shadow-md shadow-emerald-950/40">
+                <Camera className="w-5 h-5 text-emerald-400" />
+                <span>تصوير مباشر بالكاميرا</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
+              {/* Quick Analyze Button right after upload when preview is loaded */}
+              {previewUrl && (
                 <button
                   type="button"
-                  onClick={() => loadSample(sampleLabCases[0])}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 text-xs font-semibold transition-all"
+                  onClick={() => handleRunAnalysis()}
+                  disabled={isAnalyzing}
+                  className="w-full min-h-[54px] py-3.5 px-4 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-2xl text-sm sm:text-base shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                 >
-                  <Eye className="w-3.5 h-3.5" />
-                  <span>نموذج تقرير رسمي جاهز</span>
+                  {isAnalyzing ? (
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+                      <span>{ocrStatus || 'جارٍ استخراج وقراءة نتائج التحليل...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-5 h-5 text-slate-950" />
+                      <span>بدء قراءة وتحليل صورة التحليل</span>
+                    </>
+                  )}
                 </button>
+              )}
+
+              {/* Patient Demographics Selector (Clean Gender & Age) */}
+              <div className="p-3.5 bg-slate-950/80 rounded-xl border border-slate-800 space-y-2.5">
+                <span className="text-xs font-bold text-emerald-300 block">
+                  بيانات المريض (لتطبيق النطاق المرجعي الصحيح)
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                  <div className="sm:col-span-7 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleGenderChange('female')}
+                      className={`min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        patientGender === 'female'
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                          : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                      }`}
+                    >
+                      <span>👩 أنثى</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleGenderChange('male')}
+                      className={`min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        patientGender === 'male'
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                          : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                      }`}
+                    >
+                      <span>👨 ذكر</span>
+                    </button>
+                  </div>
+
+                  <div className="sm:col-span-5 flex items-center gap-2 bg-slate-900 px-3 min-h-[44px] rounded-xl border border-emerald-500/30">
+                    <span className="text-xs text-slate-300 font-semibold shrink-0">العمر:</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      value={patientAge}
+                      onChange={(e) => handleAgeChange(e.target.value)}
+                      placeholder="28"
+                      className="w-full bg-transparent text-sm text-center text-emerald-300 font-mono font-bold outline-none"
+                    />
+                    <span className="text-xs text-slate-400 font-medium shrink-0">سنة</span>
+                  </div>
+                </div>
               </div>
 
-              {/* Lab Panel Selectors (Grid Buttons just like Imaging) */}
-              <div>
-                <span className="text-[11px] font-bold text-teal-300 block mb-1.5">
-                  نوع التحليل أو الباقة المخبرية (Lab Panel):
+              {/* Lab Panel Selectors (Large Cohesive Emerald Buttons) */}
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-emerald-300 block">
+                  نوع التحليل أو الباقة المخبرية:
                 </span>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-2.5">
                   {[
-                    { id: 'all', label: '📑 فحص شامل لكافة المؤشرات' },
-                    { id: 'cmp_electrolytes', label: '⚗️ الكيمياء الشاملة والأملاح والإنزيمات (CMP)' },
-                    { id: 'hormones', label: '🧬 هرمونات ومقاومة إنسولين وفيتامينات' },
-                    { id: 'cbc', label: '🩸 صورة الدم والأنيميا (CBC)' },
+                    { id: 'all', label: '📑 فحص شامل (الكل)' },
+                    { id: 'cmp_electrolytes', label: '⚗️ الكيمياء والأملاح (CMP)' },
+                    { id: 'hormones', label: '🧬 الهرمونات والفيتامينات' },
+                    { id: 'cbc', label: '🩸 صورة الدم (CBC)' },
                     { id: 'kidney', label: '🧪 وظائف الكلى والأملاح' },
                     { id: 'liver', label: '🫀 وظائف الكبد والصفراء' },
                     { id: 'diabetes', label: '🍬 السكر والتراكمي (HbA1c)' },
-                    { id: 'lipids', label: '🧈 دهون الدم والكوليسترول' },
-                    { id: 'thyroid', label: '🦋 الغدة والفيتامينات' },
+                    { id: 'lipids', label: '🧈 الدهون والكوليسترول' },
+                    { id: 'thyroid', label: '🦋 الغدة الدرقية والفيتامينات' },
                     { id: 'coagulation', label: '🧬 التخثر والسيولة (INR)' },
                     { id: 'inflammation', label: '🛡️ دلالات الالتهاب (CRP)' },
                     { id: 'urine', label: '🧫 تحليل البول الكامل' },
@@ -1496,10 +1295,10 @@ ${recsText}
                       key={p.id}
                       type="button"
                       onClick={() => setSelectedLabCategory(p.id)}
-                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all text-center ${
+                      className={`min-h-[52px] py-3 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all text-center leading-snug cursor-pointer flex items-center justify-center ${
                         selectedLabCategory === p.id
-                          ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
-                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                          : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
                       }`}
                     >
                       {p.label}
@@ -1508,52 +1307,24 @@ ${recsText}
                 </div>
               </div>
 
-              {/* Extracted Values & Quick Clinical Tags */}
-              <div className="space-y-2 p-3 bg-slate-950/80 rounded-xl border border-slate-800">
+              {/* Optional Text Notes / Extracted Values */}
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-teal-300 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-teal-400" />
-                    <span>المؤشرات والرموز المقروءة أو المدخلة (قابلة للتعديل والتحرير):</span>
-                  </span>
+                  <label htmlFor="textNotesInput" className="text-xs font-bold text-emerald-300">
+                    ملاحظات أو قيم إضافية (اختياري):
+                  </label>
                   {textNotes.trim() && (
-                    <span className="text-[10px] text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
-                      جاهز للتحليل
-                    </span>
+                    <span className="text-[11px] text-emerald-400 font-semibold">جاهز للتحليل</span>
                   )}
-                </div>
-
-                {/* Quick Presets for common tests */}
-                <div className="flex flex-wrap gap-1 text-[10px]">
-                  {[
-                    { label: '⚗️ كيمياء وأملاح وإنزيمات: ALT 315 وAST 285 ولاكتيك 3.8 وبوتاسيوم 3.4', text: 'Sodium: 139 (136 - 145 mmol/L)\nPotassium: 3.4 L (3.5 - 5.1 mmol/L)\nChloride: 104 (98 - 107 mmol/L)\nCO2: 24 (22 - 29 mmol/L)\nBlood Urea Nitrogen: 6 L (8 - 23 mg/dL)\nCreatinine: 0.9 (0.7 - 1.3 mg/dL)\nAST: 285 H (10 - 40 U/L)\nALT: 315 H (7 - 56 U/L)\nLactic Acid: 3.8 H (0.5 - 2.2 mmol/L)' },
-                    { label: '🩺 عينة التقرير الشامل (15 مؤشراً: صوديوم 142، يوريا 0.7، إنزيمات 77/79)', text: 'Sodium: 142 mmol/L (135 - 148)\nPotassium: 3.4 mmol/L (3.5 - 5.1)\nChloride: 107 mmol/L (99 - 111)\nCO2: 20 mmol/L (21 - 31)\nBlood urea nitrogen: 0.7 mmol/L (2.5 - 7.9)\nCreatinine: 27 µmol/L (27 - 62)\nCalcium: 2.2 mmol/L (2.0 - 2.6)\nTotal protein: 65 g/L (60 - 82)\nGlucose: 4.7 mmol/L (3.3 - 5.5)\nAlanine aminotransferase (ALT): 77 U/L (0 - 31)\nAspartate aminotransferase (AST): 79 U/L (0 - 31)\nLactic acid: 2.7 mmol/L (0.5 - 2.2)\nCarboxyhemoglobin: 1.2 % (0 - 2.0)\nAcetaminophen: < 6.614 µmol/L (66 - 132)\nSalicylate: < 0.22 mmol/L (0.14 - 0.72)' },
-                    { label: '⚡ مقاومة إنسولين 2.89 + فيريتين <5 + فيتامين د 10.87', text: 'Insulin Resistance (HOMA-IR): 2.89 H (0.5 - 1.8 index)\nFerritin: < 5 ng/ml L (12 - 290 ng/ml)\n25-Hydroxyvitamin D3: 10.87 ng/ml L (Desirable > 32 ng/ml)' },
-                    { label: '🩸 خضاب دم CBC 9.4 وكرات بيضاء 6400', text: 'Hemoglobin: 9.4 g/dL L (13.0 - 17.5)\nWBC: 6,400 /µL (4,000 - 11,000)\nPlatelets: 295,000 /µL (150,000 - 450,000)' },
-                    { label: '🧪 وظائف كلى: كرياتينين 1.75 ويوريا 44', text: 'Serum Creatinine: 1.75 mg/dL H (0.70 - 1.20)\nBlood Urea: 44 mg/dL H (15 - 45)\neGFR: 44 mL/min L' },
-                    { label: '🍬 سكر تراكمي HbA1c 8.9% وصائم 182', text: 'HbA1c: 8.9 % H (< 5.7)\nFasting Blood Glucose: 182 mg/dL H (70 - 99)' },
-                    { label: '🦋 غدة درقية: TSH 8.85 وفيتامين د 14', text: 'TSH: 8.85 µIU/mL H (0.45 - 4.50)\nFree T4: 0.74 ng/dL L (0.82 - 1.77)\nVitamin D3: 14.2 ng/mL L' },
-                  ].map((p, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => {
-                        setTextNotes(p.text);
-                        handleRunAnalysis(p.text);
-                      }}
-                      className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-300 hover:text-teal-200 border border-slate-800 transition-all font-medium text-right"
-                    >
-                      {p.label}
-                    </button>
-                  ))}
                 </div>
 
                 <textarea
                   id="textNotesInput"
                   value={textNotes}
                   onChange={(e) => setTextNotes(e.target.value)}
-                  placeholder="النصوص أو الرموز المقروءة تظهر هنا تلقائياً، أو يمكنك كتابة الفحوصات يدوياً مباشرة (مثل: HOMA 2.89 أو Ferritin < 5 أو سكر صائم 140)..."
+                  placeholder="تظهر القيم المقروءة هنا تلقائياً، أو يمكنك كتابة قيم إضافية (مثل: Ferritin 12 أو HbA1c 6.4)..."
                   rows={3}
-                  className="w-full bg-slate-900/90 border border-slate-700/80 rounded-lg p-2 text-xs text-slate-100 font-mono placeholder-slate-500 focus:outline-none focus:border-teal-500 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-colors"
                 />
               </div>
 
@@ -1561,17 +1332,17 @@ ${recsText}
               <button
                 onClick={() => handleRunAnalysis()}
                 disabled={isAnalyzing || (!previewUrl && !textNotes.trim())}
-                className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full min-h-[54px] py-4 px-5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-45 text-slate-950 rounded-2xl text-sm sm:text-base font-black shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
                 {isAnalyzing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-teal-300" />
-                    <span>جارٍ فحص وتحليل المؤشرات واستخراج التقرير السريري...</span>
+                    <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+                    <span>{ocrStatus || 'جارٍ فحص وتحليل المؤشرات...'}</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>بدء قراءة وتحليل صورة التحليل واستخراج النتائج</span>
+                    <Sparkles className="w-5 h-5 text-slate-950" />
+                    <span>بدء قراءة وتحليل التقرير واستخراج النتائج</span>
                   </>
                 )}
               </button>
@@ -1596,26 +1367,19 @@ ${recsText}
               {/* Input Card: Test Name + Unit + Value */}
               <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3.5">
                 {/* 0. Patient Demographics (Gender & Age) */}
-                <div className="p-3 bg-slate-900/90 rounded-xl border border-teal-500/40 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
-                      <span>👤 بيانات المريض (لتكييف النطاق المرجعي فسيولوجياً):</span>
-                    </span>
-                    <span className="text-[10px] text-teal-400 bg-teal-950/70 px-2 py-0.5 rounded border border-teal-500/30">
-                      يعدل المدى تلقائياً حسب الجنس والعمر
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
-                    {/* Gender Selector */}
-                    <div className="sm:col-span-6 flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium px-2 shrink-0">الجنس:</span>
+                <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2.5">
+                  <span className="text-xs font-bold text-emerald-300 block">
+                    بيانات المريض (لتطبيق النطاق المرجعي الصحيح)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                    <div className="sm:col-span-7 grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => handleGenderChange('female')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        className={`min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           patientGender === 'female'
-                            ? 'bg-gradient-to-r from-rose-500/30 to-pink-500/30 text-rose-200 border border-rose-500/50 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                            : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
                         }`}
                       >
                         <span>👩 أنثى</span>
@@ -1623,19 +1387,18 @@ ${recsText}
                       <button
                         type="button"
                         onClick={() => handleGenderChange('male')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                        className={`min-h-[44px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                           patientGender === 'male'
-                            ? 'bg-gradient-to-r from-cyan-500/30 to-teal-500/30 text-cyan-200 border border-cyan-500/50 shadow-sm'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                            : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
                         }`}
                       >
                         <span>👨 ذكر</span>
                       </button>
                     </div>
 
-                    {/* Age Input */}
-                    <div className="sm:col-span-6 flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
-                      <span className="text-[11px] text-slate-400 font-medium shrink-0">العمر:</span>
+                    <div className="sm:col-span-5 flex items-center gap-2 bg-slate-950 px-3 min-h-[44px] rounded-xl border border-emerald-500/30">
+                      <span className="text-xs text-slate-300 font-semibold shrink-0">العمر:</span>
                       <input
                         type="number"
                         min="1"
@@ -1643,25 +1406,9 @@ ${recsText}
                         value={patientAge}
                         onChange={(e) => handleAgeChange(e.target.value)}
                         placeholder="28"
-                        className="flex-1 bg-slate-900 border border-slate-700 focus:border-teal-400 rounded-lg px-2 py-1 text-xs text-center text-teal-300 font-mono font-bold outline-none"
+                        className="w-full bg-transparent text-sm text-center text-emerald-300 font-mono font-bold outline-none"
                       />
                       <span className="text-xs text-slate-400 font-medium shrink-0">سنة</span>
-                      <div className="hidden sm:flex items-center gap-1">
-                        {['10', '28', '45', '65'].map(a => (
-                          <button
-                            key={a}
-                            type="button"
-                            onClick={() => handleAgeChange(a)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                              patientAge === a
-                                ? 'bg-teal-500 text-slate-950'
-                                : 'bg-slate-850 text-slate-400 hover:text-slate-200'
-                            }`}
-                          >
-                            {a}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1752,10 +1499,10 @@ ${recsText}
                   <button
                     type="button"
                     onClick={handleAddManualTestRow}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+                    className="min-h-[48px] px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
                   >
                     <Plus className="w-4 h-4 text-slate-950" />
-                    <span>➕ إضافة التحليل إلى الجدول</span>
+                    <span>إضافة التحليل إلى الجدول</span>
                   </button>
                 </div>
               </div>
@@ -1764,28 +1511,25 @@ ${recsText}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <Activity className="w-3.5 h-3.5 text-teal-400" />
+                    <Activity className="w-3.5 h-3.5 text-emerald-400" />
                     <span>جدول الفحوصات المضافة للتحليل ({userManualRows.length} فحص):</span>
                   </div>
                   {userManualRows.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setUserManualRows([])}
-                      className="text-[11px] text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-slate-400 hover:text-rose-400 flex items-center gap-1 cursor-pointer"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-3.5 h-3.5" />
                       <span>مسح الكل</span>
                     </button>
                   )}
                 </div>
 
                 {userManualRows.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800 border-dashed text-center space-y-1">
+                  <div className="p-4 rounded-xl bg-slate-950/50 border border-slate-800 border-dashed text-center">
                     <p className="text-xs text-slate-400">
-                      الجدول فارغ حالياً. اختر فحصاً من القائمة أعلاه وضَع الرقم واضغط "إضافة التحليل إلى الجدول".
-                    </p>
-                    <p className="text-[11px] text-teal-400 font-medium">
-                      أو اختر أحد النماذج السريعة الجاهزة أدناه بنقرة واحدة!
+                      الجدول فارغ حالياً. اختر فحصاً من القائمة أعلاه وأدخل النتيجة ثم اضغط "إضافة التحليل إلى الجدول".
                     </p>
                   </div>
                 ) : (
@@ -1814,7 +1558,7 @@ ${recsText}
                                   type="text"
                                   value={row.value}
                                   onChange={(e) => handleUpdateManualRowValue(rIdx, e.target.value)}
-                                  className="w-20 bg-slate-900 border border-slate-700 focus:border-teal-500 rounded px-1.5 py-0.5 text-xs text-teal-300 font-mono font-bold outline-none"
+                                  className="w-20 bg-slate-900 border border-slate-700 focus:border-emerald-500 rounded px-1.5 py-0.5 text-xs text-emerald-300 font-mono font-bold outline-none"
                                 />
                                 <span className="text-[11px] text-slate-400 font-mono">{row.unit}</span>
                               </div>
@@ -1840,52 +1584,15 @@ ${recsText}
                 )}
               </div>
 
-              {/* 1-Click Clinical Presets */}
-              <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-300 block">
-                  نماذج سريعة للتعبئة بنقرة واحدة (1-Click Presets):
-                </span>
-                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('cmp')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    ⚗️ وظائف الكبد والأملاح (CMP)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('metabolism')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🧬 هرمونات ومقاومة إنسولين وفيتامينات
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('cbc')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🩸 صورة الدم الكاملة والأنيميا (CBC)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleLoadManualPreset('renal')}
-                    className="p-2 rounded-lg bg-slate-900 hover:bg-teal-500/20 text-slate-200 hover:text-teal-200 border border-slate-800 text-right transition-all font-medium cursor-pointer"
-                  >
-                    🧪 وظائف الكلى والأملاح (Renal)
-                  </button>
-                </div>
-              </div>
-
               {/* Master Run Analysis Button */}
               <button
                 type="button"
                 onClick={handleRunManualEvaluation}
                 disabled={userManualRows.length === 0}
-                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-black shadow-xl shadow-teal-950 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+                className="w-full min-h-[54px] py-4 px-5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-45 text-slate-950 rounded-2xl text-sm sm:text-base font-black shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
-                <Sparkles className="w-4 h-4 text-emerald-200" />
-                <span>🩺 تحليل نتائج الفحوصات وإصدار التقرير الطبي الشامل</span>
+                <Sparkles className="w-5 h-5 text-slate-950" />
+                <span>تحليل نتائج الفحوصات وإصدار التقرير الطبي</span>
               </button>
             </div>
           )}
@@ -1914,14 +1621,14 @@ ${recsText}
               </div>
 
               {/* Category Pills */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-thin">
+              <div className="flex gap-2 overflow-x-auto pb-1.5 text-xs scrollbar-thin">
                 <button
                   type="button"
                   onClick={() => setCatalogCategory('all')}
-                  className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition-all ${
+                  className={`min-h-[42px] px-4 py-2 rounded-xl font-bold shrink-0 border transition-all cursor-pointer ${
                     catalogCategory === 'all'
-                      ? 'bg-teal-600 text-white'
-                      : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                      ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                      : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
                   }`}
                 >
                   الكل
@@ -1931,10 +1638,10 @@ ${recsText}
                     key={g.id}
                     type="button"
                     onClick={() => setCatalogCategory(g.id)}
-                    className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition-all flex items-center gap-1 ${
+                    className={`min-h-[42px] px-3.5 py-2 rounded-xl font-bold shrink-0 border transition-all flex items-center gap-1.5 cursor-pointer ${
                       catalogCategory === g.id
-                        ? 'bg-teal-600 text-white'
-                        : 'bg-slate-950 text-slate-400 hover:text-white border border-slate-800'
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                        : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
                     }`}
                   >
                     <span>{g.icon}</span>
@@ -2017,7 +1724,7 @@ ${recsText}
                         type="button"
                         onClick={() => handleEvaluateCatalogTest(selectedCatalogTest, customTestValue)}
                         disabled={!customTestValue.trim()}
-                        className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition-all shadow disabled:opacity-50"
+                        className="min-h-[44px] px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-green-500 hover:from-emerald-400 hover:to-green-400 text-slate-950 rounded-xl text-xs sm:text-sm font-black transition-all shadow-md shadow-emerald-500/20 disabled:opacity-45 cursor-pointer"
                       >
                         تفسير النتيجة 📊
                       </button>
@@ -2031,13 +1738,13 @@ ${recsText}
           {/* IMAGING INPUT PANEL */}
           {analysisType === 'imaging' && (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-              <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <Upload className="w-4 h-4 text-teal-400" />
+              <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+                <Upload className="w-4 h-4 text-emerald-400" />
                 <span>رفع صورة الأشعة والتصوير الطبي</span>
               </h3>
 
               {/* Dropzone */}
-              <label className="border-2 border-dashed border-slate-700 hover:border-teal-500/60 transition-all rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer bg-slate-950/40 group relative overflow-hidden">
+              <label className="border-2 border-dashed border-emerald-500/40 hover:border-emerald-400 transition-all rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer bg-emerald-950/15 hover:bg-emerald-950/25 group relative overflow-hidden">
                 <input
                   type="file"
                   accept="image/*,.pdf,application/pdf"
@@ -2045,14 +1752,14 @@ ${recsText}
                   className="hidden"
                 />
                 {previewUrl ? (
-                  <div className="w-full text-center space-y-2">
+                  <div className="w-full text-center space-y-2.5">
                     {(selectedIsPdf || previewUrl.startsWith('data:application/pdf')) ? (
-                      <div className="p-4 rounded-xl bg-slate-900 border border-teal-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
-                        <FileText className="w-10 h-10 text-teal-400" />
+                      <div className="p-4 rounded-xl bg-slate-900 border border-emerald-500/40 flex flex-col items-center justify-center gap-2 max-w-xs mx-auto">
+                        <FileText className="w-10 h-10 text-emerald-400" />
                         <span className="text-xs font-bold text-white truncate max-w-full" dir="ltr">
                           {selectedFileName || selectedFile?.name || 'imaging-report.pdf'}
                         </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30 font-semibold">
+                        <span className="text-[11px] text-emerald-300 font-semibold">
                           تقرير أو أشعة PDF جاهزة للقراءة
                         </span>
                       </div>
@@ -2060,45 +1767,58 @@ ${recsText}
                       <img
                         src={previewUrl}
                         alt="Preview"
-                        className="max-h-48 mx-auto rounded-lg object-contain border border-slate-800 shadow"
+                        className="max-h-48 mx-auto rounded-xl object-contain border border-emerald-500/30 shadow"
                       />
                     )}
-                    <p className="text-[11px] text-teal-300 font-medium">انقر لتغيير الملف أو الصورة المرفوعة</p>
+                    <p className="text-xs text-emerald-300 font-semibold">انقر لتغيير الملف أو الصورة المرفوعة</p>
                   </div>
                 ) : (
-                  <div className="text-center space-y-2">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-teal-400 group-hover:scale-110 transition-all">
-                      <Upload className="w-6 h-6" />
+                  <div className="text-center space-y-2.5">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+                      <Upload className="w-7 h-7" />
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-slate-300 block">انقر لرفع صورة الأشعة أو تقرير PDF (X-Ray, CT, MRI)</span>
-                      <span className="text-[10px] text-slate-500">يدعم PDF, PNG, JPG, JPEG، أو تصوير الكاميرا المباشر</span>
+                      <span className="text-sm font-bold text-white block">انقر هنا لرفع صورة الأشعة أو ملف PDF</span>
+                      <span className="text-xs text-slate-400 mt-0.5 block">يدعم X-Ray, CT, MRI, Ultrasound وملفات PDF</span>
                     </div>
                   </div>
                 )}
               </label>
 
+              {/* Direct Camera Button */}
+              <label className="w-full min-h-[50px] flex items-center justify-center gap-2.5 py-3.5 px-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-100 border border-emerald-500/45 text-sm font-bold cursor-pointer transition-all shadow-md shadow-emerald-950/40">
+                <Camera className="w-5 h-5 text-emerald-400" />
+                <span>تصوير مباشر بالكاميرا</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
               {/* Modality & Region Selectors for Imaging */}
-              <div className="space-y-3 p-3 bg-slate-950/70 rounded-xl border border-slate-800/80">
+              <div className="space-y-4">
                 <div>
-                  <span className="text-[11px] font-bold text-teal-300 block mb-1.5">
-                    1. نوع الفحص الشعاعي (Modality):
+                  <span className="text-xs font-bold text-emerald-300 block mb-2">
+                    1. نوع الفحص الشعاعي:
                   </span>
-                  <div className="grid grid-cols-2 gap-1.5">
+                  <div className="grid grid-cols-2 gap-2.5">
                     {[
                       { id: 'xray', label: '🩻 أشعة سينية (X-Ray)' },
-                      { id: 'ct', label: '🌀 أشعة مقطعية (CT Scan)' },
+                      { id: 'ct', label: '🌀 أشعة مقطعية (CT)' },
                       { id: 'mri', label: '🧲 رنين مغناطيسي (MRI)' },
-                      { id: 'ultrasound', label: '🔊 موجات فوق صوتية (US)' },
+                      { id: 'ultrasound', label: '🔊 موجات صوتية (US)' },
                     ].map((m) => (
                       <button
                         key={m.id}
                         type="button"
                         onClick={() => setImagingModality(m.id as any)}
-                        className={`py-1.5 px-2 rounded-lg text-[11px] font-bold border transition-all text-center ${
+                        className={`min-h-[50px] py-3 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all text-center cursor-pointer flex items-center justify-center ${
                           imagingModality === m.id
-                            ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                            : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
                         }`}
                       >
                         {m.label}
@@ -2108,10 +1828,10 @@ ${recsText}
                 </div>
 
                 <div>
-                  <span className="text-[11px] font-bold text-teal-300 block mb-1.5">
-                    2. العضو / المنطقة التشريحية (Region):
+                  <span className="text-xs font-bold text-emerald-300 block mb-2">
+                    2. العضو / المنطقة التشريحية:
                   </span>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                     {[
                       { id: 'chest', label: '🫁 الصدر والرئة' },
                       { id: 'brain', label: '🧠 الدماغ والمخ' },
@@ -2123,10 +1843,10 @@ ${recsText}
                         key={r.id}
                         type="button"
                         onClick={() => setAnatomicalRegion(r.id as any)}
-                        className={`py-1.5 px-1.5 rounded-lg text-[10px] font-bold border transition-all text-center ${
+                        className={`min-h-[48px] py-3 px-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all text-center cursor-pointer flex items-center justify-center ${
                           anatomicalRegion === r.id
-                            ? 'bg-teal-500/20 text-teal-300 border-teal-500/60 shadow-sm'
-                            : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-lg shadow-emerald-500/25'
+                            : 'bg-emerald-950/45 hover:bg-emerald-900/60 text-emerald-100 border-emerald-500/35'
                         }`}
                       >
                         {r.label}
@@ -2138,15 +1858,15 @@ ${recsText}
 
               {/* Optional Notes */}
               <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1.5">
-                  ملاحظات أو أسئلة إضافية أو كتابة نص التقرير يدوياً:
+                <label className="text-xs font-bold text-emerald-300 block mb-1.5">
+                  ملاحظات أو أسئلة إضافية (اختياري):
                 </label>
                 <textarea
                   value={textNotes}
                   onChange={(e) => setTextNotes(e.target.value)}
-                  placeholder="مثال: مريض تعرض لضربة بالرأس، هل يوجد نزف أو كسر؟ أو مريض يعاني من ألم بالظهر..."
+                  placeholder="مثال: ألم في الصدر أو كحة، أو ألم أسفل الظهر..."
                   rows={2}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500 transition-colors"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl p-3 text-xs sm:text-sm text-slate-200 placeholder-slate-500 focus:outline-none transition-colors"
                 />
               </div>
 
@@ -2154,41 +1874,22 @@ ${recsText}
               <button
                 onClick={() => handleRunAnalysis()}
                 disabled={isAnalyzing || (!previewUrl && !textNotes.trim())}
-                className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2"
+                className="w-full min-h-[54px] py-4 px-5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-45 text-slate-950 rounded-2xl text-sm sm:text-base font-black shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               >
                 {isAnalyzing ? (
                   <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>جارٍ الفحص الإشعاعي بالذكاء الاصطناعي...</span>
+                    <RefreshCw className="w-5 h-5 animate-spin text-slate-950" />
+                    <span>جارٍ قراءة وتحليل الأشعة...</span>
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
+                    <Sparkles className="w-5 h-5 text-slate-950" />
                     <span>بدء قراءة وتفسير الصورة الإشعاعية</span>
                   </>
                 )}
               </button>
             </div>
           )}
-
-          {/* Quick Preset Samples */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-2">
-            <span className="text-[11px] text-slate-400 block font-semibold">أو اختر فحصاً سريعاً للتجربة الفورية:</span>
-            <div className="grid grid-cols-1 gap-1.5 max-h-48 overflow-y-auto pr-1">
-              {sampleLabCases
-                .filter(s => analysisType === 'lab' ? s.type === 'lab' : s.type === 'imaging')
-                .map((s: any, i) => (
-                  <button
-                    key={i}
-                    onClick={() => loadSample(s)}
-                    className="text-right text-[11px] px-3 py-2 rounded-lg bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800 transition-all flex items-center justify-between"
-                  >
-                    <span className="truncate">{s.title}</span>
-                    <ArrowRight className="w-3.5 h-3.5 text-teal-400 shrink-0 mr-1" />
-                  </button>
-                ))}
-            </div>
-          </div>
         </div>
 
         {/* Right Column: Results Panel */}
@@ -2531,7 +2232,9 @@ ${recsText}
               <div className="max-w-md space-y-1.5">
                 <h3 className="text-base font-bold text-slate-200">التقرير الطبي بانتظار الفحص</h3>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  ارفع صورة الفحص المخبري أو الأشعة الطبية من اللوحة الجانبية، أو اختر من قائمة التحاليل الشاملة لبدء القراءة والتحليل السريري المباشر.
+                  {analysisType === 'lab'
+                    ? 'ارفع صورة التحليل المخبري أو ملف PDF من اللوحة الجانبية، أو أدخل نتائجك يدوياً لبدء القراءة والتحليل السريري المباشر.'
+                    : 'ارفع صورة الأشعة الطبية (X-Ray / CT / MRI / US) أو الصق نص تقرير الأشعة في خانة الملاحظات لبدء التقييم الإشعاعي.'}
                 </p>
               </div>
             </div>

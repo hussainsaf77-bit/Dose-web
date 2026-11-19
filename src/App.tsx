@@ -36,7 +36,9 @@ const resolveTab = (h: string): ActiveTabType => {
   if (clean === 'crm' || clean === 'subscribers_crm') return 'crm';
   if (clean === 'pregnancy' || clean === 'maternal' || clean === 'pregnant') return 'pregnancy';
   if (clean === 'symptoms' || clean === 'ddx') return 'symptoms';
-  if (clean === 'lab_imaging' || clean === 'xray' || clean === 'lab') return 'lab_imaging';
+  if (clean === 'imaging' || clean === 'xray' || clean === 'radiology') return 'imaging';
+  if (clean === 'lab_imaging') return h.toLowerCase().includes('mode=imaging') ? 'imaging' : 'lab';
+  if (clean === 'lab') return 'lab';
   if (clean === 'pediatric') return 'pediatric';
   if (clean === 'interactions') return 'interactions';
   if (clean === 'diet') return 'diet';
@@ -53,7 +55,8 @@ const TAB_LABELS: Record<ActiveTabType, { ar: string; en: string }> = {
   relief: { ar: 'المبادرات الإنسانية', en: 'Humanitarian Care' },
   drugs: { ar: 'دليل الأدوية السريري', en: 'Drug Catalog' },
   pregnancy: { ar: 'رعاية ومتابعة الحامل', en: 'Maternal Care' },
-  lab_imaging: { ar: 'المختبر والأشعة', en: 'Lab & Radiology' },
+  lab: { ar: 'المختبر والتحاليل الطبية', en: 'Lab Tests & Reports' },
+  imaging: { ar: 'قراءة الأشعة والتصوير', en: 'X-Ray & Radiology' },
   symptoms: { ar: 'فاحص الأعراض والتشخيص', en: 'Symptom Checker' },
   pediatric: { ar: 'حاسبة جرعات الأطفال', en: 'Pediatric Dosing' },
   interactions: { ar: 'فحص التعارضات الدوائية', en: 'Drug Interactions' },
@@ -416,9 +419,22 @@ export default function App() {
           <PregnancyCareSection />
         )}
 
-        {/* 2.2 Lab & Imaging Analyzer */}
-        {activeTab === 'lab_imaging' && (
+        {/* 2.2 Dedicated Lab Analyzer */}
+        {activeTab === 'lab' && (
           <LabAndImagingAnalyzer
+            key="lab"
+            lockedMode="lab"
+            userTier={currentUser?.subscription.tier || 'free'}
+            telegramId={currentUser?.telegramId || '1001'}
+            onUpgradeClick={() => handleSelectFeature('plans')}
+          />
+        )}
+
+        {/* 2.3 Dedicated Radiology & Imaging Analyzer */}
+        {activeTab === 'imaging' && (
+          <LabAndImagingAnalyzer
+            key="imaging"
+            lockedMode="imaging"
             userTier={currentUser?.subscription.tier || 'free'}
             telegramId={currentUser?.telegramId || '1001'}
             onUpgradeClick={() => handleSelectFeature('plans')}

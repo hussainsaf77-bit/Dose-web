@@ -1,22 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Stethoscope, 
-  AlertCircle, 
-  CheckCircle2, 
-  ShieldAlert, 
-  Sparkles, 
-  Activity, 
-  FileText, 
-  HeartPulse, 
-  Mic, 
-  MicOff, 
-  Copy, 
-  Check, 
-  Printer, 
-  Clock, 
-  AlertTriangle,
-  RotateCcw,
-  Sparkle
+import {
+  Stethoscope,
+  AlertCircle,
+  CheckCircle2,
+  ShieldAlert,
+  Sparkles,
+  Activity,
+  FileText,
+  Mic,
+  MicOff,
+  Copy,
+  Check,
+  Printer,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { SubscriptionTier } from '../types';
 import { Language } from '../utils/translations';
@@ -33,12 +30,9 @@ interface ClinicalSymptomCheckerProps {
 }
 
 export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
-  userTier = 'pro',
   telegramId = '1001',
   language = 'ar',
-  onUpgradeClick,
-  onNavigateToAiChat,
-  onNavigateToDrugCatalog,
+  onNavigateToAiChat
 }) => {
   const isAr = language === 'ar';
 
@@ -49,7 +43,9 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
   const [vitalSigns, setVitalSigns] = useState('');
   const [severity, setSeverity] = useState<'mild' | 'moderate' | 'severe' | 'critical'>('moderate');
   const [duration, setDuration] = useState<'hours' | 'days' | 'weeks' | 'chronic'>('days');
-  const [mode, setMode] = useState<'patient' | 'doctor'>('doctor'); // DDx clinical toggle
+  const [selectedSystemIdx, setSelectedSystemIdx] = useState<number | null>(null);
+  const [showOptionalExtras, setShowOptionalExtras] = useState(false);
+
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [result, setResult] = useState<any | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -77,14 +73,8 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
         setIsListening(false);
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
       recognitionRef.current = recognition;
     }
   }, [isAr]);
@@ -106,110 +96,87 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
   };
 
   const commonDiseasesList = isAr
-    ? [
-        'السكري (Diabetes)',
-        'ارتفاع ضغط الدم (HTN)',
-        'أمراض القلب والشرايين',
-        'الربو وحساسية الصدر (Asthma)',
-        'قصور كلوي (CKD)',
-        'أمراض الغدة الدرقية',
-        'القولون العصبي (IBS)'
-      ]
-    : [
-        'Diabetes Mellitus',
-        'Hypertension (HTN)',
-        'Cardiovascular Disease',
-        'Asthma / COPD',
-        'Chronic Kidney Disease',
-        'Thyroid Disorder',
-        'Irritable Bowel (IBS)'
-      ];
+    ? ['السكري', 'ارتفاع ضغط الدم', 'أمراض القلب', 'الربو', 'قصور الكلى', 'الغدة الدرقية', 'القولون العصبي']
+    : ['Diabetes', 'Hypertension', 'Heart Disease', 'Asthma', 'Kidney Disease', 'Thyroid Disorder', 'IBS'];
 
-  // Quick symptom library by body system
-  const symptomPresets = [
+  const symptomSystems = [
     {
-      categoryAr: '🫀 القلب والصدر (طوارئ)',
-      categoryEn: 'Cardiovascular & Chest',
+      categoryAr: '🫀 القلب والصدر',
+      categoryEn: 'Heart & Chest',
       items: [
-        { labelAr: 'ألم ضاغط في منتصف الصدر يمتد للكتف الأيسر والفك مع تعرق بارد', labelEn: 'Crushing chest pain radiating to left arm & jaw with diaphoresis' },
-        { labelAr: 'خفقان وتسارع ضربات القلب مع ضيق تنفس وإعياء مفاجئ', labelEn: 'Rapid palpitations with dyspnea and acute fatigue' },
-        { labelAr: 'تورم في الساقين مع ضيق تنفس شديد عند الاستلقاء (Orthopnea)', labelEn: 'Bilateral leg edema with orthopnea' }
+        { labelAr: 'ألم ضاغط بمنتصف الصدر يمتد للكتف أو الفك مع تعرق', labelEn: 'Crushing chest pain radiating to arm/jaw with sweating' },
+        { labelAr: 'خفقان وتسارع نبضات القلب مع ضيق تنفس', labelEn: 'Rapid palpitations with shortness of breath' },
+        { labelAr: 'تورم الساقين مع صعوبة التنفس عند الاستلقاء', labelEn: 'Leg swelling with difficulty breathing when lying flat' }
       ]
     },
     {
       categoryAr: '🫁 الجهاز التنفسي',
       categoryEn: 'Respiratory',
       items: [
-        { labelAr: 'سعال جاف مستمر مع ضيق في التنفس وصفير مسموع بالصدر', labelEn: 'Dry persistent cough with wheezing and dyspnea' },
-        { labelAr: 'سعال مع بلغم مدمم أو مصفر مصحوب بحرارة وقشعريرة', labelEn: 'Productive colored sputum with high fever and chills' },
-        { labelAr: 'ألم طاعن حاد في الصدر يزداد بشدة مع أخذ النفس العميق (جنبي)', labelEn: 'Pleuritic sharp chest pain worsening with deep inspiration' }
+        { labelAr: 'سعال جاف مستمر مع صفير وضيق تنفس', labelEn: 'Persistent dry cough with wheezing and dyspnea' },
+        { labelAr: 'سعال ببلغم ملون مع حرارة وقشعريرة', labelEn: 'Productive cough with fever and chills' },
+        { labelAr: 'ألم حاد بالصدر يزداد مع التنفس العميق', labelEn: 'Sharp chest pain worsening with deep breath' }
       ]
     },
     {
-      categoryAr: '🍽️ البطن والجهاز الهضمي',
-      categoryEn: 'Gastrointestinal & Abdomen',
+      categoryAr: '🍽️ البطن والهضم',
+      categoryEn: 'Abdomen & GI',
       items: [
-        { labelAr: 'ألم حاد ومفاجئ في أسفل البطن جهة اليمين مع غثيان وحرارة (اشتباه زائدة)', labelEn: 'Acute right lower quadrant abdominal pain with nausea and fever' },
-        { labelAr: 'ألم حارق برأس المعدة يزداد بعد الوجبات أو عند الجوع مع ارتجاع حمضي', labelEn: 'Epigastric burning pain with severe acid reflux' },
-        { labelAr: 'مغص مراري حاد في أعلى يمين البطن بعد وجبة دسمة يمتد للكتف', labelEn: 'Right upper quadrant colicky pain after fatty meals radiating to shoulder' },
-        { labelAr: 'إسهال مائي متكرر ومغص شديد مع جفاف وقيء مستمر', labelEn: 'Acute watery diarrhea with dehydration and persistent vomiting' }
+        { labelAr: 'ألم حاد أسفل يمين البطن مع غثيان وحرارة', labelEn: 'Acute right lower abdominal pain with nausea and fever' },
+        { labelAr: 'ألم حارق بالمعدة وارتجاع حمضي بعد الأكل', labelEn: 'Burning stomach pain and acid reflux after meals' },
+        { labelAr: 'ألم أعلى يمين البطن بعد وجبة دسمة يمتد للكتف', labelEn: 'Right upper abdominal pain after fatty meals' },
+        { labelAr: 'إسهال متكرر مع مغص وقيء وجفاف', labelEn: 'Frequent diarrhea with cramps, vomiting and dehydration' }
       ]
     },
     {
-      categoryAr: '🧠 الجهاز العصبي والرأس',
-      categoryEn: 'Neurology & Head',
+      categoryAr: '🧠 الرأس والأعصاب',
+      categoryEn: 'Head & Neuro',
       items: [
-        { labelAr: 'صداع نصفي نابض مع غثيان وحساسية شديدة من الضوء والصوت', labelEn: 'Unilateral throbbing migraine with nausea, photophobia and phonophobia' },
-        { labelAr: 'دوار مفاجئ وعدم اتزان وإحساس بدوران الغرفة مع حركة الرأس', labelEn: 'Acute vertigo and spinning sensation triggered by head movement' },
-        { labelAr: 'تنميل مفاجئ في جانب واحد من الوجه أو اليد وصعوبة نطق (إشارة سكتة)', labelEn: 'Sudden facial droop, unilateral arm numbness and dysarthria (Stroke warning)' }
+        { labelAr: 'صداع نصفي نابض مع غثيان وحساسية للضوء', labelEn: 'Throbbing migraine with nausea and light sensitivity' },
+        { labelAr: 'دوار مفاجئ وإحساس بدوران عند حركة الرأس', labelEn: 'Sudden vertigo triggered by head movement' },
+        { labelAr: 'تنميل مفاجئ بنصف الوجه أو اليد مع صعوبة نطق', labelEn: 'Sudden facial/arm numbness with speech difficulty' }
       ]
     },
     {
-      categoryAr: '🩸 الكلى والمسالك البولية',
-      categoryEn: 'Urinary & Renal',
+      categoryAr: '🧪 الكلى والمسالك',
+      categoryEn: 'Kidney & Urinary',
       items: [
-        { labelAr: 'حرقة شديدة أثناء التبول مع تكرار وإلحاح بولي وألم أسفل الحوض', labelEn: 'Severe dysuria with urinary urgency, frequency and suprapubic pain' },
-        { labelAr: 'مغص كلوي حاد ومتقطع في الخاصرة يمتد للمثانة مع دم خفيف بالبول', labelEn: 'Severe flank colicky pain radiating to groin with microscopic hematuria' }
+        { labelAr: 'حرقة وتكرار في التبول مع ألم أسفل البطن', labelEn: 'Burning frequent urination with lower abdominal pain' },
+        { labelAr: 'مغص حاد بالخاصرة يمتد للأسفل مع دم بالبول', labelEn: 'Severe flank pain radiating down with blood in urine' }
       ]
     },
     {
-      categoryAr: '👂 الأنف والأذن والحنجرة (ENT)',
-      categoryEn: 'Ear, Nose & Throat (ENT)',
+      categoryAr: '👂 الأنف والأذن والحلق',
+      categoryEn: 'ENT',
       items: [
-        { labelAr: 'ألم حاد بالحلق وصعوبة شديدة في البلع مع تضخم اللوزتين وحرارة', labelEn: 'Severe sore throat, painful swallowing, tonsillar exudates and fever' },
-        { labelAr: 'ضغط وثقل شديد في الجبهة وتحت العينين مع احتقان أنفي وصداع', labelEn: 'Facial and forehead pressure with purulent nasal discharge' },
-        { labelAr: 'ألم نابض في إحدى الأذنين مع ضعف سمع خفيف وحرارة', labelEn: 'Otalgia with reduced hearing and low-grade fever' }
+        { labelAr: 'ألم شديد بالحلق وصعوبة البلع مع حرارة', labelEn: 'Severe sore throat, painful swallowing and fever' },
+        { labelAr: 'صداع وثقل بالجيوب الأنفية مع انسداد الأنف', labelEn: 'Sinus pressure, headache and nasal congestion' },
+        { labelAr: 'ألم نابض بالأذن مع ضعف سمع وحرارة', labelEn: 'Throbbing ear pain with reduced hearing and fever' }
       ]
     },
     {
       categoryAr: '👁️ العيون والرؤية',
-      categoryEn: 'Ophthalmology & Vision',
+      categoryEn: 'Vision',
       items: [
-        { labelAr: 'احمرار شديد بالعين مع إفرازات قيحية وحكة والتصاق الجفون صباحاً', labelEn: 'Severe conjunctival injection with purulent discharge and matting' },
-        { labelAr: 'ألم حاد وعميق في العين مع رؤية هالات ملونة حول الأضواء وضبابية', labelEn: 'Deep ocular ache with rainbow halos around lights and blurred vision' }
+        { labelAr: 'احمرار العين مع إفرازات وحكة والتصاق الجفون', labelEn: 'Red eye with discharge, itching and sticky eyelids' },
+        { labelAr: 'ألم عميق بالعين مع ضبابية وهالات حول الضوء', labelEn: 'Deep eye pain with blurred vision and halos' }
       ]
     },
     {
-      categoryAr: '🦵 المفاصل والعظام والجلد',
-      categoryEn: 'Musculoskeletal & Dermatology',
+      categoryAr: '🦵 المفاصل والجلد',
+      categoryEn: 'Joints & Skin',
       items: [
-        { labelAr: 'ألم حاد وتورم واحمرار وسخونة في مفصل إبهام القدم أو الركبة (اشتباه نقرس)', labelEn: 'Acute hot, red, severely swollen first MTP or knee joint (Gout suspect)' },
-        { labelAr: 'طفح جلدي أحمر مفاجئ مع حكة شديدة بعد تناول طعام أو دواء جديد', labelEn: 'Pruritic urticarial rash following new food or antibiotic' },
-        { labelAr: 'ألم أسفل الظهر يمتد خلف الفخذ إلى الساق (عِرق النسا / ديسك)', labelEn: 'Lumbar pain radiating down posterior thigh and leg (Sciatica)' }
+        { labelAr: 'ألم وتورم واحمرار مفاجئ في مفصل القدم أو الركبة', labelEn: 'Sudden hot swollen red toe or knee joint' },
+        { labelAr: 'طفح جلدي أحمر مفاجئ مع حكة شديدة', labelEn: 'Sudden itchy red skin rash' },
+        { labelAr: 'ألم أسفل الظهر يمتد خلف الفخذ للساق', labelEn: 'Lower back pain radiating down the leg' }
       ]
     }
   ];
 
-  const handleSelectPreset = (text: string) => {
-    setSymptoms(text);
-  };
-
   const toggleDisease = (disease: string) => {
-    if (chronicDiseases.includes(disease)) {
-      setChronicDiseases(chronicDiseases.filter(d => d !== disease));
-    } else {
-      setChronicDiseases([...chronicDiseases, disease]);
-    }
+    setChronicDiseases(prev =>
+      prev.includes(disease) ? prev.filter(d => d !== disease) : [...prev, disease]
+    );
   };
 
   const handleEvaluate = async () => {
@@ -232,8 +199,8 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
           vitalSigns,
           severity,
           duration,
-          lang: language,
-        }),
+          lang: language
+        })
       });
 
       const contentType = response.headers.get('content-type') || '';
@@ -244,7 +211,7 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
           evaluatedSuccessfully = true;
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       console.warn('Symptom check fetch warning, engaging client engine:', err);
     }
 
@@ -258,13 +225,13 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
           vitalSigns,
           severity,
           duration,
-          lang: language,
+          lang: language
         });
         setResult(fallbackResult);
         setErrorMsg(null);
-      } catch (fallbackErr: any) {
+      } catch (fallbackErr) {
         console.error('Fallback evaluation error:', fallbackErr);
-        setErrorMsg(isAr ? 'حدث خطأ أثناء فحص الأعراض، يرجى إعادة المحاولة' : 'Error checking symptoms');
+        setErrorMsg(isAr ? 'حدث خطأ أثناء فحص الأعراض، يرجى المحاولة مرة أخرى.' : 'Error checking symptoms.');
       }
     }
 
@@ -273,41 +240,22 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
 
   const handleCopyReport = () => {
     if (!result) return;
-    let text = `🩺 تقرير فاحص الأعراض والتشخيص التفريقي (منصة جرعة الطبية)\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `👤 المريض: ${patientAge} سنة | ${gender === 'male' ? 'ذكر' : 'أنثى'}\n`;
-    if (vitalSigns) text += `📊 العلامات الحيوية: ${vitalSigns}\n`;
-    if (chronicDiseases.length) text += `🏥 الأمراض المزمنة: ${chronicDiseases.join('، ')}\n`;
-    text += `⚠️ الشكوى السريرية: ${symptoms}\n`;
-    text += `⏱️ المدة والشدة: ${duration} | ${severity}\n`;
-    text += `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-    text += `📌 الانطباع الأولي: ${result.primaryCondition}\n`;
-    text += `🚨 مستوى الاستعجال: ${result.urgencyText} (${result.urgency})\n`;
-    text += `🏥 التخصص الطبي الموصى به: ${result.recommendedSpecialty}\n\n`;
+    let text = `تقرير فاحص الأعراض والتشخيص التفريقي (منصة جرعة)\n`;
+    text += `• العمر والجنس: ${patientAge} سنة · ${gender === 'male' ? 'ذكر' : 'أنثى'}\n`;
+    if (vitalSigns) text += `• العلامات الحيوية: ${vitalSigns}\n`;
+    if (chronicDiseases.length) text += `• الأمراض المزمنة: ${chronicDiseases.join('، ')}\n`;
+    text += `• الشكوى: ${symptoms}\n`;
+    text += `• الانطباع الأولي: ${result.primaryCondition}\n`;
+    text += `• الاستعجال: ${result.urgencyText}\n`;
+    text += `• التخصص الموصى به: ${result.recommendedSpecialty}\n\n`;
 
     if (result.differentialDiagnoses?.length) {
-      text += `📋 التشخيصات التفريقية الأكثر احتمالاً (DDx):\n`;
+      text += `التشخيصات المحتملة:\n`;
       result.differentialDiagnoses.forEach((d: any, idx: number) => {
         text += `${idx + 1}. ${d.name} (${d.likelihood})\n`;
-        if (d.rationale) text += `   - الأساس السريري: ${d.rationale}\n`;
-        if (d.confirmingTests) text += `   - الفحوصات التأكيدية: ${d.confirmingTests}\n`;
+        if (d.rationale) text += `   - ${d.rationale}\n`;
       });
-      text += `\n`;
     }
-
-    if (result.recommendedTests?.length) {
-      text += `🧪 الفحوصات المقترحة: ${result.recommendedTests.join('، ')}\n\n`;
-    }
-
-    if (result.redFlags?.length) {
-      text += `🚨 علامات الخطر:\n• ${result.redFlags.join('\n• ')}\n\n`;
-    }
-
-    if (result.clinicalSummary) {
-      text += `💡 التوجيه السريري: ${result.clinicalSummary}\n\n`;
-    }
-
-    text += `⚠️ تنويه: هذا التقرير استرشادي مساعد لتوجيه الرعاية ولا يغني عن الفحص الطبي المباشر.`;
 
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -319,289 +267,298 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
   };
 
   return (
-    <div className="space-y-6" id="clinical-symptom-checker-section">
-      {/* Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
-              <Stethoscope className="w-4 h-4" />
-              <span>
-                {isAr ? 'الفرز والتشخيص التفريقي السريري (Clinical DDx)' : 'Clinical DDx & Triage'}
-              </span>
-            </div>
-            <h2 className="text-2xl font-black text-white">
-              {isAr ? 'فاحص الأعراض والتشخيص التفريقي الطبي' : 'Differential Diagnosis & Clinical Triage'}
-            </h2>
-            <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              {isAr
-                ? 'أداة سريرية متقدمة للأطباء وممارسي الرعاية الصحية والمرضى، تضع الاحتمالات التشخيصية (DDx) المرتبة حسب الاحتمال وإشارات الخطر والفحوصات التأكيدية.'
-                : 'Advanced clinical diagnostic tool for healthcare providers & patients. Generates evidence-based differential diagnosis (DDx), red flags, and diagnostic workup.'
-              }
-            </p>
+    <div className="space-y-5" id="clinical-symptom-checker-section">
+      {/* Compact Clean Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0">
+            <Stethoscope className="w-6 h-6" />
           </div>
-
-          {/* Mode Switcher */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 self-start md:self-auto">
-            <button
-              onClick={() => setMode('doctor')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                mode === 'doctor'
-                  ? 'bg-teal-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {isAr ? '🩺 نمط الطبيب (DDx السريري)' : '🩺 Clinical DDx'}
-            </button>
-            <button
-              onClick={() => setMode('patient')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                mode === 'patient'
-                  ? 'bg-teal-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {isAr ? '👤 نمط المريض (التوجيه)' : '👤 Patient Triage'}
-            </button>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              {isAr ? 'فاحص الأعراض السريري' : 'Clinical Symptom Checker'}
+            </h2>
+            <p className="text-slate-400 text-xs mt-0.5">
+              {isAr ? 'أدخل الأعراض لترتيب الاحتمالات التشخيصية والتوجيه الطبي' : 'Enter symptoms for clinical differential guidance'}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Form Inputs */}
-        <div className="lg:col-span-5 space-y-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-4">
-            <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
-              <HeartPulse className="w-4 h-4 text-teal-400" />
-              <span>{isAr ? 'بيانات الحالة السريرية' : 'Clinical Case Parameters'}</span>
-            </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Input Form Column */}
+        <div className="lg:col-span-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-5">
 
-            {/* Age & Gender */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                  {isAr ? 'العمر بالسنوات:' : 'Age (years):'}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="120"
-                  value={patientAge}
-                  onChange={(e) => setPatientAge(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                  {isAr ? 'الجنس البيولوجي:' : 'Biological Sex:'}
-                </label>
-                <select
-                  value={gender}
-                  onChange={(e) => setGender(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                >
-                  <option value="male">{isAr ? 'ذكر' : 'Male'}</option>
-                  <option value="female">{isAr ? 'أنثى' : 'Female'}</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Severity & Duration */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                  {isAr ? 'شدة الأعراض:' : 'Severity:'}
-                </label>
-                <select
-                  value={severity}
-                  onChange={(e) => setSeverity(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                >
-                  <option value="mild">{isAr ? 'خفيف (Mild)' : 'Mild'}</option>
-                  <option value="moderate">{isAr ? 'متوسط (Moderate)' : 'Moderate'}</option>
-                  <option value="severe">{isAr ? 'شديد (Severe)' : 'Severe'}</option>
-                  <option value="critical">{isAr ? 'حرج / طارئ (Critical)' : 'Critical'}</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                  {isAr ? 'مدة استمرار العَرَض:' : 'Duration:'}
-                </label>
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-teal-500"
-                >
-                  <option value="hours">{isAr ? 'منذ ساعات (Hours)' : 'Hours'}</option>
-                  <option value="days">{isAr ? 'منذ أيام (1-3 Days)' : 'Days'}</option>
-                  <option value="weeks">{isAr ? 'منذ أسابيع (1+ Weeks)' : 'Weeks'}</option>
-                  <option value="chronic">{isAr ? 'مزمن (Chronic)' : 'Chronic'}</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Vital Signs (Optional) */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1">
-                {isAr ? 'العلامات الحيوية (اختياري: ضغط، نبض، حرارة، أكسجين):' : 'Vital Signs (Optional: BP, HR, Temp, SpO2):'}
-              </label>
-              <input
-                type="text"
-                value={vitalSigns}
-                onChange={(e) => setVitalSigns(e.target.value)}
-                placeholder={isAr ? 'مثال: BP: 130/85, HR: 88, Temp: 38.2C, SpO2: 97%' : 'e.g. BP: 130/85, HR: 88, Temp: 38.2C, SpO2: 97%'}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            {/* Chronic Conditions */}
-            <div>
-              <label className="text-[11px] font-semibold text-slate-300 block mb-1.5">
-                {isAr ? 'الأمراض المزمنة المسجلة:' : 'Pre-existing Conditions:'}
-              </label>
-              <div className="flex flex-wrap gap-1.5">
-                {commonDiseasesList.map((disease) => {
-                  const isSelected = chronicDiseases.includes(disease);
-                  return (
-                    <button
-                      key={disease}
-                      type="button"
-                      onClick={() => toggleDisease(disease)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
-                        isSelected
-                          ? 'bg-teal-500/20 text-teal-300 border-teal-500/40 font-bold'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
-                      }`}
-                    >
-                      {disease}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Quick Symptom Presets Selector */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-semibold text-slate-300 block">
-                  {isAr ? '⚡ مكتبة الأعراض السريرية الشائعة:' : '⚡ Common Clinical Symptom Presets:'}
-                </label>
-                <span className="text-[10px] text-teal-400">
-                  {isAr ? 'اختر بنقرة واحدة' : 'Click to load'}
-                </span>
-              </div>
-
-              <div className="space-y-2 mb-3 bg-slate-950/70 p-2.5 rounded-xl border border-slate-800 max-h-48 overflow-y-auto">
-                <div className="flex flex-wrap gap-2">
-                  {symptomPresets.map((cat, cIdx) => (
-                    <div key={cIdx} className="w-full">
-                      <span className="text-[10px] font-bold text-slate-400 block mb-1">
-                        {isAr ? cat.categoryAr : cat.categoryEn}
-                      </span>
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        {cat.items.map((item, iIdx) => {
-                          const itemText = isAr ? item.labelAr : item.labelEn;
-                          const isSelected = symptoms === itemText;
-                          return (
-                            <button
-                              key={iIdx}
-                              type="button"
-                              onClick={() => handleSelectPreset(itemText)}
-                              className={`text-[10px] text-right px-2 py-1 rounded-lg border transition-all ${
-                                isSelected
-                                  ? 'bg-teal-500/20 text-teal-300 border-teal-500/50 font-bold'
-                                  : 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                              }`}
-                            >
-                              {itemText}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Symptoms Description with Voice Mic */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[11px] font-semibold text-slate-300 block">
-                  {isAr ? 'صف الأعراض وتاريخ الشكوى المرضية بالتفصيل:' : 'Chief Complaints & Clinical Presentation:'}
+            {/* 1. Symptom Description & Quick System Selector */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs sm:text-sm font-bold text-emerald-300">
+                  {isAr ? '1. ما هي الأعراض التي تشعر بها؟' : '1. What are the symptoms?'}
                 </label>
                 <div className="flex items-center gap-2">
                   {speechSupported && (
                     <button
                       type="button"
                       onClick={toggleListening}
-                      className={`text-[10px] px-2 py-0.5 rounded-lg border flex items-center gap-1 transition-all ${
+                      className={`min-h-[36px] px-3 py-1 rounded-xl text-xs font-bold border flex items-center gap-1.5 transition-all cursor-pointer ${
                         isListening
-                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse font-bold'
-                          : 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/50'
+                          : 'bg-emerald-950/60 hover:bg-emerald-900/70 text-emerald-200 border-emerald-500/40'
                       }`}
                     >
-                      {isListening ? (
-                        <>
-                          <MicOff className="w-3 h-3 text-rose-400" />
-                          <span>{isAr ? 'إيقاف التسجيل' : 'Stop'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Mic className="w-3 h-3 text-teal-400" />
-                          <span>{isAr ? 'إملاء صوتي' : 'Voice'}</span>
-                        </>
-                      )}
+                      {isListening ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5 text-emerald-400" />}
+                      <span>{isListening ? (isAr ? 'إيقاف' : 'Stop') : (isAr ? 'تحدث صوتياً' : 'Voice')}</span>
                     </button>
                   )}
                   {symptoms && (
                     <button
                       type="button"
                       onClick={() => setSymptoms('')}
-                      className="text-[10px] text-slate-400 hover:text-rose-400 transition-colors"
+                      className="text-xs text-slate-400 hover:text-rose-400 cursor-pointer"
                     >
                       {isAr ? 'مسح' : 'Clear'}
                     </button>
                   )}
                 </div>
               </div>
+
               <textarea
                 value={symptoms}
                 onChange={(e) => setSymptoms(e.target.value)}
                 placeholder={
                   isAr
-                    ? 'اكتب شكواك السريرية بحرية هنا أو استخدم زر الإملاء الصوتي أو اختر من النماذج السريعة...'
-                    : 'Describe patient complaints freely or use voice dictation...'
+                    ? 'اكتب الأعراض بوضوح (مثال: ألم في الصدر، صداع نصفي، حرارة وسعال)...'
+                    : 'Describe symptoms clearly...'
                 }
-                rows={4}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-teal-500 transition-colors"
+                rows={3}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl p-3.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-colors"
               />
+
+              {/* Clean Expandable Body System Buttons */}
+              <div className="space-y-2">
+                <span className="text-xs font-semibold text-slate-400 block">
+                  {isAr ? 'أو اختر الجهاز للاختيار السريع:' : 'Or choose a body system:'}
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {symptomSystems.map((sys, idx) => {
+                    const isOpen = selectedSystemIdx === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedSystemIdx(isOpen ? null : idx)}
+                        className={`min-h-[44px] py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center text-center ${
+                          isOpen
+                            ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md shadow-emerald-500/20'
+                            : 'bg-emerald-950/40 hover:bg-emerald-900/55 text-emerald-100 border-emerald-500/30'
+                        }`}
+                      >
+                        {isAr ? sys.categoryAr : sys.categoryEn}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {selectedSystemIdx !== null && (
+                  <div className="p-2.5 rounded-xl bg-slate-950 border border-emerald-500/35 space-y-1.5">
+                    {symptomSystems[selectedSystemIdx].items.map((item, iIdx) => {
+                      const itemText = isAr ? item.labelAr : item.labelEn;
+                      const active = symptoms === itemText;
+                      return (
+                        <button
+                          key={iIdx}
+                          type="button"
+                          onClick={() => setSymptoms(itemText)}
+                          className={`w-full min-h-[42px] text-right px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer block ${
+                            active
+                              ? 'bg-emerald-500/25 text-emerald-200 border-emerald-400'
+                              : 'bg-slate-900 hover:bg-emerald-950/50 text-slate-200 border-slate-800'
+                          }`}
+                        >
+                          {itemText}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Submit */}
+            {/* 2. Patient Info (Gender buttons + Age) */}
+            <div className="pt-4 border-t border-slate-800 space-y-3">
+              <span className="text-xs sm:text-sm font-bold text-emerald-300 block">
+                {isAr ? '2. بيانات المريض' : '2. Patient Info'}
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                <div className="sm:col-span-7 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setGender('male')}
+                    className={`min-h-[46px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                      gender === 'male'
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md'
+                        : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                    }`}
+                  >
+                    👨 {isAr ? 'ذكر' : 'Male'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGender('female')}
+                    className={`min-h-[46px] py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                      gender === 'female'
+                        ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md'
+                        : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                    }`}
+                  >
+                    👩 {isAr ? 'أنثى' : 'Female'}
+                  </button>
+                </div>
+
+                <div className="sm:col-span-5 flex items-center gap-2 bg-slate-950 px-3 min-h-[46px] rounded-xl border border-emerald-500/30">
+                  <span className="text-xs text-slate-300 font-semibold shrink-0">{isAr ? 'العمر:' : 'Age:'}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="120"
+                    value={patientAge}
+                    onChange={(e) => setPatientAge(e.target.value)}
+                    className="w-full bg-transparent text-sm text-center text-emerald-300 font-mono font-bold outline-none"
+                  />
+                  <span className="text-xs text-slate-400 shrink-0">{isAr ? 'سنة' : 'yr'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Severity & Duration as Clear Touch Buttons */}
+            <div className="pt-4 border-t border-slate-800 space-y-3">
+              <div>
+                <span className="text-xs font-bold text-emerald-300 block mb-2">
+                  {isAr ? '3. شدة الأعراض:' : '3. Severity:'}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'mild', labelAr: 'خفيف', labelEn: 'Mild' },
+                    { id: 'moderate', labelAr: 'متوسط', labelEn: 'Moderate' },
+                    { id: 'severe', labelAr: 'شديد', labelEn: 'Severe' },
+                    { id: 'critical', labelAr: 'حرج', labelEn: 'Critical' }
+                  ].map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setSeverity(s.id as any)}
+                      className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        severity === s.id
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md'
+                          : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                      }`}
+                    >
+                      {isAr ? s.labelAr : s.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-xs font-bold text-emerald-300 block mb-2">
+                  {isAr ? '4. مدة الأعراض:' : '4. Duration:'}
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'hours', labelAr: 'ساعات', labelEn: 'Hours' },
+                    { id: 'days', labelAr: 'أيام', labelEn: 'Days' },
+                    { id: 'weeks', labelAr: 'أسابيع', labelEn: 'Weeks' },
+                    { id: 'chronic', labelAr: 'مزمن', labelEn: 'Chronic' }
+                  ].map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setDuration(d.id as any)}
+                      className={`min-h-[44px] py-2 px-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        duration === d.id
+                          ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300 shadow-md'
+                          : 'bg-emerald-950/35 hover:bg-emerald-900/50 text-emerald-100 border-emerald-500/30'
+                      }`}
+                    >
+                      {isAr ? d.labelAr : d.labelEn}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Optional Medical History & Vitals (Collapsible so form stays light) */}
+            <div className="pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setShowOptionalExtras(!showOptionalExtras)}
+                className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-bold text-slate-300 flex items-center justify-between cursor-pointer transition-all"
+              >
+                <span>
+                  {isAr
+                    ? `أمراض مزمنة أو علامات حيوية (اختياري)${chronicDiseases.length ? ` · ${chronicDiseases.length} محددة` : ''}`
+                    : 'Chronic conditions & vitals (optional)'}
+                </span>
+                {showOptionalExtras ? <ChevronUp className="w-4 h-4 text-emerald-400" /> : <ChevronDown className="w-4 h-4 text-emerald-400" />}
+              </button>
+
+              {showOptionalExtras && (
+                <div className="mt-3 space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    {commonDiseasesList.map((disease) => {
+                      const isSelected = chronicDiseases.includes(disease);
+                      return (
+                        <button
+                          key={disease}
+                          type="button"
+                          onClick={() => toggleDisease(disease)}
+                          className={`min-h-[42px] px-2.5 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-slate-950 border-emerald-300'
+                              : 'bg-emerald-950/35 text-emerald-100 border-emerald-500/30 hover:bg-emerald-900/50'
+                          }`}
+                        >
+                          {disease}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <input
+                    type="text"
+                    value={vitalSigns}
+                    onChange={(e) => setVitalSigns(e.target.value)}
+                    placeholder={isAr ? 'العلامات الحيوية (مثال: ضغط 130/80، حرارة 38.2)' : 'Vitals e.g. BP 130/80, Temp 38.2C'}
+                    className="w-full min-h-[44px] bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-500 outline-none"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Primary CTA */}
             <button
+              type="button"
               onClick={handleEvaluate}
               disabled={isEvaluating || !symptoms.trim()}
-              className="w-full py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs sm:text-sm font-bold shadow-lg shadow-teal-600/20 transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-[54px] py-4 px-5 bg-gradient-to-r from-emerald-500 via-green-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-45 text-slate-950 rounded-2xl text-sm sm:text-base font-black shadow-xl shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               {isEvaluating ? (
                 <>
-                  <Activity className="w-4 h-4 animate-spin" />
-                  <span>{isAr ? 'جارٍ توليد التشخيص التفريقي (DDx)...' : 'Generating DDx Analysis...'}</span>
+                  <Activity className="w-5 h-5 animate-spin text-slate-950" />
+                  <span>{isAr ? 'جارٍ تحليل الأعراض...' : 'Analyzing symptoms...'}</span>
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
-                  <span>{isAr ? 'تحليل الأعراض واستخراج التشخيص التفريقي' : 'Run Differential Diagnosis'}</span>
+                  <Sparkles className="w-5 h-5 text-slate-950" />
+                  <span>{isAr ? 'تحليل الأعراض وإصدار التقييم' : 'Analyze Symptoms'}</span>
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Results */}
+        {/* Results Column */}
         <div className="lg:col-span-7">
           {errorMsg && (
             <div className="p-4 rounded-xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center gap-3 mb-4">
@@ -611,55 +568,48 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
           )}
 
           {result ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-5 print:bg-white print:text-black print:border-none print:shadow-none">
-              
-              {/* Header Actions: Print & Copy Report */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5 print:bg-white print:text-black">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3 print:hidden">
-                <span className="text-xs text-teal-400 font-bold flex items-center gap-1.5">
+                <span className="text-xs sm:text-sm text-emerald-400 font-bold flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4" />
-                  {isAr ? 'التقرير السريري المعتمد' : 'Clinical Diagnostic Report'}
+                  <span>{isAr ? 'التقييم السريري الأولي' : 'Clinical Assessment'}</span>
                 </span>
 
                 <div className="flex items-center gap-2">
                   <button
+                    type="button"
                     onClick={handleCopyReport}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 transition-all border border-slate-700"
+                    className="min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-xs font-bold text-slate-200 border border-slate-700 cursor-pointer"
                   >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span className="text-emerald-400">{isAr ? 'تم النسخ!' : 'Copied!'}</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>{isAr ? 'نسخ التقرير' : 'Copy'}</span>
-                      </>
-                    )}
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}</span>
                   </button>
 
                   <button
+                    type="button"
                     onClick={handlePrint}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-300 border border-teal-500/40 text-xs transition-all"
+                    className="min-h-[38px] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 text-xs font-bold cursor-pointer"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    <span>{isAr ? 'طباعة / PDF' : 'Print / PDF'}</span>
+                    <span>{isAr ? 'طباعة' : 'Print'}</span>
                   </button>
                 </div>
               </div>
 
-              {/* Top Impression & Urgency */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-slate-800 pb-4">
+              {/* Primary Impression & Urgency */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
                 <div>
-                  <span className="px-2.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/30 text-xs font-bold inline-block mb-1">
-                    {isAr ? 'الانطباع السريري الأولي (Primary Impression)' : 'Primary Clinical Impression'}
+                  <span className="text-xs text-emerald-400 font-bold block">
+                    {isAr ? 'الاحتمال الأبرز' : 'Primary Impression'}
                   </span>
-                  <h3 className="text-lg font-bold text-white print:text-black">{result.primaryCondition || 'التقييم السريري'}</h3>
+                  <h3 className="text-lg sm:text-xl font-black text-white mt-0.5 print:text-black">
+                    {result.primaryCondition || 'التقييم السريري'}
+                  </h3>
                 </div>
 
-                <div className={`px-3 py-1.5 rounded-xl text-xs font-bold border self-start ${
+                <div className={`px-3.5 py-2 rounded-xl text-xs font-bold border self-start shrink-0 ${
                   result.urgency === 'critical'
-                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/50 animate-pulse'
+                    ? 'bg-rose-950/80 text-rose-300 border-rose-500/50'
                     : result.urgency === 'urgent'
                     ? 'bg-amber-950/80 text-amber-300 border-amber-500/50'
                     : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/50'
@@ -669,30 +619,25 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
               </div>
 
               {/* Recommended Specialty */}
-              <div className="bg-teal-950/30 border border-teal-500/30 rounded-xl p-3.5 flex items-center justify-between">
+              <div className="bg-emerald-950/25 border border-emerald-500/30 rounded-xl p-4 flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] text-teal-400 block font-semibold">
-                    {isAr ? 'التخصص الطبي الدقيق الموصى به:' : 'Recommended Medical Specialty:'}
+                  <span className="text-xs text-emerald-400 block font-semibold">
+                    {isAr ? 'التخصص الطبي الموصى به:' : 'Recommended Specialty:'}
                   </span>
-                  <span className="text-sm font-bold text-white">{result.recommendedSpecialty}</span>
+                  <span className="text-sm sm:text-base font-bold text-white">{result.recommendedSpecialty}</span>
                 </div>
-                <Stethoscope className="w-5 h-5 text-teal-400" />
+                <Stethoscope className="w-5 h-5 text-emerald-400 shrink-0" />
               </div>
 
-              {/* Differential Diagnosis (DDx) Ranked Table */}
+              {/* Differential Diagnoses */}
               {result.differentialDiagnoses && result.differentialDiagnoses.length > 0 && (
                 <div className="space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-teal-400" />
-                      <span>{isAr ? 'قائمة التشخيص التفريقي (Differential Diagnoses - DDx):' : 'Differential Diagnosis Workup (DDx):'}</span>
-                    </h4>
-                    <span className="text-[10px] text-slate-400">
-                      {isAr ? 'مرتب حسب درجة الاحتمال والخطورة' : 'Ranked by likelihood & acuity'}
-                    </span>
-                  </div>
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-200 flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-emerald-400" />
+                    <span>{isAr ? 'التشخيصات التفريقية المحتملة:' : 'Differential Diagnoses:'}</span>
+                  </h4>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     {result.differentialDiagnoses.map((ddx: any, idx: number) => {
                       const isMustRuleOut = ddx.category === 'must_rule_out';
                       const isLikely = ddx.category === 'most_likely';
@@ -700,49 +645,42 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
                       return (
                         <div
                           key={idx}
-                          className={`p-3.5 rounded-xl border transition-all ${
+                          className={`p-4 rounded-xl border space-y-2 ${
                             isMustRuleOut
-                              ? 'bg-rose-950/20 border-rose-500/40 text-slate-200'
+                              ? 'bg-rose-950/20 border-rose-500/40'
                               : isLikely
-                              ? 'bg-teal-950/20 border-teal-500/40 text-slate-200'
-                              : 'bg-slate-950 border-slate-800 text-slate-200'
+                              ? 'bg-emerald-950/20 border-emerald-500/40'
+                              : 'bg-slate-950 border-slate-800'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2 mb-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                isMustRuleOut
-                                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                                  : isLikely
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                                  : 'bg-slate-800 text-slate-300'
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <span className={`text-[11px] font-bold block mb-0.5 ${
+                                isMustRuleOut ? 'text-rose-300' : isLikely ? 'text-emerald-300' : 'text-slate-400'
                               }`}>
                                 {isMustRuleOut
-                                  ? (isAr ? '⚠️ يجب استبعاده (Rule Out)' : '⚠️ Must Rule Out')
+                                  ? (isAr ? 'يجب استبعاده' : 'Must Rule Out')
                                   : isLikely
-                                  ? (isAr ? '⭐ الأرجح (Most Likely)' : '⭐ Most Likely')
-                                  : (isAr ? 'وارد (Possible)' : 'Possible')}
+                                  ? (isAr ? 'الأرجح' : 'Most Likely')
+                                  : (isAr ? 'احتمال وارد' : 'Possible')}
                               </span>
-                              <span className="text-xs sm:text-sm font-bold text-white">{ddx.name}</span>
+                              <span className="text-sm font-bold text-white">{ddx.name}</span>
                             </div>
 
-                            <span className="text-xs font-mono font-bold text-teal-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 shrink-0">
+                            <span className="text-xs font-mono font-bold text-emerald-300 tabular-nums shrink-0">
                               {ddx.likelihood}
                             </span>
                           </div>
 
                           {ddx.rationale && (
-                            <p className="text-[11px] text-slate-300 leading-relaxed mb-1.5">
-                              <strong className="text-slate-400 font-semibold">{isAr ? 'الأساس السريري: ' : 'Rationale: '}</strong>
-                              {ddx.rationale}
-                            </p>
+                            <p className="text-xs text-slate-300 leading-relaxed">{ddx.rationale}</p>
                           )}
 
                           {ddx.confirmingTests && (
-                            <div className="text-[10px] text-teal-300/90 bg-slate-900/60 p-2 rounded-lg border border-slate-800/80 flex items-center gap-1.5">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-teal-400 shrink-0" />
+                            <div className="text-xs text-emerald-300 pt-1.5 border-t border-slate-800/80 flex items-start gap-1.5">
+                              <CheckCircle2 className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                               <span>
-                                <strong>{isAr ? 'الفحوصات التأكيدية: ' : 'Confirming Tests: '}</strong>
+                                <strong>{isAr ? 'فحوصات تأكيدية: ' : 'Confirming tests: '}</strong>
                                 {ddx.confirmingTests}
                               </span>
                             </div>
@@ -754,31 +692,27 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
                 </div>
               )}
 
-              {/* Recommended Lab & Imaging Tests */}
+              {/* Recommended Tests */}
               {result.recommendedTests && result.recommendedTests.length > 0 && (
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <h4 className="text-xs font-bold text-slate-200">
-                    {isAr ? 'الفحوصات والتحاليل التشخيصية الموصى بها:' : 'Recommended Diagnostic Workup:'}
+                    {isAr ? 'الفحوصات المقترحة:' : 'Recommended Tests:'}
                   </h4>
-                  <div className="flex flex-wrap gap-1.5">
-                    {result.recommendedTests.map((test: string, i: number) => (
-                      <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20">
-                        {test}
-                      </span>
-                    ))}
-                  </div>
+                  <p className="text-xs text-emerald-300 leading-relaxed">
+                    {result.recommendedTests.join(' · ')}
+                  </p>
                 </div>
               )}
 
-              {/* Red-Flags and Advice */}
-              <div className="bg-slate-950/80 rounded-xl p-4 border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                  <ShieldAlert className="w-4 h-4 text-amber-400" />
-                  <span>{isAr ? 'إشارات الخطر الفورية (Red Flags) والتوجيهات:' : 'Clinical Red Flags & Guidance:'}</span>
+              {/* Red Flags & Advice */}
+              <div className="bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-2.5">
+                <h4 className="text-xs sm:text-sm font-bold text-amber-300 flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 shrink-0" />
+                  <span>{isAr ? 'علامات الخطر والتوجيه' : 'Red Flags & Guidance'}</span>
                 </h4>
-                
+
                 {result.redFlags && result.redFlags.length > 0 && (
-                  <ul className="list-disc list-inside text-xs text-rose-300/90 space-y-1">
+                  <ul className="list-disc list-inside text-xs text-rose-300 space-y-1">
                     {result.redFlags.map((flag: string, i: number) => (
                       <li key={i}>{flag}</li>
                     ))}
@@ -786,52 +720,41 @@ export const ClinicalSymptomChecker: React.FC<ClinicalSymptomCheckerProps> = ({
                 )}
 
                 {result.clinicalSummary && (
-                  <p className="text-xs text-slate-300 leading-relaxed pt-1 border-t border-slate-800">
+                  <p className="text-xs text-slate-300 leading-relaxed pt-2 border-t border-slate-800">
                     {result.clinicalSummary}
                   </p>
                 )}
               </div>
 
-              {/* Disclaimer & Pharmacy Action */}
-              <div className="space-y-3 print:hidden">
-                <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-amber-300 text-[11px] flex items-start gap-2">
-                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>
-                    {isAr 
-                      ? 'هذا التقييم مولد بواسطة الذكاء الاصطناعي للأغراض الإرشادية والسريرية المساعدة فقط، ولا يُغني عن الفحص السريري المباشر للطبيب المعالج.'
-                      : 'This clinical differential diagnosis is generated for educational & decision-support purposes only and does not replace in-person medical evaluation.'
-                    }
-                  </span>
-                </div>
+              {/* AI Pharmacist Follow-up CTA */}
+              {onNavigateToAiChat && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToAiChat(result.primaryCondition)}
+                  className="w-full min-h-[48px] py-3 px-4 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/70 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer print:hidden"
+                >
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>{isAr ? 'استشر الصيدلاني الذكي حول هذا التشخيص' : 'Consult AI Pharmacist'}</span>
+                </button>
+              )}
 
-                {onNavigateToAiChat && (
-                  <button
-                    onClick={() => onNavigateToAiChat(result.primaryCondition)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-slate-800/80 hover:bg-slate-800 border border-teal-500/30 text-teal-300 text-xs font-bold flex items-center justify-center gap-2 transition-all"
-                  >
-                    <Sparkles className="w-4 h-4" />
-                    <span>{isAr ? 'استشر الصيدلاني الذكي حول أدوية هذا التشخيص' : 'Consult AI Pharmacist on Medication'}</span>
-                  </button>
-                )}
-              </div>
-
+              <p className="text-[11px] text-slate-500 text-center print:hidden">
+                {isAr
+                  ? 'هذا التقييم إرشادي مساعد ولا يغني عن الفحص السريري لدى الطبيب المختص.'
+                  : 'For clinical guidance only; does not replace in-person medical evaluation.'}
+              </p>
             </div>
           ) : (
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-12 text-center flex flex-col items-center justify-center min-h-[420px] text-slate-400 space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-slate-800/80 border border-slate-700/60 flex items-center justify-center text-teal-400 shadow-inner">
-                <Stethoscope className="w-8 h-8" />
+            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-10 text-center flex flex-col items-center justify-center min-h-[380px] text-slate-400 space-y-3">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-400">
+                <Stethoscope className="w-7 h-7" />
               </div>
-              <div className="max-w-md space-y-1.5">
-                <h4 className="text-base font-bold text-slate-200">
-                  {isAr ? 'أدخل بيانات المريض وشكواه السريرية' : 'Enter Patient Presentation to Generate DDx'}
-                </h4>
-                <p className="text-xs text-slate-400">
-                  {isAr
-                    ? 'يقوم المحرك السريري بمقارنة الشكوى مع آلاف البروتوكولات التشخيصية لتوليد قائمة بالتشخيصات التفريقية الأكثر احتمالاً والحرجة.'
-                    : 'The clinical engine cross-references clinical findings with medical guidelines to produce ranked differential diagnoses.'
-                  }
-                </p>
-              </div>
+              <h4 className="text-base font-bold text-slate-200">
+                {isAr ? 'التقييم الطبي بانتظار إدخال الأعراض' : 'Enter Symptoms to Begin'}
+              </h4>
+              <p className="text-xs text-slate-500 max-w-sm">
+                {isAr ? 'صف الأعراض أو اختر من الأجهزة الجانبية ثم اضغط تحليل.' : 'Describe symptoms or pick a body system to analyze.'}
+              </p>
             </div>
           )}
         </div>

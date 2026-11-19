@@ -24,7 +24,8 @@ import {
   Heart,
   Home,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Microscope
 } from 'lucide-react';
 
 export type ActiveTabType =
@@ -32,7 +33,8 @@ export type ActiveTabType =
   | 'relief'
   | 'drugs'
   | 'pregnancy'
-  | 'lab_imaging'
+  | 'lab'
+  | 'imaging'
   | 'symptoms'
   | 'pediatric'
   | 'interactions'
@@ -101,7 +103,8 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'home' as ActiveTabType, label: isAr ? 'الرئيسية (قائمة الميزات)' : 'Home (All Features)', icon: Home, highlight: true },
     { id: 'pregnancy' as ActiveTabType, label: isAr ? 'رعاية ومتابعة الحامل' : 'Maternal Care', icon: Heart, iconColor: 'text-rose-400' },
     { id: 'symptoms' as ActiveTabType, label: t.tab_symptoms, icon: Stethoscope, iconColor: 'text-teal-400' },
-    { id: 'lab_imaging' as ActiveTabType, label: isAr ? 'الأشعة وفحوصات المختبر' : 'X-Ray & Lab Tests', icon: FileText, iconColor: 'text-sky-400' },
+    { id: 'imaging' as ActiveTabType, label: isAr ? 'قراءة الأشعة والتصوير' : 'X-Ray & Radiology', icon: FileText, iconColor: 'text-sky-400' },
+    { id: 'lab' as ActiveTabType, label: isAr ? 'المختبر والتحاليل الطبية' : 'Lab Tests & Reports', icon: Microscope, iconColor: 'text-emerald-400' },
     { id: 'drugs' as ActiveTabType, label: t.tab_drugs, icon: Pill, iconColor: 'text-teal-400' },
     { id: 'pediatric' as ActiveTabType, label: t.tab_pediatric, icon: Baby, iconColor: 'text-amber-400' },
     { id: 'interactions' as ActiveTabType, label: t.tab_interactions, icon: ShieldAlert, iconColor: 'text-red-400' },
@@ -119,17 +122,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/95 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16 gap-3">
+        <div className="max-w-7xl mx-auto px-2.5 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
             
             {/* Left/Start: Square Menu Button + Brand Logo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
               
               {/* الزر المربع للقائمة الجانبية الشاقولية */}
               <button
                 id="btn-square-menu"
                 onClick={() => setSidebarOpen(true)}
-                className="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/90 flex items-center justify-center text-teal-400 hover:text-white transition-all shadow-sm active:scale-95 cursor-pointer"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/90 flex items-center justify-center text-teal-400 hover:text-white transition-all shadow-sm active:scale-95 cursor-pointer shrink-0"
                 title={isAr ? 'فتح القائمة الجانبية الشاقولية للميزات' : 'Open features sidebar'}
                 aria-label="القائمة الجانبية"
               >
@@ -139,14 +142,14 @@ export const Navbar: React.FC<NavbarProps> = ({
               {/* Logo & Brand */}
               <div
                 onClick={() => setActiveTab('home')}
-                className="flex items-center gap-2.5 cursor-pointer select-none"
+                className="flex items-center gap-2 cursor-pointer select-none min-w-0"
                 title={isAr ? 'العودة للصفحة الرئيسية' : 'Go to Home'}
               >
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white font-black">
-                  <Pill className="w-5 h-5 text-white -rotate-45" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 flex items-center justify-center shadow-lg shadow-teal-500/20 text-white font-black shrink-0">
+                  <Pill className="w-4 h-4 sm:w-5 sm:h-5 text-white -rotate-45" />
                 </div>
-                <div>
-                  <span className="font-black text-lg sm:text-xl text-white tracking-tight flex items-center gap-2">
+                <div className="min-w-0">
+                  <span className="font-black text-base sm:text-xl text-white tracking-tight flex items-center gap-2 whitespace-nowrap">
                     {t.brand_title}
                   </span>
                 </div>
@@ -169,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
 
             {/* Right: Bot + Language + Profile */}
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               
               {/* Telegram Bot */}
               <a
@@ -177,7 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 href="https://t.me/Drugscalculat_bot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-semibold transition-all whitespace-nowrap shrink-0"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-xs font-semibold transition-all whitespace-nowrap shrink-0"
                 title="فتح بوت جرعة على تليجرام"
               >
                 <Send className="w-3.5 h-3.5 text-sky-400" />
@@ -198,7 +201,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 id="language-switcher-btn"
                 onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-xs font-medium text-slate-200 transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700/80 text-[11px] sm:text-xs font-medium text-slate-200 transition-all whitespace-nowrap shrink-0 cursor-pointer"
                 title={isAr ? 'Switch to English' : 'التحويل إلى العربية'}
               >
                 <Globe className="w-3.5 h-3.5 text-teal-400" />
@@ -210,15 +213,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={onOpenWelcome || onOpenAuth}
-                  className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl px-2.5 py-1 transition-colors cursor-pointer shrink-0"
+                  className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl px-2 sm:px-2.5 py-1 transition-colors cursor-pointer shrink-0"
                   title={currentUser.username ? `@${currentUser.username.replace(/^@/, '')}` : currentUser.firstName}
                 >
                   <div className="text-right min-w-0">
-                    <span className="text-xs font-bold text-teal-300 max-w-[95px] sm:max-w-[140px] truncate block leading-tight">
+                    <span className="text-[11px] sm:text-xs font-bold text-teal-300 max-w-[74px] sm:max-w-[140px] truncate block leading-tight">
                       {currentUser.firstName}
                     </span>
                     {currentUser.username && currentUser.username !== 'guest_preview' && (
-                      <span className="text-[10px] font-mono text-sky-400 max-w-[95px] sm:max-w-[140px] truncate block leading-tight" dir="ltr">
+                      <span className="text-[10px] font-mono text-sky-400 max-w-[74px] sm:max-w-[140px] truncate block leading-tight" dir="ltr">
                         @{currentUser.username.replace(/^@/, '')}
                       </span>
                     )}

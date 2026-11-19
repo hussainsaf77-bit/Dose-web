@@ -1,42 +1,59 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  Heart, 
-  Baby, 
-  Calendar, 
-  ShieldAlert, 
-  AlertTriangle, 
-  CheckCircle2, 
-  Search, 
-  Pill, 
-  Apple, 
-  Activity, 
-  Clock, 
-  FileText, 
-  Printer, 
-  Copy, 
-  Sparkles, 
-  Info, 
-  ChevronRight, 
-  X, 
-  Stethoscope, 
-  UserCheck, 
-  AlertCircle 
+import {
+  Heart,
+  Baby,
+  Calendar,
+  ShieldAlert,
+  AlertTriangle,
+  CheckCircle2,
+  Search,
+  Pill,
+  Apple,
+  Activity,
+  FileText,
+  Printer,
+  Copy,
+  Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  X,
+  Stethoscope,
+  AlertCircle
 } from 'lucide-react';
-import { 
-  ObstetricProfile, 
-  calculateObstetricDates, 
-  assessObstetricRisk, 
-  CHRONIC_DISEASE_OPTIONS, 
-  PREGNANCY_DRUG_DATABASE, 
-  PREGNANCY_FOOD_RESTRICTIONS, 
-  STAGE_NUTRITION_RECOMMENDATIONS, 
-  PREGNANCY_ACTIVITY_GUIDELINES, 
-  PregnancyDrugInfo 
+import {
+  ObstetricProfile,
+  calculateObstetricDates,
+  assessObstetricRisk,
+  CHRONIC_DISEASE_OPTIONS,
+  PREGNANCY_DRUG_DATABASE,
+  PREGNANCY_FOOD_RESTRICTIONS,
+  STAGE_NUTRITION_RECOMMENDATIONS,
+  PREGNANCY_ACTIVITY_GUIDELINES
 } from '../data/pregnancyObstetricEngine';
 
+type PregnancyServiceTab =
+  | 'calculator'
+  | 'recommendations'
+  | 'drugs'
+  | 'vitals'
+  | 'nutrition'
+  | 'activity';
+
+const SERVICE_STEPS: { id: PregnancyServiceTab; step: number; label: string; icon: React.ReactNode }[] = [
+  { id: 'calculator', step: 1, label: 'حساب الحمل والولادة', icon: <Calendar className="w-4 h-4 shrink-0" /> },
+  { id: 'recommendations', step: 2, label: 'التوصيات والفحوصات', icon: <Stethoscope className="w-4 h-4 shrink-0" /> },
+  { id: 'drugs', step: 3, label: 'أمان الأدوية', icon: <Pill className="w-4 h-4 shrink-0" /> },
+  { id: 'vitals', step: 4, label: 'المتابعة الشهرية', icon: <Activity className="w-4 h-4 shrink-0" /> },
+  { id: 'nutrition', step: 5, label: 'التغذية والممنوعات', icon: <Apple className="w-4 h-4 shrink-0" /> },
+  { id: 'activity', step: 6, label: 'الحركة والطوارئ', icon: <ShieldAlert className="w-4 h-4 shrink-0" /> }
+];
+
 export const PregnancyCareSection: React.FC = () => {
-  // Navigation internal tabs
-  const [activeSubTab, setActiveSubTab] = useState<'profile' | 'vitals' | 'drugs' | 'nutrition' | 'activity'>('profile');
+  const [activeSubTab, setActiveSubTab] = useState<PregnancyServiceTab>('calculator');
+
+  // Nutrition & Activity sub-view toggles (for non-tiring, clean mobile browsing)
+  const [nutritionSubView, setNutritionSubView] = useState<'restrictions' | 't1' | 't2' | 't3'>('restrictions');
+  const [activitySubView, setActivitySubView] = useState<'red_flags' | 'safe' | 'avoid'>('red_flags');
 
   // Monthly Vitals Tracker States
   const [vitalGlucoseType, setVitalGlucoseType] = useState<'fasting' | 'postprandial' | 'random'>('fasting');
@@ -45,20 +62,13 @@ export const PregnancyCareSection: React.FC = () => {
   const [vitalDiastolic, setVitalDiastolic] = useState<number>(75);
   const [vitalWeightPre, setVitalWeightPre] = useState<number>(62);
   const [vitalWeightCurrent, setVitalWeightCurrent] = useState<number>(66);
-  const [vitalHeightCm, setVitalHeightCm] = useState<number>(165);
+  const [vitalHeightCm] = useState<number>(165);
   const [vitalMonth, setVitalMonth] = useState<number>(4);
-  const [peSymptoms, setPeSymptoms] = useState<{
-    headache: boolean;
-    blurryVision: boolean;
-    epigastricPain: boolean;
-    swelling: boolean;
-    proteinuria: boolean;
-  }>({
+  const [peSymptoms, setPeSymptoms] = useState({
     headache: false,
     blurryVision: false,
     epigastricPain: false,
-    swelling: false,
-    proteinuria: false,
+    swelling: false
   });
 
   // Recorded Vitals Log
@@ -91,14 +101,13 @@ export const PregnancyCareSection: React.FC = () => {
   // Obstetric Profile Inputs
   const [maternalAge, setMaternalAge] = useState<number>(28);
   const [lmpDate, setLmpDate] = useState<string>(() => {
-    // Default to ~12 weeks ago for instant realistic preview
     const d = new Date();
     d.setDate(d.getDate() - 84);
     return d.toISOString().split('T')[0];
   });
   const [cycleLength, setCycleLength] = useState<number>(28);
-  const [gravidity, setGravidity] = useState<number>(2); // 2nd pregnancy
-  const [parity, setParity] = useState<number>(1); // 1 previous birth
+  const [gravidity, setGravidity] = useState<number>(2);
+  const [parity, setParity] = useState<number>(1);
   const [abortions, setAbortions] = useState<number>(0);
   const [livingChildren, setLivingChildren] = useState<number>(1);
   const [selectedDiseases, setSelectedDiseases] = useState<string[]>([]);
@@ -113,14 +122,12 @@ export const PregnancyCareSection: React.FC = () => {
   // Copy feedback
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
-  // Toggle Chronic Disease
   const toggleDisease = (id: string) => {
-    setSelectedDiseases(prev => 
+    setSelectedDiseases(prev =>
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
     );
   };
 
-  // Build Obstetric Profile
   const obstetricProfile: ObstetricProfile = useMemo(() => ({
     maternalAge: Number(maternalAge) || 28,
     lmpDate,
@@ -139,7 +146,6 @@ export const PregnancyCareSection: React.FC = () => {
     hasPreviousPreeclampsia, hasPreviousPreterm
   ]);
 
-  // Calculations & Clinical Assessment
   const calculation = useMemo(() => {
     return calculateObstetricDates(lmpDate, cycleLength);
   }, [lmpDate, cycleLength]);
@@ -148,7 +154,6 @@ export const PregnancyCareSection: React.FC = () => {
     return assessObstetricRisk(obstetricProfile, calculation);
   }, [obstetricProfile, calculation]);
 
-  // Filtered Drugs
   const filteredDrugs = useMemo(() => {
     let list = PREGNANCY_DRUG_DATABASE;
     if (selectedDrugFilter !== 'all') {
@@ -156,7 +161,7 @@ export const PregnancyCareSection: React.FC = () => {
     }
     if (drugSearchQuery.trim()) {
       const q = drugSearchQuery.trim().toLowerCase();
-      list = list.filter(d => 
+      list = list.filter(d =>
         d.nameAr.toLowerCase().includes(q) ||
         d.nameEn.toLowerCase().includes(q) ||
         d.therapeuticClassAr.toLowerCase().includes(q) ||
@@ -166,29 +171,23 @@ export const PregnancyCareSection: React.FC = () => {
     return list;
   }, [drugSearchQuery, selectedDrugFilter]);
 
-  // Copy summary to clipboard
   const handleCopySummary = async () => {
     if (!calculation) return;
-    const summaryText = `🤰 تقرير صحة ورعاية الحامل السريري (Dose Obstetric Care)
----------------------------------------------
+    const summaryText = `تقرير رعاية وصحة الحامل (Dose)
 • عمر الأم: ${maternalAge} عاماً
-• عمر الحمل الحالي: ${calculation.gestationalWeeks} أسبوع و ${calculation.gestationalDays} يوم (${calculation.trimesterNameAr})
-• الشهر التقريبي: الشهر ${calculation.pregnancyMonth}
-• موعد الولادة المتوقع (EDD): ${calculation.estimatedDueDateFormattedAr}
-• الأيام المتبقية للولادة: ${calculation.daysRemaining} يوماً تقريباً
-• التنسيق التوليدي: G${gravidity} P${parity} A${abortions} L${livingChildren}
-• تصنيف الخطورة: ${riskAssessment.riskLabelAr}
-• الفحوصات الموصى بها لهذا الأسبوع:
-${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingAr})`).join('\n')}
-
-تم استخراج التقرير عبر محرك Dose الطبي السريري.`;
+• عمر الحمل: ${calculation.gestationalWeeks} أسبوع و ${calculation.gestationalDays} يوم (${calculation.trimesterNameAr})
+• موعد الولادة المتوقع: ${calculation.estimatedDueDateFormattedAr} (متبقي ${calculation.daysRemaining} يوماً)
+• التصنيف التوليدي: G${gravidity} P${parity} A${abortions} L${livingChildren}
+• تقييم الخطورة: ${riskAssessment.riskLabelAr}
+• الفحوصات الموصى بها:
+${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingAr})`).join('\n')}`;
 
     try {
       await navigator.clipboard.writeText(summaryText);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2500);
     } catch {
-      // fallback
+      // ignore clipboard errors
     }
   };
 
@@ -196,479 +195,605 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
     window.print();
   };
 
+  const currentStepIdx = SERVICE_STEPS.findIndex(s => s.id === activeSubTab);
+  const prevStep = currentStepIdx > 0 ? SERVICE_STEPS[currentStepIdx - 1] : null;
+  const nextStep = currentStepIdx < SERVICE_STEPS.length - 1 ? SERVICE_STEPS[currentStepIdx + 1] : null;
+
+  const goToStep = (tab: PregnancyServiceTab) => {
+    setActiveSubTab(tab);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <div className="w-full max-w-7xl mx-auto px-3 sm:px-6 py-6 font-sans text-slate-100" dir="rtl">
-      
-      {/* Top Banner & Header */}
-      <div className="rounded-3xl bg-gradient-to-br from-rose-950/60 via-slate-900 to-slate-950 border border-rose-500/30 p-5 sm:p-8 shadow-2xl mb-8">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-rose-400 text-xs font-bold tracking-wide">
-              <Baby className="w-4 h-4" />
-              <span>رعاية الحوامل والتوليد السريري</span>
+    <div className="w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 font-sans text-slate-100 space-y-5" dir="rtl">
+
+      {/* Compact Clean Header + Mobile-First Service Navigation Grid */}
+      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
+              <Baby className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white tracking-tight flex items-center gap-3">
-              <span>رعاية وصحة الحامل</span>
-              <span className="text-rose-400">والأمان الدوائي</span>
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-              حساب دقيق لأسابيع الحمل وموعد الولادة بقاعدة نيجيل، تصنيف المخاطر التوليدية (G/P/A)، كاشف أمان الأدوية حسب ثلث الحمل، دليل التغذية الحصري والممنوعات، وإرشادات الحركة وعلامات الإنذار.
-            </p>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-black text-white">
+                رعاية وصحة الحامل
+              </h1>
+              <p className="text-xs text-slate-400">
+                اختر الخدمة المطلوبة أو اتبع الخطوات بالترتيب
+              </p>
+            </div>
           </div>
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
+              type="button"
               onClick={handleCopySummary}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 shadow-sm transition-all cursor-pointer"
+              className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700 transition-all cursor-pointer"
             >
               {copySuccess ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-slate-300" />}
-              <span>{copySuccess ? 'تم نسخ التقرير!' : 'نسخ التقرير الطبي'}</span>
+              <span>{copySuccess ? 'تم النسخ' : 'نسخ التقرير'}</span>
             </button>
             <button
+              type="button"
               onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-600/90 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/30 transition-all cursor-pointer"
+              className="min-h-[42px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 text-xs font-bold border border-rose-500/35 transition-all cursor-pointer"
             >
               <Printer className="w-4 h-4" />
-              <span>طباعة التقرير</span>
+              <span>طباعة</span>
             </button>
           </div>
         </div>
 
-        {/* Sub-Tabs Navigation */}
-        <div className="relative z-10 flex items-center gap-2 mt-8 overflow-x-auto pb-2 border-b border-slate-800">
-          <button
-            onClick={() => setActiveSubTab('profile')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'profile'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            <span>الملف التوليدي وحساب الحمل</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('vitals')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'vitals'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Activity className="w-4 h-4 text-emerald-400" />
-            <span>سجل القياسات الشهرية (سكر، ضغط، وزن)</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('drugs')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'drugs'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Pill className="w-4 h-4" />
-            <span>كاشف أمان الأدوية في الحمل</span>
-            <span className="px-1.5 py-0.5 rounded-full bg-rose-950/80 text-[10px] text-rose-300 border border-rose-500/40 font-mono">
-              {PREGNANCY_DRUG_DATABASE.length}
-            </span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('nutrition')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'nutrition'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Apple className="w-4 h-4" />
-            <span>دليل التغذية والممنوعات</span>
-          </button>
-          <button
-            onClick={() => setActiveSubTab('activity')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all whitespace-nowrap cursor-pointer ${
-              activeSubTab === 'activity'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/30'
-                : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Activity className="w-4 h-4" />
-            <span>المشي والرياضة وعلامات الطوارئ</span>
-          </button>
+        {/* 6 Clear Mobile-Ready Service Buttons (No horizontal overflow) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-3 border-t border-slate-800">
+          {SERVICE_STEPS.map((srv) => {
+            const isActive = activeSubTab === srv.id;
+            return (
+              <button
+                key={srv.id}
+                type="button"
+                onClick={() => setActiveSubTab(srv.id)}
+                className={`min-h-[54px] px-3 py-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer text-center leading-snug ${
+                  isActive
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-300 shadow-lg shadow-rose-500/25'
+                    : 'bg-slate-950/80 hover:bg-rose-950/35 text-slate-200 border-slate-800 hover:border-rose-500/40'
+                }`}
+              >
+                <span className={`w-5 h-5 rounded-md text-[11px] font-mono font-black flex items-center justify-center shrink-0 ${
+                  isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-rose-300'
+                }`}>
+                  {srv.step}
+                </span>
+                {srv.icon}
+                <span className="truncate">{srv.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* TAB 1: OBSTETRIC PROFILE & CALCULATOR */}
-      {activeSubTab === 'profile' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Inputs Section (Left / 5 cols) */}
-          <div className="lg:col-span-5 space-y-5">
-            <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <h2 className="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
-                <Calendar className="w-4 h-4 text-rose-400" />
-                <span>البيانات التوليدية للأم (Obstetric History)</span>
-              </h2>
+      {/* STEP 1: GESTATIONAL AGE & DUE DATE CALCULATOR */}
+      {activeSubTab === 'calculator' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Focused Calculator Inputs */}
+          <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <h2 className="text-base font-bold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
+              <Calendar className="w-4 h-4 text-rose-400" />
+              <span>حساب عمر الحمل وموعد الولادة</span>
+            </h2>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    عمر الأم (سنة)
-                  </label>
-                  <input
-                    type="number"
-                    min="14"
-                    max="55"
-                    value={maternalAge}
-                    onChange={(e) => setMaternalAge(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500"
-                  />
-                  {maternalAge >= 35 && (
-                    <span className="text-[10px] text-amber-400 mt-1 block">
-                      ⚠️ عمر الأم ≥ 35 (حمل متقدم المتابعة)
-                    </span>
-                  )}
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                أول يوم لآخر دورة شهرية (LMP)
+              </label>
+              <input
+                type="date"
+                value={lmpDate}
+                onChange={(e) => setLmpDate(e.target.value)}
+                className="w-full min-h-[48px] bg-slate-950 border border-slate-700 focus:border-rose-500 rounded-xl px-3.5 py-2.5 text-sm text-white font-mono outline-none"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    طول الدورة الشهرية (يوم)
-                  </label>
-                  <input
-                    type="number"
-                    min="21"
-                    max="45"
-                    value={cycleLength}
-                    onChange={(e) => setCycleLength(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500"
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  أول يوم لآخر دورة شهرية (LMP)
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  طول الدورة (يوم)
                 </label>
                 <input
-                  type="date"
-                  value={lmpDate}
-                  onChange={(e) => setLmpDate(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-rose-500 font-mono"
+                  type="number"
+                  min="21"
+                  max="45"
+                  value={cycleLength}
+                  onChange={(e) => setCycleLength(Number(e.target.value))}
+                  className="w-full min-h-[46px] bg-slate-950 border border-slate-700 focus:border-rose-500 rounded-xl px-3 py-2 text-sm text-center text-white font-mono font-bold outline-none"
                 />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  تعتمد قاعدة نيجيل (Naegele) لحساب موعد الولادة المتوقع وعمر الحمل.
-                </span>
               </div>
-
-              {/* GPA (Gravidity / Parity / Abortions / Living) */}
-              <div className="pt-2 border-t border-slate-800">
-                <label className="block text-xs font-semibold text-slate-300 mb-2">
-                  التصنيف التوليدي السريري (GPA Profile):
+              <div>
+                <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                  عمر الأم (سنة)
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <span className="text-[10px] text-slate-400 block">مرات الحمل (G)</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="15"
-                      value={gravidity}
-                      onChange={(e) => setGravidity(Number(e.target.value))}
-                      className="w-full bg-transparent text-center font-bold text-sm text-rose-300 outline-none"
-                    />
-                  </div>
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <span className="text-[10px] text-slate-400 block">الولادات (P)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="15"
-                      value={parity}
-                      onChange={(e) => setParity(Number(e.target.value))}
-                      className="w-full bg-transparent text-center font-bold text-sm text-teal-300 outline-none"
-                    />
-                  </div>
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <span className="text-[10px] text-slate-400 block">الإسقاطات (A)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      value={abortions}
-                      onChange={(e) => setAbortions(Number(e.target.value))}
-                      className="w-full bg-transparent text-center font-bold text-sm text-amber-300 outline-none"
-                    />
-                  </div>
-                  <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
-                    <span className="text-[10px] text-slate-400 block">أحياء (L)</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="15"
-                      value={livingChildren}
-                      onChange={(e) => setLivingChildren(Number(e.target.value))}
-                      className="w-full bg-transparent text-center font-bold text-sm text-emerald-300 outline-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Special Obstetric flags */}
-              <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isMultiplePregnancy}
-                    onChange={(e) => setIsMultiplePregnancy(e.target.checked)}
-                    className="w-4 h-4 rounded text-rose-500 focus:ring-0 bg-slate-950 border-slate-700"
-                  />
-                  <span>حمل توأمي / متعدد الأجنة (Twin/Multiple)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hasPreviousPreeclampsia}
-                    onChange={(e) => setHasPreviousPreeclampsia(e.target.checked)}
-                    className="w-4 h-4 rounded text-rose-500 focus:ring-0 bg-slate-950 border-slate-700"
-                  />
-                  <span>تاريخ سابق للإصابة بتسمم الحمل (Pre-eclampsia)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={hasPreviousPreterm}
-                    onChange={(e) => setHasPreviousPreterm(e.target.checked)}
-                    className="w-4 h-4 rounded text-rose-500 focus:ring-0 bg-slate-950 border-slate-700"
-                  />
-                  <span>تاريخ سابق للولادة المبكرة (Preterm Delivery)</span>
-                </label>
-              </div>
-
-              {/* Chronic Diseases Multi-select */}
-              <div className="pt-3 border-t border-slate-800">
-                <label className="block text-xs font-semibold text-slate-300 mb-2 flex items-center justify-between">
-                  <span>الأمراض المزمنة والمصاحبة:</span>
-                  <span className="text-[10px] text-rose-400 font-mono">
-                    {selectedDiseases.length} محددة
-                  </span>
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pr-1">
-                  {CHRONIC_DISEASE_OPTIONS.map((dis) => {
-                    const isSelected = selectedDiseases.includes(dis.id);
-                    return (
-                      <button
-                        key={dis.id}
-                        type="button"
-                        onClick={() => toggleDisease(dis.id)}
-                        className={`text-right px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all cursor-pointer flex items-center justify-between ${
-                          isSelected
-                            ? 'bg-rose-500/20 text-rose-200 border-rose-500/50'
-                            : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="truncate">{dis.labelAr}</span>
-                        {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-rose-400 shrink-0 mr-1" />}
-                      </button>
-                    );
-                  })}
-                </div>
+                <input
+                  type="number"
+                  min="14"
+                  max="55"
+                  value={maternalAge}
+                  onChange={(e) => setMaternalAge(Number(e.target.value))}
+                  className="w-full min-h-[46px] bg-slate-950 border border-slate-700 focus:border-rose-500 rounded-xl px-3 py-2 text-sm text-center text-white font-mono font-bold outline-none"
+                />
               </div>
             </div>
+
+            {maternalAge >= 35 && (
+              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-xs text-amber-300">
+                عمر الأم 35 عاماً فأكثر يتطلب متابعة طبية إضافية.
+              </div>
+            )}
           </div>
 
-          {/* Results & Clinical Assessment (Right / 7 cols) */}
-          <div className="lg:col-span-7 space-y-5">
+          {/* Clear Calculator Results */}
+          <div className="lg:col-span-7">
             {calculation ? (
-              <>
-                {/* Gestational Age Card */}
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 border border-rose-500/40 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-                    <div>
-                      <span className="text-[11px] text-rose-400 font-bold uppercase tracking-wider block">
-                        {calculation.trimesterNameAr}
-                      </span>
-                      <h3 className="text-2xl sm:text-3xl font-black text-white mt-0.5">
-                        الأسبوع {calculation.gestationalWeeks}{' '}
-                        <span className="text-base sm:text-lg font-semibold text-rose-300">
-                          و {calculation.gestationalDays} يوم
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-1">
-                        تقريباً في نهاية <strong>الشهر {calculation.pregnancyMonth}</strong> من الحمل
-                      </p>
+              <div className="bg-slate-900 border border-rose-500/35 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+                  <div>
+                    <div className="text-xs text-rose-400 font-bold">
+                      {calculation.trimesterNameAr} · الشهر {calculation.pregnancyMonth}
                     </div>
-
-                    <div className="bg-slate-950/80 border border-slate-800 p-3 rounded-xl text-center sm:text-left">
-                      <span className="text-[10px] text-slate-400 block font-medium">موعد الولادة المتوقع (EDD)</span>
-                      <span className="text-sm font-bold text-emerald-400 block mt-0.5">
-                        {calculation.estimatedDueDateFormattedAr}
+                    <h3 className="text-2xl sm:text-3xl font-black text-white mt-1 tabular-nums">
+                      الأسبوع {calculation.gestationalWeeks}{' '}
+                      <span className="text-base sm:text-lg font-semibold text-rose-300">
+                        و {calculation.gestationalDays} يوم
                       </span>
-                      <span className="text-[10px] text-slate-400 block mt-0.5">
-                        متبقي <strong>{calculation.daysRemaining}</strong> يوماً للولادة
-                      </span>
-                    </div>
+                    </h3>
                   </div>
 
-                  {/* Progress Bar */}
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                      <span>بداية الحمل</span>
-                      <span className="text-rose-400 font-bold">{calculation.progressPercent}% تم إنجازه</span>
-                      <span>موعد الولادة</span>
-                    </div>
-                    <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-emerald-400 transition-all duration-500"
-                        style={{ width: `${calculation.progressPercent}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Fetal Milestone Card */}
-                  <div className="mt-4 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-rose-500/20 flex items-center justify-center shrink-0 text-rose-300">
-                      <Baby className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-rose-200">
-                          حجم وتطور الجنين الحالي:
-                        </span>
-                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold">
-                          {calculation.fetalSizeComparisonAr}
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 leading-relaxed mt-1">
-                        {calculation.fetalDevelopmentSummaryAr}
-                      </p>
-                    </div>
+                  <div className="bg-slate-950 border border-slate-800 px-4 py-3 rounded-xl text-center sm:text-left">
+                    <span className="text-[11px] text-slate-400 block">موعد الولادة المتوقع</span>
+                    <span className="text-sm sm:text-base font-bold text-emerald-400 block mt-0.5">
+                      {calculation.estimatedDueDateFormattedAr}
+                    </span>
+                    <span className="text-xs text-slate-300 block mt-0.5 tabular-nums">
+                      متبقي {calculation.daysRemaining} يوماً
+                    </span>
                   </div>
                 </div>
 
-                {/* Obstetric Risk Assessment Card */}
-                <div className={`border rounded-2xl p-5 shadow-xl ${riskAssessment.riskColor}`}>
-                  <div className="flex items-center justify-between pb-3 border-b border-current/20 mb-3">
-                    <div className="flex items-center gap-2">
-                      <ShieldAlert className="w-5 h-5" />
-                      <h4 className="text-sm font-bold">{riskAssessment.riskLabelAr}</h4>
-                    </div>
-                    <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-current/20">
-                      تقييم بروتوكول ACOG
-                    </span>
+                {/* Progress Bar */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
+                    <span>بداية الحمل</span>
+                    <span className="text-rose-400 font-bold tabular-nums">{calculation.progressPercent}%</span>
+                    <span>الولادة</span>
                   </div>
+                  <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-rose-500 via-pink-500 to-emerald-400 transition-all duration-500"
+                      style={{ width: `${calculation.progressPercent}%` }}
+                    />
+                  </div>
+                </div>
 
-                  {/* Risk Factors list */}
-                  {riskAssessment.riskFactors.length > 0 ? (
-                    <div className="space-y-2 mb-4">
-                      <span className="text-xs font-bold block">عوامل الخطورة المرصودة:</span>
-                      {riskAssessment.riskFactors.map((rf, idx) => (
-                        <div key={idx} className="bg-slate-950/70 p-2.5 rounded-xl border border-slate-800/80 text-xs text-slate-200">
-                          <strong className="text-rose-300 block mb-0.5">{rf.titleAr}</strong>
-                          <span className="text-slate-400">{rf.descriptionAr}</span>
-                        </div>
-                      ))}
+                {/* Fetal Growth Summary (Clean unboxed metadata, no squished pill) */}
+                <div className="bg-rose-950/25 border border-rose-500/25 rounded-xl p-4 flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0 text-rose-300">
+                    <Baby className="w-5 h-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs sm:text-sm font-bold text-white">
+                      حجم الجنين: <span className="text-rose-300">{calculation.fetalSizeComparisonAr}</span>
                     </div>
-                  ) : (
-                    <p className="text-xs text-emerald-300 mb-4 leading-relaxed">
-                      ✅ الحمل يسير بمسار اعتيادي منخفض الخطورة دون عوامل خطر حرجة مرصودة في التاريخ الطبي للأم.
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      {calculation.fetalDevelopmentSummaryAr}
                     </p>
-                  )}
-
-                  {/* Preventive Protocols */}
-                  {riskAssessment.clinicalProtocols.length > 0 && (
-                    <div className="space-y-2 pt-3 border-t border-current/20">
-                      <span className="text-xs font-bold block flex items-center gap-1.5">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                        <span>البروتوكولات الوقائية والدوائية الموصى بها:</span>
-                      </span>
-                      {riskAssessment.clinicalProtocols.map((proto, idx) => (
-                        <div key={idx} className="bg-slate-950/80 p-2.5 rounded-xl border border-amber-500/30 text-xs">
-                          <strong className="text-amber-300 block mb-0.5">📌 {proto.titleAr}</strong>
-                          <span className="text-slate-300">{proto.descriptionAr}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Recommended Labs for this stage */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
-                  <h4 className="text-sm font-bold text-white flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Stethoscope className="w-4 h-4 text-teal-400" />
-                      <span>الفحوصات والتحاليل المطلوبة لهذا الأسبوع تحديداً:</span>
-                    </span>
-                    <span className="text-[10px] text-teal-300 bg-teal-500/20 px-2 py-0.5 rounded-full font-mono">
-                      الأسبوع {calculation.gestationalWeeks}
-                    </span>
-                  </h4>
-
-                  <div className="space-y-2.5">
-                    {riskAssessment.recommendedLabsThisStage.map((lab, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-xl border text-xs flex items-start gap-3 ${
-                          lab.isUrgent
-                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-200'
-                            : 'bg-slate-950 border-slate-800 text-slate-300'
-                        }`}
-                      >
-                        <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${lab.isUrgent ? 'bg-rose-500' : 'bg-teal-400'}`} />
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <strong className="text-white text-xs">{lab.nameAr}</strong>
-                            <span className="text-[10px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300">
-                              {lab.timingAr}
-                            </span>
-                            {lab.isUrgent && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-rose-500 text-white font-bold">
-                                عاجل / هام
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[11px] text-slate-400 leading-relaxed">
-                            {lab.importanceAr}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </div>
-              </>
+              </div>
             ) : (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
                 <AlertCircle className="w-8 h-8 mx-auto text-amber-400 mb-2" />
-                <p className="text-sm font-bold text-slate-200">يرجى إدخال تاريخ أول يوم لآخر دورة شهرية (LMP) لحساب الحمل.</p>
+                <p className="text-sm font-bold text-slate-200">أدخلي تاريخ أول يوم لآخر دورة لحساب عمر الحمل.</p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* TAB: MONTHLY VITALS TRACKER (SUGAR, BP, WEIGHT) */}
-      {activeSubTab === 'vitals' && (
-        <div className="space-y-6">
-          {/* Header Banner */}
-          <div className="bg-gradient-to-r from-emerald-950/60 via-slate-900 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                <Activity className="w-4 h-4" />
-                <span>بروتوكول الفحص الدوري الشهري للحامل (ACOG Guidelines)</span>
+      {/* STEP 2: CLINICAL RECOMMENDATIONS, RISK & STAGE LABS */}
+      {activeSubTab === 'recommendations' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Obstetric History & Chronic Diseases */}
+          <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <h2 className="text-base font-bold text-white flex items-center gap-2 pb-3 border-b border-slate-800">
+              <FileText className="w-4 h-4 text-rose-400" />
+              <span>التاريخ التوليدي والحالة الصحية</span>
+            </h2>
+
+            {/* GPA Grid */}
+            <div className="grid grid-cols-4 gap-2">
+              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                <span className="text-[11px] text-slate-400 block">الحمل (G)</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="15"
+                  value={gravidity}
+                  onChange={(e) => setGravidity(Number(e.target.value))}
+                  className="w-full bg-transparent text-center font-bold text-base text-rose-300 outline-none mt-1"
+                />
               </div>
-              <h3 className="text-lg sm:text-xl font-extrabold text-white">
-                سجل المتابعة الشهرية: السكر، ضغط الدم، والزيادة الصحية للوزن
+              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                <span className="text-[11px] text-slate-400 block">الولادات (P)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="15"
+                  value={parity}
+                  onChange={(e) => setParity(Number(e.target.value))}
+                  className="w-full bg-transparent text-center font-bold text-base text-teal-300 outline-none mt-1"
+                />
+              </div>
+              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                <span className="text-[11px] text-slate-400 block">إسقاط (A)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="10"
+                  value={abortions}
+                  onChange={(e) => setAbortions(Number(e.target.value))}
+                  className="w-full bg-transparent text-center font-bold text-base text-amber-300 outline-none mt-1"
+                />
+              </div>
+              <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-center">
+                <span className="text-[11px] text-slate-400 block">أحياء (L)</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="15"
+                  value={livingChildren}
+                  onChange={(e) => setLivingChildren(Number(e.target.value))}
+                  className="w-full bg-transparent text-center font-bold text-base text-emerald-300 outline-none mt-1"
+                />
+              </div>
+            </div>
+
+            {/* Obstetric Checkboxes */}
+            <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isMultiplePregnancy}
+                  onChange={(e) => setIsMultiplePregnancy(e.target.checked)}
+                  className="w-4 h-4 rounded accent-rose-500"
+                />
+                <span>حمل توأمي / متعدد الأجنة</span>
+              </label>
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hasPreviousPreeclampsia}
+                  onChange={(e) => setHasPreviousPreeclampsia(e.target.checked)}
+                  className="w-4 h-4 rounded accent-rose-500"
+                />
+                <span>تاريخ سابق لتسمم الحمل</span>
+              </label>
+              <label className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/60 border border-slate-800/80 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hasPreviousPreterm}
+                  onChange={(e) => setHasPreviousPreterm(e.target.checked)}
+                  className="w-4 h-4 rounded accent-rose-500"
+                />
+                <span>تاريخ سابق للولادة المبكرة</span>
+              </label>
+            </div>
+
+            {/* Chronic Diseases */}
+            <div className="pt-2 border-t border-slate-800 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-300">
+                <span>الأمراض المزمنة المصاحبة</span>
+                <span className="text-rose-400 font-mono">{selectedDiseases.length} محددة</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto pr-1">
+                {CHRONIC_DISEASE_OPTIONS.map((dis) => {
+                  const isSelected = selectedDiseases.includes(dis.id);
+                  return (
+                    <button
+                      key={dis.id}
+                      type="button"
+                      onClick={() => toggleDisease(dis.id)}
+                      className={`min-h-[42px] text-right px-3 py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                        isSelected
+                          ? 'bg-rose-500/20 text-rose-100 border-rose-500/50'
+                          : 'bg-slate-950/70 text-slate-300 border-slate-800 hover:border-slate-700'
+                      }`}
+                    >
+                      <span className="leading-snug">{dis.labelAr}</span>
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-rose-400 shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Risk, Protocols & Recommended Labs */}
+          <div className="lg:col-span-7 space-y-5">
+            {/* Risk & Preventive Recommendations Card */}
+            <div className={`border rounded-2xl p-5 shadow-xl space-y-4 ${riskAssessment.riskColor}`}>
+              <div className="flex items-center justify-between gap-2 pb-3 border-b border-current/20">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-5 h-5 shrink-0" />
+                  <h3 className="text-sm sm:text-base font-bold">{riskAssessment.riskLabelAr}</h3>
+                </div>
+                <span className="text-xs font-semibold opacity-80 shrink-0">بروتوكول ACOG</span>
+              </div>
+
+              {riskAssessment.riskFactors.length > 0 ? (
+                <div className="space-y-2">
+                  <span className="text-xs font-bold block">عوامل الخطورة:</span>
+                  {riskAssessment.riskFactors.map((rf, idx) => (
+                    <div key={idx} className="bg-slate-950/75 p-3 rounded-xl border border-slate-800 text-xs">
+                      <strong className="text-rose-300 block mb-0.5">{rf.titleAr}</strong>
+                      <span className="text-slate-300 leading-relaxed">{rf.descriptionAr}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs sm:text-sm text-emerald-300 leading-relaxed">
+                  الحمل يسير بمسار منخفض الخطورة دون عوامل خطر حرجة مرصودة.
+                </p>
+              )}
+
+              {riskAssessment.clinicalProtocols.length > 0 && (
+                <div className="space-y-2 pt-3 border-t border-current/20">
+                  <span className="text-xs font-bold flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-300" />
+                    <span>التعليمات والتوصيات الوقائية:</span>
+                  </span>
+                  {riskAssessment.clinicalProtocols.map((proto, idx) => (
+                    <div key={idx} className="bg-slate-950/80 p-3 rounded-xl border border-amber-500/30 text-xs space-y-1">
+                      <strong className="text-amber-300 block">{proto.titleAr}</strong>
+                      <span className="text-slate-300 leading-relaxed block">{proto.descriptionAr}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recommended Labs for This Stage */}
+            {calculation && (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3.5">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <h4 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-emerald-400" />
+                    <span>الفحوصات المطلوبة حالياً</span>
+                  </h4>
+                  <span className="text-xs text-emerald-400 font-bold tabular-nums">
+                    الأسبوع {calculation.gestationalWeeks}
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {riskAssessment.recommendedLabsThisStage.map((lab, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                        lab.isUrgent
+                          ? 'bg-rose-950/35 border-rose-500/40 text-rose-100'
+                          : 'bg-slate-950/80 border-slate-800 text-slate-200'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <strong className="text-white text-xs sm:text-sm">{lab.nameAr}</strong>
+                        <span className={`text-[11px] font-semibold ${lab.isUrgent ? 'text-rose-300' : 'text-teal-300'}`}>
+                          {lab.timingAr}{lab.isUrgent ? ' · عاجل' : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed">
+                        {lab.importanceAr}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* STEP 3: PREGNANCY DRUG SAFETY CHECKER */}
+      {activeSubTab === 'drugs' && (
+        <div className="space-y-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="ابحثي عن أي دواء (مثلاً: باراسيتامول، بروفين، أوجمنتين، كليكسان)..."
+                value={drugSearchQuery}
+                onChange={(e) => setDrugSearchQuery(e.target.value)}
+                className="w-full min-h-[46px] bg-slate-950 border border-slate-700 rounded-xl pr-10 pl-10 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
+              />
+              {drugSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setDrugSearchQuery('')}
+                  className="absolute left-3 top-3 text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDrugFilter('all')}
+                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedDrugFilter === 'all'
+                    ? 'bg-rose-500 text-white shadow-md'
+                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                الكل ({PREGNANCY_DRUG_DATABASE.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDrugFilter('safe')}
+                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedDrugFilter === 'safe'
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-slate-950 text-emerald-400 border border-slate-800 hover:border-emerald-500/40'
+                }`}
+              >
+                آمن ومفضل
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDrugFilter('caution')}
+                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedDrugFilter === 'caution'
+                    ? 'bg-amber-600 text-white shadow-md'
+                    : 'bg-slate-950 text-amber-400 border border-slate-800 hover:border-amber-500/40'
+                }`}
+              >
+                بحذر وإشراف
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDrugFilter('contraindicated')}
+                className={`min-h-[44px] px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedDrugFilter === 'contraindicated'
+                    ? 'bg-rose-700 text-white shadow-md'
+                    : 'bg-slate-950 text-rose-400 border border-slate-800 hover:border-rose-500/40'
+                }`}
+              >
+                محظور تماماً
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1">
+              <span className="text-slate-400 shrink-0">شائع:</span>
+              {['باراسيتامول', 'إيبوبروفين', 'أوجمنتين', 'كليكسان', 'ليفوثيروكسين', 'ميثيل دوبا'].map((pillName) => (
+                <button
+                  key={pillName}
+                  type="button"
+                  onClick={() => setDrugSearchQuery(pillName)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                >
+                  {pillName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredDrugs.map((drug) => {
+              const isContra = drug.overallSafety === 'contraindicated';
+              const isSafe = drug.overallSafety === 'safe';
+
+              return (
+                <div
+                  key={drug.id}
+                  className={`bg-slate-900 border rounded-2xl p-5 shadow-xl space-y-3.5 ${
+                    isContra
+                      ? 'border-rose-500/40'
+                      : isSafe
+                      ? 'border-emerald-500/40'
+                      : 'border-amber-500/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[11px] text-slate-400 block">{drug.therapeuticClassAr}</span>
+                      <h3 className="text-base font-bold text-white mt-0.5">{drug.nameAr}</h3>
+                      <span className="text-xs text-slate-400 font-mono">{drug.nameEn}</span>
+                    </div>
+
+                    <div className="text-left shrink-0">
+                      <span className={`text-xs font-bold block ${
+                        isContra ? 'text-rose-400' : isSafe ? 'text-emerald-400' : 'text-amber-300'
+                      }`}>
+                        {isContra ? 'محظور قطعي' : isSafe ? 'آمن ومفضل' : 'بحذر وإشراف'}
+                      </span>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        FDA: {drug.fdaCategory}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    {[
+                      { label: 'الثلث 1', safety: drug.firstTrimester.safety },
+                      { label: 'الثلث 2', safety: drug.secondTrimester.safety },
+                      { label: 'الثلث 3', safety: drug.thirdTrimester.safety }
+                    ].map((t, tIdx) => (
+                      <div
+                        key={tIdx}
+                        className={`p-2 rounded-xl border ${
+                          t.safety === 'contraindicated'
+                            ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
+                            : t.safety === 'safe'
+                            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
+                            : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
+                        }`}
+                      >
+                        <span className="block text-[11px] text-slate-400">{t.label}</span>
+                        <span className="font-bold">
+                          {t.safety === 'contraindicated' ? 'محظور' : t.safety === 'safe' ? 'آمن' : 'بحذر'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
+                    <p className="text-slate-300 leading-relaxed">
+                      {drug.thirdTrimester.noteAr || drug.firstTrimester.noteAr || drug.clinicalMechanismAr}
+                    </p>
+                    {drug.safeAlternativesAr.length > 0 && (
+                      <div className="pt-2 border-t border-slate-800 text-emerald-300">
+                        <strong>البدائل الآمنة:</strong> {drug.safeAlternativesAr.join(' • ')}
+                      </div>
+                    )}
+                    <div className="pt-1.5 border-t border-slate-800 text-slate-400">
+                      <strong>الرضاعة:</strong> {drug.breastfeedingSafetyAr}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {filteredDrugs.length === 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
+              <Pill className="w-8 h-8 mx-auto text-rose-400 mb-2 opacity-60" />
+              <p className="text-sm font-bold text-slate-200">لم يتم العثور على نتائج مطابقة.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* STEP 4: MONTHLY VITALS TRACKER */}
+      {activeSubTab === 'vitals' && (
+        <div className="space-y-5">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-white">
+                سجل المتابعة الشهرية
               </h3>
-              <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-                مراقبة دقيقة للأرقام الحيوية للكشف المبكر عن سكر الحمل (GDM)، ارتفاع ضغط الدم وتسمم الحمل (Pre-eclampsia)، وضمان نمو الجنين بأمان.
+              <p className="text-xs text-slate-400">
+                متابعة السكر، ضغط الدم، والوزن الشهري
               </p>
             </div>
             <button
+              type="button"
               onClick={() => {
                 const newLog = {
                   id: `v_${Date.now()}`,
                   date: new Date().toISOString().split('T')[0],
                   month: vitalMonth,
                   glucose: {
-                    type: vitalGlucoseType === 'fasting' ? 'صائم' : vitalGlucoseType === 'postprandial' ? 'بعد الأكل بساعتين' : 'عشوائي',
+                    type: vitalGlucoseType === 'fasting' ? 'صائم' : vitalGlucoseType === 'postprandial' ? 'بعد الأكل' : 'عشوائي',
                     val: vitalGlucoseVal,
                     status: (vitalGlucoseType === 'fasting' && vitalGlucoseVal < 95) || (vitalGlucoseType === 'postprandial' && vitalGlucoseVal < 120) ? 'normal' : vitalGlucoseVal < 140 ? 'borderline' : 'high'
                   } as any,
@@ -685,64 +810,58 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
                 };
                 setVitalsLog(prev => [newLog, ...prev]);
               }}
-              className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer shrink-0"
+              className="min-h-[46px] px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg transition-all flex items-center gap-2 cursor-pointer shrink-0"
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>حفظ القياسات الحالية بالسجل</span>
+              <span>حفظ القياس الحالي</span>
             </button>
           </div>
 
-          {/* Three Interactive Cards Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* 1. Blood Glucose Card */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            {/* 1. Blood Glucose */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
                   <Heart className="w-4 h-4" />
-                  <h4>1. فحص السكر الشهري (GDM)</h4>
+                  <h4>1. السكر الشهري</h4>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-                  mg/dL
-                </span>
+                <span className="text-xs text-slate-400 font-mono">mg/dL</span>
               </div>
 
-              {/* Glucose Type Selector */}
               <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs">
                 <button
                   type="button"
                   onClick={() => setVitalGlucoseType('fasting')}
-                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
-                    vitalGlucoseType === 'fasting' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  className={`min-h-[38px] py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    vitalGlucoseType === 'fasting' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  صائم (Fasting)
+                  صائم
                 </button>
                 <button
                   type="button"
                   onClick={() => setVitalGlucoseType('postprandial')}
-                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
-                    vitalGlucoseType === 'postprandial' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  className={`min-h-[38px] py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    vitalGlucoseType === 'postprandial' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
                   }`}
                 >
-                  بعد الأكل (2h)
+                  بعد الأكل
                 </button>
                 <button
                   type="button"
                   onClick={() => setVitalGlucoseType('random')}
-                  className={`py-1.5 rounded-lg font-bold text-center transition-all ${
-                    vitalGlucoseType === 'random' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+                  className={`min-h-[38px] py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                    vitalGlucoseType === 'random' ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   عشوائي
                 </button>
               </div>
 
-              {/* Value Input */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center text-xs">
-                  <label className="text-slate-300 font-bold">قراءة السكر الحالية:</label>
-                  <span className="text-rose-400 font-mono font-bold text-base">{vitalGlucoseVal} mg/dL</span>
+                  <label className="text-slate-300 font-bold">القراءة:</label>
+                  <span className="text-rose-400 font-mono font-bold text-base tabular-nums">{vitalGlucoseVal} mg/dL</span>
                 </div>
                 <input
                   type="range"
@@ -752,729 +871,366 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
                   onChange={e => setVitalGlucoseVal(Number(e.target.value))}
                   className="w-full accent-rose-500 cursor-pointer"
                 />
-                <div className="flex justify-between text-[10px] text-slate-500 font-mono">
-                  <span>60 (منخفض)</span>
-                  <span>95 (حد الصيام)</span>
-                  <span>140</span>
-                  <span>220</span>
-                </div>
               </div>
 
-              {/* Clinical Interpretation */}
-              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400">التقييم السريري:</span>
-                  {vitalGlucoseType === 'fasting' ? (
-                    vitalGlucoseVal < 95 ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 صائم مثالي وسليم</span>
-                    ) : vitalGlucoseVal <= 125 ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 اشتباه سكر حمل</span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🔴 سكر صائم مرتفع حرج</span>
-                    )
-                  ) : (
-                    vitalGlucoseVal < 120 ? (
-                      <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 بعد الأكل طبيعي</span>
-                    ) : vitalGlucoseVal <= 140 ? (
-                      <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 حد أعلى مقبول</span>
-                    ) : (
-                      <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🔴 مرتفع بعد الوجبة</span>
-                    )
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+                <div className="font-bold">
                   {vitalGlucoseType === 'fasting'
-                    ? (vitalGlucoseVal < 95
-                        ? 'القيمة تحت 95 mg/dL ممتازة وتحمي الجنين من فرط النمو أو انخفاض السكر بعد الولادة.'
-                        : 'سكر الصائم فوق 95 mg/dL يستدعي فحص OGTT 75g في الأسبوع 24-28 لتأكيد أو استبعاد سكر الحمل.')
-                    : (vitalGlucoseVal < 120
-                        ? 'القيمة بعد الأكل بساعتين تحت 120 mg/dL تؤكد كفاءة إفراز الأنسولين وحسن استجابة الجسم.'
-                        : 'القيمة أعلى من 120 mg/dL تستدعي توزيع النشويات والمشي الخفيف بعد الوجبات الرئيسية.')}
-                </p>
+                    ? (vitalGlucoseVal < 95 ? <span className="text-emerald-400">طبيعي (أقل من 95)</span> : <span className="text-amber-300">مرتفع · يتطلب متابعة</span>)
+                    : (vitalGlucoseVal < 120 ? <span className="text-emerald-400">طبيعي (أقل من 120)</span> : <span className="text-amber-300">مرتفع · يتطلب متابعة</span>)}
+                </div>
               </div>
             </div>
 
-            {/* 2. Blood Pressure Card */}
+            {/* 2. Blood Pressure */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
                   <Activity className="w-4 h-4" />
-                  <h4>2. قياس ضغط الدم وتسمم الحمل</h4>
+                  <h4>2. ضغط الدم</h4>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-                  mmHg
-                </span>
+                <span className="text-xs text-slate-400 font-mono">mmHg</span>
               </div>
 
-              {/* BP Inputs */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[11px] text-slate-400 font-bold">الانقباضي (العالي):</label>
+                <div>
+                  <label className="text-xs text-slate-400 font-bold block mb-1">العالي</label>
                   <input
                     type="number"
                     min="80"
                     max="200"
                     value={vitalSystolic}
                     onChange={e => setVitalSystolic(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold text-base focus:border-indigo-500 outline-none"
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold outline-none"
                   />
-                  <span className="text-[10px] text-slate-500 block text-center">المثالي: &lt; 120</span>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[11px] text-slate-400 font-bold">الانبساطي (الواطي):</label>
+                <div>
+                  <label className="text-xs text-slate-400 font-bold block mb-1">الواطي</label>
                   <input
                     type="number"
                     min="50"
                     max="130"
                     value={vitalDiastolic}
                     onChange={e => setVitalDiastolic(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold text-base focus:border-indigo-500 outline-none"
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center font-bold outline-none"
                   />
-                  <span className="text-[10px] text-slate-500 block text-center">المثالي: &lt; 80</span>
                 </div>
               </div>
 
-              {/* Pre-eclampsia Quick Screening Checkboxes */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-[11px] font-bold text-slate-300 block">فحص أعراض تسمم الحمل (Pre-eclampsia):</label>
-                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
+              <div className="grid grid-cols-2 gap-1.5 text-xs">
+                {[
+                  { key: 'headache', label: 'صداع شديد' },
+                  { key: 'blurryVision', label: 'زغللة عين' },
+                  { key: 'epigastricPain', label: 'ألم أعلى البطن' },
+                  { key: 'swelling', label: 'تورم مفاجئ' }
+                ].map((sym) => (
+                  <label key={sym.key} className="flex items-center gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={peSymptoms.headache}
-                      onChange={e => setPeSymptoms(prev => ({ ...prev, headache: e.target.checked }))}
+                      checked={(peSymptoms as any)[sym.key]}
+                      onChange={e => setPeSymptoms(prev => ({ ...prev, [sym.key]: e.target.checked }))}
                       className="accent-rose-500 rounded"
                     />
-                    <span>صداع نابض مستمر</span>
+                    <span>{sym.label}</span>
                   </label>
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={peSymptoms.blurryVision}
-                      onChange={e => setPeSymptoms(prev => ({ ...prev, blurryVision: e.target.checked }))}
-                      className="accent-rose-500 rounded"
-                    />
-                    <span>زغللة بالعين/ومضات</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={peSymptoms.epigastricPain}
-                      onChange={e => setPeSymptoms(prev => ({ ...prev, epigastricPain: e.target.checked }))}
-                      className="accent-rose-500 rounded"
-                    />
-                    <span>ألم فم المعدة</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 text-slate-300 cursor-pointer bg-slate-950/80 p-1.5 rounded-lg border border-slate-800">
-                    <input
-                      type="checkbox"
-                      checked={peSymptoms.swelling}
-                      onChange={e => setPeSymptoms(prev => ({ ...prev, swelling: e.target.checked }))}
-                      className="accent-rose-500 rounded"
-                    />
-                    <span>انتفاخ مفاجئ بالوجه</span>
-                  </label>
-                </div>
+                ))}
               </div>
 
-              {/* Clinical BP Interpretation */}
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400">تقييم الضغط:</span>
-                  {vitalSystolic < 120 && vitalDiastolic < 80 ? (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-xs font-bold">🟢 طبيعي ومثالي</span>
-                  ) : vitalSystolic < 140 && vitalDiastolic < 90 ? (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 text-xs font-bold">🟡 ضغط حدودي للمتابعة</span>
-                  ) : (
-                    <span className="px-2 py-0.5 rounded-full bg-rose-950 text-rose-400 border border-rose-500/40 text-xs font-bold">🚨 إنذار تسمم الحمل (حرج)</span>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  {vitalSystolic >= 140 || vitalDiastolic >= 90 || Object.values(peSymptoms).some(Boolean)
-                    ? '⚠️ تحذير: قراءة الضغط >= 140/90 أو وجود أعراض عينية وصداع يستدعي مراجعة طوارئ الولادة لفحص زلال البول وضمان سلامة المشيمة.'
-                    : 'ضغط دم سليم يضمن تدفق الدم الكافي عبر المشيمة ونقل الأكسجين والغذاء للجنين.'}
-                </p>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold">
+                {vitalSystolic >= 140 || vitalDiastolic >= 90 || Object.values(peSymptoms).some(Boolean)
+                  ? <span className="text-rose-400">تحذير: مراجعة الطوارئ فوراً</span>
+                  : <span className="text-emerald-400">الضغط سليم ومطمئن</span>}
               </div>
             </div>
 
-            {/* 3. Weight Gain Card */}
+            {/* 3. Weight Gain */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
                   <Baby className="w-4 h-4" />
-                  <h4>3. متابعة الوزن والزيادة الصحية</h4>
+                  <h4>3. الوزن الشهري</h4>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
-                  kg
-                </span>
+                <span className="text-xs text-slate-400 font-mono">kg</span>
               </div>
 
-              {/* Weight Inputs */}
               <div className="grid grid-cols-3 gap-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 font-bold block">قبل الحمل (كغ):</label>
+                <div>
+                  <label className="text-[11px] text-slate-400 font-bold block mb-1">قبل الحمل</label>
                   <input
                     type="number"
                     value={vitalWeightPre}
                     onChange={e => setVitalWeightPre(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                    className="w-full min-h-[42px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 font-bold block">الوزن الحالي (كغ):</label>
+                <div>
+                  <label className="text-[11px] text-slate-400 font-bold block mb-1">الحالي</label>
                   <input
                     type="number"
                     value={vitalWeightCurrent}
                     onChange={e => setVitalWeightCurrent(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                    className="w-full min-h-[42px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-400 font-bold block">شهر الحمل (1-9):</label>
+                <div>
+                  <label className="text-[11px] text-slate-400 font-bold block mb-1">الشهر</label>
                   <input
                     type="number"
                     min="1"
                     max="9"
                     value={vitalMonth}
                     onChange={e => setVitalMonth(Number(e.target.value))}
-                    className="w-full px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
+                    className="w-full min-h-[42px] px-2 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-white font-mono text-center text-sm font-bold"
                   />
                 </div>
               </div>
 
-              {/* Calculations Box */}
               {(() => {
                 const heightM = (vitalHeightCm || 165) / 100;
                 const preBMI = Number(((vitalWeightPre || 60) / (heightM * heightM)).toFixed(1));
                 const totalGain = Number(((vitalWeightCurrent || 60) - (vitalWeightPre || 60)).toFixed(1));
-                const expectedGainForMonth = vitalMonth <= 3 ? 1.5 : 1.5 + (vitalMonth - 3) * 1.8;
-                const isRapidGain = totalGain > expectedGainForMonth + 3.0;
-
+                const expectedGain = vitalMonth <= 3 ? 1.5 : 1.5 + (vitalMonth - 3) * 1.8;
                 return (
-                  <div className="space-y-2.5">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                        <span className="text-[10px] text-slate-400 block">مؤشر BMI قبل الحمل:</span>
-                        <strong className="text-cyan-400 font-mono text-sm">{preBMI}</strong>
-                        <span className="text-[10px] text-slate-500 block">
-                          {preBMI < 18.5 ? 'نحافة' : preBMI < 25 ? 'وزن طبيعي' : preBMI < 30 ? 'زيادة وزن' : 'سمنة'}
-                        </span>
-                      </div>
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                        <span className="text-[10px] text-slate-400 block">الزيادة التراكمية:</span>
-                        <strong className={`font-mono text-sm ${totalGain < 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {totalGain > 0 ? `+${totalGain}` : totalGain} كغ
-                        </strong>
-                        <span className="text-[10px] text-slate-500 block">
-                          المتوقع للشهر {vitalMonth}: ~{expectedGainForMonth.toFixed(1)} كغ
-                        </span>
-                      </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[11px] text-slate-400 block">BMI الأولي</span>
+                      <strong className="text-cyan-400 font-mono text-base">{preBMI}</strong>
                     </div>
-
-                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] text-slate-300 leading-relaxed">
-                      {isRapidGain ? (
-                        <span className="text-amber-400 font-bold block">
-                          ⚠️ تنبيه زيادة سريعة: زيادة تفوق المعدل الطبيعي قد تشير لاحتباس سوائل وتورم أنسجة (Edema). يرجى قياس الضغط ومراقبة تناول الأملاح.
-                        </span>
-                      ) : (
-                        <span>
-                          🟢 زيادة تدريجية وصحية متوافقة مع نمو الجنين، المشيمة، والسائل السلوي بحسب إرشادات IOM العالمية.
-                        </span>
-                      )}
+                    <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-center">
+                      <span className="text-[11px] text-slate-400 block">الزيادة (المتوقع ~{expectedGain.toFixed(1)})</span>
+                      <strong className="text-emerald-400 font-mono text-base">
+                        {totalGain > 0 ? `+${totalGain}` : totalGain} كغ
+                      </strong>
                     </div>
                   </div>
                 );
               })()}
             </div>
-
           </div>
 
-          {/* Historical Visits & Vitals Log */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <FileText className="w-4 h-4 text-emerald-400" />
-                <h4>سجل المتابعات الشهرية الموثقة للحامل</h4>
-              </div>
-              <span className="text-xs text-slate-400 font-mono">
-                {vitalsLog.length} تسجيلات موثقة
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-right text-xs">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 font-bold text-[11px]">
-                    <th className="py-2 px-3">التاريخ</th>
-                    <th className="py-2 px-3">الشهر</th>
-                    <th className="py-2 px-3">السكر (mg/dL)</th>
-                    <th className="py-2 px-3">ضغط الدم (mmHg)</th>
-                    <th className="py-2 px-3">الوزن والزيادة</th>
-                    <th className="py-2 px-3 text-center">الحالة العامة</th>
+          {/* Monthly Log */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl overflow-x-auto">
+            <table className="w-full text-right text-xs">
+              <thead>
+                <tr className="border-b border-slate-800 text-slate-400">
+                  <th className="py-2 px-3">التاريخ</th>
+                  <th className="py-2 px-3">الشهر</th>
+                  <th className="py-2 px-3">السكر</th>
+                  <th className="py-2 px-3">الضغط</th>
+                  <th className="py-2 px-3">الوزن</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono tabular-nums">
+                {vitalsLog.map((log) => (
+                  <tr key={log.id}>
+                    <td className="py-2.5 px-3 text-slate-300 font-sans">{log.date}</td>
+                    <td className="py-2.5 px-3 text-rose-300 font-sans">الشهر {log.month}</td>
+                    <td className="py-2.5 px-3 text-white font-bold">{log.glucose.val}</td>
+                    <td className="py-2.5 px-3 text-indigo-300 font-bold">{log.bp.sys}/{log.bp.dia}</td>
+                    <td className="py-2.5 px-3 text-emerald-300">{log.weight.current} كغ (+{log.weight.gain})</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 font-mono">
-                  {vitalsLog.map((log) => (
-                    <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-2.5 px-3 text-slate-300 font-sans">{log.date}</td>
-                      <td className="py-2.5 px-3 text-rose-300 font-sans">الشهر {log.month}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="font-bold text-white">{log.glucose.val}</span>{' '}
-                        <span className="text-[10px] text-slate-400 font-sans">({log.glucose.type})</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-indigo-300 font-bold">
-                        {log.bp.sys} / {log.bp.dia}
-                      </td>
-                      <td className="py-2.5 px-3 text-cyan-300">
-                        {log.weight.current} كغ{' '}
-                        <span className="text-[10px] text-emerald-400 font-sans">(+{log.weight.gain})</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-center font-sans">
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-500/40 text-[10px] font-bold">
-                          مطمئن وسليم
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* TAB 2: PREGNANCY DRUG SAFETY CHECKER */}
-      {activeSubTab === 'drugs' && (
-        <div className="space-y-6">
-          {/* Drug Search & Filter bar */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <div className="relative flex-1 w-full">
-                <Search className="w-4 h-4 text-slate-400 absolute right-3.5 top-3.5 pointer-events-none" />
-                <input
-                  type="text"
-                  placeholder="ابحث عن أي دواء بالاسم العلمي أو التجاري (مثال: بروفين، باراسيتامول، ليفوثيروكسين، كليكسان، أوجمنتين...)"
-                  value={drugSearchQuery}
-                  onChange={(e) => setDrugSearchQuery(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl pr-10 pl-4 py-2.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500"
-                />
-                {drugSearchQuery && (
-                  <button
-                    onClick={() => setDrugSearchQuery('')}
-                    className="absolute left-3 top-3 text-slate-400 hover:text-white"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Status Filter */}
-              <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-                <button
-                  onClick={() => setSelectedDrugFilter('all')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedDrugFilter === 'all'
-                      ? 'bg-rose-500 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:text-white'
-                  }`}
-                >
-                  الكل ({PREGNANCY_DRUG_DATABASE.length})
-                </button>
-                <button
-                  onClick={() => setSelectedDrugFilter('safe')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedDrugFilter === 'safe'
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-slate-800 text-emerald-400 hover:bg-slate-700'
-                  }`}
-                >
-                  آمن ومفضل
-                </button>
-                <button
-                  onClick={() => setSelectedDrugFilter('caution')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedDrugFilter === 'caution'
-                      ? 'bg-amber-600 text-white'
-                      : 'bg-slate-800 text-amber-400 hover:bg-slate-700'
-                  }`}
-                >
-                  بحذر
-                </button>
-                <button
-                  onClick={() => setSelectedDrugFilter('contraindicated')}
-                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    selectedDrugFilter === 'contraindicated'
-                      ? 'bg-rose-700 text-white'
-                      : 'bg-slate-800 text-rose-400 hover:bg-slate-700'
-                  }`}
-                >
-                  محظور تماماً
-                </button>
-              </div>
-            </div>
-
-            {/* Quick Drug Pills for Fast Testing */}
-            <div className="flex items-center gap-2 overflow-x-auto text-[11px] pt-1">
-              <span className="text-slate-400 shrink-0">أدوية شائعة للفحص السريع:</span>
-              {['إيبوبروفين', 'باراسيتامول', 'أوجمنتين', 'وارفارين', 'إنوكسبارين (كليكسان)', 'روأكوتان', 'ليسينوبريل', 'ليفوثيروكسين', 'ميثيل دوبا'].map((pillName) => (
-                <button
-                  key={pillName}
-                  onClick={() => setDrugSearchQuery(pillName.split(' ')[0])}
-                  className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
-                >
-                  {pillName}
-                </button>
-              ))}
-            </div>
+      {/* STEP 5: NUTRITION & RESTRICTIONS (Clean Sub-Buttons) */}
+      {activeSubTab === 'nutrition' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {[
+              { id: 'restrictions', label: '🚫 الأطعمة الممنوعة' },
+              { id: 't1', label: '🌱 تغذية الثلث الأول' },
+              { id: 't2', label: '🦴 تغذية الثلث الثاني' },
+              { id: 't3', label: '👶 تغذية الثلث الثالث' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setNutritionSubView(item.id as any)}
+                className={`min-h-[48px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                  nutritionSubView === item.id
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-300 shadow-lg'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          {/* Drug Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {filteredDrugs.map((drug) => {
-              const isContra = drug.overallSafety === 'contraindicated';
-              const isSafe = drug.overallSafety === 'safe';
-
-              return (
-                <div
-                  key={drug.id}
-                  className={`bg-slate-900 border rounded-2xl p-5 shadow-xl space-y-3.5 transition-all ${
-                    isContra
-                      ? 'border-rose-500/40 hover:border-rose-500'
-                      : isSafe
-                      ? 'border-emerald-500/40 hover:border-emerald-500'
-                      : 'border-amber-500/40 hover:border-amber-500'
-                  }`}
-                >
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <span className="text-[10px] text-slate-400 font-medium block">
-                        {drug.therapeuticClassAr}
-                      </span>
-                      <h3 className="text-base font-bold text-white mt-0.5">
-                        {drug.nameAr}
-                      </h3>
-                      <span className="text-xs text-slate-400 font-mono block">
-                        {drug.nameEn}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <span
-                        className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${
-                          isContra
-                            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                            : isSafe
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                            : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                        }`}
-                      >
-                        {isContra ? '🔴 محظور قطعي' : isSafe ? '🟢 آمن ومفضل' : '🟡 حذر وإشراف'}
-                      </span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        FDA Category: <strong className="text-white">{drug.fdaCategory}</strong>
-                      </span>
-                    </div>
+          {nutritionSubView === 'restrictions' && (
+            <div className="bg-slate-900 border border-rose-500/40 rounded-2xl p-5 shadow-xl space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-rose-400" />
+                <span>الأطعمة الممنوعة أثناء الحمل</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {PREGNANCY_FOOD_RESTRICTIONS.map((item) => (
+                  <div key={item.id} className="bg-slate-950 p-4 rounded-xl border border-rose-500/25 text-xs space-y-1.5">
+                    <strong className="text-rose-300 block text-sm">{item.titleAr}</strong>
+                    <p className="text-slate-300"><strong>أمثلة:</strong> {item.itemsAr}</p>
+                    <p className="text-rose-400"><strong>السبب:</strong> {item.riskAr}</p>
+                    <p className="text-emerald-300 pt-1 border-t border-slate-800">
+                      <strong>البديل الآمن:</strong> {item.safetyRecommendationAr}
+                    </p>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  {/* Trimester Safety Grid */}
-                  <div className="grid grid-cols-3 gap-1.5 pt-1 text-center">
-                    <div
-                      className={`p-2 rounded-xl border text-[11px] ${
-                        drug.firstTrimester.safety === 'contraindicated'
-                          ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-                          : drug.firstTrimester.safety === 'safe'
-                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                          : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                      }`}
-                    >
-                      <strong className="block text-[10px] text-slate-400">الثلث 1</strong>
-                      <span>
-                        {drug.firstTrimester.safety === 'contraindicated'
-                          ? '❌ محظور'
-                          : drug.firstTrimester.safety === 'safe'
-                          ? '✅ آمن'
-                          : '⚠️ بحذر'}
-                      </span>
+          {nutritionSubView !== 'restrictions' && (() => {
+            const stageData =
+              nutritionSubView === 't1'
+                ? STAGE_NUTRITION_RECOMMENDATIONS.firstTrimester
+                : nutritionSubView === 't2'
+                ? STAGE_NUTRITION_RECOMMENDATIONS.secondTrimester
+                : STAGE_NUTRITION_RECOMMENDATIONS.thirdTrimester;
+            const stageTitle =
+              nutritionSubView === 't1'
+                ? 'تغذية الثلث الأول (الأسابيع 1 - 13)'
+                : nutritionSubView === 't2'
+                ? 'تغذية الثلث الثاني (الأسابيع 14 - 27)'
+                : 'تغذية الثلث الثالث (الأسابيع 28 - 40)';
+
+            return (
+              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+                <h3 className="text-base font-bold text-white pb-3 border-b border-slate-800">
+                  {stageTitle}
+                </h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {stageData.keyNutrients.map((n, i) => (
+                    <div key={i} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                      <strong className="text-emerald-300 block text-sm">{n.nameAr} · {n.amountAr}</strong>
+                      <span className="text-slate-400 block">{n.sourceAr}</span>
                     </div>
-
-                    <div
-                      className={`p-2 rounded-xl border text-[11px] ${
-                        drug.secondTrimester.safety === 'contraindicated'
-                          ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-                          : drug.secondTrimester.safety === 'safe'
-                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                          : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                      }`}
-                    >
-                      <strong className="block text-[10px] text-slate-400">الثلث 2</strong>
-                      <span>
-                        {drug.secondTrimester.safety === 'contraindicated'
-                          ? '❌ محظور'
-                          : drug.secondTrimester.safety === 'safe'
-                          ? '✅ آمن'
-                          : '⚠️ بحذر'}
-                      </span>
-                    </div>
-
-                    <div
-                      className={`p-2 rounded-xl border text-[11px] ${
-                        drug.thirdTrimester.safety === 'contraindicated'
-                          ? 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-                          : drug.thirdTrimester.safety === 'safe'
-                          ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                          : 'bg-amber-950/40 border-amber-500/40 text-amber-300'
-                      }`}
-                    >
-                      <strong className="block text-[10px] text-slate-400">الثلث 3</strong>
-                      <span>
-                        {drug.thirdTrimester.safety === 'contraindicated'
-                          ? '❌ محظور'
-                          : drug.thirdTrimester.safety === 'safe'
-                          ? '✅ آمن'
-                          : '⚠️ بحذر'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Clinical Details */}
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-                    <div>
-                      <strong className="text-slate-300 block mb-0.5">
-                        الآلية والمخاطر السريرية:
-                      </strong>
-                      <p className="text-slate-400 leading-relaxed text-[11px]">
-                        {drug.thirdTrimester.noteAr || drug.firstTrimester.noteAr || drug.clinicalMechanismAr}
-                      </p>
-                    </div>
-
-                    {drug.safeAlternativesAr.length > 0 && (
-                      <div className="pt-2 border-t border-slate-800/80">
-                        <strong className="text-emerald-400 block mb-0.5">
-                          💡 البدائل الآمنة الموصى بها:
-                        </strong>
-                        <span className="text-[11px] text-slate-300">
-                          {drug.safeAlternativesAr.join(' • ')}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
-                      <span>الرضاعة الطبيعية:</span>
-                      <span className="text-slate-300 font-medium">{drug.breastfeedingSafetyAr}</span>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              );
-            })}
+
+                <div className="space-y-1.5 pt-2 border-t border-slate-800 text-xs text-slate-300">
+                  <span className="font-bold text-rose-300 block">توصيات غذائية:</span>
+                  {stageData.tipsAr.map((tip, i) => (
+                    <p key={i}>• {tip}</p>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* STEP 6: ACTIVITY & EMERGENCY RED FLAGS (Clean Sub-Buttons) */}
+      {activeSubTab === 'activity' && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {[
+              { id: 'red_flags', label: '🚨 علامات الطوارئ' },
+              { id: 'safe', label: '✅ التمارين الآمنة' },
+              { id: 'avoid', label: '⛔ تمارين يجب تجنبها' }
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActivitySubView(item.id as any)}
+                className={`min-h-[48px] px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all cursor-pointer ${
+                  activitySubView === item.id
+                    ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-300 shadow-lg'
+                    : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-800'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
 
-          {filteredDrugs.length === 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-400">
-              <Pill className="w-8 h-8 mx-auto text-rose-400 mb-2 opacity-50" />
-              <p className="text-sm font-bold text-slate-200">لم يتم العثور على أدوية مطابقة لكلمة البحث.</p>
-              <p className="text-xs text-slate-500 mt-1">جرب البحث بالاسم العلمي أو التجاري الشائع.</p>
+          {activitySubView === 'red_flags' && (
+            <div className="bg-slate-900 border border-rose-500/50 rounded-2xl p-5 shadow-xl space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+                <span>علامات تستدعي التوجه للطوارئ فوراً</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {PREGNANCY_ACTIVITY_GUIDELINES.emergencyRedFlagsAr.map((flag, idx) => (
+                  <div key={idx} className="bg-slate-950 border border-rose-500/35 p-3.5 rounded-xl text-xs space-y-1">
+                    <strong className="text-rose-300 block text-sm">{flag.titleAr}</strong>
+                    <p className="text-slate-300 leading-relaxed">{flag.descriptionAr}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activitySubView === 'safe' && (
+            <div className="bg-slate-900 border border-emerald-500/35 rounded-2xl p-5 shadow-xl space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <span>الأنشطة والرياضات الآمنة</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {PREGNANCY_ACTIVITY_GUIDELINES.safeExercisesAr.map((ex, i) => (
+                  <div key={i} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                    <strong className="text-emerald-300 block text-sm">{ex.titleAr}</strong>
+                    <p className="text-slate-400 leading-relaxed">{ex.descriptionAr}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activitySubView === 'avoid' && (
+            <div className="bg-slate-900 border border-amber-500/35 rounded-2xl p-5 shadow-xl space-y-4">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-400" />
+                <span>تمارين وممارسات يجب تجنبها</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {PREGNANCY_ACTIVITY_GUIDELINES.exercisesToAvoidAr.map((ex, i) => (
+                  <div key={i} className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs space-y-1">
+                    <strong className="text-amber-300 block text-sm">{ex.titleAr}</strong>
+                    <p className="text-slate-400 leading-relaxed">{ex.descriptionAr}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 3: NUTRITION & FOOD RESTRICTIONS */}
-      {activeSubTab === 'nutrition' && (
-        <div className="space-y-6">
-          {/* Critical Food Restrictions Warning Banner */}
-          <div className="bg-gradient-to-br from-rose-950/70 to-slate-900 border border-rose-500/50 rounded-2xl p-5 shadow-2xl space-y-3">
-            <div className="flex items-center gap-2 text-rose-400">
-              <ShieldAlert className="w-5 h-5 shrink-0" />
-              <h3 className="text-base font-bold text-white">
-                قائمة الأطعمة المحظورة والممنوعة قطعياً أثناء الحمل
-              </h3>
-            </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              تجنب هذه الأطعمة أمر حيوي للوقاية من عدوى الليستيريا، المقوسات (Toxoplasmosis)، وتسمم الجنين بالزئبق أو فيتامين A المشوه:
-            </p>
+      {/* Guided Step-by-Step Navigation Footer */}
+      <div className="flex items-center justify-between gap-3 pt-2">
+        {prevStep ? (
+          <button
+            type="button"
+            onClick={() => goToStep(prevStep.id)}
+            className="min-h-[48px] px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer"
+          >
+            <ChevronRight className="w-4 h-4 text-rose-400" />
+            <span>السابق: {prevStep.label}</span>
+          </button>
+        ) : (
+          <div />
+        )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-              {PREGNANCY_FOOD_RESTRICTIONS.map((item) => (
-                <div key={item.id} className="bg-slate-950/80 p-3.5 rounded-xl border border-rose-500/30 text-xs space-y-1.5">
-                  <strong className="text-rose-300 block text-xs">⛔ {item.titleAr}</strong>
-                  <p className="text-slate-300 text-[11px]">
-                    <strong>أمثلة:</strong> {item.itemsAr}
-                  </p>
-                  <p className="text-rose-400/90 text-[11px] leading-relaxed">
-                    <strong>الخطر:</strong> {item.riskAr}
-                  </p>
-                  <p className="text-emerald-300 text-[11px] pt-1 border-t border-slate-800">
-                    <strong>البديل الآمن:</strong> {item.safetyRecommendationAr}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Stage by stage nutrition recommendations */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            {/* 1st Trimester Nutrition */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="border-b border-slate-800 pb-3">
-                <span className="text-[10px] text-pink-400 font-bold block uppercase tracking-wide">
-                  الأسابيع 1 - 13
-                </span>
-                <h4 className="text-sm font-bold text-white mt-0.5">
-                  تغذية الثلث الأول والوحام
-                </h4>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-300 block">المغذيات الحيوية:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.firstTrimester.keyNutrients.map((n, i) => (
-                  <div key={i} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
-                    <strong className="text-rose-300 block">{n.nameAr} ({n.amountAr})</strong>
-                    <span className="text-[11px] text-slate-400">{n.sourceAr}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-1.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
-                <span className="font-bold text-amber-300 block">نصائح تخفيف الغثيان:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.firstTrimester.tipsAr.map((tip, i) => (
-                  <p key={i}>• {tip}</p>
-                ))}
-              </div>
-            </div>
-
-            {/* 2nd Trimester Nutrition */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="border-b border-slate-800 pb-3">
-                <span className="text-[10px] text-teal-400 font-bold block uppercase tracking-wide">
-                  الأسابيع 14 - 27
-                </span>
-                <h4 className="text-sm font-bold text-white mt-0.5">
-                  تغذية الثلث الثاني وبناء العظام
-                </h4>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-300 block">المغذيات الحيوية:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.secondTrimester.keyNutrients.map((n, i) => (
-                  <div key={i} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
-                    <strong className="text-teal-300 block">{n.nameAr} ({n.amountAr})</strong>
-                    <span className="text-[11px] text-slate-400">{n.sourceAr}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-1.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
-                <span className="font-bold text-teal-300 block">إرشادات هامة:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.secondTrimester.tipsAr.map((tip, i) => (
-                  <p key={i}>• {tip}</p>
-                ))}
-              </div>
-            </div>
-
-            {/* 3rd Trimester Nutrition */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="border-b border-slate-800 pb-3">
-                <span className="text-[10px] text-emerald-400 font-bold block uppercase tracking-wide">
-                  الأسابيع 28 - 40+
-                </span>
-                <h4 className="text-sm font-bold text-white mt-0.5">
-                  تغذية الثلث الثالث والاستعداد للولادة
-                </h4>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-xs font-bold text-slate-300 block">المغذيات الحيوية:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.thirdTrimester.keyNutrients.map((n, i) => (
-                  <div key={i} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 text-xs">
-                    <strong className="text-emerald-300 block">{n.nameAr} ({n.amountAr})</strong>
-                    <span className="text-[11px] text-slate-400">{n.sourceAr}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-1.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
-                <span className="font-bold text-emerald-300 block">نصائح الثلث الأخير:</span>
-                {STAGE_NUTRITION_RECOMMENDATIONS.thirdTrimester.tipsAr.map((tip, i) => (
-                  <p key={i}>• {tip}</p>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: PHYSICAL ACTIVITY & RED FLAGS */}
-      {activeSubTab === 'activity' && (
-        <div className="space-y-6">
-          {/* Urgent Emergency Red Flags */}
-          <div className="bg-gradient-to-br from-rose-950 via-slate-900 to-slate-950 border border-rose-500/70 rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-rose-400">
-              <AlertTriangle className="w-6 h-6" />
-              <h3 className="text-base sm:text-lg font-bold text-white">
-                🚨 علامات الخطورة الحمراء (تستوجب التوجه الفوري لطوارئ التوليد)
-              </h3>
-            </div>
-            <p className="text-xs text-rose-200 leading-relaxed">
-              إذا شعرتِ بأي من هذه الأعراض في أي وقت خلال الحمل، يجب التوجه فوراً لأقرب مستشفى أو الاتصال بطبيب التوليد:
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {PREGNANCY_ACTIVITY_GUIDELINES.emergencyRedFlagsAr.map((flag, idx) => (
-                <div key={idx} className="bg-slate-950/90 border border-rose-500/40 p-3.5 rounded-xl text-xs space-y-1">
-                  <strong className="text-rose-300 block font-bold text-xs">⚠️ {flag.titleAr}</strong>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">{flag.descriptionAr}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Safe vs Forbidden Exercises */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Safe Activity */}
-            <div className="bg-slate-900 border border-emerald-500/30 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center gap-2 text-emerald-400 border-b border-slate-800 pb-3">
-                <CheckCircle2 className="w-5 h-5" />
-                <h4 className="text-sm font-bold text-white">الأنشطة والرياضات الآمنة والموصى بها</h4>
-              </div>
-
-              <div className="space-y-3">
-                {PREGNANCY_ACTIVITY_GUIDELINES.safeExercisesAr.map((ex, i) => (
-                  <div key={i} className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
-                    <strong className="text-emerald-300 block text-xs">🟢 {ex.titleAr}</strong>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">{ex.descriptionAr}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Exercises to avoid */}
-            <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-5 shadow-xl space-y-4">
-              <div className="flex items-center gap-2 text-amber-400 border-b border-slate-800 pb-3">
-                <AlertCircle className="w-5 h-5" />
-                <h4 className="text-sm font-bold text-white">تمارين وممارسات يجب تجنبها تماماً</h4>
-              </div>
-
-              <div className="space-y-3">
-                {PREGNANCY_ACTIVITY_GUIDELINES.exercisesToAvoidAr.map((ex, i) => (
-                  <div key={i} className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1">
-                    <strong className="text-amber-300 block text-xs">⛔ {ex.titleAr}</strong>
-                    <p className="text-slate-400 text-[11px] leading-relaxed">{ex.descriptionAr}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Medical Disclaimer Footer */}
-      <div className="mt-8 bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 text-center text-xs text-slate-400 leading-relaxed">
-        <p>
-          🩺 <strong>إخلاء مسؤولية سريري:</strong> هذا المحرك معد للأغراض الاسترشادية والتثقيفية الطبية المساندة وفق بروتوكولات ACOG و RCOG. لا يغني عن استشارة طبيب النساء والتوليد المعالج أو الفحص السريري المباشر في العيادة.
-        </p>
+        {nextStep && (
+          <button
+            type="button"
+            onClick={() => goToStep(nextStep.id)}
+            className="min-h-[48px] px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-400 hover:to-pink-400 text-white text-xs sm:text-sm font-bold shadow-lg shadow-rose-500/25 flex items-center gap-2 transition-all cursor-pointer mr-auto"
+          >
+            <span>التالي: {nextStep.label}</span>
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
+      {/* Concise Medical Note */}
+      <p className="text-center text-[11px] text-slate-500 pt-1">
+        إرشادات سريرية مساندة وفق بروتوكولات ACOG و RCOG ولا تغني عن مراجعة الطبيب المختص.
+      </p>
     </div>
   );
 };
