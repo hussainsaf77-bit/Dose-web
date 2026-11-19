@@ -244,8 +244,8 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
           </div>
         </div>
 
-        {/* 6 Clear Mobile-Ready Service Buttons (No horizontal overflow) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-3 border-t border-slate-800">
+        {/* 6 Clear Stacked Vertical Service Buttons */}
+        <div className="flex flex-col gap-2.5 pt-3 border-t border-slate-800">
           {SERVICE_STEPS.map((srv) => {
             const isActive = activeSubTab === srv.id;
             return (
@@ -253,19 +253,22 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
                 key={srv.id}
                 type="button"
                 onClick={() => setActiveSubTab(srv.id)}
-                className={`min-h-[54px] px-3 py-3 rounded-xl text-xs sm:text-sm font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer text-center leading-snug ${
+                className={`w-full min-h-[54px] px-4 py-3 rounded-xl text-sm font-bold border transition-all flex items-center justify-between gap-3 cursor-pointer text-right ${
                   isActive
                     ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white border-rose-300 shadow-lg shadow-rose-500/25'
-                    : 'bg-slate-950/80 hover:bg-rose-950/35 text-slate-200 border-slate-800 hover:border-rose-500/40'
+                    : 'bg-slate-950/85 hover:bg-rose-950/35 text-slate-200 border-slate-800 hover:border-rose-500/40'
                 }`}
               >
-                <span className={`w-5 h-5 rounded-md text-[11px] font-mono font-black flex items-center justify-center shrink-0 ${
-                  isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-rose-300'
-                }`}>
-                  {srv.step}
-                </span>
-                {srv.icon}
-                <span className="truncate">{srv.label}</span>
+                <div className="flex items-center gap-3">
+                  <span className={`w-7 h-7 rounded-lg text-xs font-mono font-black flex items-center justify-center shrink-0 ${
+                    isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-rose-300'
+                  }`}>
+                    {srv.step}
+                  </span>
+                  {srv.icon}
+                  <span>{srv.label}</span>
+                </div>
+                <ChevronLeft className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
               </button>
             );
           })}
@@ -672,14 +675,13 @@ ${riskAssessment.recommendedLabsThisStage.map(l => `  - ${l.nameAr} (${l.timingA
               </button>
             </div>
 
-            <div className="flex items-center gap-2 overflow-x-auto text-xs pb-1">
-              <span className="text-slate-400 shrink-0">شائع:</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
               {['باراسيتامول', 'إيبوبروفين', 'أوجمنتين', 'كليكسان', 'ليفوثيروكسين', 'ميثيل دوبا'].map((pillName) => (
                 <button
                   key={pillName}
                   type="button"
                   onClick={() => setDrugSearchQuery(pillName)}
-                  className="px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-white transition-colors shrink-0 cursor-pointer"
+                  className="min-h-[38px] px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-rose-500/50 text-slate-300 hover:text-white transition-colors cursor-pointer"
                 >
                   {pillName}
                 </button>
