@@ -24,8 +24,9 @@ export default async function handler(req, res) {
     try { body = JSON.parse(body); } catch (e) {}
   }
 
-  const { drugs = [], text = '', lang = 'ar', customApiKey } = body;
+  const { drugs = [], text = '', lang = 'ar', mode = 'drug_drug', customApiKey } = body;
   const isAr = lang === 'ar';
+  const checkMode = mode === 'drug_food' || mode === 'food_food' ? mode : 'drug_drug';
 
   let drugList = Array.isArray(drugs) ? [...drugs] : [];
 
@@ -43,8 +44,8 @@ export default async function handler(req, res) {
 
   if (drugList.length < 2) {
     return res.status(400).json({
-      error: isAr ? 'يرجى تحديد دوائين على الأقل للتحقق من التداخل السريري' : 'Please select at least two medications to analyze interactions.',
-      errorEn: 'Please specify at least two medicines to analyze interactions.'
+      error: isAr ? 'يرجى تحديد مركبين على الأقل للتحقق من التداخل' : 'Please select at least two items to analyze interactions.',
+      errorEn: 'Please specify at least two items to analyze interactions.'
     });
   }
 
@@ -52,19 +53,97 @@ export default async function handler(req, res) {
   const drugsString = drugList.join(' + ');
 
   let severity = 'safe';
-  let severityLabel = isAr ? '🟢 آمن سريرياً (لا يوجد تعارض حرج مسجل)' : '🟢 Safe (No Known Critical Interaction)';
+  let severityLabel = isAr ? '🟢 آمن سريرياً (لا يوجد تعارض مسجل)' : '🟢 Safe (No Known Interaction)';
   let mechanism = '';
   let recommendation = '';
   let clinicalDetails = '';
   let detectedInteractions = [];
   let cumulativeRisks = [];
 
-  // 1. If Gemini API key is available, execute Multi-Drug Clinical Pharmacology Analysis
+  // 1. If Gemini API key is available, execute Mode-Specific Analysis
   if (apiKey) {
-    const candidateModels = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
-    
-    const prompt = isAr
-      ? `أنت بروفيسور واستشاري أول في الصيدلة السريرية وعلم السموم الدوائية (Clinical Pharmacology & Toxicology).
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-2.5-flash'];
+    const itemA = drugList[0];
+    const itemB = drugList[1];
+
+    let prompt = '';
+    if (checkMode === 'drug_food') {
+      prompt = isAr
+        ? `أنت بروفيسور واستشاري في الصيدلة السريرية والتغذية العلاجية.
+المطلوب فحص التداخل الدوائي-الغذائي تحديداً بين هذين المركبين فقط:
+- الدواء: ${itemA}
+- الغذاء أو المشروب أو المكمل: ${itemB}
+
+تعليمات صارمة:
+1. ركز حصراً على العلاقة بين (${itemA}) و (${itemB}) ولا تتطرق لأغذية أخرى غير مطلوبة.
+2. حدد هل التداخل تعارض خطير ("critical")، تعارض متوسط ("warning")، طفيف ("minor")، أم آمن/تآزر إيجابي ("safe").
+3. وضح الآلية الحيوية والإنزيمية أو الامتصاصية (مثل CYP3A4، الاستخلاب بالكالسيوم، فيتامين K، التيرامين، البوتاسيوم، الكافيين، إلخ).
+4. قدم توصية عملية دقيقة (هل يمتنع عنه نهائياً أم يفصل بينهما بساعات محددة؟).
+
+أخرج النتيجة بصيغة JSON حصراً بهذا الشكل:
+{
+  "severity": "critical أو warning أو minor أو safe",
+  "severityLabel": "🔴 تعارض حرج أو 🟠 تعارض متوسط أو 🟡 طفيف أو 🟢 آمن / تآزر إيجابي",
+  "mechanism": "شرح علمي دقيق للتداخل بين هذا الدواء وهذا الغذاء فقط",
+  "recommendation": "التوجيه العملي والفاصل الزمني بالساعات والبديل الآمن",
+  "clinicalDetails": "المؤشرات أو الملاحظات السريرية الواجب الانتباه لها",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`
+        : `You are a Senior Clinical Pharmacist and Clinical Nutritionist.
+Evaluate the specific drug-food/supplement interaction ONLY between:
+- Drug: ${itemA}
+- Food/Beverage/Supplement: ${itemB}
+
+Output strictly valid JSON:
+{
+  "severity": "critical" | "warning" | "minor" | "safe",
+  "severityLabel": "🔴 Severe or 🟠 Moderate or 🟡 Minor or 🟢 Safe / Beneficial",
+  "mechanism": "Specific pharmacokinetic/pharmacodynamic mechanism between these two items",
+  "recommendation": "Actionable guidance and hour-separation timing if applicable",
+  "clinicalDetails": "Key monitoring notes",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`;
+    } else if (checkMode === 'food_food') {
+      prompt = isAr
+        ? `أنت استشاري في التغذية العلاجية والكيمياء الحيوية الغذائية.
+المطلوب فحص التداخل الغذائي-الغذائي تحديداً بين هذين العنصرين فقط:
+- العنصر الغذائي الأول: ${itemA}
+- العنصر الغذائي الثاني: ${itemB}
+
+تعليمات صارمة:
+1. ركز حصراً على الجمع بين (${itemA}) و (${itemB}): هل يحدث بينهما تآزر امتصاصي إيجابي، تنافس على الامتصاص (تثبيط)، خطر تراكمي (مثل فرط البوتاسيوم أو أوكسالات وحصى الكلى)، أم أنهما متوافقان وآمنا الجمع؟
+2. استخدم "safe" للتركيبات الآمنة أو التآزرية الإيجابية (واذكر ذلك بوضوح في severityLabel)، و"warning" أو "critical" عند وجود تثبيط امتصاص أو خطر صحي.
+
+أخرج النتيجة بصيغة JSON حصراً بهذا الشكل:
+{
+  "severity": "critical أو warning أو minor أو safe",
+  "severityLabel": "🟢 تآزر إيجابي ممتاز أو 🟢 تركيبة متوافقة وآمنة أو 🟠 تثبيط امتصاص أو 🔴 خطر صحي",
+  "mechanism": "الآلية الحيوية والهضمية للجمع بين هذين العنصرين الغذائيين",
+  "recommendation": "التوجيه الغذائي العملي (هل يجمعان معاً أم يفصل بينهما بساعات وما طريقة التحضير المثلى؟)",
+  "clinicalDetails": "نصيحة مطبخية أو سريرية عملية مختصرة",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`
+        : `You are a Clinical Nutritionist and Nutritional Biochemist.
+Evaluate the specific food-food or nutrient-nutrient interaction ONLY between:
+- Item 1: ${itemA}
+- Item 2: ${itemB}
+
+Output strictly valid JSON:
+{
+  "severity": "critical" | "warning" | "minor" | "safe",
+  "severityLabel": "🟢 Beneficial Synergy or 🟢 Safe Pairing or 🟠 Absorption Inhibition or 🔴 Risk",
+  "mechanism": "Biochemical and absorption mechanism between these two food/nutrient items",
+  "recommendation": "Practical dietary guidance and timing separation if needed",
+  "clinicalDetails": "Practical culinary/clinical tip",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`;
+    } else {
+      prompt = isAr
+        ? `أنت بروفيسور واستشاري أول في الصيدلة السريرية وعلم السموم الدوائية (Clinical Pharmacology & Toxicology).
 المطلوب فحص وتقييم التداخلات الدوائية الشاملة لكافة الأدوية المدخلة في هذا البرنامج العلاجي:
 قائمة الأدوية كاملة (${drugList.length} أدوية):
 ${drugsString}
@@ -98,7 +177,7 @@ ${drugsString}
     }
   ]
 }`
-      : `You are a Senior Clinical Pharmacologist and Board-Certified Pharmacotherapy Specialist.
+        : `You are a Senior Clinical Pharmacologist and Board-Certified Pharmacotherapy Specialist.
 Analyze the comprehensive drug-drug interactions for this multi-drug regimen (${drugList.length} medications):
 ${drugsString}
 
@@ -125,6 +204,7 @@ Output strictly valid JSON with this structure:
     }
   ]
 }`;
+    }
 
     for (const model of candidateModels) {
       try {
@@ -170,38 +250,67 @@ Output strictly valid JSON with this structure:
   }
 
   // 2. Comprehensive Pharmacological Local Engine (Ground Truth Guarantee)
-  const localResult = analyzeAllMedications(drugList, lang);
+  const localFoodFood = evaluateFoodFoodInteractions(drugList, lang);
+  const localMealInstructions = getMealInstructions(drugList, lang);
 
-  if (!mechanism) {
-    severity = localResult.severity;
-    severityLabel = localResult.severityLabel;
-    mechanism = localResult.mechanism;
-    recommendation = localResult.recommendation;
-    clinicalDetails = localResult.clinicalDetails;
-    detectedInteractions = localResult.detectedInteractions;
-    cumulativeRisks = localResult.cumulativeRisks;
-  } else {
-    // If Gemini evaluated the regimen, ensure it doesn't contradict a critical/warning local finding
-    if (localResult.severity === 'critical' && severity !== 'critical') {
-      severity = 'critical';
-      severityLabel = localResult.severityLabel;
-      mechanism = `${localResult.mechanism}\n\n${mechanism}`;
-      recommendation = `${localResult.recommendation}\n\n${recommendation}`;
-    } else if (localResult.severity === 'warning' && severity === 'safe') {
-      severity = 'warning';
+  if (checkMode === 'drug_drug') {
+    const localResult = analyzeAllMedications(drugList, lang);
+    if (!mechanism) {
+      severity = localResult.severity;
       severityLabel = localResult.severityLabel;
       mechanism = localResult.mechanism;
       recommendation = localResult.recommendation;
-    }
-
-    // Merge detected interactions
-    if (detectedInteractions.length === 0 && localResult.detectedInteractions.length > 0) {
+      clinicalDetails = localResult.clinicalDetails;
       detectedInteractions = localResult.detectedInteractions;
+      cumulativeRisks = localResult.cumulativeRisks;
+    } else {
+      if (localResult.severity === 'critical' && severity !== 'critical') {
+        severity = 'critical';
+        severityLabel = localResult.severityLabel;
+        mechanism = `${localResult.mechanism}\n\n${mechanism}`;
+        recommendation = `${localResult.recommendation}\n\n${recommendation}`;
+      } else if (localResult.severity === 'warning' && severity === 'safe') {
+        severity = 'warning';
+        severityLabel = localResult.severityLabel;
+        mechanism = localResult.mechanism;
+        recommendation = localResult.recommendation;
+      }
+      if (detectedInteractions.length === 0 && localResult.detectedInteractions.length > 0) {
+        detectedInteractions = localResult.detectedInteractions;
+      }
     }
+  } else if (checkMode === 'food_food') {
+    if (localFoodFood.length > 0) {
+      const top = localFoodFood[0];
+      severity = top.type === 'synergy' ? 'safe' : top.severity === 'critical' ? 'critical' : 'warning';
+      severityLabel = top.typeLabel;
+      mechanism = top.mechanism;
+      recommendation = top.recommendation;
+      clinicalDetails = top.clinicalNote || '';
+    } else if (!mechanism) {
+      severity = 'safe';
+      severityLabel = isAr ? '🟢 تركيبة غذائية متوافقة وآمنة' : '🟢 Safe & Compatible Food Pairing';
+      mechanism = isAr
+        ? `لا يوجد تعارض امتصاصي أو كيميائي حيوي مسجل عند الجمع بين (${drugList[0]}) و (${drugList[1]}) ضمن الكميات الغذائية المعتادة.`
+        : `No significant absorption antagonism or adverse interaction identified between ${drugList[0]} and ${drugList[1]}.`;
+      recommendation = isAr
+        ? 'يمكن تناولهما معاً بأمان ضمن نظام غذائي متوازن.'
+        : 'Safe to consume together as part of a balanced diet.';
+    }
+  } else if (checkMode === 'drug_food' && !mechanism) {
+    severity = 'safe';
+    severityLabel = isAr ? '🟢 لا يوجد تعارض مباشر مسجل بين المركبين' : '🟢 No Direct Conflict Identified';
+    mechanism = isAr
+      ? `لا يوجد تداخل دوائي-غذائي مباشر خطير مسجل بين (${drugList[0]}) و (${drugList[1]}).`
+      : `No major direct interaction identified between ${drugList[0]} and ${drugList[1]}.`;
+    recommendation = isAr
+      ? 'الالتزام بتعليمات توقيت الوجبات المعتادة للدواء الموضحة أدناه.'
+      : 'Follow standard meal timing instructions for the medication.';
   }
 
   res.status(200).json({
     success: true,
+    mode: checkMode,
     analyzedDrugs: drugList,
     totalCount: drugList.length,
     drugsString,
@@ -213,9 +322,9 @@ Output strictly valid JSON with this structure:
     clinicalDetails,
     detectedInteractions,
     cumulativeRisks,
-    foodInteractions: localResult.foodInteractions,
-    foodFoodInteractions: localResult.foodFoodInteractions,
-    mealInstructions: localResult.mealInstructions,
+    foodInteractions: evaluateFoodInteractions(drugList, lang),
+    foodFoodInteractions: localFoodFood,
+    mealInstructions: localMealInstructions,
     disclaimerAr: '⚠️ إخلاء مسؤولية: هذا الفحص استرشادي صيدلاني للأغراض التثقيفية والسريرية، ولا يغني عن تقييم الطبيب المعالج.',
     disclaimerEn: '⚠️ Disclaimer: Clinical decision support tool for educational purposes only; does not replace medical consultation.'
   });

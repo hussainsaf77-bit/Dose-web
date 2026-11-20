@@ -59,7 +59,7 @@ const TAB_LABELS: Record<ActiveTabType, { ar: string; en: string }> = {
   imaging: { ar: 'قراءة الأشعة والتصوير', en: 'X-Ray & Radiology' },
   symptoms: { ar: 'فاحص الأعراض والتشخيص', en: 'Symptom Checker' },
   pediatric: { ar: 'حاسبة جرعات الأطفال', en: 'Pediatric Dosing' },
-  interactions: { ar: 'فحص التعارضات الدوائية', en: 'Drug Interactions' },
+  interactions: { ar: 'التداخلات الدوائية والغذائية', en: 'Drug & Food Interactions' },
   diet: { ar: 'التغذية العلاجية', en: 'Therapeutic Diet' },
   health: { ar: 'حاسبة BMI والسكر والضغط', en: 'BMI & Vitals' },
   reminders: { ar: 'التذكير بالأدوية', en: 'Medication Reminders' },

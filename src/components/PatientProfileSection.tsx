@@ -926,7 +926,7 @@ export const PatientProfileSection: React.FC<PatientProfileSectionProps> = ({
                 className="p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-teal-500/50 transition-colors flex items-center gap-2 text-slate-200 font-semibold"
               >
                 <Shield className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>فحص التداخلات الدوائية</span>
+                <span>التداخلات الدوائية والغذائية</span>
               </a>
 
               <a

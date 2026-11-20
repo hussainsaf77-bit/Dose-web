@@ -4264,9 +4264,10 @@ app.post(["/api/medical/symptom-check", "/api/medical/check-symptoms"], async (r
 
 // 21. Clinical Drug Interactions AI Checker Endpoint
 app.post("/api/interactions/check", async (req, res) => {
-  const { drugs = [], text = "", lang = "ar", telegramId = "1001" } = req.body;
+  const { drugs = [], text = "", lang = "ar", mode = "drug_drug", telegramId = "1001" } = req.body;
   const user = usersDB.get(String(telegramId));
   const plan = user?.plan || "pro";
+  const checkMode = mode === "drug_food" || mode === "food_food" ? mode : "drug_drug";
 
   let drugList: string[] = Array.isArray(drugs) ? [...drugs] : [];
 
@@ -4310,8 +4311,55 @@ app.post("/api/interactions/check", async (req, res) => {
 
   if (ai) {
     try {
-      const prompt = lang === "ar"
-        ? `أنت صيدلاني سريري واستشاري في علم الأدوية السريري (Clinical Pharmacist).
+      const itemA = drugList[0];
+      const itemB = drugList[1];
+      let prompt = "";
+
+      if (checkMode === "drug_food") {
+        prompt = lang === "ar"
+          ? `أنت صيدلاني سريري واستشاري في التغذية العلاجية.
+المطلوب فحص التداخل الدوائي-الغذائي تحديداً بين هذين المركبين فقط:
+- الدواء: ${itemA}
+- الغذاء أو المشروب أو المكمل: ${itemB}
+
+ركز حصراً على العلاقة بين (${itemA}) و (${itemB}) فقط.
+أخرج النتيجة بتنسيق JSON حصراً بهذا الشكل:
+{
+  "severity": "critical أو warning أو minor أو safe",
+  "severityLabel": "🔴 تعارض حرج أو 🟠 تعارض متوسط أو 🟡 طفيف أو 🟢 آمن / تآزر إيجابي",
+  "mechanism": "شرح علمي دقيق للتداخل بين هذا الدواء وهذا الغذاء فقط",
+  "recommendation": "التوجيه العملي والفاصل الزمني بالساعات والبديل الآمن",
+  "clinicalDetails": "ملاحظات سريرية ومؤشرات متابعة",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`
+          : `You are a Clinical Pharmacist and Clinical Nutritionist.
+Evaluate the specific drug-food interaction ONLY between Drug: ${itemA} and Food/Supplement: ${itemB}.
+Output strictly valid JSON with fields: severity ("critical"|"warning"|"minor"|"safe"), severityLabel, mechanism, recommendation, clinicalDetails, cumulativeRisks ([]), detectedInteractions ([]).`;
+      } else if (checkMode === "food_food") {
+        prompt = lang === "ar"
+          ? `أنت استشاري في التغذية العلاجية والكيمياء الحيوية الغذائية.
+المطلوب فحص التداخل الغذائي-الغذائي تحديداً بين هذين العنصرين فقط:
+- العنصر الغذائي الأول: ${itemA}
+- العنصر الغذائي الثاني: ${itemB}
+
+وضح هل بينهما تآزر إيجابي أم تثبيط امتصاص أم خطر صحي أم توافق آمن.
+أخرج النتيجة بتنسيق JSON حصراً بهذا الشكل:
+{
+  "severity": "critical أو warning أو minor أو safe",
+  "severityLabel": "🟢 تآزر إيجابي ممتاز أو 🟢 تركيبة متوافقة وآمنة أو 🟠 تثبيط امتصاص أو 🔴 خطر صحي",
+  "mechanism": "الآلية الحيوية والهضمية للجمع بين هذين العنصرين الغذائيين",
+  "recommendation": "التوجيه الغذائي العملي والفاصل الزمني إن وجد",
+  "clinicalDetails": "نصيحة عملية مختصرة",
+  "cumulativeRisks": [],
+  "detectedInteractions": []
+}`
+          : `You are a Clinical Nutritionist.
+Evaluate the specific food-food or nutrient-nutrient interaction ONLY between: ${itemA} and ${itemB}.
+Output strictly valid JSON with fields: severity ("critical"|"warning"|"minor"|"safe"), severityLabel, mechanism, recommendation, clinicalDetails, cumulativeRisks ([]), detectedInteractions ([]).`;
+      } else {
+        prompt = lang === "ar"
+          ? `أنت صيدلاني سريري واستشاري في علم الأدوية السريري (Clinical Pharmacist).
 قم بفحص وتقييم التداخل والتعارض الدوائي بدقة بالغة بين كافة هذه الأدوية (${drugList.length} أدوية):
 ${drugsString}
 
@@ -4336,7 +4384,7 @@ ${drugsString}
     }
   ]
 }`
-        : `You are an expert Clinical Pharmacist and Clinical Pharmacologist.
+          : `You are an expert Clinical Pharmacist and Clinical Pharmacologist.
 Analyze the multi-drug interaction between:
 ${drugsString}
 
@@ -4361,16 +4409,18 @@ Output strictly valid JSON in this structure:
     }
   ]
 }`;
+      }
 
-      const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
+      const candidateModels = ["gemini-3.1-flash-lite", "gemini-4-hydrogen"];
       for (const modelName of candidateModels) {
         try {
           const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("AI Model Timeout")), 12000));
           const generatePromise = ai.models.generateContent({
             model: modelName,
             contents: prompt,
-            config: { 
+            config: {
               responseMimeType: "application/json",
+              thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
             }
           });
           const response: any = await Promise.race([generatePromise, timeoutPromise]);
@@ -4395,14 +4445,25 @@ Output strictly valid JSON in this structure:
 
   // Comprehensive Clinical Pharmacology Fallback Rule Engine
   if (!mechanism) {
-    const localResult = analyzeAllMedications(drugList, lang as 'ar' | 'en');
-    severity = localResult.severity;
-    severityLabel = localResult.severityLabel;
-    mechanism = localResult.mechanism;
-    recommendation = localResult.recommendation;
-    clinicalDetails = localResult.clinicalDetails;
-    detectedInteractions = localResult.detectedInteractions;
-    cumulativeRisks = localResult.cumulativeRisks;
+    if (checkMode === "drug_drug") {
+      const localResult = analyzeAllMedications(drugList, lang as 'ar' | 'en');
+      severity = localResult.severity;
+      severityLabel = localResult.severityLabel;
+      mechanism = localResult.mechanism;
+      recommendation = localResult.recommendation;
+      clinicalDetails = localResult.clinicalDetails;
+      detectedInteractions = localResult.detectedInteractions;
+      cumulativeRisks = localResult.cumulativeRisks;
+    } else {
+      severity = "safe";
+      severityLabel = lang === "ar" ? "🟢 آمن سريرياً (لا يوجد تعارض مسجل)" : "🟢 Safe (No Known Interaction)";
+      mechanism = lang === "ar"
+        ? `لا يوجد تعارض مباشر حرج مسجل بين (${drugList[0]}) و (${drugList[1]}).`
+        : `No direct adverse interaction identified between ${drugList[0]} and ${drugList[1]}.`;
+      recommendation = lang === "ar"
+        ? "يمكن الاستمرار بالخطة العلاجية أو الغذائية المعتادة مع مراعاة توقيت الوجبات."
+        : "Proceed with standard clinical and dietary guidance.";
+    }
   }
 
   // Log sync entry
@@ -4412,14 +4473,15 @@ Output strictly valid JSON in this structure:
     source: "web_platform",
     userTelegramId: String(telegramId),
     userName: user?.username ? `@${user.username}` : user?.firstName || "مستخدم جرعة",
-    actionAr: `فحص تداخلات دوائية سريري: (${drugsString})`,
-    actionEn: `Clinical drug interaction check: (${drugsString})`,
+    actionAr: `فحص تداخلات (${checkMode}): (${drugsString})`,
+    actionEn: `Clinical interaction check (${checkMode}): (${drugsString})`,
     status: severity === "critical" ? "warning" : "success",
     tierUsed: plan,
   });
 
   res.json({
     success: true,
+    mode: checkMode,
     analyzedDrugs: drugList,
     drugsString,
     severity,

@@ -1,55 +1,54 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { 
-  ShieldAlert, 
-  ShieldCheck, 
-  AlertTriangle, 
-  Plus, 
-  X, 
-  Sparkles, 
-  RefreshCw, 
-  Copy, 
-  Check, 
-  Info, 
-  Share2, 
-  Pill, 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  ShieldAlert,
+  AlertTriangle,
+  Sparkles,
+  RefreshCw,
+  Copy,
+  Check,
+  Info,
+  Share2,
+  Pill,
   CheckCircle2,
   Stethoscope,
   ExternalLink,
-  History,
-  Trash2,
-  Search,
   Utensils,
-  Coffee,
-  Wine,
   Apple,
   Clock,
-  Shield,
-  Download
+  ChevronDown,
 } from 'lucide-react';
-import { INTERACTIONS_DB } from '../data/medicalData';
-import { 
-  analyzeAllMedications, 
-  PairwiseInteraction, 
+import {
+  analyzeAllMedications,
+  PairwiseInteraction,
   cleanDrugToken,
   DrugFoodInteraction,
   FoodFoodInteraction,
   MealInstruction,
   evaluateFoodInteractions,
   evaluateFoodFoodInteractions,
-  getMealInstructions
+  getMealInstructions,
 } from '../data/clinicalInteractionEngine';
-import { COMPREHENSIVE_CATALOG } from '../data/masterClinicalDrugs';
+import { getAllSeededDrugs } from '../data/universalDrugDirectory';
 import { getApiUrl } from '../utils/apiConfig';
+
+type InteractionMode = 'drug_drug' | 'drug_food' | 'food_food';
 
 interface DrugInteractionsCheckerProps {
   initialDrugs?: string[];
   language?: 'ar' | 'en';
 }
 
+interface SelectOption {
+  value: string;
+  label: string;
+}
+
 interface InteractionResult {
+  mode: InteractionMode;
   severity: 'critical' | 'warning' | 'minor' | 'safe';
   severityLabel: string;
   isSafe: boolean;
+  isSynergy?: boolean;
   mechanism: string;
   recommendation: string;
   clinicalDetails?: string;
@@ -60,189 +59,412 @@ interface InteractionResult {
   foodFoodInteractions?: FoodFoodInteraction[];
   mealInstructions?: MealInstruction[];
 }
-interface AutoDrug {
-  name: string;
-  nameEn: string;
-  trade: string;
-  category: string;
-}
 
-const EXTENSIVE_AUTOCOMPLETE_DRUGS: AutoDrug[] = [
-  // Respiratory, Bronchodilators & Xanthines
-  { name: 'ثيوفلين', nameEn: 'Theophylline', trade: 'ثيودور (Theo-Dur) / يونيفيل (Uniphyl)', category: 'موسع قصبات زانثيني (CYP1A2)' },
-  { name: 'ثيوفيلين', nameEn: 'Theophylline', trade: 'ثيوفلين / كويبرون (Quibron) / ثيولين', category: 'موسع قصبات زانثيني (CYP1A2)' },
-  { name: 'أمينوفيلين', nameEn: 'Aminophylline', trade: 'أمينوفيلين وريدي (Aminophylline IV)', category: 'موسع قصبات زانثيني' },
-  { name: 'سالبوتامول', nameEn: 'Salbutamol / Albuterol', trade: 'فينتولين (Ventolin)', category: 'موسع قصبات بيتا-2' },
-  { name: 'إبراتروبيوم', nameEn: 'Ipratropium', trade: 'أتروفنت (Atrovent)', category: 'موسع قصبات كولينيرجي' },
-  { name: 'تيوتروبيوم', nameEn: 'Tiotropium', trade: 'سبيريفا (Spiriva)', category: 'موسع قصبات طويل المفعول' },
-  { name: 'مونتيلوكاست', nameEn: 'Montelukast', trade: 'سينجولير (Singulair)', category: 'مضاد مستقبلات الليكوترين' },
-
-  // Fluoroquinolones & Antimicrobials
-  { name: 'سيبروفلوكساسين', nameEn: 'Ciprofloxacin', trade: 'سيبرو (Cipro) / سيبروباي (Ciprobay)', category: 'مضاد حيوي فلوروكينولون (CYP1A2)' },
-  { name: 'ليفوفلوكساسين', nameEn: 'Levofloxacin', trade: 'تافانيك (Tavanic)', category: 'مضاد حيوي فلوروكينولون' },
-  { name: 'موكسيفلوكساسين', nameEn: 'Moxifloxacin', trade: 'أفيلوكس (Avelox)', category: 'مضاد حيوي فلوروكينولون' },
-  { name: 'كلاريثروميسين', nameEn: 'Clarithromycin', trade: 'كلاسيد (Klacid) / كلاريتوب', category: 'مضاد حيوي ماكروليد (CYP3A4)' },
-  { name: 'أزيثرومايسين', nameEn: 'Azithromycin', trade: 'زيثروماكس (Zithromax) / زيثرو', category: 'مضاد حيوي ماكروليد' },
-  { name: 'أزيثروميسين', nameEn: 'Azithromycin', trade: 'زيثروماكس (Zithromax)', category: 'مضاد حيوي ماكروليد' },
-  { name: 'إريثروميسين', nameEn: 'Erythromycin', trade: 'إريثرومايسين (Erythrocin)', category: 'مضاد حيوي ماكروليد (CYP3A4)' },
-  { name: 'أوجمنتين', nameEn: 'Augmentin', trade: 'أموكسيسيلين + كلافولانات (Curam)', category: 'مضاد حيوي واسع المجال' },
-  { name: 'أموكسيسيلين', nameEn: 'Amoxicillin', trade: 'أموكسيل (Amoxil)', category: 'مضاد حيوي بنسليني' },
-  { name: 'دوكسيسيكلين', nameEn: 'Doxycycline', trade: 'فيبرامايسين (Vibramycin)', category: 'مضاد حيوي تتراسيكلين' },
-  { name: 'سيفوروكسيم', nameEn: 'Cefuroxime', trade: 'زينات (Zinnat)', category: 'سيفالوسبورين الجيل الثاني' },
-  { name: 'سيفترياكسون', nameEn: 'Ceftriaxone', trade: 'روسيفين (Rocephin)', category: 'سيفالوسبورين الجيل الثالث' },
-  { name: 'سيفيكسيم', nameEn: 'Cefixime', trade: 'سوبراكس (Suprax)', category: 'سيفالوسبورين فموي' },
-  { name: 'باكتريم', nameEn: 'Bactrim / Cotrimoxazole', trade: 'سبترا (Septra) / كوتريموكسازول', category: 'مضاد حيوي سلفا (CYP2C9)' },
-  { name: 'ميترونيدازول', nameEn: 'Metronidazole', trade: 'فلاجيل (Flagyl) / فلاجيكور', category: 'مضاد لاهوائيات وطفيليات' },
-  { name: 'فلوكونازول', nameEn: 'Fluconazole', trade: 'ديفلوكان (Diflucan)', category: 'مضاد فطريات آزولي (CYP2C9/3A4)' },
-  { name: 'إيتراكونازول', nameEn: 'Itraconazole', trade: 'سبورانوكس (Sporanox)', category: 'مضاد فطريات قوي (CYP3A4)' },
-  { name: 'كيتوكونازول', nameEn: 'Ketoconazole', trade: 'نيزورال (Nizoral)', category: 'مضاد فطريات' },
-  { name: 'جنتامايسين', nameEn: 'Gentamicin', trade: 'جنتامايسين حقن', category: 'مضاد أمينوجليكوسيد' },
-  { name: 'أميكاسين', nameEn: 'Amikacin', trade: 'أميكين (Amikin)', category: 'مضاد أمينوجليكوسيد' },
-  { name: 'فانكومايسين', nameEn: 'Vancomycin', trade: 'فانكوسين (Vancocin)', category: 'مضاد حيوي جليكوببتيد' },
-
-  // Anticoagulants, Antiplatelets & PDE-5
-  { name: 'وارفارين', nameEn: 'Warfarin', trade: 'كومادين (Coumadin) / ماريفان (Marivan)', category: 'مضاد تخثر / فيتامين K' },
-  { name: 'أسبرين', nameEn: 'Aspirin', trade: 'جوسبرين / أسبوسيد / باير أسبرين', category: 'مضاد صفيحات ومسكن' },
-  { name: 'كلوبيدوجريل', nameEn: 'Clopidogrel', trade: 'بلافيكس (Plavix)', category: 'مضاد صفيحات P2Y12' },
-  { name: 'تيكاجريلور', nameEn: 'Ticagrelor', trade: 'بريلينتا (Brilinta)', category: 'مضاد صفيحات P2Y12' },
-  { name: 'ريفاروكسابان', nameEn: 'Rivaroxaban', trade: 'زاريلتو (Xarelto)', category: 'مضاد تخثر فموي DOAC' },
-  { name: 'أبيكسابان', nameEn: 'Apixaban', trade: 'إيليكويس (Eliquis)', category: 'مضاد تخثر فموي DOAC' },
-  { name: 'دابيجاتران', nameEn: 'Dabigatran', trade: 'براداكسا (Pradaxa)', category: 'مثبط مباشر للثرومبين' },
-  { name: 'إينوكسابارين', nameEn: 'Enoxaparin', trade: 'كليكسان (Clexane)', category: 'هيبارين منخفض الوزن LMWH' },
-  { name: 'سيلدينافيل', nameEn: 'Sildenafil', trade: 'فياغرا (Viagra) / ريفاتيو', category: 'مثبط PDE-5' },
-  { name: 'تادالافيل', nameEn: 'Tadalafil', trade: 'سياليس (Cialis) / سنافي (Snafi)', category: 'مثبط PDE-5' },
-  { name: 'فاردينافيل', nameEn: 'Vardenafil', trade: 'ليفيترا (Levitra)', category: 'مثبط PDE-5' },
-  { name: 'نيتروجلسرين', nameEn: 'Nitroglycerin', trade: 'نيتروديرم / نترونال / أنجيسيد', category: 'نترات موسعة للشرايين' },
-  { name: 'إيزوسوربيد', nameEn: 'Isosorbide Dinitrate', trade: 'إمدور (Imdur) / إيزورديل (Isordil)', category: 'نترات عضوية' },
-
-  // Cardiovascular, Blood Pressure & Antiarrhythmics
-  { name: 'بيسوبرولول', nameEn: 'Bisoprolol', trade: 'كونكور (Concor)', category: 'حاصر مستقبلات بيتا القلبي' },
-  { name: 'كارفيديلول', nameEn: 'Carvedilol', trade: 'ديلاتزند (Dilatrend)', category: 'حاصر ألفا وبيتا' },
-  { name: 'أتينولول', nameEn: 'Atenolol', trade: 'تينورمين (Tenormin)', category: 'حاصر مستقبلات بيتا' },
-  { name: 'ميتوبرولول', nameEn: 'Metoprolol', trade: 'بيتالوك (Betaloc)', category: 'حاصر مستقبلات بيتا' },
-  { name: 'بروبرانولول', nameEn: 'Propranolol', trade: 'إندرال (Inderal)', category: 'حاصر بيتا غير انتقائي' },
-  { name: 'نيبيفولول', nameEn: 'Nebivolol', trade: 'نيبيليت (Nebilet)', category: 'حاصر بيتا قلبي موسع' },
-  { name: 'أملوديبين', nameEn: 'Amlodipine', trade: 'نورفاسك (Norvasc)', category: 'حاصر قنوات الكالسيوم (CCB)' },
-  { name: 'نيفيديبين', nameEn: 'Nifedipine', trade: 'أدالات (Adalat)', category: 'حاصر قنوات الكالسيوم' },
-  { name: 'فيراباميل', nameEn: 'Verapamil', trade: 'إيزوبتين (Isoptin)', category: 'حاصر قنوات الكالسيوم (بطء قلب)' },
-  { name: 'ديلتيازيم', nameEn: 'Diltiazem', trade: 'ألتيازيم (Altiazem)', category: 'حاصر قنوات الكالسيوم' },
-  { name: 'لوسارتان', nameEn: 'Losartan', trade: 'كوزار (Cozaar)', category: 'حاصر مستقبلات أنجيوتنسين ARB' },
-  { name: 'فالسارتان', nameEn: 'Valsartan', trade: 'ديوفان (Diovan) / تارج', category: 'حاصر مستقبلات أنجيوتنسين ARB' },
-  { name: 'كانديسارتان', nameEn: 'Candesartan', trade: 'أتاكاند (Atacand)', category: 'حاصر مستقبلات أنجيوتنسين ARB' },
-  { name: 'تيلميسارتان', nameEn: 'Telmisartan', trade: 'ميكارديس (Micardis)', category: 'حاصر مستقبلات أنجيوتنسين ARB' },
-  { name: 'كابتوبريل', nameEn: 'Captopril', trade: 'كابوتن (Capoten)', category: 'مثبط ACE' },
-  { name: 'إنالابريل', nameEn: 'Enalapril', trade: 'رينيتك (Renitec)', category: 'مثبط ACE' },
-  { name: 'راميبريل', nameEn: 'Ramipril', trade: 'تريتاس (Tritace)', category: 'مثبط ACE' },
-  { name: 'ليسينوبريل', nameEn: 'Lisinopril', trade: 'زيستريل (Zestril)', category: 'مثبط ACE' },
-  { name: 'سبيرونولاكتون', nameEn: 'Spironolactone', trade: 'ألداكتون (Aldactone)', category: 'مدر بول حافظ للبوتاسيوم' },
-  { name: 'فوروسيميد', nameEn: 'Furosemide', trade: 'لازيكس (Lasix)', category: 'مدر بول عروي قوي' },
-  { name: 'هيدروكلوروثيازيد', nameEn: 'Hydrochlorothiazide', trade: 'إيزيدريكس (Esidrex) / HCTZ', category: 'مدر بول ثيازيدي' },
-  { name: 'إنداباميد', nameEn: 'Indapamide', trade: 'ناتريليكس (Natrilix)', category: 'مدر بول ثيازيد شبيه' },
-  { name: 'ديجوكسين', nameEn: 'Digoxin', trade: 'لانوكسين (Lanoxin)', category: 'جليكوسيد مقو لعضلة القلب' },
-  { name: 'أميودارون', nameEn: 'Amiodarone', trade: 'كوردارون (Cordarone)', category: 'منظم نظم القلب ومطيل لـ QT' },
-
-  // Lipid-Lowering Statins
-  { name: 'أتورفاستاتين', nameEn: 'Atorvastatin', trade: 'ليبيتور (Lipitor) / أتور', category: 'ستاتين خافض للكوليسترول (CYP3A4)' },
-  { name: 'سيمفاستاتين', nameEn: 'Simvastatin', trade: 'زوكور (Zocor)', category: 'ستاتين خافض للكوليسترول (CYP3A4)' },
-  { name: 'روزوفاستاتين', nameEn: 'Rosuvastatin', trade: 'كريستور (Crestor)', category: 'ستاتين خافض للكوليسترول عالي الفعالية' },
-  { name: 'برافاستاتين', nameEn: 'Pravastatin', trade: 'ليبوستات (Lipostat)', category: 'ستاتين آمن استقلابياً' },
-  { name: 'إيزيتيميب', nameEn: 'Ezetimibe', trade: 'إيزيترول (Ezetrol)', category: 'مثبط امتصاص الكولسترول' },
-
-  // Diabetes & Metabolic
-  { name: 'ميتفورمين', nameEn: 'Metformin', trade: 'غلوكوفاج (Glucophage) / سيدوفاج', category: 'منظم سكر / بيغوانيد' },
-  { name: 'جليمبريد', nameEn: 'Glimepiride', trade: 'أماريل (Amaryl)', category: 'سلفونيل يوريا محفز للإنسولين' },
-  { name: 'جليكلازيد', nameEn: 'Gliclazide', trade: 'دياميكرون (Diamicron)', category: 'سلفونيل يوريا محفز للإنسولين' },
-  { name: 'إمباغليفلوزين', nameEn: 'Empagliflozin', trade: 'جارديانس (Jardiance)', category: 'مثبط ناقل SGLT2 كلوياً' },
-  { name: 'داباجليفلوزين', nameEn: 'Dapagliflozin', trade: 'فورسيجا (Forxiga)', category: 'مثبط ناقل SGLT2 كلوياً' },
-  { name: 'سيتاغليبتين', nameEn: 'Sitagliptin', trade: 'جانوفيا (Januvia)', category: 'مثبط إنزيم DPP-4' },
-  { name: 'فيلداغليبتين', nameEn: 'Vildagliptin', trade: 'جالفوس (Galvus)', category: 'مثبط إنزيم DPP-4' },
-  { name: 'سيماجلوتايد', nameEn: 'Semaglutide', trade: 'أوزمبيك (Ozempic) / ويغوفي', category: 'منبه مستقبلات GLP-1' },
-  { name: 'تيرزيباتيد', nameEn: 'Tirzepatide', trade: 'مونجارو (Mounjaro)', category: 'منبه مستقبلات GIP / GLP-1' },
-  { name: 'إنسولين', nameEn: 'Insulin', trade: 'لانتوس / نوفورابيد / ميكستارد', category: 'هرمون مخفض لسكر الدم' },
-
-  // Analgesics, NSAIDs & Muscle Relaxants
-  { name: 'إيبوبروفين', nameEn: 'Ibuprofen', trade: 'بروفين (Brufen) / أدفيل (Advil)', category: 'مسكن ومضاد التهاب NSAID' },
-  { name: 'باراسيتامول', nameEn: 'Paracetamol', trade: 'بانادول (Panadol) / أدول (Adol)', category: 'مسكن وخافض حرارة آمن' },
-  { name: 'ديكلوفيناك', nameEn: 'Diclofenac', trade: 'فولتارين (Voltaren) / كاتافلام', category: 'مسكن ومضاد التهاب NSAID' },
-  { name: 'نابروكسين', nameEn: 'Naproxen', trade: 'أليف (Aleve) / بروكسين', category: 'مسكن ومضاد التهاب NSAID' },
-  { name: 'ميلوكسيكام', nameEn: 'Meloxicam', trade: 'موبيك (Mobic)', category: 'مسكن NSAID انتقائي' },
-  { name: 'سيليكوكسيب', nameEn: 'Celecoxib', trade: 'سيليبريكس (Celebrex)', category: 'مثبط انتقائي لـ COX-2' },
-  { name: 'ترامادول', nameEn: 'Tramadol', trade: 'ترامال (Tramal) / كونترامال', category: 'مسكن أفيوني وسيروتونيني' },
-  { name: 'مورفين', nameEn: 'Morphine', trade: 'م إس تي (MST Continus)', category: 'مسكن أفيوني مركزي قوي' },
-  { name: 'تيزانيدين', nameEn: 'Tizanidine', trade: 'سيردالود (Sirdalud)', category: 'مرخي عضلات مركزي (CYP1A2)' },
-  { name: 'باكلوفين', nameEn: 'Baclofen', trade: 'ليوريسال (Lioresal)', category: 'مرخي عضلات مركزي' },
-  { name: 'جابابنتين', nameEn: 'Gabapentin', trade: 'نيورونتين (Neurontin)', category: 'مسكن لآلام الأعصاب' },
-  { name: 'بريجابالين', nameEn: 'Pregabalin', trade: 'ليريكا (Lyrica)', category: 'مسكن لآلام الأعصاب' },
-
-  // CNS & Psychiatric
-  { name: 'إسيتالوبرام', nameEn: 'Escitalopram', trade: 'سبرالكس (Cipralex) / ليكسابرو', category: 'مضاد اكتئاب SSRI' },
-  { name: 'سيرترالين', nameEn: 'Sertraline', trade: 'زولوفت (Zoloft) / لوسترال', category: 'مضاد اكتئاب SSRI' },
-  { name: 'فلوكسيتين', nameEn: 'Fluoxetine', trade: 'بروزاك (Prozac)', category: 'مضاد اكتئاب SSRI' },
-  { name: 'باروكسيتين', nameEn: 'Paroxetine', trade: 'سيروكسات (Seroxat)', category: 'مضاد اكتئاب SSRI' },
-  { name: 'دولوكستين', nameEn: 'Duloxetine', trade: 'سيمبالتا (Cymbalta)', category: 'مضاد اكتئاب وآلام SNRI' },
-  { name: 'فينلافاكسين', nameEn: 'Venlafaxine', trade: 'إفكسور (Efexor)', category: 'مضاد اكتئاب SNRI' },
-  { name: 'ليثيوم', nameEn: 'Lithium', trade: 'بريادل (Priadel)', category: 'مثبت للمزاج' },
-  { name: 'ديازيبام', nameEn: 'Diazepam', trade: 'فاليوم (Valium)', category: 'مهدئ بنزوديازيبين' },
-  { name: 'ألبرازولام', nameEn: 'Alprazolam', trade: 'زاناكس (Xanax)', category: 'مهدئ بنزوديازيبين' },
-  { name: 'كلونازيبام', nameEn: 'Clonazepam', trade: 'ريفوتريل (Rivotril)', category: 'مهدئ ومضاد صرع' },
-  { name: 'كاربامازيبين', nameEn: 'Carbamazepine', trade: 'تجريتول (Tegretol)', category: 'مضاد صرع ومحفز للإنزيمات' },
-  { name: 'فالبروات الصوديوم', nameEn: 'Sodium Valproate', trade: 'ديباكين (Depakine)', category: 'مضاد صرع ومثبت مزاج' },
-  { name: 'لاموتريجين', nameEn: 'Lamotrigine', trade: 'لاميكتال (Lamictal)', category: 'مضاد صرع' },
-  { name: 'ليفيتيراسيتام', nameEn: 'Levetiracetam', trade: 'كيبرا (Keppra)', category: 'مضاد صرع حديث' },
-
-  // Gastrointestinal & PPIs
-  { name: 'أوميبرازول', nameEn: 'Omeprazole', trade: 'لوسيك (Losec) / أوميز', category: 'مثبط مضخة البروتون (CYP2C19)' },
-  { name: 'إيزوميبرازول', nameEn: 'Esomeprazole', trade: 'نيكسيوم (Nexium)', category: 'مثبط مضخة البروتون (CYP2C19)' },
-  { name: 'بانتوبرازول', nameEn: 'Pantoprazole', trade: 'كونترولوك (Controloc)', category: 'مثبط مضخة البروتون آمن للقلب' },
-  { name: 'لانزوبرازول', nameEn: 'Lansoprazole', trade: 'لانزور (Lanzor)', category: 'مثبط مضخة البروتون' },
-  { name: 'فاموتيدين', nameEn: 'Famotidine', trade: 'فامودار (Famodar) / جاسيك', category: 'حاصر مستقبلات H2' },
-  { name: 'دومبيريدون', nameEn: 'Domperidone', trade: 'موتيليوم (Motilium)', category: 'محرك للمعدة ومضاد غثيان' },
-  { name: 'أوندانسيترون', nameEn: 'Ondansetron', trade: 'زوفران (Zofran)', category: 'مضاد غثيان قوي 5-HT3' },
-
-  // Endocrine, Minerals & Others
-  { name: 'ليفوثيروكسين', nameEn: 'Levothyroxine', trade: 'إلتروكسين / يثيروكس (Euthyrox)', category: 'هرمون الغدة الدرقية' },
-  { name: 'بريدنيزولون', nameEn: 'Prednisolone', trade: 'سولبريد / بريدو', category: 'كورتيكوستيرويد مضاد التهاب' },
-  { name: 'ديكساميثازون', nameEn: 'Dexamethasone', trade: 'ديكادرون (Decadron)', category: 'كورتيزون قوي' },
-  { name: 'ميثوتريكسات', nameEn: 'Methotrexate', trade: 'ميثوتريكسات (MTX) / تريكسان', category: 'مضاد مناعة وأورام' },
-  { name: 'ألوبيورينول', nameEn: 'Allopurinol', trade: 'زيلوريك (Zyloric)', category: 'مثبط إنزيم الزانثين للنقرس' },
-  { name: 'فيبوكسوستات', nameEn: 'Febuxostat', trade: 'أدينوريك (Adenuric)', category: 'خافض لحمض البوليك' },
-  { name: 'كولشيسين', nameEn: 'Colchicine', trade: 'كولشيسين (Colchicine)', category: 'مضاد التهاب لنوبات النقرس' },
-  { name: 'كالسيوم', nameEn: 'Calcium', trade: 'كالسيتريول / أوستوكير / كالتريت', category: 'مكمل معدني' },
-  { name: 'حديد', nameEn: 'Iron / Ferrous', trade: 'فيروز / فيروجلوبين', category: 'مكمل حديد لعلاج فقر الدم' },
-  { name: 'مغنيسيوم', nameEn: 'Magnesium', trade: 'مغنيسيوم ب6 / سترات المغنيسيوم', category: 'مكمل معدني' },
-  { name: 'فيتامين د', nameEn: 'Vitamin D3', trade: 'ديفارول / كوليكالسيفيرول', category: 'فيتامين داعم للعظام' },
-  { name: 'فيتامين سي', nameEn: 'Vitamin C / Ascorbic Acid', trade: 'سيفامول / فيتامين ج', category: 'فيتامين ومضاد أكسدة يعزز الامتصاص' },
-  { name: 'زنك', nameEn: 'Zinc', trade: 'زنكترون / أوكتازنك', category: 'مكمل معدني ومقوي مناعة' },
-  { name: 'شاي', nameEn: 'Tea / Tannins', trade: 'شاي أحمر / شاي أخضر (تانات)', category: 'مشروب غذائي غني بالتانينات' },
-  { name: 'قهوة', nameEn: 'Coffee / Caffeine', trade: 'قهوة / إسبريسو / نسكافيه (كافيين)', category: 'مشروب غذائي منبه وغني بالكافيين' },
-  { name: 'حليب', nameEn: 'Milk / Dairy Products', trade: 'حليب / لبن / زبادي / أجبان (كالسيوم)', category: 'أغذية ومشتقات ألبان غنية بالكالسيوم' },
-  { name: 'سبانخ', nameEn: 'Spinach / Oxalates', trade: 'سبانخ / سلق / ورقيات داكنة', category: 'خضار ورقي غني بالأوكسالات وفيتامين K' },
-  { name: 'جريب فروت', nameEn: 'Grapefruit', trade: 'عصير جريب فروت (فورانوكومارين)', category: 'فاكهة حمضية مثبطة لإنزيم CYP3A4' },
-  { name: 'عرق سوس', nameEn: 'Licorice / Glycyrrhizin', trade: 'شراب عرق السوس', category: 'مشروب عشبي حابس للصوديوم ومطرح للبوتاسيوم' },
-  { name: 'بدائل الملح', nameEn: 'Salt Substitutes / KCl', trade: 'ملح البوتاسيوم / بديل ملح الطعام', category: 'بديل ملح غني بـ كلوريد البوتاسيوم' },
-  { name: 'أجبان معتقة', nameEn: 'Aged Cheese / Tyramine', trade: 'جبن بارميزان / جبن شيدر معتق', category: 'أغذية غنية بالتيرامين' },
-  { name: 'زيت زيتون', nameEn: 'Olive Oil / Healthy Fats', trade: 'زيت زيتون بكر / دهون صحية', category: 'دهون صحية تعزز امتصاص الفيتامينات الذوابة بالدهون' },
-  { name: 'جزر', nameEn: 'Carrots / Beta-Carotene', trade: 'جزر / قرع عسلي / بطاطا حلوة', category: 'خضار غني بـ بيتا كاروتين وفيتامين A' },
-  { name: 'نخالة القمح', nameEn: 'Wheat Bran / Fiber', trade: 'نخالة القمح / حبوب كاملة (فيتات)', category: 'ألياف غذائية غنية بحمض الفيتيك المخلب للمعادن' },
-  { name: 'بياض البيض النيئ', nameEn: 'Raw Egg White / Avidin', trade: 'بياض بيض غير مطهو (أفيدين)', category: 'بروتين غذائي يرتبط بالبيوتين' }
+const CORE_DRUGS_LIST: Array<{ value: string; label: string }> = [
+  { value: 'وارفارين', label: 'وارفارين — Warfarin (كومادين / ماريفان)' },
+  { value: 'أسبرين', label: 'أسبرين — Aspirin (جوسبرين / أسبوسيد)' },
+  { value: 'كلوبيدوجريل', label: 'كلوبيدوجريل — Clopidogrel (بلافيكس)' },
+  { value: 'تيكاجريلور', label: 'تيكاجريلور — Ticagrelor (بريلينتا)' },
+  { value: 'ريفاروكسابان', label: 'ريفاروكسابان — Rivaroxaban (زاريلتو)' },
+  { value: 'أبيكسابان', label: 'أبيكسابان — Apixaban (إيليكويس)' },
+  { value: 'دابيجاتران', label: 'دابيجاتران — Dabigatran (براداكسا)' },
+  { value: 'إينوكسابارين', label: 'إينوكسابارين — Enoxaparin (كليكسان)' },
+  { value: 'سيلدينافيل', label: 'سيلدينافيل — Sildenafil (فياغرا)' },
+  { value: 'تادالافيل', label: 'تادالافيل — Tadalafil (سياليس / سنافي)' },
+  { value: 'فاردينافيل', label: 'فاردينافيل — Vardenafil (ليفيترا)' },
+  { value: 'نيتروجلسرين', label: 'نيتروجلسرين — Nitroglycerin (نترات)' },
+  { value: 'إيزوسوربيد', label: 'إيزوسوربيد — Isosorbide (إمدور / إيزورديل)' },
+  { value: 'ثيوفلين', label: 'ثيوفلين — Theophylline (ثيودور / يونيفيل)' },
+  { value: 'أمينوفيلين', label: 'أمينوفيلين — Aminophylline' },
+  { value: 'سالبوتامول', label: 'سالبوتامول — Salbutamol (فينتولين)' },
+  { value: 'مونتيلوكاست', label: 'مونتيلوكاست — Montelukast (سينجولير)' },
+  { value: 'سيبروفلوكساسين', label: 'سيبروفلوكساسين — Ciprofloxacin (سيبرو)' },
+  { value: 'ليفوفلوكساسين', label: 'ليفوفلوكساسين — Levofloxacin (تافانيك)' },
+  { value: 'موكسيفلوكساسين', label: 'موكسيفلوكساسين — Moxifloxacin (أفيلوكس)' },
+  { value: 'كلاريثروميسين', label: 'كلاريثروميسين — Clarithromycin (كلاسيد)' },
+  { value: 'أزيثرومايسين', label: 'أزيثرومايسين — Azithromycin (زيثروماكس)' },
+  { value: 'إريثروميسين', label: 'إريثروميسين — Erythromycin' },
+  { value: 'أوجمنتين', label: 'أوجمنتين — Augmentin (أموكسيسيلين + كلافولانات)' },
+  { value: 'أموكسيسيلين', label: 'أموكسيسيلين — Amoxicillin (أموكسيل)' },
+  { value: 'دوكسيسيكلين', label: 'دوكسيسيكلين — Doxycycline (فيبرامايسين)' },
+  { value: 'سيفوروكسيم', label: 'سيفوروكسيم — Cefuroxime (زينات)' },
+  { value: 'سيفترياكسون', label: 'سيفترياكسون — Ceftriaxone (روسيفين)' },
+  { value: 'سيفيكسيم', label: 'سيفيكسيم — Cefixime (سوبراكس)' },
+  { value: 'باكتريم', label: 'باكتريم — Bactrim / Cotrimoxazole (سبترا)' },
+  { value: 'ميترونيدازول', label: 'ميترونيدازول — Metronidazole (فلاجيل)' },
+  { value: 'لينيزوليد', label: 'لينيزوليد — Linezolid (زيفوكس)' },
+  { value: 'فلوكونازول', label: 'فلوكونازول — Fluconazole (ديفلوكان)' },
+  { value: 'إيتراكونازول', label: 'إيتراكونازول — Itraconazole (سبورانوكس)' },
+  { value: 'كيتوكونازول', label: 'كيتوكونازول — Ketoconazole (نيزورال)' },
+  { value: 'جنتامايسين', label: 'جنتامايسين — Gentamicin' },
+  { value: 'فانكومايسين', label: 'فانكومايسين — Vancomycin' },
+  { value: 'بيسوبرولول', label: 'بيسوبرولول — Bisoprolol (كونكور)' },
+  { value: 'كارفيديلول', label: 'كارفيديلول — Carvedilol (ديلاتزند)' },
+  { value: 'أتينولول', label: 'أتينولول — Atenolol (تينورمين)' },
+  { value: 'ميتوبرولول', label: 'ميتوبرولول — Metoprolol (بيتالوك)' },
+  { value: 'بروبرانولول', label: 'بروبرانولول — Propranolol (إندرال)' },
+  { value: 'نيبيفولول', label: 'نيبيفولول — Nebivolol (نيبيليت)' },
+  { value: 'أملوديبين', label: 'أملوديبين — Amlodipine (نورفاسك)' },
+  { value: 'نيفيديبين', label: 'نيفيديبين — Nifedipine (أدالات)' },
+  { value: 'فيراباميل', label: 'فيراباميل — Verapamil (إيزوبتين)' },
+  { value: 'ديلتيازيم', label: 'ديلتيازيم — Diltiazem (ألتيازيم)' },
+  { value: 'لوسارتان', label: 'لوسارتان — Losartan (كوزار)' },
+  { value: 'فالسارتان', label: 'فالسارتان — Valsartan (ديوفان)' },
+  { value: 'كانديسارتان', label: 'كانديسارتان — Candesartan (أتاكاند)' },
+  { value: 'تيلميسارتان', label: 'تيلميسارتان — Telmisartan (ميكارديس)' },
+  { value: 'كابتوبريل', label: 'كابتوبريل — Captopril (كابوتن)' },
+  { value: 'إنالابريل', label: 'إنالابريل — Enalapril (رينيتك)' },
+  { value: 'راميبريل', label: 'راميبريل — Ramipril (تريتاس)' },
+  { value: 'ليسينوبريل', label: 'ليسينوبريل — Lisinopril (زيستريل)' },
+  { value: 'سبيرونولاكتون', label: 'سبيرونولاكتون — Spironolactone (ألداكتون)' },
+  { value: 'فوروسيميد', label: 'فوروسيميد — Furosemide (لازيكس)' },
+  { value: 'هيدروكلوروثيازيد', label: 'هيدروكلوروثيازيد — Hydrochlorothiazide' },
+  { value: 'إنداباميد', label: 'إنداباميد — Indapamide (ناتريليكس)' },
+  { value: 'ديجوكسين', label: 'ديجوكسين — Digoxin (لانوكسين)' },
+  { value: 'أميودارون', label: 'أميودارون — Amiodarone (كوردارون)' },
+  { value: 'أتورفاستاتين', label: 'أتورفاستاتين — Atorvastatin (ليبيتور)' },
+  { value: 'سيمفاستاتين', label: 'سيمفاستاتين — Simvastatin (زوكور)' },
+  { value: 'روزوفاستاتين', label: 'روزوفاستاتين — Rosuvastatin (كريستور)' },
+  { value: 'برافاستاتين', label: 'برافاستاتين — Pravastatin (ليبوستات)' },
+  { value: 'إيزيتيميب', label: 'إيزيتيميب — Ezetimibe (إيزيترول)' },
+  { value: 'ميتفورمين', label: 'ميتفورمين — Metformin (غلوكوفاج)' },
+  { value: 'جليمبريد', label: 'جليمبريد — Glimepiride (أماريل)' },
+  { value: 'جليكلازيد', label: 'جليكلازيد — Gliclazide (دياميكرون)' },
+  { value: 'إمباغليفلوزين', label: 'إمباغليفلوزين — Empagliflozin (جارديانس)' },
+  { value: 'داباجليفلوزين', label: 'داباجليفلوزين — Dapagliflozin (فورسيجا)' },
+  { value: 'سيتاغليبتين', label: 'سيتاغليبتين — Sitagliptin (جانوفيا)' },
+  { value: 'سيماجلوتايد', label: 'سيماجلوتايد — Semaglutide (أوزمبيك)' },
+  { value: 'تيرزيباتيد', label: 'تيرزيباتيد — Tirzepatide (مونجارو)' },
+  { value: 'إنسولين', label: 'إنسولين — Insulin (لانتوس / نوفورابيد)' },
+  { value: 'باراسيتامول', label: 'باراسيتامول — Paracetamol (بانادول / أدول)' },
+  { value: 'إيبوبروفين', label: 'إيبوبروفين — Ibuprofen (بروفين / أدفيل)' },
+  { value: 'ديكلوفيناك', label: 'ديكلوفيناك — Diclofenac (فولتارين / كاتافلام)' },
+  { value: 'نابروكسين', label: 'نابروكسين — Naproxen (أليف / بروكسين)' },
+  { value: 'ميلوكسيكام', label: 'ميلوكسيكام — Meloxicam (موبيك)' },
+  { value: 'سيليكوكسيب', label: 'سيليكوكسيب — Celecoxib (سيليبريكس)' },
+  { value: 'ترامادول', label: 'ترامادول — Tramadol (ترامال)' },
+  { value: 'مورفين', label: 'مورفين — Morphine' },
+  { value: 'تيزانيدين', label: 'تيزانيدين — Tizanidine (سيردالود)' },
+  { value: 'باكلوفين', label: 'باكلوفين — Baclofen (ليوريسال)' },
+  { value: 'جابابنتين', label: 'جابابنتين — Gabapentin (نيورونتين)' },
+  { value: 'بريجابالين', label: 'بريجابالين — Pregabalin (ليريكا)' },
+  { value: 'إسيتالوبرام', label: 'إسيتالوبرام — Escitalopram (سبرالكس)' },
+  { value: 'سيرترالين', label: 'سيرترالين — Sertraline (زولوفت / لوسترال)' },
+  { value: 'فلوكسيتين', label: 'فلوكسيتين — Fluoxetine (بروزاك)' },
+  { value: 'باروكسيتين', label: 'باروكسيتين — Paroxetine (سيروكسات)' },
+  { value: 'دولوكستين', label: 'دولوكستين — Duloxetine (سيمبالتا)' },
+  { value: 'فينلافاكسين', label: 'فينلافاكسين — Venlafaxine (إفكسور)' },
+  { value: 'ليثيوم', label: 'ليثيوم — Lithium (بريادل)' },
+  { value: 'ديازيبام', label: 'ديازيبام — Diazepam (فاليوم)' },
+  { value: 'ألبرازولام', label: 'ألبرازولام — Alprazolam (زاناكس)' },
+  { value: 'كلونازيبام', label: 'كلونازيبام — Clonazepam (ريفوتريل)' },
+  { value: 'كاربامازيبين', label: 'كاربامازيبين — Carbamazepine (تجريتول)' },
+  { value: 'فالبروات الصوديوم', label: 'فالبروات الصوديوم — Sodium Valproate (ديباكين)' },
+  { value: 'لاموتريجين', label: 'لاموتريجين — Lamotrigine (لاميكتال)' },
+  { value: 'ليفيتيراسيتام', label: 'ليفيتيراسيتام — Levetiracetam (كيبرا)' },
+  { value: 'أوميبرازول', label: 'أوميبرازول — Omeprazole (لوسيك)' },
+  { value: 'إيزوميبرازول', label: 'إيزوميبرازول — Esomeprazole (نيكسيوم)' },
+  { value: 'بانتوبرازول', label: 'بانتوبرازول — Pantoprazole (كونترولوك)' },
+  { value: 'لانزوبرازول', label: 'لانزوبرازول — Lansoprazole (لانزور)' },
+  { value: 'فاموتيدين', label: 'فاموتيدين — Famotidine (فامودار)' },
+  { value: 'دومبيريدون', label: 'دومبيريدون — Domperidone (موتيليوم)' },
+  { value: 'أوندانسيترون', label: 'أوندانسيترون — Ondansetron (زوفران)' },
+  { value: 'ليفوثيروكسين', label: 'ليفوثيروكسين — Levothyroxine (إلتروكسين / يثيروكس)' },
+  { value: 'بريدنيزولون', label: 'بريدنيزولون — Prednisolone (سولبريد / بريدو)' },
+  { value: 'ديكساميثازون', label: 'ديكساميثازون — Dexamethasone (ديكادرون)' },
+  { value: 'ميثوتريكسات', label: 'ميثوتريكسات — Methotrexate' },
+  { value: 'ألوبيورينول', label: 'ألوبيورينول — Allopurinol (زيلوريك)' },
+  { value: 'فيبوكسوستات', label: 'فيبوكسوستات — Febuxostat (أدينوريك)' },
+  { value: 'كولشيسين', label: 'كولشيسين — Colchicine' },
+  { value: 'روأكوتان', label: 'إيزوتريتينوين — Isotretinoin (روأكوتان)' },
+  { value: 'حديد', label: 'مكمل حديد — Iron / Ferrous (فيروز / فيروجلوبين)' },
+  { value: 'كالسيوم', label: 'مكمل كالسيوم — Calcium (أوستوكير / كالتريت)' },
+  { value: 'مغنيسيوم', label: 'مكمل مغنيسيوم — Magnesium' },
+  { value: 'زنك', label: 'مكمل زنك — Zinc (زنكترون)' },
+  { value: 'فيتامين د', label: 'فيتامين د — Vitamin D3' },
+  { value: 'فيتامين سي', label: 'فيتامين سي — Vitamin C' },
 ];
 
+const FOOD_OPTIONS: SelectOption[] = [
+  { value: 'حليب', label: 'الحليب ومشتقات الألبان والزبادي — Milk & Dairy (الكالسيوم)' },
+  { value: 'شاي', label: 'الشاي الأحمر والأخضر — Tea (التانينات)' },
+  { value: 'قهوة', label: 'القهوة والإسبريسو والنسكافيه — Coffee (الكافيين)' },
+  { value: 'مشروبات الطاقة والكافيين', label: 'مشروبات الطاقة والكولا — Energy Drinks & Cola' },
+  { value: 'جريب فروت', label: 'الجريب فروت والبوملي — Grapefruit & Pomelo' },
+  { value: 'سبانخ', label: 'السبانخ والملوخية والبروكلي والورقيات — Spinach & Leafy Greens (فيتامين K / أوكسالات)' },
+  { value: 'عرق سوس', label: 'عرق السوس الطبيعي — Licorice (الجليسيريزين)' },
+  { value: 'موز', label: 'الموز والتمر والأفوكادو — Bananas, Dates & Avocado (غني بالبوتاسيوم)' },
+  { value: 'بدائل الملح', label: 'بدائل الملح الخالية من الصوديوم — Salt Substitutes (KCl)' },
+  { value: 'أجبان معتقة', label: 'الأجبان المعتقة (شيدر / بارميزان) — Aged Cheese (تيرامين)' },
+  { value: 'لحوم مصنعة ومخللات', label: 'اللحوم المصنعة والمخللات وصلصة الصويا — Cured Meats & Soy Sauce (تيرامين)' },
+  { value: 'كحول', label: 'المشروبات الكحولية — Alcohol & Ethanol' },
+  { value: 'برتقال وليمون (فيتامين سي)', label: 'البرتقال والليمون والحمضيات — Citrus & Lemon (فيتامين C)' },
+  { value: 'جزر', label: 'الجزر والطماطم والقرع — Carrots & Tomatoes (بيتا كاروتين)' },
+  { value: 'زيت زيتون', label: 'زيت الزيتون والأفوكادو — Olive Oil & Healthy Fats' },
+  { value: 'نخالة القمح', label: 'نخالة القمح والألياف المركزة — Wheat Bran & Fiber (حمض الفيتيك)' },
+  { value: 'بياض البيض النيئ', label: 'بياض البيض النيئ — Raw Egg White (الأفيدين)' },
+  { value: 'صفار البيض', label: 'البيض المطبوخ وصفار البيض — Cooked Eggs' },
+  { value: 'لحوم حمراء وكبدة (حديد)', label: 'اللحوم الحمراء والكبدة والعدس — Red Meat, Liver & Lentils (حديد)' },
+  { value: 'فول الصويا', label: 'فول الصويا ومنتجات الصويا — Soy Products' },
+  { value: 'زنجبيل وثوم', label: 'الزنجبيل والثوم والكركم — Ginger, Garlic & Turmeric' },
+  { value: 'حديد', label: 'مكمل الحديد — Iron Supplement' },
+  { value: 'كالسيوم', label: 'مكمل الكالسيوم — Calcium Supplement' },
+  { value: 'فيتامين سي', label: 'مكمل فيتامين سي — Vitamin C' },
+  { value: 'فيتامين د', label: 'فيتامين د — Vitamin D3' },
+  { value: 'فيتامين ك', label: 'فيتامين K — Vitamin K' },
+  { value: 'بيوتين', label: 'البيوتين (فيتامين B7) — Biotin' },
+  { value: 'زنك', label: 'مكمل الزنك — Zinc' },
+  { value: 'مغنيسيوم', label: 'مكمل المغنيسيوم — Magnesium' },
+  { value: 'أوميغا 3', label: 'أوميغا 3 / زيت السمك — Omega-3' },
+];
+
+// Check if a food dropdown token matches a DrugFoodInteraction category returned by evaluateFoodInteractions
+function doesFoodMatchCategory(foodToken: string, foodCategory: string, foodCategoryEn: string): boolean {
+  const f = cleanDrugToken(foodToken);
+  const cat = cleanDrugToken(`${foodCategory} ${foodCategoryEn}`);
+
+  const matchGroups: Array<[string[], string[]]> = [
+    [['حليب', 'لبن', 'كالسيوم', 'dairy', 'milk', 'calcium'], ['حليب', 'البان', 'اجبان', 'كالسيوم', 'dairy', 'milk', 'calcium']],
+    [['قهوه', 'شاي', 'كافيين', 'طاقه', 'كولا', 'coffee', 'tea', 'caffeine'], ['قهوه', 'شاي', 'كافيين', 'منبهات', 'كولا', 'طاقه', 'coffee', 'tea', 'caffeine']],
+    [['جريب فروت', 'بوملي', 'grapefruit', 'pomelo'], ['جريب فروت', 'بوملي', 'حمضيات', 'grapefruit', 'citrus']],
+    [['سبانخ', 'ملوخيه', 'ورقيات', 'فيتامين ك', 'spinach', 'vitamin k'], ['سبانخ', 'ورقيات', 'فيتامين k', 'vitamin k', 'spinach', 'broccoli']],
+    [['عرق سوس', 'سوس', 'licorice'], ['عرق سوس', 'السوس', 'licorice', 'glycyrrhizin']],
+    [['موز', 'تمر', 'افوكادو', 'بداءل الملح', 'بدائل الملح', 'بوتاسيوم', 'banana', 'potassium', 'salt'], ['موز', 'تمر', 'بوتاسيوم', 'بداءل الملح', 'بدائل الملح', 'potassium', 'salt']],
+    [['اجبان معتقه', 'تيرامين', 'لحوم مصنعه', 'مخللات', 'صويا', 'tyramine', 'cheese'], ['تيرامين', 'اجبان معتقه', 'لحوم مصنعه', 'مخللات', 'صويا', 'tyramine', 'aged cheese']],
+    [['كحول', 'alcohol', 'ethanol'], ['كحول', 'alcohol', 'ethanol']],
+    [['بيض', 'egg'], ['بيض', 'egg']],
+    [['حديد', 'iron', 'ferrous'], ['حديد', 'iron']],
+  ];
+
+  for (const [tokenKeys, catKeys] of matchGroups) {
+    const tokenMatches = tokenKeys.some(k => f.includes(cleanDrugToken(k)));
+    const catMatches = catKeys.some(k => cat.includes(cleanDrugToken(k)));
+    if (tokenMatches && catMatches) return true;
+  }
+  return false;
+}
+
+// Local high-precision evaluation for specific Drug + Food pair
+function evaluateSpecificDrugFoodLocal(drug: string, food: string, lang: 'ar' | 'en'): {
+  found: boolean;
+  severity: 'critical' | 'warning' | 'minor' | 'safe';
+  severityLabel: string;
+  isSynergy?: boolean;
+  mechanism: string;
+  recommendation: string;
+  clinicalDetails?: string;
+  matchedInteractions: DrugFoodInteraction[];
+} {
+  const d = cleanDrugToken(drug);
+  const f = cleanDrugToken(food);
+  const isAr = lang === 'ar';
+
+  // 1. Check built-in engine rules filtered specifically to the chosen food
+  const allDrugFoods = evaluateFoodInteractions([drug], lang);
+  const matched = allDrugFoods.filter(fi => doesFoodMatchCategory(food, fi.foodCategory, fi.foodCategoryEn));
+  if (matched.length > 0) {
+    const primary = matched[0];
+    return {
+      found: true,
+      severity: primary.severity,
+      severityLabel: primary.severityLabel,
+      mechanism: primary.mechanism,
+      recommendation: primary.recommendation,
+      clinicalDetails: primary.dietaryAdvice || primary.clinicalNote,
+      matchedInteractions: matched,
+    };
+  }
+
+  // 2. Iron + Vitamin C (Synergy)
+  if ((d.includes('حديد') || d.includes('iron')) && (f.includes('فيتامين س') || f.includes('فيتامين c') || f.includes('برتقال') || f.includes('ليمون'))) {
+    return {
+      found: true,
+      severity: 'safe',
+      isSynergy: true,
+      severityLabel: isAr ? '🟢 تآزر إيجابي ممتاز (+300% امتصاص)' : '🟢 Excellent Positive Synergy (+300% Absorption)',
+      mechanism: isAr
+        ? 'حمض الأسكوربيك (فيتامين C) يحوّل الحديد الثلاثي إلى الشكل الثنائي الذائب في الأمعاء، مما يرفع امتصاص مكمل الحديد بأكثر من 3 أضعاف.'
+        : 'Vitamin C reduces ferric iron to readily absorbable ferrous iron, more than tripling iron absorption.',
+      recommendation: isAr
+        ? 'يُنصح بتناول قرص الحديد مع كوب عصير برتقال طبيعي أو ليمون، وتجنب الشاي والقهوة والحليب خلال ساعتين.'
+        : 'Take iron supplements with fresh orange juice or Vitamin C.',
+      clinicalDetails: isAr ? 'يسرّع علاج فقر الدم ويقلل الجرعة المتبقية المسببة لاضطراب المعدة.' : 'Optimizes anemia recovery.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 3. Iron/Zinc/Magnesium/Calcium + Wheat Bran (Phytate chelation)
+  if (
+    (d.includes('حديد') || d.includes('زنك') || d.includes('مغنيسيوم') || d.includes('كالسيوم') || d.includes('ليفوثيروكسين')) &&
+    (f.includes('نخاله') || f.includes('الياف') || f.includes('فول الصويا'))
+  ) {
+    return {
+      found: true,
+      severity: 'warning',
+      severityLabel: isAr ? '🟠 تعارض امتصاص: تقليل فعالية الدواء / المكمل' : '🟠 Absorption Inhibition',
+      mechanism: isAr
+        ? 'الألياف المركزة وحمض الفيتيك في نخالة القمح أو بروتينات الصويا ترتبط بالمعادن أو بهرمون الغدة الدرقية داخل الأمعاء وتمنع امتصاصها الكامل.'
+        : 'Phytic acid and concentrated fiber or soy bind minerals and levothyroxine in the gut, impairing bioavailability.',
+      recommendation: isAr
+        ? 'افصل بين الدواء أو المكمل وبين الألياف/نخالة القمح أو الصويا بساعتين إلى 4 ساعات على الأقل.'
+        : 'Separate administration by 2 to 4 hours.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 4. Warfarin + Garlic / Ginger / Omega-3
+  if (
+    (d.includes('وارفارين') || d.includes('warfarin') || d.includes('اسبرين') || d.includes('كلوبيدوجريل')) &&
+    (f.includes('زنجبيل') || f.includes('ثوم') || f.includes('اوميغا') || f.includes('omega'))
+  ) {
+    return {
+      found: true,
+      severity: 'warning',
+      severityLabel: isAr ? '🟠 تنبيه نزيف: تعزيز مفعول المميع' : '🟠 Bleeding Risk Warning',
+      mechanism: isAr
+        ? 'الكميات العلاجية المركزة من الزنجبيل والثوم أو مكملات أوميغا 3 تمتلك تأثيراً مضاداً لتجمع الصفائح، مما قد يضاعف خطر النزيف مع المميعات.'
+        : 'Concentrated garlic, ginger, and omega-3 fatty acids inhibit platelet aggregation and add to bleeding risk.',
+      recommendation: isAr
+        ? 'تجنب المكملات المركزة من الثوم أو الزنجبيل أو أوميغا 3 مع المميعات دون إشراف طبي ومراقبة فحص INR.'
+        : 'Avoid concentrated supplements alongside anticoagulants/antiplatelets without medical supervision.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 5. NSAIDs + Alcohol / Heavy Caffeine
+  if (
+    (d.includes('ايبوبروفين') || d.includes('بروفين') || d.includes('ديكلوفيناك') || d.includes('فولتارين') || d.includes('نابروكسين') || d.includes('اسبرين')) &&
+    (f.includes('كحول') || f.includes('قهوه'))
+  ) {
+    const isAlc = f.includes('كحول');
+    return {
+      found: true,
+      severity: isAlc ? 'critical' : 'warning',
+      severityLabel: isAlc ? (isAr ? '🔴 تعارض حرج: نزيف وتقرح معدة حاد' : '🔴 Critical: GI Bleeding Risk') : (isAr ? '🟠 تنبيه: تهيج بطانة المعدة' : '🟠 Warning: Gastric Irritation'),
+      mechanism: isAr
+        ? (isAlc ? 'الجمع بين المسكنات غير الستيرويدية والكحول يضاعف خطر تآكل الغشاء المخاطي للمعدة والنزيف الهضمي الحاد.' : 'القهوة مع المسكنات تزيد الحموضة وتهيج المعدة، وقد ترفع ضغط الدم قليلاً.')
+        : 'Synergistic mucosal irritation increases risk of gastritis and upper GI bleeding.',
+      recommendation: isAr
+        ? (isAlc ? 'يُمنع شرب الكحول نهائياً أثناء استخدام المسكنات.' : 'تناول المسكن بعد وجبة طعام مع ماء وليس مع القهوة على معدة فارغة.')
+        : 'Avoid alcohol completely; take NSAIDs after food with water.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 6. Metformin + Alcohol
+  if ((d.includes('ميتفورمين') || d.includes('metformin')) && f.includes('كحول')) {
+    return {
+      found: true,
+      severity: 'critical',
+      severityLabel: isAr ? '🔴 تعارض حرج: خطر الحماض اللاكتيكي وهبوط السكر' : '🔴 Critical: Lactic Acidosis Risk',
+      mechanism: isAr
+        ? 'الكحول يعيق استحداث الجلوكوز الكبدي ويزيد تراكم حمض اللاكتيك مع الميتفورمين، مما يرفع خطر الحماض اللاكتيكي المهدد للحياة.'
+        : 'Alcohol impairs hepatic gluconeogenesis and clearance of lactate, increasing fatal lactic acidosis risk.',
+      recommendation: isAr
+        ? 'الامتناع التام عن الكحول أثناء تناول الميتفورمين.'
+        : 'Strictly avoid alcohol while taking metformin.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 7. Steroids + Licorice
+  if ((d.includes('بريدنيزولون') || d.includes('ديكساميثازون') || d.includes('كورتيزون')) && f.includes('عرق سوس')) {
+    return {
+      found: true,
+      severity: 'warning',
+      severityLabel: isAr ? '🟠 تعارض متوسط: هبوط البوتاسيوم واحتباس السوائل' : '🟠 Moderate: Hypokalemia & Fluid Retention',
+      mechanism: isAr
+        ? 'عرق السوس يطيل عمر الكورتيزون الحيوي عبر تثبيط إنزيم 11β-HSD2، مما يضاعف احتباس الصوديوم وارتفاع الضغط وهبوط البوتاسيوم.'
+        : 'Glycyrrhizin inhibits cortisol inactivation, exacerbating hypokalemia, edema, and hypertension.',
+      recommendation: isAr
+        ? 'تجنب شرب عرق السوس طوال فترة العلاج بالكورتيكوستيرويدات.'
+        : 'Avoid natural licorice during corticosteroid therapy.',
+      matchedInteractions: [],
+    };
+  }
+
+  // 8. Allopurinol/Febuxostat + Red Meat / Liver (Purines)
+  if ((d.includes('الوبيورينول') || d.includes('فيبوكسوستات')) && (f.includes('لحوم حمراء') || f.includes('كبده'))) {
+    return {
+      found: true,
+      severity: 'warning',
+      severityLabel: isAr ? '🟠 تعارض غذائي: تحفيز نوبات النقرس ورفع اليوريك' : '🟠 Dietary Conflict: Hyperuricemia Flare',
+      mechanism: isAr
+        ? 'الكبدة واللحوم الحمراء غنية جداً بالبيورينات التي تتحول إلى حمض اليوريك، مما يعاكس الهدف العلاجي لأدوية النقرس.'
+        : 'Organ meats and red meats are rich in purines that elevate serum uric acid.',
+      recommendation: isAr
+        ? 'قلل تناول الكبدة واللحوم الحمراء واشرب الماء بكثرة بالتوازي مع الدواء.'
+        : 'Limit purine-rich meats and maintain high hydration.',
+      matchedInteractions: [],
+    };
+  }
+
+  return {
+    found: false,
+    severity: 'safe',
+    severityLabel: isAr ? '🟢 لا يوجد تعارض مباشر مسجل بين المركبين' : '🟢 No Direct Conflict Identified',
+    mechanism: '',
+    recommendation: '',
+    matchedInteractions: [],
+  };
+}
+
 export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = ({
-  initialDrugs = ['وارفارين', 'أسبرين'],
-  language = 'ar'
+  initialDrugs = [],
+  language = 'ar',
 }) => {
-  const [selectedTokens, setSelectedTokens] = useState<string[]>(initialDrugs);
-  const [inputVal, setInputVal] = useState('');
+  const langCode: 'ar' | 'en' = language === 'en' ? 'en' : 'ar';
+  const isAr = langCode === 'ar';
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  // Build deduplicated comprehensive Medication Dropdown options (220+ medications)
+  const drugOptions = useMemo<SelectOption[]>(() => {
+    const map = new Map<string, SelectOption>();
+    for (const item of CORE_DRUGS_LIST) {
+      map.set(cleanDrugToken(item.value), item);
+    }
+    try {
+      const seeded = getAllSeededDrugs();
+      for (const drug of seeded) {
+        const arName = (drug.name_ar || '').trim();
+        const enName = (drug.name_en || '').trim();
+        if (!arName && !enName) continue;
+        const val = arName || enName;
+        const key = cleanDrugToken(val);
+        if (!key || map.has(key)) continue;
+        const tradeHint = drug.trade_names && drug.trade_names.length > 0 ? ` (${drug.trade_names[0]})` : '';
+        map.set(key, {
+          value: val,
+          label: enName ? `${arName} — ${enName}${tradeHint}` : `${arName}${tradeHint}`,
+        });
+      }
+    } catch {
+      // ignore fallback error
+    }
+    return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label, 'ar'));
+  }, []);
+
+  // State for active mode and the 2 dropdown values under each of the 3 buttons
+  const [activeMode, setActiveMode] = useState<InteractionMode>('drug_drug');
+
+  // Mode 1: Drug - Drug
+  const [ddFirst, setDdFirst] = useState<string>(initialDrugs[0] || '');
+  const [ddSecond, setDdSecond] = useState<string>(initialDrugs[1] || '');
+
+  // Mode 2: Drug - Food
+  const [dfDrug, setDfDrug] = useState<string>('');
+  const [dfFood, setDfFood] = useState<string>('');
+
+  // Mode 3: Food - Food
+  const [ffFirst, setFfFirst] = useState<string>('');
+  const [ffSecond, setFfSecond] = useState<string>('');
+
   const [isLoading, setIsLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<InteractionResult | null>(null);
-  const [copied, setCopied] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [engineSource, setEngineSource] = useState<'clinical_class' | 'gemini_ai'>('clinical_class');
-  const [activeReportTab, setActiveReportTab] = useState<'all' | 'drugs' | 'food' | 'food_food' | 'timing'>('all');
-  const inputContainerRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
 
-  // Prefill drugs from URL hash (#interactions?patient=... or #interactions?drug=...)
+  // Sync from URL hash (#interactions?drug=... or #interactions?patient=...)
   useEffect(() => {
     const syncFromHash = () => {
       try {
@@ -255,337 +477,235 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
         if (drugParam) {
           const parsed = drugParam.split(',').map(s => s.trim()).filter(Boolean);
-          if (parsed.length > 0) {
-            setSelectedTokens(parsed);
-            setAnalysisResult(null);
-            return;
+          if (parsed.length >= 1) setDdFirst(parsed[0]);
+          if (parsed.length >= 2) {
+            setDdSecond(parsed[1]);
+            setActiveMode('drug_drug');
           }
+          return;
         }
 
         if (patientParam) {
           const rosterStr = localStorage.getItem('dose_patient_roster');
           if (rosterStr) {
             const roster = JSON.parse(rosterStr);
-            const patient = Array.isArray(roster)
-              ? roster.find((p: any) => p.id === patientParam)
-              : null;
+            const patient = Array.isArray(roster) ? roster.find((p: any) => p.id === patientParam) : null;
             if (patient) {
               const rxNames = (patient.prescriptions || [])
                 .filter((r: any) => r.status === 'active')
                 .map((r: any) => r.drugName.split('(')[0].trim())
                 .filter(Boolean);
-              if (rxNames.length > 0) {
-                setSelectedTokens(Array.from(new Set(rxNames)));
-                setAnalysisResult(null);
-              }
+              if (rxNames[0]) setDdFirst(rxNames[0]);
+              if (rxNames[1]) setDdSecond(rxNames[1]);
+              setActiveMode('drug_drug');
             }
           }
         }
-      } catch {}
+      } catch {
+        // ignore hash parse error
+      }
     };
-
     syncFromHash();
     window.addEventListener('hashchange', syncFromHash);
     return () => window.removeEventListener('hashchange', syncFromHash);
   }, []);
 
-  // Persistent Medication History Memory
-  const [recentHistory, setRecentHistory] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('dose_interaction_history');
-      return saved ? JSON.parse(saved) : ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'أزيثرومايسين'];
-    } catch {
-      return ['سيلدينافيل', 'نيتروجلسرين', 'وارفارين', 'أسبرين', 'أزيثرومايسين'];
-    }
-  });
-
-  const saveToHistory = (drugName: string) => {
-    const clean = drugName.trim();
-    if (!clean || clean.length < 2) return;
-    setRecentHistory((prev) => {
-      const updated = [clean, ...prev.filter(d => d.toLowerCase() !== clean.toLowerCase())].slice(0, 16);
-      try { localStorage.setItem('dose_interaction_history', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  };
-
-  const clearHistory = () => {
-    setRecentHistory([]);
-    try { localStorage.removeItem('dose_interaction_history'); } catch {}
-  };
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (inputContainerRef.current && !inputContainerRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Compute live matching suggestions from first 2-3 characters with Arabic prefix ("الـ") stripping
-  const cleanInput = cleanDrugToken(inputVal);
-  const strippedInput = cleanInput.startsWith('ال') && cleanInput.length > 2 ? cleanInput.slice(2) : cleanInput;
-
-  const filteredSuggestions: AutoDrug[] = (cleanInput.length >= 2 || strippedInput.length >= 2)
-    ? EXTENSIVE_AUTOCOMPLETE_DRUGS.filter(d => {
-        const cName = cleanDrugToken(d.name);
-        const sName = cName.startsWith('ال') && cName.length > 2 ? cName.slice(2) : cName;
-        const cEn = cleanDrugToken(d.nameEn);
-        const cTrade = cleanDrugToken(d.trade);
-        const cCat = cleanDrugToken(d.category);
-
-        return (
-          cName.includes(cleanInput) ||
-          cName.includes(strippedInput) ||
-          sName.includes(strippedInput) ||
-          cEn.includes(cleanInput) ||
-          cEn.includes(strippedInput) ||
-          cTrade.includes(cleanInput) ||
-          cTrade.includes(strippedInput) ||
-          cCat.includes(cleanInput) ||
-          cCat.includes(strippedInput)
-        );
-      }).slice(0, 10)
-    : [];
-
-  // Popular clinical suggestions
-  const popularSuggestions = [
-    { label: 'وارفارين (Warfarin)', key: 'وارفارين' },
-    { label: 'أسبرين (Aspirin)', key: 'أسبرين' },
-    { label: 'أزيثرومايسين (Zithromax)', key: 'أزيثرومايسين' },
-    { label: 'سيلدينافيل (فياغرا)', key: 'سيلدينافيل' },
-    { label: 'نيتروجلسرين (نترات)', key: 'نيتروجلسرين' },
-    { label: 'إيبوبروفين (بروفين)', key: 'إيبوبروفين' },
-    { label: 'باراسيتامول (بانادول)', key: 'باراسيتامول' },
-    { label: 'بيسوبرولول (كونكور)', key: 'بيسوبرولول' },
-    { label: 'أتورفاستاتين (ليبيتور)', key: 'أتورفاستاتين' },
-    { label: 'كلوبيدوجريل (بلافيكس)', key: 'كلوبيدوجريل' },
-    { label: 'أوميبرازول (Losec)', key: 'أوميبرازول' },
-    { label: 'سيبروفلوكساسين (سيبرو)', key: 'سيبروفلوكساسين' },
-    { label: 'كلاريثروميسين (كلاسيد)', key: 'كلاريثروميسين' },
-    { label: 'باكتريم (Bactrim)', key: 'باكتريم' },
-    { label: 'فلوكونازول (Diflucan)', key: 'فلوكونازول' },
-    { label: 'ديجوكسين (Lanoxin)', key: 'ديجوكسين' },
-    { label: 'أميودارون (Cordarone)', key: 'أميودارون' },
-    { label: 'ترامادول (Tramal)', key: 'ترامادول' },
-    { label: 'إسيتالوبرام (سبرالكس)', key: 'إسيتالوبرام' },
-    { label: 'لوسارتان (Cozaar)', key: 'لوسارتان' },
-    { label: 'سبيرونولاكتون (Aldactone)', key: 'سبيرونولاكتون' },
-    { label: 'ميترونيدازول (فلاجيل)', key: 'ميترونيدازول' },
-    { label: 'ليفوثيروكسين (Euthyrox)', key: 'ليفوثيروكسين' },
-  ];
-
-  // High-yield quick-test pairs
-  const quickTestPairs = [
-    { label: '🔴 ثيوفلين + سيبروفلوكساسين (تسمم صرعي حاد)', drugs: ['ثيوفلين', 'سيبروفلوكساسين'] },
-    { label: '🔴 سيبروفلوكساسين + سيردالود (هبوط كارثي وغيبوبة)', drugs: ['سيبروفلوكساسين', 'سيردالود'] },
-    { label: '🔴 وارفارين + أزيثرومايسين (نزيف وارتفاع INR)', drugs: ['وارفارين', 'أزيثرومايسين'] },
-    { label: '🔴 سيلدينافيل + نيترات (هبوط مميت)', drugs: ['سيلدينافيل', 'نيتروجلسرين'] },
-    { label: '🔴 وارفارين + أسبرين (نزيف حاد)', drugs: ['وارفارين', 'أسبرين'] },
-    { label: '🔴 سيمفاستاتين + كلاريثرومايسين (تسمم عضلات)', drugs: ['سيمفاستاتين', 'كلاريثروميسين'] },
-    { label: '🔴 وارفارين + باكتريم (نزيف كارثي)', drugs: ['وارفارين', 'باكتريم'] },
-    { label: '🔴 فلاجيل + كحول (تفاعل ديسولفيرام)', drugs: ['ميترونيدازول', 'كحول'] },
-    { label: '🔴 ديجوكسين + أميودارون (تسمم قلب)', drugs: ['ديجوكسين', 'أميودارون'] },
-    { label: '🔴 ترامادول + سيبرالكس (متلازمة سيروتونين)', drugs: ['ترامادول', 'إسيتالوبرام'] },
-    { label: '🔴 ميثوتريكسات + بروفين (تسمم نخاعي)', drugs: ['ميثوتريكسات', 'إيبوبروفين'] },
-    { label: '⚠️ لوسارتان + سبيرونولاكتون (فرط بوتاسيوم)', drugs: ['لوسارتان', 'سبيرونولاكتون'] },
-    { label: '⚠️ بلافيكس + أوميبرازول (تثبيط مفعول)', drugs: ['كلوبيدوجريل', 'أوميبرازول'] },
-    { label: '⚠️ ليفوثيروكسين + كالسيوم (تثبيط امتصاص)', drugs: ['ليفوثيروكسين', 'كالسيوم'] },
-    { label: '🟢 باراسيتامول + أوجمنتين (آمن)', drugs: ['باراسيتامول', 'أوجمنتين'] },
-    { label: '🟢 ميتفورمين + أملوديبين (آمن)', drugs: ['ميتفورمين', 'أملوديبين'] },
-  ];
-
-  // Clinically verified Drug-Food and Food-Food interaction quick tests
-  const foodQuickTests = [
-    { label: '🍊 حديد + فيتامين سي (تآزر امتصاص 300%)', drugs: ['حديد', 'فيتامين سي'] },
-    { label: '☕ حديد + شاي وقهوة (نقص امتصاص 80%)', drugs: ['حديد', 'شاي'] },
-    { label: '🥛 حديد + حليب وكالسيوم (تثبيط امتصاص)', drugs: ['حديد', 'حليب'] },
-    { label: '🥬 سبانخ + حليب (تثبيط وحصوات أوكسالات)', drugs: ['سبانخ', 'حليب'] },
-    { label: '☀️ كالسيوم + فيتامين د (تآزر عظام ممتاز)', drugs: ['كالسيوم', 'فيتامين د'] },
-    { label: '🥑 زيت زيتون + جزر (امتصاص فيتامينات 500%)', drugs: ['زيت زيتون', 'جزر'] },
-    { label: '🧂 موز + بدائل ملح البوتاسيوم (خطر فرط البوتاسيوم)', drugs: ['موز', 'بدائل الملح'] },
-    { label: '🍳 بياض بيض نيئ + بيوتين (تثبيط امتصاص البيوتين)', drugs: ['بياض البيض النيئ', 'بيوتين'] },
-    { label: '🌾 نخالة القمح + زنك ومغنيسيوم (تثبيط فيتات)', drugs: ['نخالة القمح', 'زنك'] },
-    { label: '🥛 سيبروفلوكساسين + حليب (تعطيل 70%)', drugs: ['سيبروفلوكساسين', 'حليب'] },
-    { label: '🥬 وارفارين + سبانخ (تضاد فيتامين K)', drugs: ['وارفارين', 'سبانخ'] },
-    { label: '🍇 سيمفاستاتين + جريب فروت (انحلال عضلات)', drugs: ['سيمفاستاتين', 'جريب فروت'] },
-    { label: '☕ ثيوفلين + كافيين (خفقان وتسمم)', drugs: ['ثيوفلين', 'كافيين'] },
-    { label: '🌿 ديجوكسين + عرق سوس (هبوط بوتاسيوم وتسمم)', drugs: ['ديجوكسين', 'عرق سوس'] },
-    { label: '🧀 لينيزوليد + أجبان معتقة (أزمة ضغط قاتلة)', drugs: ['لينيزوليد', 'أجبان معتقة'] },
-    { label: '🍷 ميترونيدازول + كحول (تفاعل ديسولفيرام)', drugs: ['ميترونيدازول', 'كحول'] }
-  ];
-
-  const loadPair = (drugs: string[]) => {
-    setSelectedTokens(drugs);
-    drugs.forEach(saveToHistory);
-    setAnalysisResult(null);
+  const runInteractionCheck = async (mode: InteractionMode, itemA: string, itemB: string) => {
+    setActiveMode(mode);
     setErrorMessage('');
-  };
 
-  const addDrug = (token: string) => {
-    const clean = token.trim();
-    if (!clean) return;
+    const a = itemA.trim();
+    const b = itemB.trim();
 
-    // Check if user entered combined drugs e.g. "warfarin + aspirin"
-    const delimiters = [' + ', '+', ' and ', ' AND ', ' مع ', ' و ', ', ', ','];
-    for (const d of delimiters) {
-      if (clean.includes(d)) {
-        const parts = clean.split(d).map(p => p.trim()).filter(Boolean);
-        if (parts.length >= 2) {
-          const newSet = Array.from(new Set([...selectedTokens, ...parts]));
-          setSelectedTokens(newSet);
-          parts.forEach(saveToHistory);
-          setInputVal('');
-          setShowDropdown(false);
-          setAnalysisResult(null);
-          return;
-        }
-      }
-    }
-
-    if (!selectedTokens.includes(clean)) {
-      setSelectedTokens([...selectedTokens, clean]);
-      saveToHistory(clean);
-      setAnalysisResult(null);
-    }
-    setInputVal('');
-    setShowDropdown(false);
-  };
-
-  const removeDrug = (token: string) => {
-    setSelectedTokens(selectedTokens.filter(t => t !== token));
-    setAnalysisResult(null);
-  };
-
-  const clearAll = () => {
-    setSelectedTokens([]);
-    setAnalysisResult(null);
-    setErrorMessage('');
-  };
-
-  // Run Clinical AI Interaction Check
-  const handleCheckInteractions = async () => {
-    if (selectedTokens.length < 2) {
+    if (!a || !b) {
       setErrorMessage(
-        language === 'ar'
-          ? 'يرجى تحديد دوائين أو مادتين على الأقل للتحقق من التداخل السريري.'
-          : 'Please select at least two items to verify interactions.'
+        isAr
+          ? 'يرجى اختيار المركبين من السهمين تحت الزر المحدد لإجراء الفحص.'
+          : 'Please select both items from the two dropdown menus to check interactions.'
+      );
+      return;
+    }
+
+    if (cleanDrugToken(a) === cleanDrugToken(b)) {
+      setErrorMessage(
+        isAr
+          ? 'تم اختيار نفس المركب في القائمتين؛ يرجى اختيار مركبين مختلفين للمقارنة.'
+          : 'Please select two different items to compare.'
       );
       return;
     }
 
     setIsLoading(true);
-    setErrorMessage('');
+    const pair = [a, b];
 
+    // 1. Instant Local Checks for Drug-Food and Food-Food
+    if (mode === 'drug_food') {
+      const localDF = evaluateSpecificDrugFoodLocal(a, b, langCode);
+      const mealInstructions = getMealInstructions([a], langCode);
+
+      if (localDF.found) {
+        setAnalysisResult({
+          mode: 'drug_food',
+          severity: localDF.severity,
+          severityLabel: localDF.severityLabel,
+          isSafe: localDF.severity === 'safe' || localDF.severity === 'minor',
+          isSynergy: localDF.isSynergy,
+          mechanism: localDF.mechanism,
+          recommendation: localDF.recommendation,
+          clinicalDetails: localDF.clinicalDetails,
+          analyzedDrugs: pair,
+          foodInteractions: localDF.matchedInteractions,
+          mealInstructions,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      // Query API for pairs outside static local rules
+      try {
+        const res = await fetch(getApiUrl('/api/interactions/check'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drugs: pair, mode: 'drug_food', lang: language }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setAnalysisResult({
+          mode: 'drug_food',
+          severity: data.severity || 'safe',
+          severityLabel: data.severityLabel || (isAr ? '🟢 لا يوجد تعارض مباشر مسجل' : '🟢 Safe'),
+          isSafe: Boolean(data.isSafe),
+          mechanism: data.mechanism,
+          recommendation: data.recommendation,
+          clinicalDetails: data.clinicalDetails,
+          analyzedDrugs: pair,
+          mealInstructions,
+        });
+      } catch {
+        setAnalysisResult({
+          mode: 'drug_food',
+          severity: 'safe',
+          severityLabel: isAr ? '🟢 لا يوجد تعارض مباشر مسجل بين المركبين' : '🟢 No Direct Conflict Identified',
+          isSafe: true,
+          mechanism: isAr
+            ? `لا يوجد تداخل دوائي-غذائي مباشر خطير مسجل بين (${a}) و (${b}).`
+            : `No direct adverse interaction identified between ${a} and ${b}.`,
+          recommendation: isAr
+            ? 'يمكن تناولهما بأمان مع الالتزام بإرشادات توقيت الوجبات الموضحة أدناه.'
+            : 'Safe to consume while following standard meal-timing guidance.',
+          analyzedDrugs: pair,
+          mealInstructions,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (mode === 'food_food') {
+      const localFF = evaluateFoodFoodInteractions(pair, langCode);
+      if (localFF.length > 0) {
+        const top = localFF[0];
+        const isSyn = top.type === 'synergy';
+        setAnalysisResult({
+          mode: 'food_food',
+          severity: isSyn ? 'safe' : top.severity === 'critical' ? 'critical' : 'warning',
+          severityLabel: top.typeLabel,
+          isSafe: isSyn,
+          isSynergy: isSyn,
+          mechanism: top.mechanism,
+          recommendation: top.recommendation,
+          clinicalDetails: top.clinicalNote,
+          analyzedDrugs: pair,
+          foodFoodInteractions: localFF,
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(getApiUrl('/api/interactions/check'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ drugs: pair, mode: 'food_food', lang: language }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setAnalysisResult({
+          mode: 'food_food',
+          severity: data.severity || 'safe',
+          severityLabel: data.severityLabel || (isAr ? '🟢 تركيبة غذائية متوافقة' : '🟢 Compatible Pairing'),
+          isSafe: Boolean(data.isSafe),
+          mechanism: data.mechanism,
+          recommendation: data.recommendation,
+          clinicalDetails: data.clinicalDetails,
+          analyzedDrugs: pair,
+        });
+      } catch {
+        setAnalysisResult({
+          mode: 'food_food',
+          severity: 'safe',
+          severityLabel: isAr ? '🟢 تركيبة غذائية متوافقة وآمنة' : '🟢 Compatible & Safe Food Pairing',
+          isSafe: true,
+          mechanism: isAr
+            ? `لا يوجد تعارض امتصاصي أو كيميائي حيوي مسجل عند الجمع بين (${a}) و (${b}) ضمن الكميات الغذائية المعتادة.`
+            : `No significant absorption antagonism or adverse interaction identified between ${a} and ${b}.`,
+          recommendation: isAr
+            ? 'يمكن تناولهما معاً ضمن نظام غذائي متوازن.'
+            : 'Safe to consume together as part of a balanced diet.',
+          analyzedDrugs: pair,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    // Mode 1: Drug - Drug
     try {
       const res = await fetch(getApiUrl('/api/interactions/check'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          drugs: selectedTokens,
-          lang: language,
-        }),
+        body: JSON.stringify({ drugs: pair, mode: 'drug_drug', lang: language }),
       });
-
-      if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
-      }
-
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setAnalysisResult({
+        mode: 'drug_drug',
         severity: data.severity || 'safe',
-        severityLabel: data.severityLabel || (data.severity === 'critical' ? '🔴 خطير جداً' : '🟢 آمن نسبياً'),
+        severityLabel: data.severityLabel || (isAr ? '🟢 آمن سريرياً' : '🟢 Safe'),
         isSafe: Boolean(data.isSafe),
         mechanism: data.mechanism,
         recommendation: data.recommendation,
         clinicalDetails: data.clinicalDetails,
-        analyzedDrugs: data.analyzedDrugs || selectedTokens,
+        analyzedDrugs: data.analyzedDrugs || pair,
         detectedInteractions: data.detectedInteractions || [],
         cumulativeRisks: data.cumulativeRisks || [],
-        foodInteractions: data.foodInteractions || evaluateFoodInteractions(selectedTokens, language as 'ar' | 'en'),
-        foodFoodInteractions: data.foodFoodInteractions || evaluateFoodFoodInteractions(selectedTokens, language as 'ar' | 'en'),
-        mealInstructions: data.mealInstructions || getMealInstructions(selectedTokens, language as 'ar' | 'en'),
+        mealInstructions: getMealInstructions(pair, langCode),
       });
-      setEngineSource(data.engine === 'gemini_clinical_ai' ? 'gemini_ai' : 'clinical_class');
-    } catch (err: any) {
-      console.warn('API check failed, falling back to local clinical DB:', err);
-      // Fallback to extensive local DB
-      fallbackLocalCheck();
+    } catch {
+      const localRes = analyzeAllMedications(pair, langCode);
+      setAnalysisResult({
+        mode: 'drug_drug',
+        severity: localRes.severity,
+        severityLabel: localRes.severityLabel,
+        isSafe: localRes.isSafe,
+        mechanism: localRes.mechanism,
+        recommendation: localRes.recommendation,
+        clinicalDetails: localRes.clinicalDetails,
+        analyzedDrugs: localRes.analyzedDrugs,
+        detectedInteractions: localRes.detectedInteractions,
+        cumulativeRisks: localRes.cumulativeRisks,
+        mealInstructions: localRes.mealInstructions,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const fallbackLocalCheck = () => {
-    const res = analyzeAllMedications(selectedTokens, language as 'ar' | 'en');
-    setAnalysisResult({
-      severity: res.severity,
-      severityLabel: res.severityLabel,
-      isSafe: res.isSafe,
-      mechanism: res.mechanism,
-      recommendation: res.recommendation,
-      clinicalDetails: res.clinicalDetails,
-      analyzedDrugs: res.analyzedDrugs,
-      detectedInteractions: res.detectedInteractions,
-      cumulativeRisks: res.cumulativeRisks,
-      foodInteractions: res.foodInteractions || evaluateFoodInteractions(selectedTokens, language as 'ar' | 'en'),
-      foodFoodInteractions: res.foodFoodInteractions || evaluateFoodFoodInteractions(selectedTokens, language as 'ar' | 'en'),
-      mealInstructions: res.mealInstructions || getMealInstructions(selectedTokens, language as 'ar' | 'en'),
-    });
-    setEngineSource('clinical_class');
-  };
-
-  // Immediate Food & Beverage Guidance (works for 1 or more items)
-  const handleCheckFoodGuidance = () => {
-    if (selectedTokens.length === 0) {
-      setErrorMessage(
-        language === 'ar'
-          ? 'يرجى إدخال اسم دواء أو غذاء واحد على الأقل لمعرفة تداخلاته الغذائية وتوقيت وجباته.'
-          : 'Please select at least one item to view dietary and meal guidance.'
-      );
-      return;
-    }
-
-    setErrorMessage('');
-    const foodInteractions = evaluateFoodInteractions(selectedTokens, language as 'ar' | 'en');
-    const foodFoodInteractions = evaluateFoodFoodInteractions(selectedTokens, language as 'ar' | 'en');
-    const mealInstructions = getMealInstructions(selectedTokens, language as 'ar' | 'en');
-    const hasCritical = foodInteractions.some(f => f.severity === 'critical') || foodFoodInteractions.some(f => f.severity === 'critical');
-    const hasWarning = foodInteractions.some(f => f.severity === 'warning') || foodFoodInteractions.some(f => f.severity === 'warning');
-    const totalCount = foodInteractions.length + foodFoodInteractions.length;
-
-    setAnalysisResult({
-      severity: hasCritical ? 'critical' : (hasWarning || totalCount > 0) ? 'warning' : 'safe',
-      severityLabel: hasCritical 
-        ? '🔴 تحذيرات وتداخلات غذائية حرجة' 
-        : totalCount > 0 
-        ? '🟠 إرشادات وتداخلات غذائية هامة' 
-        : '🟢 لا توجد تعارضات غذائية شائعة مسجلة',
-      isSafe: !hasCritical,
-      mechanism: totalCount > 0
-        ? `تم رصد (${foodInteractions.length} تعارض دوائي-غذائي، و ${foodFoodInteractions.length} تداخل غذائي-غذائي) للمدخلات المختارة (${selectedTokens.join(' + ')}).`
-        : `المدخلات المحددة (${selectedTokens.join(' + ')}) لا تمتلك تعارضات غذائية شائعة معروفة مع الأطعمة اليومية.`,
-      recommendation: totalCount > 0
-        ? 'راجع تفاصيل كل مادة أدناه واستفد من التآزر الإيجابي وافصل بين المواد المثبطة للامتصاص بالساعات المحددة، واطلع على توقيت الوجبات.'
-        : 'يمكن تناول الأدوية مع الالتزام بالتعليمات الموضحة في دليل توقيت الوجبات.',
-      clinicalDetails: 'دليل الصيدلة السريرية للتداخلات الدوائية والغذائية والتداخلات الغذائية الغذائية وتوقيت الوجبات.',
-      analyzedDrugs: selectedTokens,
-      detectedInteractions: [],
-      cumulativeRisks: [],
-      foodInteractions,
-      foodFoodInteractions,
-      mealInstructions,
-    });
-    setEngineSource('clinical_class');
-    setActiveReportTab(foodFoodInteractions.length > 0 && foodInteractions.length === 0 ? 'food_food' : 'food');
-  };
-
   const handleCopyReport = () => {
     if (!analysisResult) return;
-    const textToCopy = `📋 تقرير فحص التداخلات والتعارضات الدوائية:\nالأدوية: ${analysisResult.analyzedDrugs.join(' + ')}\nالخطورة: ${analysisResult.severityLabel}\nالتأثير: ${analysisResult.mechanism}\nالتوصية: ${analysisResult.recommendation}\n(منصة جرعة الطبية)`;
+    const textToCopy = `📋 تقرير التداخلات الدوائية والغذائية:\nالمركبان: ${analysisResult.analyzedDrugs.join(' + ')}\nالنتيجة: ${analysisResult.severityLabel}\nالآلية: ${analysisResult.mechanism}\nالتوصية: ${analysisResult.recommendation}\n(منصة جرعة الطبية)`;
     navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
@@ -593,775 +713,439 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
   return (
     <div id="drug-interactions-checker" className="space-y-6">
-      {/* Header Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-64 h-64 bg-rose-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-          <div>
-            <div className="flex items-center gap-2 text-rose-400 text-xs sm:text-sm font-bold mb-1.5">
-              <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0" />
-              <span>فحص التداخلات والتعارضات الدوائية السريري (Clinical Drug Interactions)</span>
+      {/* Clean Service Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
+        <div className="flex items-center gap-2.5 text-rose-400 mb-1.5">
+          <ShieldAlert className="w-5 h-5 text-rose-500 shrink-0" />
+          <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+            {isAr ? 'التداخلات الدوائية والغذائية' : 'Drug & Food Interactions'}
+          </h2>
+        </div>
+        <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
+          {isAr
+            ? 'اختر نوع التداخل ثم حدد المركبين من السهمين أسفل الزر للفحص السريري الفوري.'
+            : 'Choose an interaction type and select the two items from the dropdowns below.'}
+        </p>
+      </div>
+
+      {/* 3 Mode Buttons + 2 Dropdown Selectors Under Each Button */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Button 1: Drug - Drug Interactions */}
+        <div
+          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            activeMode === 'drug_drug' ? 'border-rose-500/70 ring-1 ring-rose-500/30' : 'border-slate-800'
+          }`}
+        >
+          <div className="space-y-3.5">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('drug_drug');
+                setErrorMessage('');
+                if (ddFirst && ddSecond) {
+                  runInteractionCheck('drug_drug', ddFirst, ddSecond);
+                }
+              }}
+              className={`w-full py-3 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeMode === 'drug_drug'
+                  ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-lg shadow-rose-950/50'
+                  : 'bg-slate-800/90 hover:bg-slate-800 text-rose-300 border border-rose-500/30'
+              }`}
+            >
+              <Pill className="w-4 h-4 shrink-0" />
+              <span>{isAr ? 'تداخلات دوائية دوائية' : 'Drug–Drug Interactions'}</span>
+            </button>
+
+            {/* 2 Dropdowns under Button 1 */}
+            <div className="space-y-2.5">
+              <div className="relative">
+                <select
+                  aria-label="المركب الدوائي الأول"
+                  value={ddFirst}
+                  onChange={(e) => {
+                    setActiveMode('drug_drug');
+                    setDdFirst(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-rose-500/60 focus:border-rose-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر الدواء الأول...' : 'Select first drug...'}</option>
+                  {drugOptions.map((opt) => (
+                    <option key={`dd1-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-rose-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              <div className="relative">
+                <select
+                  aria-label="المركب الدوائي الثاني"
+                  value={ddSecond}
+                  onChange={(e) => {
+                    setActiveMode('drug_drug');
+                    setDdSecond(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-rose-500/60 focus:border-rose-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر الدواء الثاني...' : 'Select second drug...'}</option>
+                  {drugOptions.map((opt) => (
+                    <option key={`dd2-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-rose-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
             </div>
-            <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
-              التحقق الذكي من تعارض الأدوية والمواد الفعالة
-            </h2>
-            <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-2xl leading-relaxed">
-              افحص دوائين أو أكثر في آن واحد. يعتمد النظام على أحدث الدلائل السريرية المعتمدة لكشف مخاطر النزيف، متلازمة السيروتونين، وتعارضات إنزيمات الكبد.
-            </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="bg-slate-800/90 px-4 py-2.5 rounded-xl border border-slate-700/80 text-center sm:text-right">
-              <span className="text-[11px] text-slate-400 block font-medium">الأدوية المحددة:</span>
-              <span className="text-sm sm:text-base font-black text-rose-400">{selectedTokens.length} مستحضرات</span>
+          <button
+            type="button"
+            disabled={!ddFirst || !ddSecond || isLoading}
+            onClick={() => runInteractionCheck('drug_drug', ddFirst, ddSecond)}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+              ddFirst && ddSecond && !isLoading
+                ? 'bg-rose-600/20 hover:bg-rose-600/35 text-rose-200 border border-rose-500/50 cursor-pointer'
+                : 'bg-slate-950/60 text-slate-500 border border-slate-800 cursor-not-allowed'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isAr ? 'فحص التداخل الدوائي' : 'Check Drug–Drug'}</span>
+          </button>
+        </div>
+
+        {/* Button 2: Drug - Food Interactions */}
+        <div
+          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            activeMode === 'drug_food' ? 'border-amber-500/70 ring-1 ring-amber-500/30' : 'border-slate-800'
+          }`}
+        >
+          <div className="space-y-3.5">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('drug_food');
+                setErrorMessage('');
+                if (dfDrug && dfFood) {
+                  runInteractionCheck('drug_food', dfDrug, dfFood);
+                }
+              }}
+              className={`w-full py-3 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeMode === 'drug_food'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-lg shadow-amber-950/50'
+                  : 'bg-slate-800/90 hover:bg-slate-800 text-amber-300 border border-amber-500/30'
+              }`}
+            >
+              <Utensils className="w-4 h-4 shrink-0" />
+              <span>{isAr ? 'تداخلات دوائية غذائية' : 'Drug–Food Interactions'}</span>
+            </button>
+
+            {/* 2 Dropdowns under Button 2 */}
+            <div className="space-y-2.5">
+              <div className="relative">
+                <select
+                  aria-label="الدواء"
+                  value={dfDrug}
+                  onChange={(e) => {
+                    setActiveMode('drug_food');
+                    setDfDrug(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر الدواء...' : 'Select medication...'}</option>
+                  {drugOptions.map((opt) => (
+                    <option key={`df1-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-amber-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              <div className="relative">
+                <select
+                  aria-label="الغذاء أو المشروب أو المكمل"
+                  value={dfFood}
+                  onChange={(e) => {
+                    setActiveMode('drug_food');
+                    setDfFood(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر الغذاء أو المكمل...' : 'Select food / supplement...'}</option>
+                  {FOOD_OPTIONS.map((opt) => (
+                    <option key={`df2-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-amber-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
             </div>
           </div>
+
+          <button
+            type="button"
+            disabled={!dfDrug || !dfFood || isLoading}
+            onClick={() => runInteractionCheck('drug_food', dfDrug, dfFood)}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+              dfDrug && dfFood && !isLoading
+                ? 'bg-amber-600/20 hover:bg-amber-600/35 text-amber-200 border border-amber-500/50 cursor-pointer'
+                : 'bg-slate-950/60 text-slate-500 border border-slate-800 cursor-not-allowed'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isAr ? 'فحص التداخل الدوائي الغذائي' : 'Check Drug–Food'}</span>
+          </button>
+        </div>
+
+        {/* Button 3: Food - Food Interactions */}
+        <div
+          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            activeMode === 'food_food' ? 'border-emerald-500/70 ring-1 ring-emerald-500/30' : 'border-slate-800'
+          }`}
+        >
+          <div className="space-y-3.5">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveMode('food_food');
+                setErrorMessage('');
+                if (ffFirst && ffSecond) {
+                  runInteractionCheck('food_food', ffFirst, ffSecond);
+                }
+              }}
+              className={`w-full py-3 px-4 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                activeMode === 'food_food'
+                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-950/50'
+                  : 'bg-slate-800/90 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30'
+              }`}
+            >
+              <Apple className="w-4 h-4 shrink-0" />
+              <span>{isAr ? 'تداخلات غذائية غذائية' : 'Food–Food Interactions'}</span>
+            </button>
+
+            {/* 2 Dropdowns under Button 3 */}
+            <div className="space-y-2.5">
+              <div className="relative">
+                <select
+                  aria-label="العنصر الغذائي الأول"
+                  value={ffFirst}
+                  onChange={(e) => {
+                    setActiveMode('food_food');
+                    setFfFirst(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-emerald-500/60 focus:border-emerald-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر العنصر الغذائي الأول...' : 'Select first food / nutrient...'}</option>
+                  {FOOD_OPTIONS.map((opt) => (
+                    <option key={`ff1-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-emerald-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+
+              <div className="relative">
+                <select
+                  aria-label="العنصر الغذائي الثاني"
+                  value={ffSecond}
+                  onChange={(e) => {
+                    setActiveMode('food_food');
+                    setFfSecond(e.target.value);
+                  }}
+                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-emerald-500/60 focus:border-emerald-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
+                >
+                  <option value="">{isAr ? 'اختر العنصر الغذائي الثاني...' : 'Select second food / nutrient...'}</option>
+                  {FOOD_OPTIONS.map((opt) => (
+                    <option key={`ff2-${opt.value}`} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-emerald-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            disabled={!ffFirst || !ffSecond || isLoading}
+            onClick={() => runInteractionCheck('food_food', ffFirst, ffSecond)}
+            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+              ffFirst && ffSecond && !isLoading
+                ? 'bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-200 border border-emerald-500/50 cursor-pointer'
+                : 'bg-slate-950/60 text-slate-500 border border-slate-800 cursor-not-allowed'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isAr ? 'فحص التداخل الغذائي' : 'Check Food–Food'}</span>
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Drug Selector & Tags */}
-        <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Pill className="w-4 h-4 text-rose-400" />
-              <span>الأدوية المراد فحصها</span>
-            </h3>
-            {selectedTokens.length > 0 && (
+      {errorMessage && (
+        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs sm:text-sm text-rose-300 font-medium">
+          {errorMessage}
+        </div>
+      )}
+
+      {/* Clinical Report Output */}
+      <div ref={reportRef} className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-rose-400" />
+            <span>{isAr ? 'تقرير الفحص السريري والتوصيات' : 'Clinical Report & Recommendations'}</span>
+          </h3>
+
+          {analysisResult && !isLoading && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={clearAll}
-                className="text-xs text-slate-400 hover:text-rose-400 transition-colors"
+                onClick={() => window.print()}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1 border border-slate-700 transition-colors cursor-pointer"
               >
-                مسح الكل
+                <Share2 className="w-3.5 h-3.5" />
+                <span>{isAr ? 'طباعة' : 'Print'}</span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleCopyReport}
+                className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1 border border-slate-700 transition-colors cursor-pointer"
+              >
+                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>{copied ? (isAr ? 'تم النسخ' : 'Copied') : (isAr ? 'نسخ' : 'Copy')}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {!analysisResult && !isLoading && (
+          <div className="text-center py-10 text-slate-500 space-y-2">
+            <ShieldAlert className="w-8 h-8 mx-auto text-slate-600" />
+            <p className="text-xs sm:text-sm text-slate-400">
+              {isAr
+                ? 'حدد المركبين من القائمتين أسفل أي من الأزرار الثلاثة ثم اضغط فحص لعرض النتيجة.'
+                : 'Select two items under any of the three modes and tap check to view the report.'}
+            </p>
           </div>
+        )}
 
-          {/* Quick Input Bar with Auto-suggest & Autocomplete Dropdown */}
-          <div className="space-y-2 relative" ref={inputContainerRef}>
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-semibold text-slate-300">
-                اكتب اسم الدواء (أو دوائين معاً مثل: وارفارين + أسبرين):
-              </label>
-              <span className="text-[11px] text-teal-400 font-medium flex items-center gap-1">
-                <Search className="w-3 h-3" />
-                <span>تعرف فوري من أول حرفين (عربي/إنجليزي)</span>
-              </span>
-            </div>
+        {isLoading && (
+          <div className="text-center py-12 text-slate-400 space-y-3">
+            <RefreshCw className="w-9 h-9 mx-auto text-rose-500 animate-spin" />
+            <p className="text-xs sm:text-sm text-white font-bold">
+              {isAr ? 'جاري فحص التداخل بين المركبين...' : 'Analyzing interaction...'}
+            </p>
+          </div>
+        )}
 
-            <div className="flex gap-2 relative">
-              <div className="relative flex-1">
-                <input
-                  id="interaction-drug-input"
-                  type="text"
-                  value={inputVal}
-                  onFocus={() => setShowDropdown(true)}
-                  onChange={(e) => {
-                    setInputVal(e.target.value);
-                    setShowDropdown(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (filteredSuggestions.length > 0 && showDropdown) {
-                        addDrug(filteredSuggestions[0].name);
-                      } else {
-                        addDrug(inputVal);
-                      }
-                    }
-                  }}
-                  placeholder="اكتب أول حرفين مثل: سيل، نيت، بان، كون، وارفارين..."
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-rose-500 transition-colors"
-                />
-
-                {/* Floating Autocomplete Dropdown */}
-                {showDropdown && filteredSuggestions.length > 0 && (
-                  <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-slate-950/95 backdrop-blur-md border border-rose-500/50 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto divide-y divide-slate-800 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="px-3 py-1.5 bg-rose-950/40 text-[11px] text-rose-300 font-bold flex items-center justify-between">
-                      <span>الأدوية المطابقة ({filteredSuggestions.length}):</span>
-                      <span className="text-[10px] text-slate-400">اضغط للاختيار الفوري</span>
-                    </div>
-                    {filteredSuggestions.map((sug, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => addDrug(sug.name)}
-                        className="w-full text-right px-3.5 py-2 hover:bg-rose-900/30 flex items-center justify-between text-xs transition-colors group cursor-pointer"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-white font-bold group-hover:text-rose-300 transition-colors">
-                            {sug.name} <span className="text-slate-400 font-normal">({sug.nameEn})</span>
-                          </span>
-                          <span className="text-[11px] text-amber-300/90">{sug.trade}</span>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-300 shrink-0">
-                          {sug.category}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+        {analysisResult && !isLoading && (
+          <div className="space-y-4">
+            {/* Severity Banner */}
+            <div
+              className={`p-4 sm:p-5 rounded-2xl border ${
+                analysisResult.severity === 'critical'
+                  ? 'bg-rose-950/40 border-rose-800/80 text-rose-200'
+                  : analysisResult.severity === 'warning'
+                  ? 'bg-amber-950/40 border-amber-800/80 text-amber-200'
+                  : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-200'
+              }`}
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2">
+                <span className="text-base sm:text-lg font-black">{analysisResult.severityLabel}</span>
+                <span className="text-xs font-semibold px-3 py-1 rounded-lg bg-slate-950/70 border border-slate-700/60 text-slate-200 self-start sm:self-auto">
+                  {analysisResult.analyzedDrugs.join('  ⟷  ')}
+                </span>
               </div>
-
-              <button
-                type="button"
-                onClick={() => addDrug(inputVal)}
-                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-900/30 flex items-center gap-1 shrink-0 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>إضافة</span>
-              </button>
             </div>
 
-            {/* Persistent Medication Memory (سجل الأدوية السابقة) */}
-            {recentHistory.length > 0 && (
-              <div className="pt-2">
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[11px] font-semibold text-slate-400 flex items-center gap-1">
-                    <History className="w-3 h-3 text-teal-400" />
-                    <span>ذاكرة الأدوية الأخيرة (Recent Memory):</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={clearHistory}
-                    className="text-[10px] text-slate-500 hover:text-rose-400 flex items-center gap-0.5 transition-colors cursor-pointer"
-                  >
-                    <Trash2 className="w-2.5 h-2.5" />
-                    <span>مسح الذاكرة</span>
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {recentHistory.slice(0, 8).map((d, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => addDrug(d)}
-                      className="px-2 py-0.5 rounded-md text-[11px] bg-slate-950/80 hover:bg-slate-800 text-teal-300 border border-slate-800/90 hover:border-teal-500/50 transition-all font-mono"
-                    >
-                      + {d}
-                    </button>
+            {/* Mechanism */}
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+              <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
+                <AlertTriangle className="w-4 h-4" />
+                <span>{isAr ? 'الآلية والتقييم السريري:' : 'Mechanism & Clinical Assessment:'}</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+                {analysisResult.mechanism}
+              </p>
+            </div>
+
+            {/* Recommendation */}
+            <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+              <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{isAr ? 'التوصية العملية والفاصل الزمني:' : 'Actionable Recommendation:'}</span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium whitespace-pre-line">
+                {analysisResult.recommendation}
+              </p>
+            </div>
+
+            {/* Clinical Details / Culinary Tip */}
+            {analysisResult.clinicalDetails && (
+              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 flex items-start gap-2">
+                <Info className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                <span>{analysisResult.clinicalDetails}</span>
+              </div>
+            )}
+
+            {/* Meal Timing Instructions (when a medication has specific timing rules) */}
+            {analysisResult.mealInstructions && analysisResult.mealInstructions.length > 0 && (
+              <div className="space-y-2.5 pt-2 border-t border-slate-800/80">
+                <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-teal-400" />
+                  <span>{isAr ? 'توقيت الدواء مع الوجبات:' : 'Medication Meal Timing:'}</span>
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {analysisResult.mealInstructions.map((item, idx) => (
+                    <div key={idx} className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between gap-2 pb-1 border-b border-slate-800/60">
+                        <span className="font-bold text-white">{item.drug}</span>
+                        <span className="px-2 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-800/70 text-[10px] font-bold">
+                          {item.timingLabel}
+                        </span>
+                      </div>
+                      <p className="text-slate-300 leading-relaxed">{item.instructions}</p>
+                    </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Selected Medicine Chips */}
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-slate-400 block">
-              القائمة المختارة للفحص ({selectedTokens.length}):
-            </span>
-
-            {selectedTokens.length === 0 ? (
-              <div className="p-5 rounded-xl bg-slate-950/70 border border-dashed border-slate-800 text-center text-xs text-slate-500 space-y-1">
-                <p>لم تختر أدوية بعد.</p>
-                <p className="text-[11px] text-slate-600">اختر من الأمثلة السريعة أدناه أو اكتب أسماء أدويتك.</p>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {selectedTokens.map((tok) => (
-                  <span
-                    key={tok}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-white text-xs border border-slate-700 font-semibold shadow-sm animate-fade-in"
-                  >
-                    <span>{tok}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeDrug(tok)}
-                      className="hover:text-rose-400 transition-colors p-0.5 rounded-full hover:bg-slate-700/60"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </span>
-                ))}
+            {/* External Clinical References for Drug-Drug */}
+            {analysisResult.mode === 'drug_drug' && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                <a
+                  href={`https://www.drugs.com/interactions-check.php?drug_list=${encodeURIComponent(analysisResult.analyzedDrugs.join(','))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/25 hover:bg-indigo-600/40 border border-indigo-500/40 text-indigo-200 text-xs font-semibold transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Drugs.com</span>
+                </a>
+                <a
+                  href="https://reference.medscape.com/drug-interactionchecker"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                  <span>Medscape</span>
+                </a>
               </div>
             )}
-          </div>
 
-          {/* Action Trigger Buttons */}
-          <div className="space-y-2">
-            <button
-              type="button"
-              disabled={selectedTokens.length < 2 || isLoading}
-              onClick={handleCheckInteractions}
-              className={`w-full py-3.5 rounded-xl text-sm font-black flex items-center justify-center gap-2 transition-all shadow-xl ${
-                selectedTokens.length >= 2 && !isLoading
-                  ? 'bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-rose-900/40 cursor-pointer'
-                  : 'bg-slate-800 text-slate-500 border border-slate-700/60 cursor-not-allowed'
-              }`}
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin text-rose-300" />
-                  <span>جاري تحليل التداخلات السريرية بالذكاء الاصطناعي...</span>
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>بدء الفحص والتقييم السريري الشامل</span>
-                </>
-              )}
-            </button>
-
-            {/* Quick Food & Meal Guidance Button (Works with 1 or more medications) */}
-            <button
-              type="button"
-              disabled={selectedTokens.length === 0 || isLoading}
-              onClick={handleCheckFoodGuidance}
-              className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all border ${
-                selectedTokens.length > 0 && !isLoading
-                  ? 'bg-amber-950/40 hover:bg-amber-900/60 text-amber-200 border-amber-800/80 hover:border-amber-600 cursor-pointer shadow-sm'
-                  : 'bg-slate-900/50 text-slate-600 border-slate-800 cursor-not-allowed'
-              }`}
-            >
-              <Utensils className="w-4 h-4 text-amber-400" />
-              <span>
-                {selectedTokens.length === 1 
-                  ? `فحص التداخلات الغذائية وتوقيت الوجبات لـ (${selectedTokens[0]})`
-                  : 'فحص التداخلات الغذائية وتوقيت الوجبات للأدوية المحددة'}
-              </span>
-            </button>
-          </div>
-
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300">
-              {errorMessage}
-            </div>
-          )}
-
-          {/* Quick Suggestions */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <span className="text-xs font-semibold text-slate-400 block mb-2">
-              أمثلة شائعة للتجربة السريعة:
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {popularSuggestions.map((item) => {
-                const isAdded = selectedTokens.includes(item.key);
-                return (
-                  <button
-                    key={item.key}
-                    type="button"
-                    onClick={() => {
-                      if (isAdded) removeDrug(item.key);
-                      else addDrug(item.key);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                      isAdded
-                        ? 'bg-rose-500/25 text-rose-300 border border-rose-500/50 shadow-sm'
-                        : 'bg-slate-950/80 hover:bg-slate-800 text-slate-400 border border-slate-800 hover:text-slate-200'
-                    }`}
-                  >
-                    {isAdded ? '✓ ' : '+ '}
-                    {item.label}
-                  </button>
-                );
-              })}
+            <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-[11px] text-slate-500">
+              {isAr
+                ? '⚠️ إخلاء مسؤولية: هذا الفحص استرشادي صيدلاني ولا يغني عن استشارة الطبيب أو الصيدلاني.'
+                : '⚠️ Disclaimer: Educational clinical decision support only; consult a physician or pharmacist.'}
             </div>
           </div>
-
-          {/* Clinically Verified Drug-Food Interactions Quick Tests */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <span className="text-xs font-semibold text-amber-400 block mb-2 flex items-center gap-1.5">
-              <Utensils className="w-3.5 h-3.5" />
-              <span>تداخلات دوائية - غذائية شائعة بنقرة واحدة:</span>
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {foodQuickTests.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => loadPair(p.drugs)}
-                  className="text-right px-2.5 py-1.5 rounded-lg text-xs bg-amber-950/20 hover:bg-amber-900/40 text-amber-200 border border-amber-900/40 hover:border-amber-700 transition-all font-medium truncate"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Quick Test Interaction Pairs */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <span className="text-xs font-semibold text-rose-400 block mb-2 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>أزواج دوائية نموذجية للاختبار السريع بنقرة واحدة:</span>
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {quickTestPairs.map((p, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => loadPair(p.drugs)}
-                  className="text-right px-2.5 py-1.5 rounded-lg text-xs bg-slate-950/70 hover:bg-slate-800/90 text-slate-300 border border-slate-800/80 hover:border-slate-700 transition-all font-medium truncate"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column: Clinical Report & Guidance */}
-        <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-              <Stethoscope className="w-4 h-4 text-rose-400" />
-              <span>تقرير الفحص السريري والتوصيات</span>
-            </h3>
-
-            {analysisResult && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => window.print()}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1 border border-slate-700 transition-colors"
-                >
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>طباعة / تصدير</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCopyReport}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center gap-1 border border-slate-700 transition-colors"
-                >
-                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copied ? 'تم النسخ' : 'نسخ التقرير'}</span>
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Results State */}
-          {!analysisResult && !isLoading && (
-            <div className="text-center py-16 text-slate-500 space-y-4">
-              <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-950 flex items-center justify-center border border-slate-800 shadow-inner">
-                <ShieldAlert className="w-8 h-8 text-slate-600" />
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-white font-bold text-base">حدد دوائين على الأقل واضغط "بدء الفحص"</h4>
-                <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                  يمكنك مثلاً إضافة <strong>وارفارين</strong> و <strong>أسبرين</strong> لاختبار كشف التعارض الحرج مع مضادات التخثر.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {isLoading && (
-            <div className="text-center py-16 text-slate-400 space-y-4">
-              <RefreshCw className="w-10 h-10 mx-auto text-rose-500 animate-spin" />
-              <div className="space-y-1">
-                <h4 className="text-white font-bold text-sm">جاري مضاهاة الأدوية سريرياً بالذكاء الاصطناعي...</h4>
-                <p className="text-xs text-slate-500">فحص الإنزيمات الكبدية ومسارات التخثر والمستقبلات العصبية.</p>
-              </div>
-            </div>
-          )}
-
-          {analysisResult && !isLoading && (
-            <div className="space-y-4 animate-fade-in">
-              {/* Severity Banner */}
-              <div
-                className={`p-4 sm:p-5 rounded-2xl border ${
-                  analysisResult.severity === 'critical'
-                    ? 'bg-rose-950/40 border-rose-800/80 text-rose-200'
-                    : analysisResult.severity === 'warning'
-                    ? 'bg-amber-950/40 border-amber-800/80 text-amber-200'
-                    : 'bg-emerald-950/40 border-emerald-800/80 text-emerald-200'
-                }`}
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
-                  <span className="text-base sm:text-lg font-black tracking-wide">
-                    {analysisResult.severityLabel}
-                  </span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-md bg-slate-900/80 border border-slate-700/80 text-rose-300">
-                      {engineSource === 'gemini_ai' ? '🤖 ذكاء اصطناعي (Gemini)' : '⚡ محرك الصيدلة السريرية الشامل (INN Engine)'}
-                    </span>
-                    <span className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-950/70 border border-slate-700/60 text-slate-300">
-                      {analysisResult.analyzedDrugs.join(' + ')}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-xs text-slate-300 leading-relaxed font-medium mt-2">
-                  {analysisResult.severity === 'critical'
-                    ? '⚠️ تحذير حرج: هذا التداخل قد يسبب مضاعفات خطيرة ومهددة للحياة. يجب إبلاغ الطبيب المعالج فوراً والامتناع عن الجمع.'
-                    : analysisResult.severity === 'warning'
-                    ? '⚠️ تنبيه سريري أو غذائي: يلزم المباعدة الزمنية بالساعات أو تعديل الجرعات وطريقة التحضير.'
-                    : (analysisResult.foodFoodInteractions && analysisResult.foodFoodInteractions.some(f => f.type === 'synergy' || (f as any).effectType === 'synergy'))
-                    ? '✨ تركيبة تآزرية ممتازة: تعزز الامتصاص وتضاعف الفائدة الحيوية الصحية والعلاجية للمريض.'
-                    : '✅ مطمئن: لا يوجد تعارض رئيسي مسجل بين هذه المواد في الجرعات العلاجية الاعتيادية.'}
-                </div>
-              </div>
-
-              {/* Report Category Filter Tabs */}
-              <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-xl bg-slate-950/80 border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setActiveReportTab('all')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeReportTab === 'all'
-                      ? 'bg-rose-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>التقرير الشامل</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveReportTab('drugs')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeReportTab === 'drugs'
-                      ? 'bg-rose-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Pill className="w-3.5 h-3.5" />
-                  <span>تعارضات الأدوية ({analysisResult.detectedInteractions?.length || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveReportTab('food')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeReportTab === 'food'
-                      ? 'bg-amber-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Utensils className="w-3.5 h-3.5" />
-                  <span>أدوية مع أغذية ({analysisResult.foodInteractions?.length || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveReportTab('food_food')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeReportTab === 'food_food'
-                      ? 'bg-emerald-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Apple className="w-3.5 h-3.5" />
-                  <span>أغذية مع أغذية ({analysisResult.foodFoodInteractions?.length || 0})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveReportTab('timing')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                    activeReportTab === 'timing'
-                      ? 'bg-teal-600 text-white shadow'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>توقيت الوجبات ({analysisResult.mealInstructions?.length || 0})</span>
-                </button>
-              </div>
-
-              {/* SECTION 1: DRUG-DRUG INTERACTIONS */}
-              {(activeReportTab === 'all' || activeReportTab === 'drugs') && (
-                <>
-                  {/* Cumulative Risks Badges */}
-                  {analysisResult.cumulativeRisks && analysisResult.cumulativeRisks.length > 0 && (
-                    <div className="p-3.5 rounded-xl bg-rose-950/30 border border-rose-900/50 space-y-2">
-                      <span className="text-xs font-bold text-rose-300 block flex items-center gap-1.5">
-                        <AlertTriangle className="w-4 h-4 text-rose-400" />
-                        المخاطر التراكمية المشتركة لهذا البرنامج العلاجي:
-                      </span>
-                      <div className="flex flex-wrap gap-2">
-                        {analysisResult.cumulativeRisks.map((risk, idx) => (
-                          <span key={idx} className="text-xs px-2.5 py-1 rounded-lg bg-rose-900/40 border border-rose-700/50 text-rose-200 font-medium">
-                            ⚠️ {risk}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Detected Pairwise Interaction Cards */}
-                  {analysisResult.detectedInteractions && analysisResult.detectedInteractions.length > 0 ? (
-                    <div className="space-y-2.5">
-                      <span className="text-xs font-bold text-slate-300 block flex items-center gap-1.5">
-                        <Pill className="w-4 h-4 text-teal-400" />
-                        تفصيل التعارضات بين أزواج الأدوية ({analysisResult.detectedInteractions.length} تعارض محدد):
-                      </span>
-                      <div className="space-y-2">
-                        {analysisResult.detectedInteractions.map((pair, idx) => (
-                          <div
-                            key={idx}
-                            className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
-                              pair.severity === 'critical'
-                                ? 'bg-rose-950/30 border-rose-800/60 text-rose-200'
-                                : 'bg-amber-950/30 border-amber-800/60 text-amber-200'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between font-bold">
-                              <span>{pair.drugA} ⟷ {pair.drugB}</span>
-                              <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-700 text-[11px]">
-                                {pair.severityLabel}
-                              </span>
-                            </div>
-                            <p className="text-slate-300 leading-relaxed">{pair.mechanism}</p>
-                            <p className="text-emerald-300 font-medium">💡 التوجيه: {pair.recommendation}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : activeReportTab === 'drugs' && (
-                    <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>لا توجد تعارضات دوائية سلبية مسجلة بين هذه الأدوية المحددة.</span>
-                    </div>
-                  )}
-
-                  {/* Mechanism of Action */}
-                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                    <div className="flex items-center gap-2 text-rose-400 text-xs font-bold">
-                      <AlertTriangle className="w-4 h-4" />
-                      <span>آلية التأثير والمخاطر السريرية (Mechanism & Risks):</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
-                      {analysisResult.mechanism}
-                    </p>
-                  </div>
-
-                  {/* Actionable Clinical Recommendation */}
-                  <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
-                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>التوصية السريرية والبدائل الآمنة (Clinical Guidance & Substitutes):</span>
-                    </div>
-                    <p className="text-xs sm:text-sm text-slate-200 leading-relaxed font-medium">
-                      {analysisResult.recommendation}
-                    </p>
-                  </div>
-                </>
-              )}
-
-              {/* SECTION 2: DRUG-FOOD & BEVERAGE INTERACTIONS */}
-              {(activeReportTab === 'all' || activeReportTab === 'food') && (
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                      <Utensils className="w-4 h-4 text-amber-400" />
-                      <span>التداخلات الدوائية والغذائية (Food & Beverage Interactions):</span>
-                    </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-amber-950/80 text-amber-300 border border-amber-800/60 font-semibold">
-                      {analysisResult.foodInteractions && analysisResult.foodInteractions.length > 0
-                        ? `${analysisResult.foodInteractions.length} تداخل مرصود`
-                        : 'لا توجد تعارضات غذائية'}
-                    </span>
-                  </div>
-
-                  {analysisResult.foodInteractions && analysisResult.foodInteractions.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {analysisResult.foodInteractions.map((food, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-4 rounded-xl border text-xs space-y-2.5 ${
-                            food.severity === 'critical'
-                              ? 'bg-rose-950/30 border-rose-800/70 text-rose-100'
-                              : 'bg-amber-950/30 border-amber-800/70 text-amber-100'
-                          }`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2">
-                            <div className="flex items-center gap-2 font-black text-sm">
-                              <span className="text-xl">{food.foodIcon}</span>
-                              <span className="text-white">{food.foodCategory}</span>
-                              <span className="text-slate-400 text-xs font-normal">مع دواء: <strong className="text-rose-300">({food.affectedDrug})</strong></span>
-                            </div>
-                            <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold shrink-0 self-start sm:self-auto ${
-                              food.severity === 'critical' ? 'bg-rose-900/80 text-rose-200 border border-rose-700' : 'bg-amber-900/80 text-amber-200 border border-amber-700'
-                            }`}>
-                              {food.severityLabel}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1.5 text-slate-300 leading-relaxed text-xs">
-                            <p><strong className="text-rose-300">⚠️ الآلية السريرية:</strong> {food.mechanism}</p>
-                            <p><strong className="text-emerald-300">💡 التوجيه الصيدلاني:</strong> {food.recommendation}</p>
-                            <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-1.5">
-                              <Info className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                              <span><strong className="text-teal-300">النصيحة والبدائل الغذائية:</strong> {food.dietaryAdvice}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>لا توجد تعارضات غذائية شائعة أو حرجة مسجلة لهذه الأدوية مع الأطعمة والمشروبات اليومية.</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SECTION 2.5: FOOD-FOOD & NUTRIENT-NUTRIENT INTERACTIONS */}
-              {(activeReportTab === 'all' || activeReportTab === 'food_food') && (
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <span className="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-                      <Apple className="w-4 h-4 text-emerald-400" />
-                      <span>التداخلات الغذائية - الغذائية والعناصر (Food-Food & Nutrient Interactions):</span>
-                    </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-800/60 font-semibold">
-                      {analysisResult.foodFoodInteractions && analysisResult.foodFoodInteractions.length > 0
-                        ? `${analysisResult.foodFoodInteractions.length} تداخل غذائي مرصود`
-                        : 'لا توجد تعارضات غذائية بينية'}
-                    </span>
-                  </div>
-
-                  {analysisResult.foodFoodInteractions && analysisResult.foodFoodInteractions.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2.5">
-                      {analysisResult.foodFoodInteractions.map((ffi, idx) => (
-                        <div
-                          key={idx}
-                          className={`p-4 rounded-xl border text-xs space-y-2.5 ${
-                            (ffi.type === 'synergy' || (ffi as any).effectType === 'synergy')
-                              ? 'bg-emerald-950/30 border-emerald-800/70 text-emerald-100'
-                              : ffi.severity === 'critical'
-                              ? 'bg-rose-950/30 border-rose-800/70 text-rose-100'
-                              : 'bg-amber-950/30 border-amber-800/70 text-amber-100'
-                          }`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-2">
-                            <div className="flex flex-wrap items-center gap-2 font-black text-sm">
-                              <span className="text-xl">{(ffi as any).foodAIcon || ffi.foodIconA || '🥗'} ⚡ {(ffi as any).foodBIcon || ffi.foodIconB || '🍵'}</span>
-                              <span className="text-white">{ffi.foodA} ⟷ {ffi.foodB}</span>
-                              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                                (ffi.type === 'synergy' || (ffi as any).effectType === 'synergy')
-                                  ? 'bg-emerald-900/80 text-emerald-300 border border-emerald-700'
-                                  : 'bg-amber-900/80 text-amber-300 border border-amber-700'
-                              }`}>
-                                {(ffi.type === 'synergy' || (ffi as any).effectType === 'synergy') ? '🟢 تآزر امتصاص إيجابي' : '🟠 تثبيط / تنافس امتصاص'}
-                              </span>
-                            </div>
-                            <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold shrink-0 self-start sm:self-auto ${
-                              ffi.severity === 'critical' 
-                                ? 'bg-rose-900/80 text-rose-200 border border-rose-700' 
-                                : (ffi.type === 'synergy' || (ffi as any).effectType === 'synergy')
-                                ? 'bg-emerald-900/60 text-emerald-200 border border-emerald-700'
-                                : 'bg-amber-900/80 text-amber-200 border border-amber-700'
-                            }`}>
-                              {(ffi as any).severityLabel || ffi.typeLabel || 'تنبيه غذائي'}
-                            </span>
-                          </div>
-
-                          <div className="space-y-1.5 text-slate-300 leading-relaxed text-xs">
-                            <p><strong className="text-rose-300">🔬 الآلية الحيوية:</strong> {ffi.mechanism}</p>
-                            <p><strong className="text-emerald-300">💡 التوجيه الغذائي:</strong> {ffi.recommendation}</p>
-                            <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-1.5">
-                              <Info className="w-3.5 h-3.5 text-teal-400 shrink-0 mt-0.5" />
-                              <span><strong className="text-teal-300">نصيحة المطبخ والتطبيق العملي:</strong> {(ffi as any).culinaryTip || ffi.clinicalNote}</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : activeReportTab === 'food_food' && (
-                    <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400 flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <span>لا توجد تداخلات أو تعارضات غذائية-غذائية مرصودة بين العناصر المحددة.</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* SECTION 3: MEAL TIMING & ADMINISTRATION */}
-              {(activeReportTab === 'all' || activeReportTab === 'timing') && analysisResult.mealInstructions && analysisResult.mealInstructions.length > 0 && (
-                <div className="space-y-3 pt-1">
-                  <div className="flex items-center justify-between border-t border-slate-800/80 pt-3">
-                    <span className="text-xs font-bold text-teal-300 flex items-center gap-1.5">
-                      <Clock className="w-4 h-4 text-teal-400" />
-                      <span>دليل التوقيت مع الوجبات والمعدة (Meal Timing Guide):</span>
-                    </span>
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-teal-950/80 text-teal-300 border border-teal-800/60 font-semibold">
-                      {analysisResult.mealInstructions.length} إرشادات دوائية
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {analysisResult.mealInstructions.map((item, idx) => (
-                      <div key={idx} className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2 text-xs">
-                        <div className="flex items-center justify-between border-b border-slate-800/60 pb-1.5">
-                          <span className="font-bold text-white flex items-center gap-1.5">
-                            <Pill className="w-3.5 h-3.5 text-rose-400" />
-                            {item.drug}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            item.timing === 'empty_stomach' 
-                              ? 'bg-amber-950 text-amber-300 border border-amber-800/80' 
-                              : item.timing === 'with_food' || item.timing === 'after_food'
-                              ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/80'
-                              : 'bg-slate-800 text-slate-300'
-                          }`}>
-                            {item.timingLabel}
-                          </span>
-                        </div>
-                        <p className="text-slate-300 text-xs leading-relaxed">{item.instructions}</p>
-                        <p className="text-slate-400 text-[11px] leading-relaxed italic border-t border-slate-800/60 pt-1">
-                          <strong className="text-slate-300 not-italic">السبب الطبي:</strong> {item.rationale}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Extra clinical points if available */}
-              {analysisResult.clinicalDetails && (
-                <div className="p-3.5 rounded-xl bg-slate-950/50 border border-slate-800/80 text-xs text-slate-400 leading-relaxed">
-                  <span className="font-bold text-slate-300 block mb-1">ملاحظات إضافية:</span>
-                  {analysisResult.clinicalDetails}
-                </div>
-              )}
-
-              {/* Online Global References Verification Card (Drugs.com & Medscape) */}
-              <div className="p-4 rounded-xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/40 border border-indigo-800/40 space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
-                    <ExternalLink className="w-4 h-4 text-indigo-400" />
-                    <span>التحقق المباشر من المراجع الدوائية العالمية (Global Grounded Checkers):</span>
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-950 text-indigo-300 border border-indigo-700/50">
-                    Live Web References
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  يمكنك مضاهاة هذا التقرير مع قواعد البيانات الصيدلانية السريرية المعتمدة عالمياً (Lexicomp, Drugs.com, Medscape) بضغطة زر:
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <a
-                    href={`https://www.drugs.com/interactions-check.php?drug_list=${encodeURIComponent(analysisResult.analyzedDrugs.join(','))}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-semibold transition-all"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>فتح فاحص Drugs.com العالمي</span>
-                  </a>
-                  <a
-                    href="https://reference.medscape.com/drug-interactionchecker"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold transition-all"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
-                    <span>فاحص Medscape السريري</span>
-                  </a>
-                </div>
-              </div>
-
-              {/* Mandatory Medical Disclaimer */}
-              <div className="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-[11px] text-slate-500 space-y-0.5">
-                <span className="font-bold text-slate-400 block">إخلاء مسؤولية طبي:</span>
-                <p>
-                  هذا الفحص مخصص للأغراض التثقيفية والإرشاد السريري ولا يغني عن تقييم الطبيب المعالج أو الصيدلاني المرخص.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
