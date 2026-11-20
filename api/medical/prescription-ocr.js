@@ -31,25 +31,14 @@ export default async function handler(req, res) {
   const apiKey = customApiKey || process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
 
   if (apiKey) {
-    const candidateModels = ['gemini-4-hydrogen', 'gemini-3.1-flash-lite'];
-    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading prescriptions and medicine packaging (syrup bottles, drops, ointments, inhalers, vials, suppositories).
-Carefully analyze this medicine image.
-Extract the exact information from the packaging or prescription:
-
-1. Identify:
-   - Trade / Brand Name: (e.g. Augmentin, Amoxil, Curam, Megamox, Suprax, Zithromax, Panadol, Adol, Brufen, Profinal, Ventolin, Pulmicort, Decadron, Fenistil, Prospan, Mucosolvan, Dentinox, Tobrex, Fucidin, Claforan, Rocephin, etc.)
-   - Scientific / Generic Name: (e.g. Amoxicillin, Amoxicillin/Clavulanate, Cefixime, Azithromycin, Paracetamol, Ibuprofen, Salbutamol, Dexamethasone, Dimetindene, Ambroxol, Simethicone, Cefotaxime, etc.)
-   - Formulation: "syrup" (oral suspension / elixir / syrup), "drops" (oral drops or eye/ear drops), "suppository" (rectal suppository), "ointment" (cream/ointment), "spray" (inhaler/spray), "injection" (vial/ampoule), "sachet" (rehydration salts / powder).
-   - Concentration: For syrups, extract mg per 5ml (e.g. 125, 156, 200, 228, 250, 312, 400, 457, 600, 100, 120). For drops, mg/ml.
-   - Standard Pediatric Dosage: (Min and Max mg/kg/day, frequency in hours and times per day).
-
-Output strictly valid JSON with this schema:
+    const prompt = `Pediatric pharmacist OCR: extract exact medicine details from this box/bottle/prescription image as strict JSON.
+JSON schema:
 {
   "isValidMedicineImage": true,
-  "drugNameAr": "الاسم بالعربية الدقيق للدواء المقروء",
-  "drugNameEn": "Exact Generic or Trade Name in English",
-  "tradeName": "Brand name if visible (e.g. Augmentin, Amoxil, Suprax, Brufen, Panadol)",
-  "genericName": "Active scientific ingredient (e.g. Amoxicillin, Paracetamol, Ibuprofen)",
+  "drugNameAr": "الاسم بالعربية",
+  "drugNameEn": "Exact English Name",
+  "tradeName": "Brand name (e.g. Augmentin, Prokinin, Adol)",
+  "genericName": "Active ingredient (e.g. Amoxicillin, Domperidone, Paracetamol)",
   "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "cefalexin" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "dexamethasone" | "dimetindene" | "prospan" | "mucosolvan" | "simethicone" | "cefotaxime" | "ors" | "other",
   "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
@@ -57,67 +46,87 @@ Output strictly valid JSON with this schema:
   "isAntibiotic": false,
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
   "confidence": "high" | "moderate" | "low",
-  "detectedText": "الملخص الصيدلاني المستخرج من العلبة بدقة",
-  "recommendedFreqAr": "التكرار المناسب (مثال: كل 12 ساعة بعد الأكل)",
-  "recommendedFreqEn": "Recommended frequency",
-  "standardMpkMin": 40,
-  "standardMpkMax": 90,
-  "dosesPerDay": 2,
-  "instructionsAr": "تعليمات الاستخدام للطفل (مثل رج العبوة جيداً، يحفظ في الثلاجة بعد التحضير)"
+  "detectedText": "ملخص مختصر للعلبة",
+  "recommendedFreqAr": "التكرار (مثال: كل 8 ساعات)",
+  "recommendedFreqEn": "Every 8 hours",
+  "standardMpkMin": 15,
+  "standardMpkMax": 30,
+  "dosesPerDay": 3,
+  "instructionsAr": "تعليمات مختصرة باللغة العربية"
 }`;
 
-    for (const model of candidateModels) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{
-                parts: [
-                  { text: prompt },
-                  {
-                    inlineData: {
-                      mimeType: mimeType || 'image/jpeg',
-                      data: imageBase64
-                    }
+    const callFastVisionModel = async (model, generationConfig, timeoutMs = 5500) => {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(timeoutMs),
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: mimeType || 'image/jpeg',
+                    data: imageBase64
                   }
-                ]
-              }],
-              generationConfig: {
-                responseMimeType: 'application/json',
-                temperature: 0.1
-              }
-            })
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (candidateText) {
-            let parsed = null;
-            try {
-              parsed = JSON.parse(candidateText.trim());
-            } catch (jsonErr) {
-              const cleaned = candidateText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
-              const match = cleaned.match(/\{[\s\S]*\}/);
-              if (match) {
-                try { parsed = JSON.parse(match[0]); } catch (_) {}
-              }
-            }
-
-            if (parsed && (parsed.drugNameEn || parsed.drugNameAr || parsed.tradeName || parsed.genericName)) {
-              return res.status(200).json({
-                success: true,
-                ...parsed
-              });
-            }
-          }
+                }
+              ]
+            }],
+            generationConfig
+          })
         }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status} from ${model}`);
+      }
+
+      const data = await response.json();
+      const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!candidateText) throw new Error(`Empty output from ${model}`);
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(candidateText.trim());
+      } catch {
+        const cleaned = candidateText.replace(/```json\s*/gi, '').replace(/```\s*$/gi, '').trim();
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        if (match) {
+          parsed = JSON.parse(match[0]);
+        }
+      }
+
+      if (parsed && (parsed.drugNameEn || parsed.drugNameAr || parsed.tradeName || parsed.genericName)) {
+        return parsed;
+      }
+      throw new Error(`Unparseable output from ${model}`);
+    };
+
+    try {
+      // Race ultra-fast zero/minimal-thinking flash models in parallel for ~1-2s recognition
+      const fastResult = await Promise.any([
+        callFastVisionModel('gemini-3.1-flash-lite', {
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingLevel: 'MINIMAL' }
+        }, 5500),
+        callFastVisionModel('gemini-2.5-flash', {
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingBudget: 0 }
+        }, 5500)
+      ]);
+      return res.status(200).json({ success: true, ...fastResult });
+    } catch (raceErr) {
+      // Final fast fallback to gemini-4-hydrogen with LOW thinking
+      try {
+        const fallbackResult = await callFastVisionModel('gemini-4-hydrogen', {
+          responseMimeType: 'application/json',
+          thinkingConfig: { thinkingLevel: 'LOW' }
+        }, 5500);
+        return res.status(200).json({ success: true, ...fallbackResult });
       } catch (err) {
-        console.warn(`Vercel OCR error on model ${model}:`, err?.message);
+        console.warn('All cloud OCR vision attempts failed:', err?.message || raceErr?.message);
       }
     }
   }
@@ -126,7 +135,6 @@ Output strictly valid JSON with this schema:
   return res.status(422).json({
     success: false,
     noApiKey: !apiKey,
-    success: false,
     error: isAr
       ? "تعذر قراءة بيانات الدواء من الصورة تلقائياً. يرجى التأكد من وضوح اسم الدواء وتركيزه على العلبة، أو إدخال البيانات يدوياً."
       : "Could not clearly detect the medicine from the image. Please ensure clear lighting on name and concentration, or select manually."

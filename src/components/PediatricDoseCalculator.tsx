@@ -374,57 +374,80 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     }
   };
 
-  // Helper to downscale and compress camera photos in browser canvas
-  // Fixes Vercel 4.5MB payload limit and mobile browser memory errors
+  // Fast client-side image compression for rapid OCR (~45-70KB JPEG)
   const compressImageForOcr = (file: File): Promise<{ base64: string; mimeType: string; previewUrl: string }> => {
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
+      const processImageUrl = (srcUrl: string, revokeAfter: boolean) => {
         const img = new Image();
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let { width, height } = img;
-          const maxDim = 1280; // High resolution for packaging OCR, compressed to ~150-250KB JPEG
-          if (width > maxDim || height > maxDim) {
-            if (width > height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
+          try {
+            const canvas = document.createElement('canvas');
+            let { width, height } = img;
+            const maxDim = 768; // Crisp for medicine labels while 4x faster to upload & analyze
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
             }
-          }
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            const raw = e.target?.result as string;
-            resolve({ base64: raw.split(',')[1], mimeType: file.type || 'image/jpeg', previewUrl: raw });
-            return;
-          }
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              throw new Error('Canvas unavailable');
+            }
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'medium';
+            ctx.drawImage(img, 0, 0, width, height);
 
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          resolve({
-            base64: compressedDataUrl.split(',')[1],
-            mimeType: 'image/jpeg',
-            previewUrl: compressedDataUrl
-          });
+            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72);
+            resolve({
+              base64: compressedDataUrl.split(',')[1],
+              mimeType: 'image/jpeg',
+              previewUrl: compressedDataUrl
+            });
+          } catch {
+            // Fallback to FileReader if canvas fails
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const raw = ev.target?.result as string;
+              resolve({ base64: raw.split(',')[1], mimeType: file.type || 'image/jpeg', previewUrl: raw });
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          } finally {
+            if (revokeAfter) URL.revokeObjectURL(srcUrl);
+          }
         };
         img.onerror = () => {
-          const raw = e.target?.result as string;
-          resolve({ base64: raw.split(',')[1], mimeType: file.type || 'image/jpeg', previewUrl: raw });
+          if (revokeAfter) URL.revokeObjectURL(srcUrl);
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const raw = ev.target?.result as string;
+            resolve({ base64: raw.split(',')[1], mimeType: file.type || 'image/jpeg', previewUrl: raw });
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         };
-        img.src = e.target?.result as string;
+        img.src = srcUrl;
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+
+      if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        const objectUrl = URL.createObjectURL(file);
+        processImageUrl(objectUrl, true);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (ev) => processImageUrl(ev.target?.result as string, false);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }
     });
   };
 
-  // Vision AI / OCR File Handler (Dual-Engine: Cloud Vision AI + Embedded On-Device Tesseract)
+  // Vision AI / OCR File Handler (Dual-Engine: Fast Cloud Vision AI + Timed On-Device Tesseract)
   const handleOcrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
     const file = e.target.files[0];
@@ -432,7 +455,7 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
     setIsScanningOcr(true);
     setOcrSuccessMsg(null);
     setOcrErrorMsg(null);
-    setOcrStatusText(isAr ? 'جاري ضغط وتحليل صورة الدواء بدقة...' : 'Compressing & analyzing image...');
+    setOcrStatusText(isAr ? 'جاري تجهيز الصورة...' : 'Preparing image...');
 
     try {
       const { base64: imageBase64, mimeType, previewUrl } = await compressImageForOcr(file);
@@ -440,12 +463,15 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
       let data: any = null;
       let isClientOcrUsed = false;
 
-      // 1. Attempt 1: Cloud Vision OCR via /api/medical/prescription-ocr
+      // 1. Attempt 1: Fast Cloud Vision OCR via /api/medical/prescription-ocr (8s timeout)
+      const controller = new AbortController();
+      const cloudTimeout = setTimeout(() => controller.abort(), 8000);
       try {
-        setOcrStatusText(isAr ? 'جاري الفحص السريري عبر الذكاء الاصطناعي (Gemini Vision)...' : 'Analyzing medicine packaging with Gemini Vision...');
+        setOcrStatusText(isAr ? 'جاري التعرف السريع على الدواء...' : 'Recognizing medicine...');
         const res = await fetch(getApiUrl('/api/medical/prescription-ocr'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
           body: JSON.stringify({
             imageBase64,
             mimeType,
@@ -463,14 +489,19 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
           }
         }
       } catch (cloudErr) {
-        console.warn('Cloud Vision OCR request failed, switching to on-device OCR:', cloudErr);
+        console.warn('Cloud Vision OCR request failed/timed out, switching to on-device OCR:', cloudErr);
+      } finally {
+        clearTimeout(cloudTimeout);
       }
 
-      // 2. Attempt 2: Embedded On-Device Tesseract OCR on compressed image
+      // 2. Attempt 2: Embedded On-Device Tesseract OCR (10s guard)
       if (!data || (!data.drugNameEn && !data.drugNameAr && !data.matchedDrugId && !data.tradeName && !data.genericName)) {
-        setOcrStatusText(isAr ? 'جاري استخراج النص وقراءة البيانات عبر المحرك المدمج...' : 'Reading text with on-device OCR engine...');
+        setOcrStatusText(isAr ? 'جاري قراءة النص مباشرة...' : 'Reading text locally...');
         try {
-          const ocrRes = await Tesseract.recognize(previewUrl, 'eng');
+          const ocrRes = await Promise.race([
+            Tesseract.recognize(previewUrl, 'eng'),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error('OCR timeout')), 10000))
+          ]);
           const ocrText = ocrRes?.data?.text || '';
           if (ocrText && ocrText.trim().length > 0) {
             const parsed = parsePediatricMedicineFromText(ocrText);

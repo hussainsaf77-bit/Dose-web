@@ -4,7 +4,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { execSync } from "child_process";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { analyzeAllMedications } from "./src/data/clinicalInteractionEngine";
 import { synthesizeDrugMonograph } from "./src/data/universalDrugDirectory";
 
@@ -4596,66 +4596,38 @@ app.post("/api/medical/prescription-ocr", async (req, res) => {
 
   let extractedInfo: any = null;
   if (ai) {
-    const candidateModels = ["gemini-4-hydrogen", "gemini-3.1-flash-lite"];
-    const prompt = `You are a world-class clinical pediatric pharmacist specializing in reading pediatric prescriptions, medicine packaging (syrups, drops, ointments, inhalers, suppositories, and injections).
-Analyze this medical image (doctor prescription, medicine box, bottle, vial, suppository pack, or tube).
-
-CRITICAL INSTRUCTIONS:
-1. Examine the image carefully. Identify the EXACT drug name written on the box, label, or prescription.
-   - Look for Antibiotics: Amoxicillin, Amoxil, Augmentin, Curam, Klavox, Megamox, Hibiotic, Cefixime, Suprax, Azithromycin, Zithromax, Ceftriaxone, Rocephin, Cefuroxime, Zinnat, Cefaclor, Ceclor, Clarithromycin, Klacid, Metronidazole, Flagyl, Cefotaxime, Claforan, etc.
-   - Look for Antipyretics/NSAIDs: Paracetamol, Panadol, Adol, Tempra, Cetal, Fevadol, Ibuprofen, Brufen, Advil, Profinal.
-   - Look for Respiratory & Cough: Salbutamol, Ventolin, Budesonide, Pulmicort, Prospan, Mucosolvan, Ambroxol, Dexamethasone, Decadron.
-   - Look for Antihistamines & Allergy: Cetirizine, Zyrtec, Dimetindene, Fenistil, Loratadine, Claritin.
-   - Look for GI & Colic: Ondansetron, Zofran, Domperidone, Motilium, Simethicone, Dentinox, Infacol, ORS, Pedialyte.
-   - Look for Topicals/Drops: Mupirocin, Bactroban, Hydrocortisone, Fucidin, Tobramycin, Tobrex, Ciprofloxacin.
-2. Formulation type:
-   - "syrup": oral suspension, dry powder for syrup, elixir, solution.
-   - "ointment": cream, ointment, topical gel.
-   - "drops": infant oral drops (e.g. 100mg/ml, Fenistil, Dentinox), eye drops, ear drops.
-   - "suppository": rectal suppositories (e.g. Adol 125/250, Brufen 60/125).
-   - "spray": inhaler (MDI), nasal spray, nebulizer suspension.
-   - "injection": vial, ampoule, IV/IM powder.
-   - "sachet": oral rehydration salts / soluble powder.
-3. Concentration / Strength:
-   - Extract numeric strength for syrups in mg per 5ml (e.g. 125, 156, 200, 228, 250, 312, 400, 457, 600, 120, 100).
-   - If written as "250mg/5ml", extract concentrationMgPer5ml: 250.
-   - If written as "457mg/5ml", extract concentrationMgPer5ml: 457.
-   - If drops (e.g. 100mg/ml), extract concentrationText: "100mg/ml".
-4. Infection site / Indication:
-   - "ear" for Otitis Media / أذن
-   - "lung" for Pneumonia, Bronchitis / رئة، صدر
-   - "pharynx" for Tonsillitis, Pharyngitis / حلق، لوزتين
-   - "urinary" for UTI / مسالك بولية
-   - "skin" for Impetigo, Cellulitis / جلد
-   - "general" for other / عام
-
-OUTPUT JSON SCHEMA ONLY:
+    const prompt = `Pediatric pharmacist OCR: extract medicine name, brand, generic ingredient, formulation, mg/5ml strength, whether it is an antibiotic, and frequency as strict JSON:
 {
   "isValidMedicineImage": true,
-  "drugNameAr": "الاسم بالعربية الدقيق للدواء المقروء",
-  "drugNameEn": "Exact Generic or Trade Name in English",
-  "tradeName": "Brand name if visible (e.g. Augmentin, Amoxil, Suprax, Brufen, Panadol)",
-  "genericName": "Active scientific ingredient (e.g. Amoxicillin, Paracetamol, Ibuprofen)",
+  "drugNameAr": "الاسم بالعربية",
+  "drugNameEn": "Exact English Name",
+  "tradeName": "Brand name (e.g. Augmentin, Prokinin, Adol)",
+  "genericName": "Active ingredient (e.g. Amoxicillin, Domperidone, Paracetamol)",
   "matchedDrugId": "amoxicillin" | "amoxicillin_clavulanate" | "cefalexin" | "paracetamol" | "ibuprofen" | "azithromycin" | "cefixime" | "ceftriaxone" | "salbutamol" | "cetirizine" | "mupirocin" | "cefuroxime" | "clarithromycin" | "cefaclor" | "metronidazole" | "ondansetron" | "domperidone" | "prednisolone" | "budesonide" | "dexamethasone" | "dimetindene" | "prospan" | "mucosolvan" | "simethicone" | "cefotaxime" | "ors" | "tobramycin" | "other",
   "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
   "isAntibiotic": false,
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
-  "standardMpkMin": 40,
-  "standardMpkMax": 90,
-  "dosesPerDay": 2,
+  "standardMpkMin": 15,
+  "standardMpkMax": 30,
+  "dosesPerDay": 3,
   "confidence": "high" | "moderate" | "low",
-  "detectedText": "الملخص الصيدلاني المستخرج من العلبة بدقة",
-  "recommendedFreqAr": "التكرار المناسب (مثال: كل 12 ساعة بعد الأكل)",
-  "recommendedFreqEn": "Recommended frequency",
-  "instructionsAr": "تعليمات الاستخدام للطفل (رج العبوة جيداً، حفظ في الثلاجة بعد التحضير، الخ)"
+  "detectedText": "ملخص مختصر للعلبة",
+  "recommendedFreqAr": "التكرار (مثال: كل 8 ساعات)",
+  "recommendedFreqEn": "Every 8 hours",
+  "instructionsAr": "تعليمات مختصرة باللغة العربية"
 }`;
 
-    for (const modelName of candidateModels) {
+    const candidateConfigs: Array<{ model: string; level: ThinkingLevel }> = [
+      { model: "gemini-3.1-flash-lite", level: ThinkingLevel.MINIMAL },
+      { model: "gemini-4-hydrogen", level: ThinkingLevel.LOW },
+    ];
+
+    for (const { model, level } of candidateConfigs) {
       try {
         const response = await ai.models.generateContent({
-          model: modelName,
+          model,
           contents: [
             { text: prompt },
             {
@@ -4667,16 +4639,17 @@ OUTPUT JSON SCHEMA ONLY:
           ],
           config: {
             responseMimeType: "application/json",
+            thinkingConfig: { thinkingLevel: level },
           },
         });
 
         const parsed = JSON.parse(response.text || "{}");
-        if (parsed && (parsed.drugNameEn || parsed.drugNameAr)) {
+        if (parsed && (parsed.drugNameEn || parsed.drugNameAr || parsed.tradeName || parsed.genericName)) {
           extractedInfo = parsed;
           break;
         }
       } catch (e: any) {
-        console.warn(`Prescription OCR error on model ${modelName}:`, e?.message);
+        console.warn(`Prescription OCR error on model ${model}:`, e?.message);
       }
     }
   }
