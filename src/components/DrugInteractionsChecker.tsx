@@ -16,6 +16,7 @@ import {
   Apple,
   Clock,
   ChevronDown,
+  X,
 } from 'lucide-react';
 import {
   analyzeAllMedications,
@@ -409,6 +410,237 @@ function evaluateSpecificDrugFoodLocal(drug: string, food: string, lang: 'ar' | 
   };
 }
 
+interface SearchableArrowSelectProps {
+  options: SelectOption[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  ariaLabel: string;
+  accentColor: 'rose' | 'amber' | 'emerald';
+  isAr: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+const ACCENT_CLASSES: Record<'rose' | 'amber' | 'emerald', {
+  borderHover: string;
+  borderFocus: string;
+  arrowText: string;
+  menuBorder: string;
+  itemHover: string;
+  badgeText: string;
+}> = {
+  rose: {
+    borderHover: 'hover:border-rose-500/60',
+    borderFocus: 'border-rose-500 ring-1 ring-rose-500/30',
+    arrowText: 'text-rose-400',
+    menuBorder: 'border-rose-500/50',
+    itemHover: 'hover:bg-rose-950/60',
+    badgeText: 'text-rose-300',
+  },
+  amber: {
+    borderHover: 'hover:border-amber-500/60',
+    borderFocus: 'border-amber-500 ring-1 ring-amber-500/30',
+    arrowText: 'text-amber-400',
+    menuBorder: 'border-amber-500/50',
+    itemHover: 'hover:bg-amber-950/60',
+    badgeText: 'text-amber-300',
+  },
+  emerald: {
+    borderHover: 'hover:border-emerald-500/60',
+    borderFocus: 'border-emerald-500 ring-1 ring-emerald-500/30',
+    arrowText: 'text-emerald-400',
+    menuBorder: 'border-emerald-500/50',
+    itemHover: 'hover:bg-emerald-950/60',
+    badgeText: 'text-emerald-300',
+  },
+};
+
+const SearchableArrowSelect: React.FC<SearchableArrowSelectProps> = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  ariaLabel,
+  accentColor,
+  isAr,
+  onOpenChange,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const theme = ACCENT_CLASSES[accentColor];
+
+  const selectedOption = useMemo(
+    () => options.find((opt) => opt.value === value) || null,
+    [options, value]
+  );
+
+  const setOpenState = (next: boolean) => {
+    setIsOpen(next);
+    onOpenChange?.(next);
+    if (!next) {
+      setSearchQuery('');
+    }
+  };
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent | TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpenState(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+    };
+  }, []);
+
+  // Filter & rank options by prefix match first (supports 1+ character like "وا" -> "وارفارين")
+  const filteredOptions = useMemo(() => {
+    const q = cleanDrugToken(searchQuery);
+    if (!q) return options;
+    const strippedQ = q.startsWith('ال') && q.length > 2 ? q.slice(2) : q;
+
+    const startsWithMatches: SelectOption[] = [];
+    const wordStartsMatches: SelectOption[] = [];
+    const containsMatches: SelectOption[] = [];
+
+    for (const opt of options) {
+      const cVal = cleanDrugToken(opt.value);
+      const cLbl = cleanDrugToken(opt.label);
+      const sVal = cVal.startsWith('ال') && cVal.length > 2 ? cVal.slice(2) : cVal;
+
+      if (cVal.startsWith(q) || cVal.startsWith(strippedQ) || sVal.startsWith(strippedQ) || cLbl.startsWith(q)) {
+        startsWithMatches.push(opt);
+      } else if (
+        cLbl.split(/[\s—\-()/]+/).some((w) => w.startsWith(q) || w.startsWith(strippedQ))
+      ) {
+        wordStartsMatches.push(opt);
+      } else if (cVal.includes(q) || cVal.includes(strippedQ) || cLbl.includes(q) || cLbl.includes(strippedQ)) {
+        containsMatches.push(opt);
+      }
+    }
+
+    return [...startsWithMatches, ...wordStartsMatches, ...containsMatches];
+  }, [options, searchQuery]);
+
+  const displayValue = isOpen ? searchQuery : (selectedOption ? selectedOption.label : value);
+
+  return (
+    <div ref={containerRef} className={`relative ${isOpen ? 'z-50' : 'z-10'}`}>
+      <div className="relative flex items-center">
+        <input
+          ref={inputRef}
+          type="text"
+          aria-label={ariaLabel}
+          value={displayValue}
+          placeholder={selectedOption ? selectedOption.label : placeholder}
+          onFocus={() => {
+            setSearchQuery('');
+            setOpenState(true);
+          }}
+          onChange={(e) => {
+            if (!isOpen) setOpenState(true);
+            setSearchQuery(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              if (filteredOptions.length > 0) {
+                onChange(filteredOptions[0].value);
+                setOpenState(false);
+                inputRef.current?.blur();
+              }
+            } else if (e.key === 'Escape') {
+              setOpenState(false);
+              inputRef.current?.blur();
+            }
+          }}
+          className={`w-full bg-slate-950 border rounded-xl py-2.5 ps-3 pe-14 text-xs sm:text-sm text-white placeholder-slate-400 focus:outline-none transition-colors ${
+            isOpen ? theme.borderFocus : `border-slate-700 ${theme.borderHover}`
+          }`}
+        />
+
+        {value && (
+          <button
+            type="button"
+            aria-label={isAr ? 'مسح الاختيار' : 'Clear'}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange('');
+              setSearchQuery('');
+              setOpenState(true);
+              inputRef.current?.focus();
+            }}
+            className="absolute left-8 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        )}
+
+        <button
+          type="button"
+          aria-label={isAr ? 'فتح القائمة' : 'Toggle list'}
+          onClick={() => {
+            if (isOpen) {
+              setOpenState(false);
+            } else {
+              setSearchQuery('');
+              setOpenState(true);
+              inputRef.current?.focus();
+            }
+          }}
+          className="absolute left-2 top-1/2 -translate-y-1/2 p-1 cursor-pointer"
+        >
+          <ChevronDown
+            className={`w-4 h-4 ${theme.arrowText} transition-transform duration-150 ${
+              isOpen ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          className={`absolute left-0 right-0 top-full mt-1.5 bg-slate-950 border ${theme.menuBorder} rounded-xl shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-800/80 z-50`}
+        >
+          {filteredOptions.length > 0 ? (
+            filteredOptions.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    onChange(opt.value);
+                    setOpenState(false);
+                  }}
+                  className={`w-full text-right px-3 py-2.5 text-xs sm:text-sm transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                    isSelected
+                      ? `bg-slate-900 ${theme.badgeText} font-bold`
+                      : `text-slate-200 ${theme.itemHover}`
+                  }`}
+                >
+                  <span className="truncate">{opt.label}</span>
+                  {isSelected && <Check className={`w-3.5 h-3.5 shrink-0 ${theme.badgeText}`} />}
+                </button>
+              );
+            })
+          ) : (
+            <div className="px-3 py-3 text-xs text-slate-400 text-center">
+              {isAr ? 'لا توجد نتائج مطابقة لهذا الحرف.' : 'No matching items found.'}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = ({
   initialDrugs = [],
   language = 'ar',
@@ -463,6 +695,7 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
   const [analysisResult, setAnalysisResult] = useState<InteractionResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [copied, setCopied] = useState(false);
+  const [openCard, setOpenCard] = useState<InteractionMode | null>(null);
 
   // Sync from URL hash (#interactions?drug=... or #interactions?patient=...)
   useEffect(() => {
@@ -728,11 +961,13 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
         </p>
       </div>
 
-      {/* 3 Mode Buttons + 2 Dropdown Selectors Under Each Button */}
+      {/* 3 Mode Buttons + 2 Searchable Dropdown Selectors Under Each Button */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Button 1: Drug - Drug Interactions */}
         <div
-          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+          className={`relative bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            openCard === 'drug_drug' ? 'z-30' : 'z-10'
+          } ${
             activeMode === 'drug_drug' ? 'border-rose-500/70 ring-1 ring-rose-500/30' : 'border-slate-800'
           }`}
         >
@@ -756,47 +991,35 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
               <span>{isAr ? 'تداخلات دوائية دوائية' : 'Drug–Drug Interactions'}</span>
             </button>
 
-            {/* 2 Dropdowns under Button 1 */}
+            {/* 2 Searchable Arrow Dropdowns under Button 1 */}
             <div className="space-y-2.5">
-              <div className="relative">
-                <select
-                  aria-label="المركب الدوائي الأول"
-                  value={ddFirst}
-                  onChange={(e) => {
-                    setActiveMode('drug_drug');
-                    setDdFirst(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-rose-500/60 focus:border-rose-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر الدواء الأول...' : 'Select first drug...'}</option>
-                  {drugOptions.map((opt) => (
-                    <option key={`dd1-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-rose-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={drugOptions}
+                value={ddFirst}
+                onChange={(val) => {
+                  setActiveMode('drug_drug');
+                  setDdFirst(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الدواء الأول...' : 'Select or type first drug...'}
+                ariaLabel="المركب الدوائي الأول"
+                accentColor="rose"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'drug_drug' : null)}
+              />
 
-              <div className="relative">
-                <select
-                  aria-label="المركب الدوائي الثاني"
-                  value={ddSecond}
-                  onChange={(e) => {
-                    setActiveMode('drug_drug');
-                    setDdSecond(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-rose-500/60 focus:border-rose-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر الدواء الثاني...' : 'Select second drug...'}</option>
-                  {drugOptions.map((opt) => (
-                    <option key={`dd2-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-rose-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={drugOptions}
+                value={ddSecond}
+                onChange={(val) => {
+                  setActiveMode('drug_drug');
+                  setDdSecond(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الدواء الثاني...' : 'Select or type second drug...'}
+                ariaLabel="المركب الدوائي الثاني"
+                accentColor="rose"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'drug_drug' : null)}
+              />
             </div>
           </div>
 
@@ -817,7 +1040,9 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
         {/* Button 2: Drug - Food Interactions */}
         <div
-          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+          className={`relative bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            openCard === 'drug_food' ? 'z-30' : 'z-10'
+          } ${
             activeMode === 'drug_food' ? 'border-amber-500/70 ring-1 ring-amber-500/30' : 'border-slate-800'
           }`}
         >
@@ -841,47 +1066,35 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
               <span>{isAr ? 'تداخلات دوائية غذائية' : 'Drug–Food Interactions'}</span>
             </button>
 
-            {/* 2 Dropdowns under Button 2 */}
+            {/* 2 Searchable Arrow Dropdowns under Button 2 */}
             <div className="space-y-2.5">
-              <div className="relative">
-                <select
-                  aria-label="الدواء"
-                  value={dfDrug}
-                  onChange={(e) => {
-                    setActiveMode('drug_food');
-                    setDfDrug(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر الدواء...' : 'Select medication...'}</option>
-                  {drugOptions.map((opt) => (
-                    <option key={`df1-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-amber-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={drugOptions}
+                value={dfDrug}
+                onChange={(val) => {
+                  setActiveMode('drug_food');
+                  setDfDrug(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الدواء...' : 'Select or type medication...'}
+                ariaLabel="الدواء"
+                accentColor="amber"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'drug_food' : null)}
+              />
 
-              <div className="relative">
-                <select
-                  aria-label="الغذاء أو المشروب أو المكمل"
-                  value={dfFood}
-                  onChange={(e) => {
-                    setActiveMode('drug_food');
-                    setDfFood(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-amber-500/60 focus:border-amber-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر الغذاء أو المكمل...' : 'Select food / supplement...'}</option>
-                  {FOOD_OPTIONS.map((opt) => (
-                    <option key={`df2-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-amber-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={FOOD_OPTIONS}
+                value={dfFood}
+                onChange={(val) => {
+                  setActiveMode('drug_food');
+                  setDfFood(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الغذاء أو المكمل...' : 'Select or type food...'}
+                ariaLabel="الغذاء أو المشروب أو المكمل"
+                accentColor="amber"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'drug_food' : null)}
+              />
             </div>
           </div>
 
@@ -902,7 +1115,9 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
 
         {/* Button 3: Food - Food Interactions */}
         <div
-          className={`bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+          className={`relative bg-slate-900 rounded-2xl p-4 sm:p-5 border transition-all flex flex-col justify-between gap-4 shadow-lg ${
+            openCard === 'food_food' ? 'z-30' : 'z-10'
+          } ${
             activeMode === 'food_food' ? 'border-emerald-500/70 ring-1 ring-emerald-500/30' : 'border-slate-800'
           }`}
         >
@@ -926,47 +1141,35 @@ export const DrugInteractionsChecker: React.FC<DrugInteractionsCheckerProps> = (
               <span>{isAr ? 'تداخلات غذائية غذائية' : 'Food–Food Interactions'}</span>
             </button>
 
-            {/* 2 Dropdowns under Button 3 */}
+            {/* 2 Searchable Arrow Dropdowns under Button 3 */}
             <div className="space-y-2.5">
-              <div className="relative">
-                <select
-                  aria-label="العنصر الغذائي الأول"
-                  value={ffFirst}
-                  onChange={(e) => {
-                    setActiveMode('food_food');
-                    setFfFirst(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-emerald-500/60 focus:border-emerald-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر العنصر الغذائي الأول...' : 'Select first food / nutrient...'}</option>
-                  {FOOD_OPTIONS.map((opt) => (
-                    <option key={`ff1-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-emerald-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={FOOD_OPTIONS}
+                value={ffFirst}
+                onChange={(val) => {
+                  setActiveMode('food_food');
+                  setFfFirst(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الغذاء الأول...' : 'Select or type first food...'}
+                ariaLabel="العنصر الغذائي الأول"
+                accentColor="emerald"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'food_food' : null)}
+              />
 
-              <div className="relative">
-                <select
-                  aria-label="العنصر الغذائي الثاني"
-                  value={ffSecond}
-                  onChange={(e) => {
-                    setActiveMode('food_food');
-                    setFfSecond(e.target.value);
-                  }}
-                  className="w-full appearance-none bg-slate-950 border border-slate-700 hover:border-emerald-500/60 focus:border-emerald-500 rounded-xl py-2.5 ps-3 pe-9 text-xs sm:text-sm text-white focus:outline-none transition-colors cursor-pointer"
-                >
-                  <option value="">{isAr ? 'اختر العنصر الغذائي الثاني...' : 'Select second food / nutrient...'}</option>
-                  {FOOD_OPTIONS.map((opt) => (
-                    <option key={`ff2-${opt.value}`} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="w-4 h-4 text-emerald-400 pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
-              </div>
+              <SearchableArrowSelect
+                options={FOOD_OPTIONS}
+                value={ffSecond}
+                onChange={(val) => {
+                  setActiveMode('food_food');
+                  setFfSecond(val);
+                }}
+                placeholder={isAr ? 'اختر أو ابحث عن الغذاء الثاني...' : 'Select or type second food...'}
+                ariaLabel="العنصر الغذائي الثاني"
+                accentColor="emerald"
+                isAr={isAr}
+                onOpenChange={(open) => setOpenCard(open ? 'food_food' : null)}
+              />
             </div>
           </div>
 
