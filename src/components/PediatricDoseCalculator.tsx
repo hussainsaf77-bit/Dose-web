@@ -47,6 +47,7 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   const [customDrugName, setCustomDrugName] = useState<string>('');
   const [customMpk, setCustomMpk] = useState<string>('15');
   const [customDosesPerDay, setCustomDosesPerDay] = useState<number>(3);
+  const [customIsAntibiotic, setCustomIsAntibiotic] = useState<boolean>(false);
 
   // 3. Weight & Age States with Interactive Buttons
   const [weightKg, setWeightKg] = useState<string>('12');
@@ -128,6 +129,14 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   // Copy dosage report state
   const [copiedReport, setCopiedReport] = useState<boolean>(false);
 
+  // Strict clinical detection of antibiotic drugs (never falsely triggers on antihistamines, antiemetics, or antipyretics)
+  const isAntibioticText = (text: string): boolean => {
+    const t = (text || '').toLowerCase();
+    return /\b(antibiotic|antibacterial|penicillin|aminopenicillin|cephalosporin|macrolide|fluoroquinolone|quinolone|aminoglycoside|glycopeptide|carbapenem|sulfonamide|lincosamide|tetracycline|nitroimidazole|antimicrobial)\b/.test(t)
+      || /(مضاد حيوي|مضاد بكتير|مضادات حيوية|بنسلين|سيفالوسبورين|ماكروليد|فلوروكينولون|أمينوجليكوزيد|اموكسيسيلين|أوجمنتين|سيفكسيم|سيفيكسيم|أزيثروميسين|سيفوروكسيم|سيفاكلور|كلاريثرومايسين|سيفترياكسون|سيفوتاكسيم|ميترونيدازول|فلاجيل|فانكومايسين|كليندامايسين|سيبروفلوكساسين|جنتاميسين|أميكاسين)/.test(t)
+      || /\b(amoxicillin|clavulan|ampicillin|penicillin|cefixime|ceftriaxone|cefotaxime|cefuroxime|cefaclor|cefalexin|cephalexin|cefdinir|cefpodoxime|azithromycin|clarithromycin|erythromycin|ciprofloxacin|levofloxacin|moxifloxacin|doxycycline|minocycline|metronidazole|clindamycin|vancomycin|gentamicin|amikacin|tobramycin|fusidic|mupirocin|trimethoprim|sulfamethoxazole|meropenem|imipenem|linezolid|nitrofurantoin|augmentin|curam|suprax|zithromax|zinnat|klacid|ceclor|rocephin|claforan|flagyl|bactrim|septra|fucidin|bactroban|tobrex)\b/.test(t);
+  };
+
   // Selected drug object from extended dataset or fallback
   const currentDrug: ExtendedPediatricDrug = useMemo(() => {
     const found = EXTENDED_PEDIATRIC_DRUGS.find(d => d.id === selectedDrugId);
@@ -144,7 +153,7 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
         aliases: fallback.aliases || [],
         class_ar: fallback.class_ar,
         class_en: fallback.class_en,
-        is_antibiotic: fallback.class_ar.includes('مضاد') || fallback.class_en.toLowerCase().includes('anti'),
+        is_antibiotic: isAntibioticText(`${fallback.class_ar} ${fallback.class_en} ${fallback.name_en} ${fallback.name_ar}`),
         supported_formulations: ['syrup'],
         default_formulation: 'syrup',
         mpk_min: fallback.mpk_min || 10,
@@ -165,6 +174,13 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
 
     return EXTENDED_PEDIATRIC_DRUGS[0];
   }, [selectedDrugId]);
+
+  const isActiveDrugAntibiotic = useMemo(() => {
+    if (isCustomDrugMode) {
+      return customIsAntibiotic || isAntibioticText(customDrugName);
+    }
+    return Boolean(currentDrug.is_antibiotic);
+  }, [isCustomDrugMode, customIsAntibiotic, customDrugName, currentDrug]);
 
   // Comprehensive Arabic and English text normalization for search
   const cleanArabicSearch = (str: string) =>
@@ -244,8 +260,12 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   const handleDrugSelect = (drugId: string) => {
     setSelectedDrugId(drugId);
     setIsCustomDrugMode(false);
+    setCustomIsAntibiotic(false);
     const drug = EXTENDED_PEDIATRIC_DRUGS.find(d => d.id === drugId);
     if (drug) {
+      if (!drug.is_antibiotic) {
+        setSite('general');
+      }
       if (!drug.supported_formulations.includes(selectedFormulation)) {
         setSelectedFormulation(drug.default_formulation);
       }
@@ -535,9 +555,12 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
           }
         }
 
+        let detectedIsAntibiotic = false;
         if (matchedDrug) {
           setSelectedDrugId(matchedDrug.id);
           setIsCustomDrugMode(false);
+          setCustomIsAntibiotic(false);
+          detectedIsAntibiotic = Boolean(matchedDrug.is_antibiotic);
           if (matchedDrug.supported_formulations.includes(data.formulation)) {
             setSelectedFormulation(data.formulation);
           } else {
@@ -557,6 +580,10 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
             ? `${data.tradeName} ${data.genericName ? `(${data.genericName})` : ''}`
             : (data.drugNameAr || data.drugNameEn || data.genericName || '');
           setCustomDrugName(rawTitle);
+          detectedIsAntibiotic = Boolean(data.isAntibiotic) || isAntibioticText(
+            `${data.genericName || ''} ${data.tradeName || ''} ${data.drugNameEn || ''} ${data.drugNameAr || ''} ${data.detectedText || ''}`
+          );
+          setCustomIsAntibiotic(detectedIsAntibiotic);
           if (data.formulation) setSelectedFormulation(data.formulation);
           if (data.standardMpkMin) setCustomMpk(String(data.standardMpkMin));
           if (data.dosesPerDay) setCustomDosesPerDay(data.dosesPerDay);
@@ -566,9 +593,11 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
           }
         }
 
-        // Infection site
-        if (data.infectionSite && ['general', 'ear', 'lung', 'pharynx', 'urinary', 'skin'].includes(data.infectionSite)) {
+        // Infection site: only apply when recognized drug is an antibiotic
+        if (detectedIsAntibiotic && data.infectionSite && ['general', 'ear', 'lung', 'pharynx', 'urinary', 'skin'].includes(data.infectionSite)) {
           setSite(data.infectionSite);
+        } else {
+          setSite('general');
         }
 
         const displayName = (matchedDrug ? (isAr ? matchedDrug.name_ar : matchedDrug.name_en) : (data.tradeName || data.genericName || data.drugNameAr || data.drugNameEn)) || '';
@@ -642,8 +671,8 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
           ageMonths: totalAgeMonths,
           formulation: selectedFormulation,
           concentration: isUsingCustomConc ? (parseFloat(customConcInput) || activeConcentration) : activeConcentration,
-          infectionSite: site,
-          isAntibiotic: currentDrug.is_antibiotic,
+          infectionSite: isActiveDrugAntibiotic ? site : 'general',
+          isAntibiotic: isActiveDrugAntibiotic,
           lang: language
         })
       });
@@ -672,6 +701,9 @@ export const PediatricDoseCalculator: React.FC<PediatricDoseCalculatorProps> = (
   const handleAiDrugQuickSelect = (queryName: string) => {
     setIsCustomDrugMode(true);
     setCustomDrugName(queryName);
+    const isAb = isAntibioticText(queryName);
+    setCustomIsAntibiotic(isAb);
+    if (!isAb) setSite('general');
     setSearchQuery('');
     handleClinicalApiSync(queryName);
   };
@@ -1231,7 +1263,14 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
               </label>
               <button
                 type="button"
-                onClick={() => setIsCustomDrugMode(!isCustomDrugMode)}
+                onClick={() => {
+                  const next = !isCustomDrugMode;
+                  setIsCustomDrugMode(next);
+                  setCustomIsAntibiotic(false);
+                  if (!next && !currentDrug.is_antibiotic) {
+                    setSite('general');
+                  }
+                }}
                 className="text-[11px] text-teal-400 hover:text-teal-300 font-bold cursor-pointer"
               >
                 {isCustomDrugMode ? (isAr ? '← العودة للقائمة المعتمدة' : '← Catalog') : (isAr ? '+ دواء مخصص' : '+ Custom Drug')}
@@ -1293,35 +1332,37 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                   </div>
                 </div>
 
-                {/* Popular Drugs Quick Access Chips */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {[
-                    { id: 'amoxicillin_clavulanate', name: 'أوجمنتين / كيورام' },
-                    { id: 'paracetamol', name: 'باراسيتامول / أدول' },
-                    { id: 'ibuprofen', name: 'بروفين' },
-                    { id: 'amoxicillin', name: 'أموكسيل' },
-                    { id: 'cefixime', name: 'سوبراكس' },
-                    { id: 'azithromycin', name: 'زيثروماكس' },
-                    { id: 'salbutamol', name: 'فنتولين' },
-                    { id: 'dimetindene', name: 'فينستيل' },
-                  ].map((fastDrug) => {
-                    const isSelected = selectedDrugId === fastDrug.id && !isCustomDrugMode;
-                    return (
+                {/* Live Search Matches (only visible while user is typing a search query) */}
+                {searchQuery.trim().length > 0 && (
+                  <div className="rounded-xl bg-slate-950/90 border border-teal-500/30 p-2 space-y-1 max-h-52 overflow-y-auto">
+                    {filteredDrugs.length > 0 ? (
+                      filteredDrugs.slice(0, 8).map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            handleDrugSelect(d.id);
+                            setSearchQuery('');
+                          }}
+                          className="w-full text-right flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-teal-500/15 text-xs text-white transition-colors cursor-pointer"
+                        >
+                          <span className="font-bold">{isAr ? d.name_ar : d.name_en}</span>
+                          <span className="text-[11px] text-teal-300 truncate max-w-[45%]">
+                            {d.trade_names.slice(0, 2).join(' · ')}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
                       <button
-                        key={fastDrug.id}
                         type="button"
-                        onClick={() => handleDrugSelect(fastDrug.id)}
-                        className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-teal-500/20 text-teal-300 border-teal-500 font-bold'
-                            : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                        }`}
+                        onClick={() => handleAiDrugQuickSelect(searchQuery.trim())}
+                        className="w-full px-3 py-2 rounded-lg bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 text-xs font-bold text-center cursor-pointer"
                       >
-                        {fastDrug.name}
+                        {isAr ? `حساب "${searchQuery.trim()}" كدواء مخصص` : `Use "${searchQuery.trim()}" as custom drug`}
                       </button>
-                    );
-                  })}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               /* Custom Free-Hand Drug Input Mode */
@@ -1358,12 +1399,14 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
             )}
           </div>
 
-          {/* Row 2: Formulation, Concentration, Infection Site Side-by-Side */}
+          {/* Row 2: Formulation, Concentration, and (Antibiotics-Only) Infection Site Side-by-Side */}
           <div className="pt-2 border-t border-slate-800 space-y-1.5">
             <span className="text-xs font-bold text-slate-300 block">
-              {isAr ? 'الشكل الصيدلاني والتركيز والاستطباب (قوائم منسدلة بأسهم):' : 'Formulation, Concentration & Indication:'}
+              {isActiveDrugAntibiotic
+                ? (isAr ? 'الشكل الصيدلاني والتركيز وتصنيف المضاد الحيوي (قوائم منسدلة بأسهم):' : 'Formulation, Concentration & Antibiotic Indication:')
+                : (isAr ? 'الشكل الصيدلاني والتركيز (قوائم منسدلة بأسهم):' : 'Formulation & Concentration:')}
             </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className={`grid grid-cols-1 ${isActiveDrugAntibiotic ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-3`}>
               {/* Formulation Dropdown with Arrow */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 mb-1">شكل الدواء:</label>
@@ -1399,18 +1442,21 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
                   >
                     {(isCustomDrugMode ? [
-                      { labelAr: '125 مجم / 5 مل', value: 125 },
-                      { labelAr: '156 مجم / 5 مل (أوجمنتين)', value: 156 },
-                      { labelAr: '200 مجم / 5 مل (زيثروماكس)', value: 200 },
-                      { labelAr: '250 مجم / 5 مل (شائع)', value: 250 },
-                      { labelAr: '312 مجم / 5 مل', value: 312 },
-                      { labelAr: '457 مجم / 5 مل (أوجمنتين 457)', value: 457 },
-                      { labelAr: '600 مجم / 5 مل (Augmentin ES)', value: 600 },
+                      { labelAr: '5 مجم / 5 مل', labelEn: '5 mg / 5ml', value: 5 },
+                      { labelAr: '100 مجم / 5 مل', labelEn: '100 mg / 5ml', value: 100 },
+                      { labelAr: '120 مجم / 5 مل', labelEn: '120 mg / 5ml', value: 120 },
+                      { labelAr: '125 مجم / 5 مل', labelEn: '125 mg / 5ml', value: 125 },
+                      { labelAr: '156 مجم / 5 مل (أوجمنتين)', labelEn: '156 mg / 5ml', value: 156 },
+                      { labelAr: '200 مجم / 5 مل (زيثروماكس)', labelEn: '200 mg / 5ml', value: 200 },
+                      { labelAr: '250 مجم / 5 مل (شائع)', labelEn: '250 mg / 5ml', value: 250 },
+                      { labelAr: '312 مجم / 5 مل', labelEn: '312 mg / 5ml', value: 312 },
+                      { labelAr: '457 مجم / 5 مل (أوجمنتين 457)', labelEn: '457 mg / 5ml', value: 457 },
+                      { labelAr: '600 مجم / 5 مل (Augmentin ES)', labelEn: '600 mg / 5ml', value: 600 },
                     ] : currentDrug.available_concentrations
                       .filter(c => c.formulation === selectedFormulation || selectedFormulation === 'syrup')
                     ).map((c: any) => (
                       <option key={`${c.value}-${c.labelAr}`} value={c.value}>
-                        {isAr ? c.labelAr : c.labelEn}
+                        {isAr ? c.labelAr : (c.labelEn || c.labelAr)}
                       </option>
                     ))}
                   </select>
@@ -1420,27 +1466,29 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                 </div>
               </div>
 
-              {/* Infection Site / Indication with Arrow */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 mb-1">شدة / موضع الالتهاب:</label>
-                <div className="relative">
-                  <select
-                    value={site}
-                    onChange={(e) => setSite(e.target.value as any)}
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
-                  >
-                    <option value="general">🩺 التهاب عام معتاد</option>
-                    <option value="ear">👂 التهاب الأذن الوسطى (جرعة مكثفة)</option>
-                    <option value="pharynx">🗣️ التهاب الحلق واللوزتين</option>
-                    <option value="lung">🫁 التهاب الرئة والشعب</option>
-                    <option value="urinary">🫘 التهاب المسالك البولية</option>
-                    <option value="skin">🩹 التهاب الجلد والحصف</option>
-                  </select>
-                  <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
-                    ▼
+              {/* Infection Site / Antibiotic Classification — ONLY shown when an antibiotic is selected/recognized */}
+              {isActiveDrugAntibiotic && (
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 mb-1">شدة / موضع الالتهاب:</label>
+                  <div className="relative">
+                    <select
+                      value={site}
+                      onChange={(e) => setSite(e.target.value as any)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-teal-500 appearance-none cursor-pointer pr-8"
+                    >
+                      <option value="general">🩺 التهاب عام معتاد</option>
+                      <option value="ear">👂 التهاب الأذن الوسطى (جرعة مكثفة)</option>
+                      <option value="pharynx">🗣️ التهاب الحلق واللوزتين</option>
+                      <option value="lung">🫁 التهاب الرئة والشعب</option>
+                      <option value="urinary">🫘 التهاب المسالك البولية</option>
+                      <option value="skin">🩹 التهاب الجلد والحصف</option>
+                    </select>
+                    <div className={`absolute ${isAr ? 'left-3' : 'right-3'} top-1/2 -translate-y-1/2 text-teal-400 pointer-events-none text-xs`}>
+                      ▼
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -1458,7 +1506,7 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                       {isAr ? 'الجرعة المحسوبة بدقة سريرياً' : 'Precision Clinical Dose Output'}
                     </h3>
                     <span className="text-[11px] text-slate-400">
-                      {isAr ? currentDrug.name_ar : currentDrug.name_en} — {calcResult.wt} kg
+                      {isCustomDrugMode ? (customDrugName || (isAr ? 'دواء مخصص' : 'Custom Drug')) : (isAr ? currentDrug.name_ar : currentDrug.name_en)} — {calcResult.wt} kg
                     </span>
                   </div>
                 </div>
@@ -1584,8 +1632,10 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                       <span>{isAr ? 'التوجيه السريري والموانع:' : 'Contraindications & Safety:'}</span>
                     </span>
                     <div className="flex-1 text-rose-200 leading-relaxed">
-                      {isAr ? currentDrug.clinical_pearls_ar : currentDrug.clinical_pearls_en}
-                      {currentDrug.contraindications_ar && (
+                      {isCustomDrugMode
+                        ? (detectedDrugCard?.instructionsAr || apiResult?.clinicalWarningAr || (isAr ? 'يرجى مطابقة التركيز المدون على العبوة واستشارة الطبيب أو الصيدلي قبل الإعطاء.' : 'Verify bottle concentration and consult a clinician before dosing.'))
+                        : (isAr ? currentDrug.clinical_pearls_ar : currentDrug.clinical_pearls_en)}
+                      {!isCustomDrugMode && currentDrug.contraindications_ar && (
                         <span className="block mt-1 text-slate-300 text-[11px]">
                           ⚠️ {isAr ? `موانع الاستعمال: ${currentDrug.contraindications_ar}` : `Contraindications: ${currentDrug.contraindications_en}`}
                         </span>

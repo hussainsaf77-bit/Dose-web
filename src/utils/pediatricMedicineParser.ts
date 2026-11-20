@@ -22,6 +22,7 @@ export interface DetectedMedicineResult {
   standardMpkMax?: number;
   dosesPerDay?: number;
   instructionsAr?: string;
+  isAntibiotic?: boolean;
 }
 
 // Brand dictionary linking commercial trade names to generic active ingredients & IDs
@@ -153,10 +154,10 @@ const BRAND_DICTIONARY: BrandEntry[] = [
   },
   // Domperidone
   {
-    patterns: [/motilium/i, /gastromotil/i, /domperidone/i, /موتيليوم/i, /دومبيريدون/i],
+    patterns: [/motilium/i, /prokinin/i, /gastromotil/i, /domperidone/i, /موتيليوم/i, /بروكينين/i, /دومبيريدون/i],
     drugId: 'domperidone',
-    tradeNameEn: 'Motilium',
-    tradeNameAr: 'موتيليوم (دومبيريدون)',
+    tradeNameEn: 'Motilium / Prokinin',
+    tradeNameAr: 'موتيليوم / بروكينين (دومبيريدون)',
     defaultFormulation: 'syrup',
     typicalConc: 5
   },
@@ -412,6 +413,7 @@ export function parsePediatricMedicineFromText(rawText: string): DetectedMedicin
     standardMpkMin: matchedDrug?.mpk_min,
     standardMpkMax: matchedDrug?.mpk_max,
     dosesPerDay: matchedDrug?.doses_per_day || 2,
-    instructionsAr: matchedDrug?.clinical_pearls_ar || 'يجب رج العبوة جيداً قبل كل جرعة والالتزام بكامل مدة العلاج المقررة.'
+    instructionsAr: matchedDrug?.clinical_pearls_ar || 'يجب رج العبوة جيداً قبل كل جرعة والالتزام بكامل مدة العلاج المقررة.',
+    isAntibiotic: matchedDrug ? matchedDrug.is_antibiotic : false
   };
 }

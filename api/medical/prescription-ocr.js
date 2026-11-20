@@ -54,6 +54,7 @@ Output strictly valid JSON with this schema:
   "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
+  "isAntibiotic": false,
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
   "confidence": "high" | "moderate" | "low",
   "detectedText": "الملخص الصيدلاني المستخرج من العلبة بدقة",

@@ -4640,6 +4640,7 @@ OUTPUT JSON SCHEMA ONLY:
   "formulation": "syrup" | "drops" | "suppository" | "ointment" | "spray" | "injection" | "sachet",
   "concentrationMgPer5ml": 250,
   "concentrationText": "250 mg / 5ml",
+  "isAntibiotic": false,
   "infectionSite": "general" | "ear" | "lung" | "pharynx" | "urinary" | "skin",
   "standardMpkMin": 40,
   "standardMpkMax": 90,
