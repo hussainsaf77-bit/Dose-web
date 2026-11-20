@@ -272,6 +272,13 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '1.2 جم فيال (حقن وريدي بطيء)', labelEn: '1.2 g Vial (Slow IV)', value: 1200, unit: 'mg/vial', tradeExampleAr: 'Augmentin IV 1.2g', formulation: 'injection' }
     ],
     site_doses: {
+      general: {
+        min_mpk: 40,
+        max_mpk: 50,
+        doses_per_day: 2,
+        clinical_rationale_ar: 'الالتهابات المعتادة الخفيفة إلى المتوسطة: الجرعة القياسية 40-50 مجم/كجم/يوم مقسمة كل 12 ساعة.',
+        clinical_rationale_en: 'Standard mild-to-moderate infection regimen: 40-50 mg/kg/day divided q12h.'
+      },
       ear: {
         min_mpk: 80,
         max_mpk: 90,
@@ -342,9 +349,12 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '250 مجم / 5 مل (شراب أطفال مركز)', labelEn: '250 mg / 5ml (Syrup)', value: 250, unit: 'mg/5ml', tradeExampleAr: 'Amoxil 250, Biomox 250', formulation: 'syrup' }
     ],
     site_doses: {
-      ear: { min_mpk: 80, max_mpk: 90, doses_per_day: 2, clinical_rationale_ar: 'الخط الأول لعلاج التهاب الأذن الوسطى غير المعقد بجرعة عالية 90 مجم/كجم.', clinical_rationale_en: 'First-line for uncomplicated AOM at high-dose 90 mg/kg/day.' },
-      pharynx: { min_mpk: 50, max_mpk: 50, doses_per_day: 2, clinical_rationale_ar: 'الخط الأول لالتهاب الحلق بالمكورات العقدية 50 مجم/كجم مرة واحدة أو مقسمة مرتين.', clinical_rationale_en: 'First-line for Group A Strep pharyngitis.' },
-      lung: { min_mpk: 80, max_mpk: 90, doses_per_day: 3, clinical_rationale_ar: 'الخط الأول للالتهاب الرئوي المكتسب مجتمعياً لدى الأطفال.', clinical_rationale_en: 'First-line for pediatric CAP outpatient therapy.' }
+      general: { min_mpk: 40, max_mpk: 50, doses_per_day: 3, clinical_rationale_ar: 'الالتهابات البسيطة المعتادة: 40-50 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Standard uncomplicated infections: 40-50 mg/kg/day q8h.' },
+      ear: { min_mpk: 80, max_mpk: 90, doses_per_day: 2, clinical_rationale_ar: 'الخط الأول لعلاج التهاب الأذن الوسطى الحاد بجرعة مكثفة عالية 80-90 مجم/كجم/يوم كل 12 ساعة.', clinical_rationale_en: 'First-line for uncomplicated AOM at high-dose 80-90 mg/kg/day BID.' },
+      pharynx: { min_mpk: 50, max_mpk: 50, doses_per_day: 2, clinical_rationale_ar: 'الخط الأول لالتهاب الحلق واللوزتين بالمكورات العقدية: 50 مجم/كجم/يوم مقسمة مرتين لمدة 10 أيام.', clinical_rationale_en: 'First-line for Group A Strep pharyngitis: 50 mg/kg/day BID.' },
+      lung: { min_mpk: 80, max_mpk: 90, doses_per_day: 3, clinical_rationale_ar: 'الخط الأول للالتهاب الرئوي المكتسب مجتمعياً لدى الأطفال: جرعة عالية 80-90 مجم/كجم/يوم.', clinical_rationale_en: 'First-line for pediatric CAP outpatient therapy: 80-90 mg/kg/day.' },
+      urinary: { min_mpk: 40, max_mpk: 50, doses_per_day: 3, clinical_rationale_ar: 'التهاب المسالك البولية البسيط: 40-50 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Uncomplicated UTI: 40-50 mg/kg/day q8h.' },
+      skin: { min_mpk: 40, max_mpk: 50, doses_per_day: 3, clinical_rationale_ar: 'التهابات الجلد السطحية الحساسة: 40-50 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Mild susceptible skin infection: 40-50 mg/kg/day q8h.' }
     },
     min_age_months: 1,
     max_daily_adult_mg: 3000,
@@ -376,8 +386,11 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '200 مجم / 5 مل (شراب للأطفال الكبار)', labelEn: '200 mg / 5ml', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Suprax Forte', formulation: 'syrup' }
     ],
     site_doses: {
-      urinary: { min_mpk: 8, max_mpk: 8, doses_per_day: 1, clinical_rationale_ar: 'الخيار الفموي الأول لالتهابات المسالك البولية الحادة في الأطفال 8 مجم/كجم مرة واحدة يومياً.', clinical_rationale_en: 'First-line oral choice for pediatric acute UTI, once daily.' },
-      ear: { min_mpk: 8, max_mpk: 8, doses_per_day: 2, clinical_rationale_ar: 'بديل ممتاز لالتهاب الأذن في حال فشل العلاج الأولي، يُفضل تقسيمه على جرعتين.', clinical_rationale_en: 'Alternative for failed AOM therapy, divided BID.' }
+      general: { min_mpk: 8, max_mpk: 8, doses_per_day: 1, clinical_rationale_ar: 'الجرعة القياسية لسيفيكسيم ثابتة 8 مجم/كجم/يوم (مرة واحدة يومياً أو مقسمة مرتين).', clinical_rationale_en: 'Standard cefixime dose is 8 mg/kg/day once daily or divided BID.' },
+      urinary: { min_mpk: 8, max_mpk: 8, doses_per_day: 1, clinical_rationale_ar: 'الخيار الفموي الأول لالتهابات المسالك البولية الحادة في الأطفال: 8 مجم/كجم مرة واحدة يومياً (أو 16 مجم/كجم باليوم الأول فقط في الحالات الشديدة).', clinical_rationale_en: 'First-line oral choice for pediatric acute UTI, once daily.' },
+      ear: { min_mpk: 8, max_mpk: 8, doses_per_day: 2, clinical_rationale_ar: 'في التهاب الأذن الوسطى تبقى الجرعة 8 مجم/كجم/يوم لكن يُفضَّل تقسيمها على جرعتين (كل 12 ساعة) لثبات التركيز.', clinical_rationale_en: 'In AOM, total 8 mg/kg/day is divided BID (every 12h) for steadier middle-ear levels.' },
+      pharynx: { min_mpk: 8, max_mpk: 8, doses_per_day: 1, clinical_rationale_ar: 'التهاب الحلق البكتيري: 8 مجم/كجم مرة واحدة يومياً لمدة 10 أيام.', clinical_rationale_en: 'Pharyngitis: 8 mg/kg once daily.' },
+      lung: { min_mpk: 8, max_mpk: 8, doses_per_day: 2, clinical_rationale_ar: 'التهابات الجهاز التنفسي: 8 مجم/كجم/يوم (يُفضّل تقسيمها كل 12 ساعة).', clinical_rationale_en: 'Lower respiratory infection: 8 mg/kg/day divided BID.' }
     },
     min_age_months: 6,
     max_daily_adult_mg: 400,
@@ -448,8 +461,11 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '200 مجم / 5 مل (شراب مركز)', labelEn: '200 mg / 5ml (Concentrated)', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Zithromax 200', formulation: 'syrup' }
     ],
     site_doses: {
-      lung: { min_mpk: 10, max_mpk: 10, doses_per_day: 1, clinical_rationale_ar: 'علاج التهاب الرئة اللانمطي (Atypical Pneumonia / Mycoplasma) 10 مجم/كجم باليوم الأول ثم 5 مجم/كجم لمدة 4 أيام (أو 10 مجم/كجم لثلاثة أيام).', clinical_rationale_en: 'Atypical pneumonia protocol: 10 mg/kg day 1, then 5 mg/kg days 2-5.' },
-      pharynx: { min_mpk: 12, max_mpk: 12, doses_per_day: 1, clinical_rationale_ar: 'بديل أول لحساسية البنسلين في التهاب الحلق 12 مجم/كجم يومياً لمدة 5 أيام.', clinical_rationale_en: 'Penicillin-allergy alternative for pharyngitis: 12 mg/kg/day for 5 days.' }
+      general: { min_mpk: 10, max_mpk: 10, doses_per_day: 1, clinical_rationale_ar: 'الجرعة القياسية لأزيثرومايسين: 10 مجم/كجم مرة واحدة يومياً لمدة 3 أيام.', clinical_rationale_en: 'Standard 3-day course: 10 mg/kg once daily.' },
+      ear: { min_mpk: 10, max_mpk: 10, doses_per_day: 1, clinical_rationale_ar: 'التهاب الأذن الوسطى (عند حساسية البنسلين): 10 مجم/كجم مرة واحدة يومياً لمدة 3 أيام (أو 30 مجم/كجم جرعة واحدة للضرورة).', clinical_rationale_en: 'AOM (penicillin allergy): 10 mg/kg once daily for 3 days.' },
+      lung: { min_mpk: 10, max_mpk: 10, doses_per_day: 1, clinical_rationale_ar: 'علاج التهاب الرئة اللانمطي (Atypical Pneumonia / Mycoplasma): 10 مجم/كجم باليوم الأول ثم 5 مجم/كجم لأربعة أيام (أو 10 مجم/كجم لمدة 3 أيام).', clinical_rationale_en: 'Atypical pneumonia protocol: 10 mg/kg day 1, then 5 mg/kg days 2-5.' },
+      pharynx: { min_mpk: 12, max_mpk: 12, doses_per_day: 1, clinical_rationale_ar: 'في التهاب الحلق واللوزتين العقدي ترتفع الجرعة إلى 12 مجم/كجم مرة واحدة يومياً لمدة 5 أيام.', clinical_rationale_en: 'Strep pharyngitis requires higher 12 mg/kg/day once daily for 5 days.' },
+      skin: { min_mpk: 10, max_mpk: 10, doses_per_day: 1, clinical_rationale_ar: 'التهابات الجلد الحساسة: 10 مجم/كجم يومياً لمدة 3 أيام.', clinical_rationale_en: 'Susceptible SSTI: 10 mg/kg daily for 3 days.' }
     },
     min_age_months: 6,
     max_daily_adult_mg: 500,
@@ -618,10 +634,12 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '750 مجم فيال (حقن وريدي/عضلي Zinacef)', labelEn: '750 mg Vial (Zinacef IV/IM)', value: 750, unit: 'mg/vial', tradeExampleAr: 'Zinacef 750mg', formulation: 'injection' }
     ],
     site_doses: {
-      ear: { min_mpk: 30, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهاب الأذن الوسطى: 30 مجم/كجم/يوم مقسمة كل 12 ساعة (حد أقصى 1000 مجم/يوم)', clinical_rationale_en: 'AOM: 30 mg/kg/day q12h (max 1000 mg/day)' },
-      lung: { min_mpk: 30, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهاب الرئة: 30 مجم/كجم/يوم مقسمة كل 12 ساعة مع وجبة الطعام', clinical_rationale_en: 'Pneumonia: 30 mg/kg/day q12h with meals' },
-      pharynx: { min_mpk: 20, max_mpk: 20, doses_per_day: 2, clinical_rationale_ar: 'التهاب البلعوم واللوزتين: 20 مجم/كجم/يوم مقسمة كل 12 ساعة', clinical_rationale_en: 'Pharyngitis: 20 mg/kg/day q12h' },
-      urinary: { min_mpk: 20, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'إنتان المسالك البولية: 20-30 مجم/كجم/يوم مقسمة كل 12 ساعة', clinical_rationale_en: 'UTI: 20-30 mg/kg/day q12h' }
+      general: { min_mpk: 20, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'الالتهابات المعتادة: 20-30 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'Standard pediatric dosing: 20-30 mg/kg/day divided q12h.' },
+      ear: { min_mpk: 30, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهاب الأذن الوسطى الحاد يتطلب الجرعة العليا 30 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'AOM requires upper dose 30 mg/kg/day q12h.' },
+      lung: { min_mpk: 30, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهاب الرئة والشعب الهوائية: 30 مجم/كجم/يوم مقسمة كل 12 ساعة مع وجبة الطعام.', clinical_rationale_en: 'Pneumonia: 30 mg/kg/day q12h with meals.' },
+      pharynx: { min_mpk: 20, max_mpk: 20, doses_per_day: 2, clinical_rationale_ar: 'التهاب البلعوم واللوزتين يستجيب للجرعة الأخف 20 مجم/كجم/يوم كل 12 ساعة.', clinical_rationale_en: 'Pharyngitis: lower 20 mg/kg/day q12h.' },
+      urinary: { min_mpk: 20, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'إنتان المسالك البولية: 20-30 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'UTI: 20-30 mg/kg/day q12h.' },
+      skin: { min_mpk: 20, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهابات الجلد والأنسجة الرخوة: 20-30 مجم/كجم/يوم كل 12 ساعة.', clinical_rationale_en: 'Skin/soft tissue: 20-30 mg/kg/day q12h.' }
     },
     min_age_months: 3,
     max_daily_adult_mg: 1000,
@@ -688,9 +706,11 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '375 مجم / 5 مل (سيكلور فورت)', labelEn: '375 mg / 5ml (Ceclor Forte)', value: 375, unit: 'mg/5ml', tradeExampleAr: 'Ceclor 375', formulation: 'syrup' }
     ],
     site_doses: {
-      ear: { min_mpk: 40, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهاب الأذن الوسطى: 40 مجم/كجم/يوم مقسمة كل 8 أو 12 ساعة', clinical_rationale_en: 'AOM: 40 mg/kg/day divided' },
-      pharynx: { min_mpk: 20, max_mpk: 20, doses_per_day: 3, clinical_rationale_ar: 'التهاب البلعوم واللوزتين: 20 مجم/كجم/يوم مقسمة كل 8 ساعات', clinical_rationale_en: 'Pharyngitis: 20 mg/kg/day q8h' },
-      lung: { min_mpk: 40, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهاب الشعب الهوائية والرئة: 40 مجم/كجم/يوم مقسمة كل 8 ساعات', clinical_rationale_en: 'Bronchitis/Pneumonia: 40 mg/kg/day q8h' }
+      general: { min_mpk: 20, max_mpk: 30, doses_per_day: 3, clinical_rationale_ar: 'الالتهابات الخفيفة إلى المتوسطة: 20-30 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Standard mild-to-moderate infections: 20-30 mg/kg/day q8h.' },
+      ear: { min_mpk: 40, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهاب الأذن الوسطى الحاد: ترتفع الجرعة إلى 40 مجم/كجم/يوم مقسمة كل 8 أو 12 ساعة.', clinical_rationale_en: 'AOM: higher dose 40 mg/kg/day divided.' },
+      pharynx: { min_mpk: 20, max_mpk: 20, doses_per_day: 3, clinical_rationale_ar: 'التهاب البلعوم واللوزتين: 20 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Pharyngitis: 20 mg/kg/day q8h.' },
+      lung: { min_mpk: 40, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهاب الشعب الهوائية والرئة: ترتفع إلى 40 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Bronchitis/Pneumonia: 40 mg/kg/day q8h.' },
+      skin: { min_mpk: 20, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهابات الجلد السطحية: 20-40 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Skin infection: 20-40 mg/kg/day q8h.' }
     },
     min_age_months: 1,
     max_daily_adult_mg: 1500,
@@ -722,6 +742,11 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '200 مجم / 5 مل (فلاجيل معلق مركز)', labelEn: '200 mg / 5ml (Concentrated)', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Flagyl 200mg/5ml', formulation: 'syrup' },
       { labelAr: '500 مجم / 100 مل (محلول وريدي جاهز)', labelEn: '500 mg / 100ml (Ready IV Infusion)', value: 500, unit: 'mg/100ml', tradeExampleAr: 'Flagyl IV Infusion', formulation: 'injection' }
     ],
+    site_doses: {
+      general: { min_mpk: 15, max_mpk: 30, doses_per_day: 3, clinical_rationale_ar: 'العدوى اللاهوائية الخفيفة أو الجيارديا: 15-30 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Giardiasis / mild anaerobic infection: 15-30 mg/kg/day q8h.' },
+      lung: { min_mpk: 30, max_mpk: 30, doses_per_day: 3, clinical_rationale_ar: 'التهاب الرئة الاستنشاقي والخراج الرئوي اللاهوائي: 30 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Anaerobic aspiration pneumonia / lung abscess: 30 mg/kg/day q8h.' },
+      skin: { min_mpk: 30, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'الخراجات والأنسجة الرخوة اللاهوائية أو الأميبا: 30-40 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Anaerobic soft tissue / amebiasis: 30-40 mg/kg/day q8h.' }
+    },
     min_age_months: 1,
     max_daily_adult_mg: 2000,
     contraindications_ar: 'اضطرابات عصبية حادة، الحساسية لمركبات النيتروإيميدازول.',
@@ -870,6 +895,13 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
     available_concentrations: [
       { labelAr: '240 مجم / 5 مل (معلق أطفال: 40 تريميثوبريم + 200 سلفاميثوكسازول)', labelEn: '240 mg / 5ml (40 TMP + 200 SMX)', value: 240, unit: 'mg/5ml', tradeExampleAr: 'Bactrim 240mg/5ml', formulation: 'syrup' }
     ],
+    site_doses: {
+      general: { min_mpk: 6, max_mpk: 8, doses_per_day: 2, clinical_rationale_ar: 'العدوى الخفيفة (بحساب مكون تريميثوبريم TMP): 6-8 مجم/كجم/يوم كل 12 ساعة.', clinical_rationale_en: 'Standard mild infection (TMP component): 6-8 mg/kg/day q12h.' },
+      urinary: { min_mpk: 8, max_mpk: 10, doses_per_day: 2, clinical_rationale_ar: 'التهاب المسالك البولية: 8-10 مجم/كجم/يوم (TMP) مقسمة كل 12 ساعة.', clinical_rationale_en: 'Pediatric UTI: 8-10 mg/kg/day (TMP) q12h.' },
+      ear: { min_mpk: 8, max_mpk: 10, doses_per_day: 2, clinical_rationale_ar: 'التهاب الأذن الوسطى (عند حساسية البنسلين): 8-10 مجم/كجم/يوم (TMP) كل 12 ساعة.', clinical_rationale_en: 'AOM alternative: 8-10 mg/kg/day (TMP) q12h.' },
+      skin: { min_mpk: 8, max_mpk: 12, doses_per_day: 2, clinical_rationale_ar: 'التهابات الجلد والدمامل والمكورات العنقودية (CA-MRSA): ترتفع إلى 8-12 مجم/كجم/يوم (TMP) كل 12 ساعة.', clinical_rationale_en: 'Skin / SSTI / CA-MRSA: 8-12 mg/kg/day (TMP) q12h.' },
+      lung: { min_mpk: 10, max_mpk: 12, doses_per_day: 2, clinical_rationale_ar: 'التهابات الجهاز التنفسي الشديدة الحساسة: 10-12 مجم/كجم/يوم (TMP) كل 12 ساعة.', clinical_rationale_en: 'Severe respiratory infections: 10-12 mg/kg/day (TMP) q12h.' }
+    },
     min_age_months: 2,
     max_daily_adult_mg: 960,
     contraindications_ar: 'الرضع دون عمر شهرين (خطر اليرقان النووي Kernicterus)، نقص إنزيم G6PD (أنيميا الفول)، فرط حساسية السلفا.',
@@ -960,6 +992,50 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: '125 مجم / 5 مل (معلق كفليكس / سيفاليكسين للأطفال)', labelEn: '125 mg / 5ml (Keflex Suspension)', value: 125, unit: 'mg/5ml', tradeExampleAr: 'Keflex 125mg/5ml', formulation: 'syrup' },
       { labelAr: '100 مجم / 1 مل (نقط فموية Cefalin Drops للرضع)', labelEn: '100 mg / 1ml Drops', value: 100, unit: 'mg/ml', tradeExampleAr: 'Cefalexin Infant Drops', formulation: 'drops' }
     ],
+    site_doses: {
+      general: {
+        min_mpk: 25,
+        max_mpk: 50,
+        doses_per_day: 3,
+        clinical_rationale_ar: 'الالتهابات البسيطة إلى المتوسطة: 25-50 مجم/كجم/يوم مقسمة كل 8 ساعات.',
+        clinical_rationale_en: 'Standard mild-to-moderate infections: 25-50 mg/kg/day divided q8h.'
+      },
+      ear: {
+        min_mpk: 75,
+        max_mpk: 100,
+        doses_per_day: 4,
+        clinical_rationale_ar: 'التهاب الأذن الوسطى الحاد (عند استخدام سيفاليكسين): يتطلب جرعة عالية 75-100 مجم/كجم/يوم مقسمة كل 6 ساعات (ملاحظة: الأموكسيسيلين هو الخيار الأول للأذن).',
+        clinical_rationale_en: 'AOM (if cephalexin is used): requires high-dose 75-100 mg/kg/day divided q6h (Note: amoxicillin remains first-line).'
+      },
+      pharynx: {
+        min_mpk: 25,
+        max_mpk: 50,
+        doses_per_day: 2,
+        clinical_rationale_ar: 'التهاب الحلق واللوزتين العقدي: 25-50 مجم/كجم/يوم مقسمة مرتين يومياً (كل 12 ساعة) لمدة 10 أيام.',
+        clinical_rationale_en: 'Group A Strep pharyngitis: 25-50 mg/kg/day divided BID q12h for 10 days.'
+      },
+      lung: {
+        min_mpk: 50,
+        max_mpk: 75,
+        doses_per_day: 3,
+        clinical_rationale_ar: 'التهابات الجهاز التنفسي السفلي (MSSA): ترتفع إلى 50-75 مجم/كجم/يوم مقسمة كل 8 ساعات.',
+        clinical_rationale_en: 'Lower respiratory infection: 50-75 mg/kg/day divided q8h.'
+      },
+      urinary: {
+        min_mpk: 25,
+        max_mpk: 50,
+        doses_per_day: 3,
+        clinical_rationale_ar: 'التهاب المسالك البولية البسيط عند الأطفال: 25-50 مجم/كجم/يوم مقسمة كل 8 ساعات (وفي الحالات الشديدة حتى 75 مجم/كجم/يوم).',
+        clinical_rationale_en: 'Pediatric uncomplicated UTI: 25-50 mg/kg/day divided q8h.'
+      },
+      skin: {
+        min_mpk: 25,
+        max_mpk: 50,
+        doses_per_day: 3,
+        clinical_rationale_ar: 'التهابات الجلد والأنسجة الرخوة (الحصف والقوباء والتهاب النسيج الخلوي الخفيف): 25-50 مجم/كجم/يوم كل 8 ساعات.',
+        clinical_rationale_en: 'Skin & soft tissue (impetigo/cellulitis): 25-50 mg/kg/day q8h.'
+      }
+    },
     min_age_months: 1,
     max_daily_adult_mg: 4000,
     contraindications_ar: 'فرط الحساسية للسيفالوسبورينات أو الحساسية الشديدة الفورية للبنسلين.',
@@ -1377,6 +1453,13 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: 'معلق فموي 75 مجم / 5 مل', labelEn: 'Oral Suspension 75 mg / 5ml', value: 75, unit: 'mg/5ml', tradeExampleAr: 'Dalacin C Syrup 75mg/5ml', formulation: 'syrup' },
       { labelAr: 'أمبولات حقن 300 مجم / 2 مل (150 مجم/مل)', labelEn: '300 mg / 2ml Ampoule', value: 150, unit: 'mg/ml', tradeExampleAr: 'Dalacin C 300mg Ampoule', formulation: 'injection' }
     ],
+    site_doses: {
+      general: { min_mpk: 20, max_mpk: 25, doses_per_day: 3, clinical_rationale_ar: 'العدوى الخفيفة إلى المتوسطة: 20-25 مجم/كجم/يوم مقسمة كل 8 ساعات.', clinical_rationale_en: 'Mild-to-moderate susceptible infection: 20-25 mg/kg/day q8h.' },
+      ear: { min_mpk: 30, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'التهاب الأذن الوسطى المقاوم أو عند حساسية البنسلين الشديدة: ترتفع إلى 30-40 مجم/كجم/يوم كل 8 ساعات.', clinical_rationale_en: 'Resistant AOM / severe penicillin allergy: 30-40 mg/kg/day q8h.' },
+      pharynx: { min_mpk: 20, max_mpk: 30, doses_per_day: 3, clinical_rationale_ar: 'التهاب اللوزتين المتكرر أو الحلق (حساسية بنسلين): 20-30 مجم/كجم/يوم كل 8 ساعات لمدة 10 أيام.', clinical_rationale_en: 'Recurrent Group A Strep pharyngitis: 20-30 mg/kg/day q8h.' },
+      lung: { min_mpk: 30, max_mpk: 40, doses_per_day: 3, clinical_rationale_ar: 'الالتهاب الرئوي بالمكورات العنقودية أو الاستنشاقي: 30-40 مجم/كجم/يوم كل 8 ساعات.', clinical_rationale_en: 'Staph/aspiration pneumonia: 30-40 mg/kg/day q8h.' },
+      skin: { min_mpk: 25, max_mpk: 30, doses_per_day: 3, clinical_rationale_ar: 'خراجات الجلد وأنسجة MRSA الرخوة: 25-30 مجم/كجم/يوم كل 8 ساعات.', clinical_rationale_en: 'SSTI / CA-MRSA abscess: 25-30 mg/kg/day q8h.' }
+    },
     min_age_months: 1,
     max_daily_adult_mg: 1800,
     contraindications_ar: 'التاريخ السابق لالتهاب القولون الغشائي الكاذب المرتبط بالمضادات الحيوية (C. difficile colitis).',
@@ -1463,6 +1546,12 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
     available_concentrations: [
       { labelAr: 'شراب معلق 200 مجم / 5 مل', labelEn: 'Oral Suspension 200 mg / 5ml', value: 200, unit: 'mg/5ml', tradeExampleAr: 'Erythrocin 200mg/5ml', formulation: 'syrup' }
     ],
+    site_doses: {
+      general: { min_mpk: 30, max_mpk: 40, doses_per_day: 4, clinical_rationale_ar: 'الجرعة الاعتيادية: 30-40 مجم/كجم/يوم مقسمة كل 6 ساعات.', clinical_rationale_en: 'Standard infection: 30-40 mg/kg/day q6h.' },
+      ear: { min_mpk: 40, max_mpk: 50, doses_per_day: 4, clinical_rationale_ar: 'التهاب الأذن الوسطى (بديل لحساسية البنسلين): 40-50 مجم/كجم/يوم كل 6 ساعات.', clinical_rationale_en: 'AOM alternative: 40-50 mg/kg/day q6h.' },
+      lung: { min_mpk: 40, max_mpk: 50, doses_per_day: 4, clinical_rationale_ar: 'السعال الديكي والالتهاب الرئوي اللانمطي: الجرعة المكثفة 40-50 مجم/كجم/يوم كل 6 ساعات.', clinical_rationale_en: 'Pertussis / atypical pneumonia: 40-50 mg/kg/day q6h.' },
+      pharynx: { min_mpk: 30, max_mpk: 40, doses_per_day: 4, clinical_rationale_ar: 'التهاب الحلق واللوزتين: 30-40 مجم/كجم/يوم كل 6 ساعات.', clinical_rationale_en: 'Strep pharyngitis alternative: 30-40 mg/kg/day q6h.' }
+    },
     min_age_months: 1,
     max_daily_adult_mg: 2000,
     contraindications_ar: 'الرضع أقل من أسبوعين (خطر تضيق بواب المعدة الضخامي IHPS).',
@@ -1905,6 +1994,11 @@ export const EXTENDED_PEDIATRIC_DRUGS: ExtendedPediatricDrug[] = [
       { labelAr: 'معلق فموي 250 مجم / 5 مل (50 مجم/مل)', labelEn: 'Oral Suspension 250 mg / 5ml', value: 250, unit: 'mg/5ml', tradeExampleAr: 'Cipro 250mg/5ml Suspension', formulation: 'syrup' },
       { labelAr: 'محلول تسريب وريدي 200 مجم / 100 مل (2 مجم/مل)', labelEn: '200 mg / 100ml IV Infusion', value: 2, unit: 'mg/ml', tradeExampleAr: 'Ciprofloxacin 2mg/ml IV', formulation: 'injection' }
     ],
+    site_doses: {
+      general: { min_mpk: 20, max_mpk: 20, doses_per_day: 2, clinical_rationale_ar: 'العدوى المعوية/البولية الخفيفة: 20 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'Standard pediatric dosing: 20 mg/kg/day q12h.' },
+      urinary: { min_mpk: 20, max_mpk: 30, doses_per_day: 2, clinical_rationale_ar: 'التهاب المسالك البولية المعقد وحوض الكلى: 20-30 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'Complicated UTI / pyelonephritis: 20-30 mg/kg/day q12h.' },
+      lung: { min_mpk: 30, max_mpk: 40, doses_per_day: 2, clinical_rationale_ar: 'عدوى الرئة ببكتيريا Pseudomonas أو التليف الكيسي: ترتفع إلى 30-40 مجم/كجم/يوم مقسمة كل 12 ساعة.', clinical_rationale_en: 'Cystic fibrosis Pseudomonas lung infection: 30-40 mg/kg/day q12h.' }
+    },
     min_age_months: 6,
     max_daily_adult_mg: 1500,
     contraindications_ar: 'فرط الحساسية للفلوروكينولونات، الوهن العضلي الوبيل.',

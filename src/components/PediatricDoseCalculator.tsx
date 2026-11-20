@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Baby, AlertCircle, CheckCircle, Droplets, Clock, Calculator, ShieldAlert, 
   Sparkles, Camera, Upload, Loader2, RefreshCw, Search, Syringe, Wind, 
-  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, ArrowRight
+  Copy, Check, Share2, Info, ShieldCheck, HelpCircle, Thermometer, Download, ArrowRight, Stethoscope
 } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { parsePediatricMedicineFromText } from '../utils/pediatricMedicineParser';
@@ -1631,13 +1631,28 @@ ${selectedFormulation === 'syrup' ? `• Oral Volume: ${calcResult.singleMinMl} 
                       <span>{isAr ? 'معدل الوزن والحد الأقصى:' : 'Weight Rate & Max Cap:'}</span>
                     </span>
                     <div className="flex-1 text-slate-200 flex items-center gap-3">
-                      <span className="font-mono text-amber-300 font-bold">{calcResult.minMpk}–{calcResult.maxMpk} mg/kg/day</span>
+                      <span className="font-mono text-amber-300 font-bold">
+                        {calcResult.minMpk === calcResult.maxMpk ? `${calcResult.minMpk}` : `${calcResult.minMpk}–${calcResult.maxMpk}`} mg/kg/day
+                      </span>
                       <span className="text-slate-600">|</span>
                       <span className="text-rose-400 font-mono font-bold">
                         {isAr ? `الحد الأقصى: ${calcResult.maxDailyCap} مجم/يوم` : `Max Cap: ${calcResult.maxDailyCap} mg/day`}
                       </span>
                     </div>
                   </div>
+
+                  {/* Site-Specific Antibiotic Rationale Row */}
+                  {isActiveDrugAntibiotic && calcResult.rationaleAr && (
+                    <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 bg-teal-950/20 hover:bg-teal-950/30 transition-colors">
+                      <span className="font-bold text-teal-300 shrink-0 w-44 flex items-center gap-1.5 pt-0.5">
+                        <Stethoscope className="w-3.5 h-3.5 text-teal-400" />
+                        <span>{isAr ? 'ضبط موضع الالتهاب:' : 'Infection Site Protocol:'}</span>
+                      </span>
+                      <div className="flex-1 text-teal-100 leading-relaxed font-medium">
+                        {isAr ? calcResult.rationaleAr : calcResult.rationaleEn}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Row 5: Administration Pearl (طريقة الاستخدام) */}
                   <div className="p-3.5 flex flex-col sm:flex-row sm:items-start justify-between gap-2 hover:bg-slate-900/40 transition-colors">
