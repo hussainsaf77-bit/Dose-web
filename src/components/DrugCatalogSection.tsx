@@ -131,9 +131,9 @@ export const DrugCatalogSection: React.FC<DrugCatalogSectionProps> = ({
       }
 
       if (bestScore > 0) {
-        // Prefer richer clinical monograph entries over short pediatric duplicates
+        // Prefer richer clinical monograph entries over duplicate pediatric entries of the exact same single ingredient
         const hasRichDetails = Boolean(drug.mechanism_ar && drug.adult_dosage_text_ar);
-        const coreKey = normalizeDrugSearchText(drug.name_en).split(' ')[0];
+        const coreKey = normalizeDrugSearchText(drug.name_en.replace(/\([^)]*\)/g, ''));
         if (seenCoreNames.has(coreKey) && !hasRichDetails) continue;
         seenCoreNames.add(coreKey);
 
