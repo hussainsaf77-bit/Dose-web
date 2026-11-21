@@ -4,54 +4,18 @@ import {
   Flame, 
   Utensils, 
   Droplet, 
-  Heart, 
   Scale, 
   Search, 
-  Check, 
   AlertCircle, 
   Baby, 
-  Sparkles, 
-  FileText, 
-  Info, 
   ShieldCheck, 
   Printer, 
-  RefreshCw, 
-  Zap, 
-  Loader2,
-  CheckCircle2,
   ChevronRight
 } from 'lucide-react';
 import { FOODS_NUTRITION } from '../data/medicalData';
 
-export interface ClinicalNutritionPlan {
-  conditionTitleAr: string;
-  conditionTitleEn: string;
-  clinicalRationale: string;
-  dailyCaloriesTarget: number;
-  proteinGrams: number;
-  proteinGramsPerKg: string;
-  carbsGrams: number;
-  fatGrams: number;
-  fluidRestrictionMl: string;
-  sodiumLimitMg: string;
-  potassiumRecommendation: string;
-  phosphorusRecommendation: string;
-  allowedFoods: string[];
-  forbiddenFoods: string[];
-  mealPlan: {
-    breakfast: string;
-    snack1: string;
-    lunch: string;
-    snack2: string;
-    dinner: string;
-  };
-  clinicalTips: string[];
-  drugFoodInteractions: string[];
-  monitoringParameters: string[];
-}
-
 export const HealthCalculators: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'ibw_bmi' | 'therapeutic_diet' | 'calories' | 'pediatric_nutrition' | 'foods'>('ibw_bmi');
+  const [activeTab, setActiveTab] = useState<'ibw_bmi' | 'calories' | 'pediatric_nutrition' | 'foods'>('ibw_bmi');
 
   // Universal Biometric State
   const [weightKg, setWeightKg] = useState<string>('74');
@@ -62,12 +26,6 @@ export const HealthCalculators: React.FC = () => {
   // Calorie & Activity State
   const [activityLevel, setActivityLevel] = useState<number>(1.375); // light
   const [calorieGoal, setCalorieGoal] = useState<'lose' | 'maintain' | 'gain'>('lose');
-
-  // Therapeutic Nutrition State
-  const [selectedCondition, setSelectedCondition] = useState<string>('diabetes');
-  const [isLoadingDiet, setIsLoadingDiet] = useState<boolean>(false);
-  const [clinicalDietPlan, setClinicalDietPlan] = useState<ClinicalNutritionPlan | null>(null);
-  const [dietError, setDietError] = useState<string | null>(null);
 
   // Pediatric Nutrition State
   const [pediatricAgeYears, setPediatricAgeYears] = useState<string>('4');
@@ -319,53 +277,7 @@ export const HealthCalculators: React.FC = () => {
     };
   }, [pediatricAgeYears, pediatricAgeMonths, pediatricActualWeight]);
 
-  // 4. Fetch Clinical Therapeutic Nutrition Protocol
-  const handleGenerateTherapeuticDiet = async (conditionId?: string) => {
-    const cond = conditionId || selectedCondition;
-    setIsLoadingDiet(true);
-    setDietError(null);
 
-    try {
-      const res = await fetch('/api/medical/therapeutic-nutrition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          condition: cond,
-          age: bmiAge,
-          weightKg,
-          heightCm,
-          gender,
-          activityLevel,
-          goal: calorieGoal,
-          lang: 'ar'
-        })
-      });
-
-      if (!res.ok) throw new Error('فشل استرجاع بروتوكول التغذية السريرية');
-      const data = await res.json();
-      if (data.nutritionPlan) {
-        setClinicalDietPlan(data.nutritionPlan);
-      }
-    } catch (err: any) {
-      setDietError('تعذر جلب الخطة من الذكاء السريري حالياً، تم تفعيل البروتوكول الاحتياطي');
-    } finally {
-      setIsLoadingDiet(false);
-    }
-  };
-
-  // Conditions list
-  const clinicalConditions = [
-    { id: 'diabetes', name: 'السكري من النوع 1 و 2 (Diabetes Mellitus)', desc: 'تحكم بالمؤشر الجلايسيمي، توزيع كربوهيدرات معقدة، وقاية من الهبوط والاعتلال الكلوي.' },
-    { id: 'hypertension', name: 'حمية داش لارتفاع ضغط الدم (DASH Diet)', desc: 'تقييد الصوديوم < 1500mg، رفع البوتاسيوم والمغنيسيوم لخفض الضغط الشرياني.' },
-    { id: 'ckd_predialysis', name: 'اعتلال الكلى المزمن غير الغسيلي (CKD Stage 3-4)', desc: 'تقييد البروتين 0.6-0.8 g/kg، تقييد الفوسفور والصوديوم للحفاظ على معدل الترشيح GFR.' },
-    { id: 'hemodialysis', name: 'مرضى الغسيل الكلوي الدموي (Hemodialysis)', desc: 'بروتين مرتفع 1.2-1.4 g/kg لتعويض الفاقد، تقييد صارم للبوتاسيوم وسوائل دقيقة.' },
-    { id: 'liver_cirrhosis', name: 'تشمع الكبد والاستسقاء (Cirrhosis & Ascites)', desc: 'تقييد صوديوم شديد < 2000mg، وجبات صغيرة متكررة وسناك مسائي غني بالبروتين لمنع الهدم.' },
-    { id: 'gout', name: 'النقرس وفرط حمض اليوريك (Low-Purine Diet)', desc: 'استبعاد البيورينات العالية (اللحوم الحمراء، المأكولات البحرية) وترطيب وفير > 3 لتر.' },
-    { id: 'ibs_fodmap', name: 'القولون العصبي (Low-FODMAP Diet)', desc: 'استبعاد الكربوهيدرات القابلة للتخمر لتهدئة تقلصات الأمعاء والانتفاخات والغازات.' },
-    { id: 'post_bariatric', name: 'ما بعد جراحة السمنة والتكميم (Bariatric Protocol)', desc: 'بروتين عالي مركز 60-80g، فصل السوائل عن الوجبات بـ 30 دقيقة، فيتامينات تعويضية.' },
-    { id: 'celiac', name: 'الداء الزلاقي وحساسية الغلوتين (Strict Gluten-Free)', desc: 'نظام خالٍ تماماً من القمح والشعير والجاودار لترميم زغابات الأمعاء الدقيقة.' },
-    { id: 'geriatric_frailty', name: 'كبار السن وهشاشة العضلات (Sarcopenia & Frailty)', desc: 'بروتين مدعم 1.2-1.5 g/kg، تعزيز الكالسيوم وفيتامين D وألياف سهلة الهضم.' },
-  ];
 
   // Food explorer filter
   const filteredFoods = useMemo(() => {
@@ -385,13 +297,13 @@ export const HealthCalculators: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
               <Scale className="w-4 h-4" />
-              <span>المنظومة السريرية للوزن والتغذية العلاجية (Clinical Nutrition & Biometrics)</span>
+              <span>المنظومة السريرية للوزن والسعرات الحيوية (Biometrics & Calories)</span>
             </div>
             <h2 className="text-xl md:text-2xl font-black text-white">
-              حاسبات الوزن المثالي والتغذية العلاجية المتخصصة
+              حاسبات الوزن المثالي والسعرات والماكروز
             </h2>
             <p className="text-slate-400 text-xs md:text-sm mt-1">
-              معادلات سريرية معتمدة عالمياً (Devine, Robinson, Mosteller, Holliday-Segar) لتحديد الوزن المثالي وحساب السعرات والماكروز والبروتوكولات الغذائية للمرضى.
+              معادلات سريرية معتمدة عالمياً (Devine, Robinson, Mosteller, Holliday-Segar) لتحديد الوزن المثالي وحساب السعرات والماكروز وسوائل الأطفال.
             </p>
           </div>
 
@@ -419,23 +331,6 @@ export const HealthCalculators: React.FC = () => {
         >
           <Scale className="w-4 h-4" />
           <span>الوزن المثالي (IBW) والكتلة</span>
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveTab('therapeutic_diet');
-            if (!clinicalDietPlan) {
-              handleGenerateTherapeuticDiet();
-            }
-          }}
-          className={`flex-1 min-w-[140px] flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs md:text-sm font-bold transition-all cursor-pointer ${
-            activeTab === 'therapeutic_diet'
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/25'
-              : 'text-slate-400 hover:text-white hover:bg-slate-800/80'
-          }`}
-        >
-          <Sparkles className="w-4 h-4 text-emerald-300" />
-          <span>التغذية العلاجية للمرضى</span>
         </button>
 
         <button
@@ -648,257 +543,7 @@ export const HealthCalculators: React.FC = () => {
         </div>
       )}
 
-      {/* ========================================================
-          TAB 2: CLINICAL THERAPEUTIC NUTRITION & DIET PLANS
-         ======================================================== */}
-      {activeTab === 'therapeutic_diet' && (
-        <div className="space-y-6">
-          
-          {/* Selector Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-400" />
-                  <span>اختر الحالة المرضية لتوليد خطة التغذية العلاجية السريرية</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  يتم ضبط السعرات، البروتين، الصوديوم، الفوسفور، البوتاسيوم والسوائل وفق التوجيهات الطبية الحديثة
-                </p>
-              </div>
 
-              <button
-                onClick={() => handleGenerateTherapeuticDiet()}
-                disabled={isLoadingDiet}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
-              >
-                {isLoadingDiet ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>جارٍ إعداد البروتوكول السريري...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>تحديث الخطة بالذكاء الاصطناعي</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* Condition Dropdown Select with Arrow */}
-            <div className="space-y-2">
-              <label className="block text-xs font-semibold text-slate-300">
-                اختر الحالة المرضية (قائمة منسدلة):
-              </label>
-              <div className="relative">
-                <select
-                  value={selectedCondition}
-                  onChange={(e) => {
-                    setSelectedCondition(e.target.value);
-                    handleGenerateTherapeuticDiet(e.target.value);
-                  }}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-xs sm:text-sm text-white font-bold focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer pr-10"
-                >
-                  {clinicalConditions.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-400 pointer-events-none text-xs">
-                  ▼
-                </div>
-              </div>
-
-              {/* Selected Condition Quick Description */}
-              {(() => {
-                const activeC = clinicalConditions.find(c => c.id === selectedCondition);
-                if (!activeC) return null;
-                return (
-                  <p className="text-xs text-emerald-300/90 bg-emerald-950/30 p-2.5 rounded-xl border border-emerald-500/20">
-                    💡 <strong>الملف السريري:</strong> {activeC.desc}
-                  </p>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Generated Diet Protocol Card */}
-          {clinicalDietPlan && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
-              
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold">
-                      بروتوكول سريري معتمد
-                    </span>
-                    <span className="text-xs text-slate-400">
-                      وزن المريض: {weightKg} kg • الطول: {heightCm} cm • العمر: {bmiAge} سنة
-                    </span>
-                  </div>
-                  <h3 className="text-lg md:text-xl font-extrabold text-white mt-1">
-                    {clinicalDietPlan.conditionTitleAr}
-                  </h3>
-                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    {clinicalDietPlan.clinicalRationale}
-                  </p>
-                </div>
-              </div>
-
-              {/* Targets Summary Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                
-                {/* Calories */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-amber-400 font-bold block mb-1">السعرات اليومية</span>
-                  <div className="text-2xl font-black text-white font-mono">{clinicalDietPlan.dailyCaloriesTarget}</div>
-                  <span className="text-[10px] text-slate-500">kcal/day</span>
-                </div>
-
-                {/* Protein */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-rose-400 font-bold block mb-1">البروتين السريري</span>
-                  <div className="text-2xl font-black text-white font-mono">{clinicalDietPlan.proteinGrams}g</div>
-                  <span className="text-[10px] text-rose-300/80 font-mono block truncate">{clinicalDietPlan.proteinGramsPerKg}</span>
-                </div>
-
-                {/* Carbs */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-sky-400 font-bold block mb-1">الكربوهيدرات</span>
-                  <div className="text-2xl font-black text-white font-mono">{clinicalDietPlan.carbsGrams}g</div>
-                  <span className="text-[10px] text-slate-500">معقدة وألياف</span>
-                </div>
-
-                {/* Fat */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-amber-400 font-bold block mb-1">الدهون الصحية</span>
-                  <div className="text-2xl font-black text-white font-mono">{clinicalDietPlan.fatGrams}g</div>
-                  <span className="text-[10px] text-slate-500">غير مشبعة</span>
-                </div>
-
-                {/* Sodium */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-purple-400 font-bold block mb-1">حد الصوديوم</span>
-                  <div className="text-xs font-bold text-white mt-2 leading-tight">{clinicalDietPlan.sodiumLimitMg}</div>
-                </div>
-
-                {/* Fluid */}
-                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 text-center">
-                  <span className="text-[10px] text-cyan-400 font-bold block mb-1">معدل السوائل</span>
-                  <div className="text-xs font-bold text-white mt-2 leading-tight">{clinicalDietPlan.fluidRestrictionMl}</div>
-                </div>
-              </div>
-
-              {/* Allowed vs Forbidden Foods */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* Allowed */}
-                <div className="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-2.5">
-                  <h4 className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>الأغذية المسموحة والموصى بها علاجياً:</span>
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-slate-200">
-                    {clinicalDietPlan.allowedFoods.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-emerald-400 text-sm leading-none">•</span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Forbidden */}
-                <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-500/30 space-y-2.5">
-                  <h4 className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>الأغذية الممنوعة أو المقيدة تماماً:</span>
-                  </h4>
-                  <ul className="space-y-1.5 text-xs text-slate-200">
-                    {clinicalDietPlan.forbiddenFoods.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2">
-                        <span className="text-rose-400 text-sm leading-none">•</span>
-                        <span>{f}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Sample Daily Meal Plan */}
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Utensils className="w-4 h-4 text-teal-400" />
-                  <span>جدول الوجبات السريري المقترح على مدار اليوم:</span>
-                </h4>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 text-xs">
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-teal-400 font-bold block mb-1">الإفطار</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{clinicalDietPlan.mealPlan.breakfast}</p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-amber-400 font-bold block mb-1">سناك صباحي</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{clinicalDietPlan.mealPlan.snack1}</p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-emerald-400 font-bold block mb-1">الغداء</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{clinicalDietPlan.mealPlan.lunch}</p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-amber-400 font-bold block mb-1">سناك مسائي</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{clinicalDietPlan.mealPlan.snack2}</p>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800">
-                    <span className="text-[10px] text-purple-400 font-bold block mb-1">العشاء</span>
-                    <p className="text-slate-300 text-[11px] leading-relaxed">{clinicalDietPlan.mealPlan.dinner}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Interactions & Monitoring Labs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                {clinicalDietPlan.drugFoodInteractions && clinicalDietPlan.drugFoodInteractions.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-1.5">
-                    <span className="text-[11px] text-amber-400 font-bold block">⚠️ تداخلات دوائية غذائية هامة:</span>
-                    <ul className="space-y-1 text-slate-300 text-[11px]">
-                      {clinicalDietPlan.drugFoodInteractions.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-1.5">
-                          <span>•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {clinicalDietPlan.monitoringParameters && clinicalDietPlan.monitoringParameters.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-sky-950/20 border border-sky-500/30 space-y-1.5">
-                    <span className="text-[11px] text-sky-400 font-bold block">🧪 التحاليل المخبرية للمتابعة الدورية:</span>
-                    <ul className="space-y-1 text-slate-300 text-[11px]">
-                      {clinicalDietPlan.monitoringParameters.map((item, idx) => (
-                        <li key={idx} className="flex items-start gap-1.5">
-                          <span>•</span>
-                          <span>{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-            </div>
-          )}
-
-        </div>
-      )}
 
       {/* ========================================================
           TAB 3: PEDIATRIC EXPECTED WEIGHT & HOLLIDAY-SEGAR FLUIDS
