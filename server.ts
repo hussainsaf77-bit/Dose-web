@@ -279,30 +279,7 @@ interface StoredReminder {
   created_at: string;
 }
 
-const remindersDB: StoredReminder[] = [
-  {
-    id: "rem_1",
-    telegramId: "1001",
-    drug_name: "أموكسيسيلين (Amoxicillin)",
-    dose: "500 mg",
-    times: ["08:00", "16:00", "00:00"],
-    days: ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"],
-    email_notify: true,
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: "rem_2",
-    telegramId: "1001",
-    drug_name: "أومبيرازول (Omeprazole)",
-    dose: "20 mg قبل الإفطار",
-    times: ["07:30"],
-    days: ["يومياً"],
-    email_notify: false,
-    is_active: true,
-    created_at: new Date().toISOString(),
-  },
-];
+const remindersDB: StoredReminder[] = [];
 
 const drugHistoryDB: { id: string; telegramId?: string; drug_name: string; drug_id?: string; searched_at: string }[] = [
   { id: "h_1", telegramId: "1001", drug_name: "أوجمنتين (Augmentin)", drug_id: "amoxicillin_clavulanate", searched_at: new Date(Date.now() - 3600000).toISOString() },

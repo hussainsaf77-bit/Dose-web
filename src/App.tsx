@@ -24,6 +24,7 @@ import { PregnancyCareSection } from './components/PregnancyCareSection';
 import { Language } from './utils/translations';
 import { getApiUrl } from './utils/apiConfig';
 import { MainFeaturesGrid } from './components/MainFeaturesGrid';
+import { ZipExportView } from './components/ZipExportView';
 import { CheckCircle2, Pill, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
@@ -134,11 +135,16 @@ export default function App() {
 
   const [selectedChildDrug, setSelectedChildDrug] = useState<DrugInfo | null>(null);
   const [prefillReminderName, setPrefillReminderName] = useState<string>('');
+  const [isExportZip, setIsExportZip] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.location.hash.toLowerCase().startsWith('#export-zip');
+  });
 
   useEffect(() => {
     const handleHash = () => {
-      if (window.location.hash) {
-        setActiveTab(resolveTab(window.location.hash));
+      const hash = window.location.hash || '';
+      setIsExportZip(hash.toLowerCase().startsWith('#export-zip'));
+      if (hash) {
+        setActiveTab(resolveTab(hash));
       }
     };
     window.addEventListener('hashchange', handleHash);
@@ -306,6 +312,10 @@ export default function App() {
     setActiveTab('reminders');
     showToast(`تم فتح جدولة التذكيرات لدواء: ${drug.name_ar}`);
   };
+
+  if (isExportZip) {
+    return <ZipExportView />;
+  }
 
   if (!currentUser) {
     return (
