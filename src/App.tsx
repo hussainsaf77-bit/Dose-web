@@ -25,6 +25,7 @@ import { Language } from './utils/translations';
 import { getApiUrl } from './utils/apiConfig';
 import { MainFeaturesGrid } from './components/MainFeaturesGrid';
 import { ZipExportView } from './components/ZipExportView';
+import { DoseAlarmOverlay } from './components/DoseAlarmOverlay';
 import { CheckCircle2, Pill, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
@@ -567,6 +568,8 @@ export default function App() {
           handleUserLogin(newUser);
         }}
       />
+      {/* Global Medication Dose Alarm Overlay */}
+      <DoseAlarmOverlay onActionNotice={(msg) => showToast(msg)} />
     </div>
   );
 }

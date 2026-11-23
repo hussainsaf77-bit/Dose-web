@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Clock,
   Plus,
@@ -17,6 +17,24 @@ import {
 } from 'lucide-react';
 import { MedicationReminder, SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
+import { startAlarmRing, stopAlarmRing, unlockAlarmAudio } from '../utils/alarmAudio';
+import {
+  MAX_SNOOZES,
+  REMINDERS_UPDATED_EVENT,
+  STORAGE_REMINDERS_KEY,
+  STORAGE_SNOOZES_KEY,
+  STORAGE_TAKEN_KEY,
+  SnoozeEntry,
+  TEST_ALARM_EVENT,
+  emitRemindersUpdated,
+  formatHHMM,
+  getTodayDateKey,
+  isDemoReminderId,
+  loadRemindersFromStorage,
+  loadSnoozesFromStorage,
+  loadTakenMapFromStorage,
+  markDoseGivenInStorage,
+} from '../utils/reminderMonitor';
 
 interface MedicationRemindersSectionProps {
   userTier?: SubscriptionTier;
@@ -25,43 +43,7 @@ interface MedicationRemindersSectionProps {
   prefillDrugName?: string;
 }
 
-interface SnoozeEntry {
-  slotKey: string;
-  remId: string;
-  scheduledTime: string;
-  dateKey: string;
-  snoozeCount: number;
-  nextRingTimestamp: number;
-  nextRingHHMM: string;
-}
-
-interface ActiveDoseAlert {
-  rem: MedicationReminder;
-  scheduledTime: string;
-  slotKey: string;
-  snoozeCount: number;
-  triggeredAtHHMM: string;
-}
-
-const STORAGE_REMINDERS_KEY = 'dose_med_reminders_v1';
-const STORAGE_TAKEN_KEY = 'dose_med_taken_v1';
-const STORAGE_SNOOZES_KEY = 'dose_med_snoozes_v1';
-
-const MAX_SNOOZES = 3;
-const SNOOZE_MINUTES = 30;
 const WEEK_DAYS = ['السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
-
-function getTodayDateKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function formatHHMM(date: Date): string {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
 
 function addHoursToTime(hhmm: string, hoursToAdd: number): string {
   const [hStr, mStr] = (hhmm || '08:00').split(':');
@@ -71,59 +53,15 @@ function addHoursToTime(hhmm: string, hoursToAdd: number): string {
   return `${String(Math.floor(totalMins / 60)).padStart(2, '0')}:${String(totalMins % 60).padStart(2, '0')}`;
 }
 
-function isDemoReminderId(id: string): boolean {
-  return id.startsWith('rem_demo_');
-}
-
 export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProps> = ({
   userTier = 'free',
   telegramId = '1001',
   onUpgradeClick,
   prefillDrugName = ''
 }) => {
-  const [reminders, setReminders] = useState<MedicationReminder[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_REMINDERS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter((r: MedicationReminder) => r && r.id && !isDemoReminderId(r.id));
-        }
-      }
-    } catch {}
-    return [];
-  });
-
-  const [takenMap, setTakenMap] = useState<Record<string, string[]>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_TAKEN_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') return parsed;
-      }
-    } catch {}
-    return {};
-  });
-
-  const [snoozes, setSnoozes] = useState<Record<string, SnoozeEntry>>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_SNOOZES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          const today = getTodayDateKey();
-          const cleaned: Record<string, SnoozeEntry> = {};
-          Object.entries(parsed).forEach(([k, v]: [string, any]) => {
-            if (v && v.dateKey === today) {
-              cleaned[k] = v as SnoozeEntry;
-            }
-          });
-          return cleaned;
-        }
-      }
-    } catch {}
-    return {};
-  });
+  const [reminders, setReminders] = useState<MedicationReminder[]>(() => loadRemindersFromStorage());
+  const [takenMap, setTakenMap] = useState<Record<string, string[]>>(() => loadTakenMapFromStorage());
+  const [snoozes, setSnoozes] = useState<Record<string, SnoozeEntry>>(() => loadSnoozesFromStorage());
 
   const [notificationPerm, setNotificationPerm] = useState<NotificationPermission>(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -145,128 +83,56 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
   const [notes, setNotes] = useState('');
   const [emailNotify, setEmailNotify] = useState(true);
   const [msgNotice, setMsgNotice] = useState<string | null>(null);
-
-  const [activeAlert, setActiveAlert] = useState<ActiveDoseAlert | null>(null);
-  const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-
-  const lastChimeRef = useRef<Set<string>>(new Set());
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const alarmIntervalRef = useRef<number | null>(null);
-  const alarmTimeoutRef = useRef<number | null>(null);
+  const [isTestingSound, setIsTestingSound] = useState(false);
 
   const todayKey = getTodayDateKey();
   const todayTakenIds = takenMap[todayKey] || [];
 
+  // Keep local state in sync when DoseAlarmOverlay updates takenMap / snoozes
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_REMINDERS_KEY, JSON.stringify(reminders));
-    } catch {}
-  }, [reminders]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_TAKEN_KEY, JSON.stringify(takenMap));
-    } catch {}
-  }, [takenMap]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_SNOOZES_KEY, JSON.stringify(snoozes));
-    } catch {}
-  }, [snoozes]);
-
-  const ensureAudioContext = useCallback(() => {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return null;
-      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-        audioCtxRef.current = new AudioContextClass();
-      }
-      if (audioCtxRef.current.state === 'suspended') {
-        audioCtxRef.current.resume().catch(() => {});
-      }
-      return audioCtxRef.current;
-    } catch {
-      return null;
-    }
+    const syncFromStorage = () => {
+      setTakenMap(loadTakenMapFromStorage());
+      setSnoozes(loadSnoozesFromStorage());
+    };
+    window.addEventListener(REMINDERS_UPDATED_EVENT, syncFromStorage);
+    return () => window.removeEventListener(REMINDERS_UPDATED_EVENT, syncFromStorage);
   }, []);
 
-  const stopAlarmSound = useCallback(() => {
-    if (alarmIntervalRef.current !== null) {
-      window.clearInterval(alarmIntervalRef.current);
-      alarmIntervalRef.current = null;
-    }
-    if (alarmTimeoutRef.current !== null) {
-      window.clearTimeout(alarmTimeoutRef.current);
-      alarmTimeoutRef.current = null;
-    }
-    setIsAlarmPlaying(false);
-  }, []);
-
-  const playSingleAlarmPhrase = useCallback(() => {
-    const audioCtx = ensureAudioContext();
-    if (!audioCtx) return;
-    try {
-      const now = audioCtx.currentTime;
-      const notesSeq = [
-        { freq: 659.25, start: 0.0, dur: 0.22, peak: 0.42 },
-        { freq: 783.99, start: 0.22, dur: 0.22, peak: 0.45 },
-        { freq: 1046.5, start: 0.44, dur: 0.34, peak: 0.5 },
-        { freq: 880.0, start: 0.9, dur: 0.22, peak: 0.45 },
-        { freq: 1046.5, start: 1.14, dur: 0.55, peak: 0.52 },
-      ];
-
-      notesSeq.forEach(({ freq, start, dur, peak }) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, now + start);
-        gain.gain.setValueAtTime(0.001, now + start);
-        gain.gain.linearRampToValueAtTime(peak, now + start + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start(now + start);
-        osc.stop(now + start + dur + 0.02);
-      });
-
-      if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-        navigator.vibrate([300, 120, 300, 120, 450]);
-      }
-    } catch (e) {
-      console.warn('Audio alarm error:', e);
-    }
-  }, [ensureAudioContext]);
-
-  // Plays extended alarm: 6s for test, 30s repeating ring for real dose alarm
-  const startMedicalAlarmLoop = useCallback((durationMs: number = 30000) => {
-    stopAlarmSound();
-    setIsAlarmPlaying(true);
-    playSingleAlarmPhrase();
-
-    alarmIntervalRef.current = window.setInterval(() => {
-      playSingleAlarmPhrase();
-    }, 2200);
-
-    alarmTimeoutRef.current = window.setTimeout(() => {
-      stopAlarmSound();
-    }, durationMs);
-  }, [playSingleAlarmPhrase, stopAlarmSound]);
+  const persistReminders = (updater: (prev: MedicationReminder[]) => MedicationReminder[]) => {
+    setReminders(prev => {
+      const next = updater(prev);
+      try {
+        localStorage.setItem(STORAGE_REMINDERS_KEY, JSON.stringify(next));
+      } catch {}
+      emitRemindersUpdated();
+      return next;
+    });
+  };
 
   useEffect(() => {
-    return () => {
-      stopAlarmSound();
-    };
-  }, [stopAlarmSound]);
+    if (prefillDrugName) {
+      setEditingId(null);
+      setDrugName(prefillDrugName);
+      setShowAddForm(true);
+    }
+  }, [prefillDrugName]);
 
-  // Unlock Web Audio on first tap inside the page so scheduled chimes can sound reliably on mobile
+  // Sync with backend API only if user has no local saved reminders
   useEffect(() => {
-    const unlock = () => {
-      ensureAudioContext();
-    };
-    window.addEventListener('pointerdown', unlock, { once: true });
-    return () => window.removeEventListener('pointerdown', unlock);
-  }, [ensureAudioContext]);
+    const hasLocalSaved = Boolean(localStorage.getItem(STORAGE_REMINDERS_KEY));
+    if (hasLocalSaved) return;
+    fetch(getApiUrl(`/api/reminders?telegram_id=${telegramId}`))
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          const clean = data.filter((r: MedicationReminder) => r && r.id && !isDemoReminderId(r.id));
+          if (clean.length > 0) {
+            persistReminders(() => clean);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [telegramId]);
 
   const applyIntervalPreset = (preset: 'custom' | '24' | '12' | '8' | '6', baseTime: string) => {
     setIntervalPreset(preset);
@@ -290,7 +156,7 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
   };
 
   const handleRequestNotifications = async () => {
-    ensureAudioContext();
+    unlockAlarmAudio();
     if (typeof window === 'undefined' || !('Notification' in window)) {
       setMsgNotice('متصفحك الحالي لا يدعم إشعارات سطح المكتب — سيستمر التنبيه الصوتي داخل الصفحة.');
       setTimeout(() => setMsgNotice(null), 4000);
@@ -311,151 +177,38 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
     } catch {}
   };
 
-  // Clock interval checking both scheduled times and snoozed doses every 5 seconds
-  useEffect(() => {
-    const checkDueDoses = () => {
-      const now = new Date();
-      const nowMs = now.getTime();
-      const currentHHMM = formatHHMM(now);
-      const currentDayKey = getTodayDateKey();
-      const currentTaken = takenMap[currentDayKey] || [];
-
-      // 1. Check due snoozed alarms first
-      for (const entry of Object.values(snoozes) as SnoozeEntry[]) {
-        if (entry.dateKey !== currentDayKey) continue;
-        if (currentTaken.includes(entry.slotKey)) continue;
-        if (nowMs < entry.nextRingTimestamp) continue;
-
-        const rem = reminders.find(r => r.id === entry.remId && r.is_active);
-        if (!rem) continue;
-
-        const triggerKey = `${currentDayKey}_${entry.slotKey}_snooze_${entry.snoozeCount}`;
-        if (lastChimeRef.current.has(triggerKey)) continue;
-
-        lastChimeRef.current.add(triggerKey);
-        setActiveAlert({
-          rem,
-          scheduledTime: entry.scheduledTime,
-          slotKey: entry.slotKey,
-          snoozeCount: entry.snoozeCount,
-          triggeredAtHHMM: currentHHMM,
-        });
-        startMedicalAlarmLoop(30000);
-        setMsgNotice(`⏰ تذكير مؤجل (${entry.snoozeCount}/${MAX_SNOOZES}) — حان موعد: ${rem.drug_name}`);
-
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('جرعة — تذكير الدواء (مؤجل)', {
-            body: `${rem.drug_name}: ${rem.dose}`,
-          });
-        }
-        return;
-      }
-
-      // 2. Check regular scheduled dose times
-      for (const rem of reminders) {
-        if (!rem.is_active) continue;
-        if (!rem.times.includes(currentHHMM)) continue;
-
-        const slotKey = `${rem.id}_${currentHHMM}`;
-        if (currentTaken.includes(slotKey)) continue;
-
-        const triggerKey = `${currentDayKey}_${slotKey}_sched`;
-        if (lastChimeRef.current.has(triggerKey)) continue;
-
-        lastChimeRef.current.add(triggerKey);
-        const existingSnooze = snoozes[slotKey];
-        setActiveAlert({
-          rem,
-          scheduledTime: currentHHMM,
-          slotKey,
-          snoozeCount: existingSnooze && existingSnooze.dateKey === currentDayKey ? existingSnooze.snoozeCount : 0,
-          triggeredAtHHMM: currentHHMM,
-        });
-        startMedicalAlarmLoop(30000);
-        setMsgNotice(`⏰ موعد أخذ الدواء الآن (${currentHHMM}): ${rem.drug_name}`);
-
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('جرعة — حان موعد الدواء!', {
-            body: `${rem.drug_name}: ${rem.dose}`,
-          });
-        }
-        break;
-      }
-    };
-
-    checkDueDoses();
-    const timer = setInterval(checkDueDoses, 5000);
-    return () => clearInterval(timer);
-  }, [reminders, snoozes, takenMap, startMedicalAlarmLoop]);
-
-  useEffect(() => {
-    if (prefillDrugName) {
-      setEditingId(null);
-      setDrugName(prefillDrugName);
-      setShowAddForm(true);
-    }
-  }, [prefillDrugName]);
-
-  // Sync with backend API only if user has no local saved reminders
-  useEffect(() => {
-    const hasLocalSaved = Boolean(localStorage.getItem(STORAGE_REMINDERS_KEY));
-    if (hasLocalSaved) return;
-    fetch(getApiUrl(`/api/reminders?telegram_id=${telegramId}`))
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          const clean = data.filter((r: MedicationReminder) => r && r.id && !isDemoReminderId(r.id));
-          if (clean.length > 0) setReminders(clean);
-        }
-      })
-      .catch(() => {});
-  }, [telegramId]);
-
-  const handleConfirmDoseGiven = (remId: string, scheduledTime: string, drugTitle?: string) => {
-    const slotKey = `${remId}_${scheduledTime}`;
-    stopAlarmSound();
-    setTakenMap(prev => {
-      const currentDayList = prev[todayKey] || [];
-      if (currentDayList.includes(slotKey)) return prev;
-      return { ...prev, [todayKey]: [...currentDayList, slotKey] };
-    });
-    setSnoozes(prev => {
-      if (!prev[slotKey]) return prev;
-      const copy = { ...prev };
-      delete copy[slotKey];
-      return copy;
-    });
-    setActiveAlert(prev => (prev && prev.slotKey === slotKey ? null : prev));
-    if (drugTitle) {
-      setMsgNotice(`✅ تم تأكيد إعطاء الدواء: ${drugTitle}`);
-      setTimeout(() => setMsgNotice(null), 4000);
+  const handleTestSoundToggle = async () => {
+    unlockAlarmAudio();
+    if (isTestingSound) {
+      stopAlarmRing();
+      setIsTestingSound(false);
+      setMsgNotice('🔇 تم إيقاف صوت الفحص التجريبي.');
+      setTimeout(() => setMsgNotice(null), 2500);
+    } else {
+      setIsTestingSound(true);
+      const ok = await startAlarmRing(7000);
+      setMsgNotice(
+        ok
+          ? '🔊 تم تشغيل صوت التنبيه الطبي المطوّل (7 ثوانٍ للفحص — وعند الجرعة يستمر 30 ثانية)!'
+          : 'تعذر تشغيل الصوت — تأكد من رفع مستوى صوت الوسائط في الهاتف.'
+      );
+      setTimeout(() => {
+        setIsTestingSound(false);
+      }, 7200);
+      setTimeout(() => setMsgNotice(null), 5000);
     }
   };
 
-  const handleSnoozeDose = () => {
-    if (!activeAlert) return;
-    if (activeAlert.snoozeCount >= MAX_SNOOZES) return;
-
-    stopAlarmSound();
-    const nextCount = activeAlert.snoozeCount + 1;
-    const nextTime = new Date(Date.now() + SNOOZE_MINUTES * 60 * 1000);
-    const nextRingHHMM = formatHHMM(nextTime);
-
-    const entry: SnoozeEntry = {
-      slotKey: activeAlert.slotKey,
-      remId: activeAlert.rem.id,
-      scheduledTime: activeAlert.scheduledTime,
-      dateKey: todayKey,
-      snoozeCount: nextCount,
-      nextRingTimestamp: nextTime.getTime(),
-      nextRingHHMM,
-    };
-
-    setSnoozes(prev => ({ ...prev, [activeAlert.slotKey]: entry }));
-    const drugTitle = activeAlert.rem.drug_name;
-    setActiveAlert(null);
-    setMsgNotice(`⏰ تم تأجيل «${drugTitle}» لمدة 30 دقيقة (سيرن عند ${nextRingHHMM} — المتبقي ${MAX_SNOOZES - nextCount} من ${MAX_SNOOZES})`);
-    setTimeout(() => setMsgNotice(null), 6000);
+  const handleTestFullAlertModal = () => {
+    unlockAlarmAudio();
+    const firstActive = reminders.find(r => r.is_active);
+    window.dispatchEvent(
+      new CustomEvent(TEST_ALARM_EVENT, {
+        detail: firstActive
+          ? { drugName: firstActive.drug_name, dose: firstActive.dose }
+          : undefined,
+      })
+    );
   };
 
   const adherenceStats = useMemo(() => {
@@ -487,15 +240,23 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
   }, [reminders, todayTakenIds]);
 
   const toggleDoseTaken = (remId: string, time: string) => {
+    unlockAlarmAudio();
     const slotKey = `${remId}_${time}`;
     const alreadyTaken = todayTakenIds.includes(slotKey);
     if (!alreadyTaken) {
-      handleConfirmDoseGiven(remId, time);
+      markDoseGivenInStorage(remId, time);
+      setTakenMap(loadTakenMapFromStorage());
+      setSnoozes(loadSnoozesFromStorage());
       return;
     }
     setTakenMap(prev => {
       const currentDayList = prev[todayKey] || [];
-      return { ...prev, [todayKey]: currentDayList.filter(k => k !== slotKey) };
+      const next = { ...prev, [todayKey]: currentDayList.filter(k => k !== slotKey) };
+      try {
+        localStorage.setItem(STORAGE_TAKEN_KEY, JSON.stringify(next));
+      } catch {}
+      emitRemindersUpdated();
+      return next;
     });
   };
 
@@ -550,7 +311,7 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
   const handleToggleActive = (id: string) => {
     const target = reminders.find(r => r.id === id);
     const nextActive = target ? !target.is_active : true;
-    setReminders(prev =>
+    persistReminders(prev =>
       prev.map(r => (r.id === id ? { ...r, is_active: nextActive } : r))
     );
     fetch(getApiUrl(`/api/reminders/${id}`), {
@@ -561,24 +322,23 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
   };
 
   const handleDelete = (id: string) => {
-    setReminders(prev => prev.filter(r => r.id !== id));
+    persistReminders(prev => prev.filter(r => r.id !== id));
     setSnoozes(prev => {
       const next: Record<string, SnoozeEntry> = {};
       Object.entries(prev).forEach(([k, v]: [string, SnoozeEntry]) => {
         if (v.remId !== id) next[k] = v;
       });
+      try {
+        localStorage.setItem(STORAGE_SNOOZES_KEY, JSON.stringify(next));
+      } catch {}
       return next;
     });
-    if (activeAlert?.rem.id === id) {
-      stopAlarmSound();
-      setActiveAlert(null);
-    }
     fetch(getApiUrl(`/api/reminders/${id}`), { method: 'DELETE' }).catch(() => {});
   };
 
   const handleSaveReminder = (e: React.FormEvent) => {
     e.preventDefault();
-    ensureAudioContext();
+    unlockAlarmAudio();
     if (!drugName.trim()) return;
 
     const times = [time1, time2, time3, time4].filter(Boolean);
@@ -586,7 +346,7 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
     const daysToSave = selectedDays.length > 0 ? selectedDays : ['يومياً'];
 
     if (editingId) {
-      setReminders(prev =>
+      persistReminders(prev =>
         prev.map(r =>
           r.id === editingId
             ? {
@@ -640,9 +400,9 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
       created_at: new Date().toISOString(),
     };
 
-    setReminders(prev => [newRem, ...prev]);
+    persistReminders(prev => [newRem, ...prev]);
     resetForm();
-    setMsgNotice('تم حفظ تذكير الدواء بنجاح وسيتزامن مع بوت تليجرام ✅');
+    setMsgNotice('تم حفظ تذكير الدواء بنجاح وسيرن داخل المنصة وعبر تليجرام عند الموعد ✅');
 
     fetch(getApiUrl('/api/reminders'), {
       method: 'POST',
@@ -664,70 +424,6 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
 
   return (
     <div id="medication-reminders-section" className="space-y-5">
-
-      {/* Active Ringing Dose Alert Banner / Modal */}
-      {activeAlert && (
-        <div className="bg-gradient-to-br from-teal-950/90 via-slate-900 to-emerald-950/90 border-2 border-teal-400 rounded-2xl p-5 shadow-2xl shadow-teal-500/20 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-teal-500/20 border border-teal-400/50 flex items-center justify-center shrink-0">
-                <AlarmClock className="w-6 h-6 text-teal-300 animate-bounce" />
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-teal-300 block">
-                  {activeAlert.snoozeCount > 0
-                    ? `تنبيه مؤجل (${activeAlert.snoozeCount} / ${MAX_SNOOZES}) • ${activeAlert.triggeredAtHHMM}`
-                    : `حان موعد الدواء الآن • ${activeAlert.triggeredAtHHMM}`}
-                </span>
-                <h3 className="text-lg font-black text-white">{activeAlert.rem.drug_name}</h3>
-                <p className="text-xs text-slate-300">{activeAlert.rem.dose}</p>
-              </div>
-            </div>
-
-            {isAlarmPlaying && (
-              <button
-                type="button"
-                onClick={stopAlarmSound}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-bold cursor-pointer shrink-0"
-              >
-                <VolumeX className="w-3.5 h-3.5 text-rose-400" />
-                <span>كتم الصوت</span>
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() =>
-                handleConfirmDoseGiven(
-                  activeAlert.rem.id,
-                  activeAlert.scheduledTime,
-                  activeAlert.rem.drug_name
-                )
-              }
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/25 cursor-pointer transition-all"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>تم إعطاء الدواء</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={activeAlert.snoozeCount >= MAX_SNOOZES}
-              onClick={handleSnoozeDose}
-              className="flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-amber-200 border border-amber-500/50 font-bold text-sm cursor-pointer transition-all"
-            >
-              <Clock className="w-4 h-4 text-amber-300" />
-              <span>
-                {activeAlert.snoozeCount >= MAX_SNOOZES
-                  ? `انتهت محاولات التأجيل (${MAX_SNOOZES}/${MAX_SNOOZES})`
-                  : `تأجيل 30 دقيقة (المتبقي ${MAX_SNOOZES - activeAlert.snoozeCount})`}
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
 
       {msgNotice && (
         <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 text-amber-200 text-xs flex items-center justify-between gap-2">
@@ -756,7 +452,7 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
         <button
           id="btn-open-add-reminder"
           onClick={() => {
-            ensureAudioContext();
+            unlockAlarmAudio();
             if (showAddForm) {
               resetForm();
             } else {
@@ -1113,8 +809,8 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
         )}
       </div>
 
-      {/* Reminder Settings Card (Moved to Bottom) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+      {/* Reminder Settings Card (Bottom) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-teal-400 text-xs font-bold mb-1">
@@ -1123,7 +819,7 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
             </div>
             <h2 className="text-base md:text-lg font-bold text-white">جدولة أوقات الجرعات وتأكيد تناول الدواء</h2>
             <p className="text-slate-400 text-xs mt-1">
-              يُحفظ جدولك محلياً وفي تليجرام مع رنين ممتد (حتى 30 ثانية) وخيار التأجيل 30 دقيقة حتى 3 مرات.
+              رنين صوتي ممتد (30 ثانية) مع التقاط تلقائي إذا استيقظ الهاتف خلال 30 دقيقة من الموعد، وخيارات التثبيت أو التأجيل.
             </p>
           </div>
 
@@ -1145,22 +841,22 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
             <button
               type="button"
               id="btn-test-sound-alarm"
-              onClick={() => {
-                if (isAlarmPlaying) {
-                  stopAlarmSound();
-                  setMsgNotice('🔇 تم إيقاف صوت الفحص التجريبي.');
-                  setTimeout(() => setMsgNotice(null), 2500);
-                } else {
-                  startMedicalAlarmLoop(7000);
-                  setMsgNotice('🔊 تم تشغيل صوت التنبيه الطبي المطوّل (7 ثوانٍ للفحص — وعند الجرعة يستمر حتى 30 ثانية)!');
-                  setTimeout(() => setMsgNotice(null), 5000);
-                }
-              }}
+              onClick={handleTestSoundToggle}
               className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/40 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
               title="تجربة صوت جرس التنبيه الطبي المطول الآن"
             >
-              {isAlarmPlaying ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-teal-400" />}
-              <span>{isAlarmPlaying ? 'إيقاف الصوت 🔇' : 'فحص الصوت 🔔'}</span>
+              {isTestingSound ? <VolumeX className="w-4 h-4 text-rose-400" /> : <Volume2 className="w-4 h-4 text-teal-400" />}
+              <span>{isTestingSound ? 'إيقاف الصوت 🔇' : 'فحص الصوت 🔔'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTestFullAlertModal}
+              className="flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
+              title="تجربة نافذة التنبيه وخيارات تم الإعطاء والتأجيل"
+            >
+              <AlarmClock className="w-4 h-4 text-emerald-400" />
+              <span>تجربة التنبيه</span>
             </button>
           </div>
         </div>
