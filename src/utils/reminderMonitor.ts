@@ -253,3 +253,130 @@ export function findNextDueAlert(): { alert: ActiveDoseAlert; stamp: string } | 
 
   return null;
 }
+
+export async function showSystemDoseNotification(
+  title: string,
+  body: string,
+  alertData?: {
+    remId?: string;
+    scheduledTime?: string;
+    slotKey?: string;
+    snoozeCount?: number;
+    drugName?: string;
+    withActions?: boolean;
+  }
+): Promise<boolean> {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false;
+  if (Notification.permission !== 'granted') return false;
+
+  const options: NotificationOptions & {
+    renotify?: boolean;
+    vibrate?: number[];
+    actions?: Array<{ action: string; title: string }>;
+  } = {
+    body,
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    tag: alertData?.slotKey ? `dose-${alertData.slotKey}` : 'dose-reminder',
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [400, 150, 400, 150, 600],
+    data: {
+      remId: alertData?.remId || '',
+      scheduledTime: alertData?.scheduledTime || '',
+      slotKey: alertData?.slotKey || '',
+      snoozeCount: alertData?.snoozeCount ?? 0,
+      drugName: alertData?.drugName || '',
+    },
+  };
+
+  if (alertData?.withActions !== false) {
+    options.actions = [
+      { action: 'taken', title: '✅ تم إعطاء الدواء' },
+      { action: 'snooze', title: '⏰ تأجيل 30 دقيقة' },
+    ];
+  }
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready;
+      if (reg && typeof reg.showNotification === 'function') {
+        await reg.showNotification(title, options);
+        return true;
+      }
+    }
+  } catch {}
+
+  try {
+    new Notification(title, { body, icon: '/pwa-192x192.png' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function downloadReminderIcs(rem: MedicationReminder): void {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const formatIcsDate = (d: Date) =>
+    `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+
+  const escapeText = (s: string) =>
+    (s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+
+  const events = rem.times
+    .map((hhmm, idx) => {
+      const [hStr, mStr] = hhmm.split(':');
+      const h = parseInt(hStr, 10) || 8;
+      const m = parseInt(mStr, 10) || 0;
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+      if (start.getTime() < now.getTime()) {
+        start.setDate(start.getDate() + 1);
+      }
+      const end = new Date(start.getTime() + 5 * 60 * 1000);
+      const summary = escapeText(`موعد دواء: ${rem.drug_name}`);
+      const desc = escapeText(`${rem.dose}${rem.notes ? ' - ' + rem.notes : ''}`);
+
+      return [
+        'BEGIN:VEVENT',
+        `UID:${rem.id}-${idx}@dose.app`,
+        `DTSTAMP:${formatIcsDate(now)}`,
+        `DTSTART:${formatIcsDate(start)}`,
+        `DTEND:${formatIcsDate(end)}`,
+        'RRULE:FREQ=DAILY',
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${desc}`,
+        'BEGIN:VALARM',
+        'TRIGGER:PT0M',
+        'ACTION:DISPLAY',
+        `DESCRIPTION:${summary}`,
+        'END:VALARM',
+        'END:VEVENT',
+      ].join('\r\n');
+    })
+    .join('\r\n');
+
+  const icsContent = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Dose Medical Platform//Medication Reminders//AR',
+    'CALSCALE:GREGORIAN',
+    events,
+    'END:VCALENDAR',
+  ].join('\r\n');
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `dose-${rem.id}.ics`;
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => {
+    try {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {}
+  }, 1500);
+}
+

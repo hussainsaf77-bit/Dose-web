@@ -27,6 +27,7 @@ import {
   ChevronRight,
   Microscope
 } from 'lucide-react';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export type ActiveTabType =
   | 'home'
@@ -187,6 +188,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="hidden sm:inline">بوت تليجرام</span>
               </a>
 
+              {/* PWA Install Button (Desktop) */}
+              <div className="hidden lg:flex items-center">
+                <PWAInstallButton variant="compact" />
+              </div>
+
               {/* Plans */}
               <button
                 id="header-plans-btn"
@@ -320,6 +326,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Drawer Footer */}
             <div className="p-3 border-t border-slate-800/80 bg-slate-900/40 space-y-2">
+              <div className="flex flex-col">
+                <PWAInstallButton variant="full" />
+              </div>
               <button
                 onClick={() => {
                   setActiveTab('plans');

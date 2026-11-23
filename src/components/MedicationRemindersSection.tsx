@@ -12,11 +12,13 @@ import {
   Edit3,
   Check,
   Calendar,
+  CalendarPlus,
   Settings,
   AlarmClock
 } from 'lucide-react';
 import { MedicationReminder, SubscriptionTier } from '../types';
 import { getApiUrl } from '../utils/apiConfig';
+import { PWAInstallButton } from './PWAInstallButton';
 import { startAlarmRing, stopAlarmRing, unlockAlarmAudio } from '../utils/alarmAudio';
 import {
   MAX_SNOOZES,
@@ -26,6 +28,7 @@ import {
   STORAGE_TAKEN_KEY,
   SnoozeEntry,
   TEST_ALARM_EVENT,
+  downloadReminderIcs,
   emitRemindersUpdated,
   formatHHMM,
   getTodayDateKey,
@@ -34,6 +37,7 @@ import {
   loadSnoozesFromStorage,
   loadTakenMapFromStorage,
   markDoseGivenInStorage,
+  showSystemDoseNotification,
 } from '../utils/reminderMonitor';
 
 interface MedicationRemindersSectionProps {
@@ -166,10 +170,12 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
       const perm = await Notification.requestPermission();
       setNotificationPerm(perm);
       if (perm === 'granted') {
-        setMsgNotice('✅ تم تفعيل إشعارات المتصفح بنجاح! ستصلك التنبيهات في موعد كل جرعة.');
-        new Notification('منصة جرعة الطبية', {
-          body: 'تم تفعيل تذكيرات الدواء بنجاح ✅',
-        });
+        setMsgNotice('✅ تم تفعيل إشعارات المتصفح بنجاح! ستصلك التنبيهات بنغمة الإشعار عند كل جرعة.');
+        await showSystemDoseNotification(
+          'منصة جرعة الطبية',
+          'تم تفعيل تذكيرات الدواء بنجاح — ستظهر أزرار تم الإعطاء والتأجيل مع التنبيه ✅',
+          { withActions: false }
+        );
       } else {
         setMsgNotice('لم يتم السماح بإشعارات المتصفح. يمكنك تفعيلها من إعدادات المتصفح.');
       }
@@ -772,7 +778,21 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 self-end sm:self-center">
+                <div className="flex flex-wrap items-center gap-2 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadReminderIcs(rem);
+                      setMsgNotice(`📅 تم تجهيز ملف منبه التقويم لدواء «${rem.drug_name}» — افتحه لحفظه في تقويم الهاتف للرنين الدائم.`);
+                      setTimeout(() => setMsgNotice(null), 5000);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-300 border border-sky-500/30 text-[11px] font-semibold transition-colors cursor-pointer"
+                    title="إضافة لتقويم الهاتف للرنين الدائم حتى عند إغلاق المتصفح"
+                  >
+                    <CalendarPlus className="w-3.5 h-3.5" />
+                    <span>منبه التقويم</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleStartEdit(rem)}
@@ -824,6 +844,8 @@ export const MedicationRemindersSection: React.FC<MedicationRemindersSectionProp
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <PWAInstallButton variant="full" />
+
             <button
               type="button"
               onClick={handleRequestNotifications}

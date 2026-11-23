@@ -26,6 +26,7 @@ import { getApiUrl } from './utils/apiConfig';
 import { MainFeaturesGrid } from './components/MainFeaturesGrid';
 import { ZipExportView } from './components/ZipExportView';
 import { DoseAlarmOverlay } from './components/DoseAlarmOverlay';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { CheckCircle2, Pill, ArrowLeft, ArrowRight } from 'lucide-react';
 
 const resolveTab = (h: string): ActiveTabType => {
@@ -570,6 +571,8 @@ export default function App() {
       />
       {/* Global Medication Dose Alarm Overlay */}
       <DoseAlarmOverlay onActionNotice={(msg) => showToast(msg)} />
+      {/* PWA Offline Indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

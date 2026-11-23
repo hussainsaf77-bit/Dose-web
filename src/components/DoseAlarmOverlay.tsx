@@ -8,8 +8,11 @@ import {
   findNextDueAlert,
   formatHHMM,
   getTodayDateKey,
+  loadRemindersFromStorage,
+  loadSnoozesFromStorage,
   markDoseGivenInStorage,
   recordTriggeredStamp,
+  showSystemDoseNotification,
   snoozeDose30MinInStorage,
 } from '../utils/reminderMonitor';
 import { startAlarmRing, stopAlarmRing, unlockAlarmAudio } from '../utils/alarmAudio';
@@ -38,18 +41,19 @@ export const DoseAlarmOverlay: React.FC<DoseAlarmOverlayProps> = ({ onActionNoti
       setAutoplayBlocked(true);
     }
 
-    if (
-      !alert.isTest &&
-      typeof window !== 'undefined' &&
-      'Notification' in window &&
-      Notification.permission === 'granted'
-    ) {
-      try {
-        new Notification(
-          alert.snoozeCount > 0 ? 'جرعة — تذكير الدواء (مؤجل)' : 'جرعة — حان موعد الدواء!',
-          { body: `${alert.rem.drug_name}: ${alert.rem.dose}` }
-        );
-      } catch {}
+    if (!alert.isTest) {
+      await showSystemDoseNotification(
+        alert.snoozeCount > 0 ? 'جرعة — تذكير الدواء (مؤجل)' : 'جرعة — حان موعد الدواء!',
+        `${alert.rem.drug_name}: ${alert.rem.dose}`,
+        {
+          remId: alert.rem.id,
+          scheduledTime: alert.scheduledTime,
+          slotKey: alert.slotKey,
+          snoozeCount: alert.snoozeCount,
+          drugName: alert.rem.drug_name,
+          withActions: true,
+        }
+      );
     }
   }, []);
 
@@ -63,11 +67,76 @@ export const DoseAlarmOverlay: React.FC<DoseAlarmOverlayProps> = ({ onActionNoti
     triggerAlertWithSound(due.alert);
   }, [triggerAlertWithSound]);
 
+  const handleNotificationPayload = useCallback(
+    (payload: { action?: string; remId?: string; scheduledTime?: string; drugName?: string }) => {
+      if (!payload.remId || !payload.scheduledTime) return;
+      stopAlarmRing();
+      setIsRinging(false);
+      setAutoplayBlocked(false);
+
+      if (payload.action === 'taken') {
+        markDoseGivenInStorage(payload.remId, payload.scheduledTime);
+        setActiveAlert(null);
+        onActionNotice?.(`✅ تم تأكيد إعطاء الدواء: ${payload.drugName || ''}`.trim());
+        return;
+      }
+
+      if (payload.action === 'snooze') {
+        const rems = loadRemindersFromStorage();
+        const rem = rems.find(r => r.id === payload.remId);
+        if (!rem) return;
+        const slotKey = `${rem.id}_${payload.scheduledTime}`;
+        const existing = loadSnoozesFromStorage()[slotKey];
+        const count = existing ? existing.snoozeCount : 0;
+        if (count < MAX_SNOOZES) {
+          const entry = snoozeDose30MinInStorage({
+            rem,
+            scheduledTime: payload.scheduledTime,
+            slotKey,
+            snoozeCount: count,
+            triggeredAtHHMM: formatHHMM(new Date()),
+          });
+          setActiveAlert(null);
+          if (entry) {
+            onActionNotice?.(
+              `⏰ تم تأجيل «${rem.drug_name}» 30 دقيقة (سيرن عند ${entry.nextRingHHMM} — المتبقي ${MAX_SNOOZES - entry.snoozeCount} من ${MAX_SNOOZES})`
+            );
+          }
+        }
+      }
+    },
+    [onActionNotice]
+  );
+
   useEffect(() => {
     const handleFirstTap = () => {
       unlockAlarmAudio();
     };
     window.addEventListener('pointerdown', handleFirstTap, { once: true });
+
+    // Check URL hash query if launched from notification click
+    try {
+      const hash = window.location.hash || '';
+      const qIdx = hash.indexOf('?');
+      if (qIdx !== -1) {
+        const params = new URLSearchParams(hash.slice(qIdx + 1));
+        const notifAction = params.get('notif_action');
+        const remId = params.get('rem_id');
+        const sched = params.get('sched');
+        if (notifAction && remId && sched) {
+          handleNotificationPayload({ action: notifAction, remId, scheduledTime: sched });
+        }
+      }
+    } catch {}
+
+    const handleSwMessage = (ev: MessageEvent) => {
+      if (ev.data && ev.data.type === 'DOSE_NOTIFICATION_ACTION') {
+        handleNotificationPayload(ev.data);
+      }
+    };
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
 
     checkAndTrigger();
     const intervalId = window.setInterval(checkAndTrigger, 5000);
@@ -107,12 +176,15 @@ export const DoseAlarmOverlay: React.FC<DoseAlarmOverlayProps> = ({ onActionNoti
 
     return () => {
       window.removeEventListener('pointerdown', handleFirstTap);
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
       window.clearInterval(intervalId);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener(REMINDERS_UPDATED_EVENT, checkAndTrigger);
       window.removeEventListener(TEST_ALARM_EVENT, handleTestAlarm);
     };
-  }, [checkAndTrigger, triggerAlertWithSound]);
+  }, [checkAndTrigger, triggerAlertWithSound, handleNotificationPayload]);
 
   useEffect(() => {
     if (!isRinging) return;
