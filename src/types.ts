@@ -213,14 +213,47 @@ export interface PatientClinicalNote {
   note: string;
 }
 
+export type PatientDocCategory =
+  | 'prescription'
+  | 'xray'
+  | 'lab'
+  | 'report'
+  | 'ecg'
+  | 'discharge'
+  | 'vaccination'
+  | 'other';
+
 export interface PatientMedicalDoc {
   id: string;
   title: string;
-  category: 'xray' | 'lab' | 'report';
+  category: PatientDocCategory;
   date: string;
   imageUrl?: string;
+  fileName?: string;
   summary: string;
   status: 'normal' | 'abnormal' | 'review';
+}
+
+export type SugarTiming = 'fasting' | 'before_meal' | 'post_meal_2h' | 'bedtime' | 'random';
+
+export interface PatientSugarEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  value: number; // mg/dL
+  timing: SugarTiming;
+  note?: string;
+}
+
+export interface PatientBpEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  systolic: number; // mmHg
+  diastolic: number; // mmHg
+  pulse?: number; // bpm
+  arm?: 'left' | 'right';
+  note?: string;
 }
 
 export interface PatientProfile {
@@ -240,6 +273,8 @@ export interface PatientProfile {
   currentMedications: string;
   prescriptions?: PatientPrescription[];
   vitalSignsHistory?: PatientVitalEntry[];
+  sugarLogs?: PatientSugarEntry[];
+  bpLogs?: PatientBpEntry[];
   clinicalNotes?: PatientClinicalNote[];
   documents?: PatientMedicalDoc[];
   notes: string;
