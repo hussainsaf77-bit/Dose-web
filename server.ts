@@ -7,6 +7,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { analyzeAllMedications } from "./src/data/clinicalInteractionEngine";
 import { synthesizeDrugMonograph } from "./src/data/universalDrugDirectory";
+import { checkDoseDatabaseHealth } from "./api/_lib/supabase.js";
 
 interface StoredUser {
   id: string;
@@ -442,6 +443,33 @@ app.get("/api/health", (req, res) => {
     environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString(),
   });
+});
+
+// 1b. Unified Supabase DB status check
+app.get("/api/system/db-status", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    const status = await checkDoseDatabaseHealth();
+    return res.status(status.ok ? 200 : 503).json(status);
+  } catch {
+    return res.status(500).json({
+      ok: false,
+      configured: false,
+      tablesReady: false,
+      plansCount: 0,
+      messageAr: "تعذر فحص الاتصال بقاعدة البيانات.",
+    });
+  }
+});
+
+// 1c. Read-only SQL schema download for Supabase setup
+app.get("/api/system/schema-sql", (req, res) => {
+  const schemaPath = path.join(process.cwd(), "supabase_schema.sql");
+  if (fs.existsSync(schemaPath)) {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    return res.sendFile(schemaPath);
+  }
+  return res.status(404).send("-- supabase_schema.sql not found");
 });
 
 // 2. System Configuration info
