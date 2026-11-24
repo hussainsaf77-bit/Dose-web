@@ -48,6 +48,7 @@ export default defineConfig(() => {
         },
         workbox: {
           maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
+          navigateFallbackDenylist: [/^\/api\//, /^\/bot\.py$/, /^\/supabase_schema\.sql$/],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           globIgnores: [
             '**/dose_update_new*',

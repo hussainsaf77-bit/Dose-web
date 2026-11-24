@@ -25,6 +25,7 @@ import { Language } from './utils/translations';
 import { getApiUrl } from './utils/apiConfig';
 import { MainFeaturesGrid } from './components/MainFeaturesGrid';
 import { ZipExportView } from './components/ZipExportView';
+import { DbStatusView } from './components/DbStatusView';
 import { DoseAlarmOverlay } from './components/DoseAlarmOverlay';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { CheckCircle2, Pill, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -140,11 +141,15 @@ export default function App() {
   const [isExportZip, setIsExportZip] = useState<boolean>(() => {
     return typeof window !== 'undefined' && window.location.hash.toLowerCase().startsWith('#export-zip');
   });
+  const [isDbStatus, setIsDbStatus] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.location.hash.toLowerCase().startsWith('#db-status');
+  });
 
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash || '';
       setIsExportZip(hash.toLowerCase().startsWith('#export-zip'));
+      setIsDbStatus(hash.toLowerCase().startsWith('#db-status'));
       if (hash) {
         setActiveTab(resolveTab(hash));
       }
@@ -317,6 +322,10 @@ export default function App() {
 
   if (isExportZip) {
     return <ZipExportView />;
+  }
+
+  if (isDbStatus) {
+    return <DbStatusView />;
   }
 
   if (!currentUser) {
